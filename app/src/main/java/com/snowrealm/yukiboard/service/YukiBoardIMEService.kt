@@ -17,6 +17,12 @@ import com.snowrealm.yukiboard.sensor.AppModeDetector
 import com.snowrealm.yukiboard.sensor.CursorDirection
 import com.snowrealm.yukiboard.sensor.GyroscopeCursorController
 import com.snowrealm.yukiboard.sensor.ShakeDetector
+import com.snowrealm.yukiboard.remote.BluetoothHidKeyboard
+import com.snowrealm.yukiboard.remote.ConnectionState
+import com.snowrealm.yukiboard.remote.KeyAction
+import com.snowrealm.yukiboard.remote.RemoteKeyEvent
+import com.snowrealm.yukiboard.remote.RemoteKeyboardService
+import com.snowrealm.yukiboard.remote.WifiKeyboardServer
 import com.snowrealm.yukiboard.speech.AndroidSpeechEngine
 import com.snowrealm.yukiboard.speech.SpeechInputEngine
 import com.snowrealm.yukiboard.theme.KeyboardTheme
@@ -61,6 +67,11 @@ class YukiBoardIMEService : InputMethodService() {
 
     // 語音輸入
     private var speechEngine: SpeechInputEngine? = null
+
+    // 遠端鍵盤
+    private var btKeyboard: BluetoothHidKeyboard? = null
+    private var wifiServer: WifiKeyboardServer? = null
+    private var remotePanel: RemoteKeyboardPanelView? = null
 
     // 鍵盤尺寸調整 + 懸浮
     private var resizeHandle: KeyboardResizeHandle? = null
@@ -257,6 +268,8 @@ class YukiBoardIMEService : InputMethodService() {
         gyroController.unregister()
         gameLoop?.stop()
         speechEngine?.destroy()
+        btKeyboard?.destroy()
+        wifiServer?.destroy()
     }
 
     // =========================================================================
@@ -346,6 +359,18 @@ class YukiBoardIMEService : InputMethodService() {
                     // MVP: 插入貼圖名稱（完整實作需 commitContent + FileProvider）
                     currentInputConnection?.commitText("[${sticker.name}]", 1)
                 }
+                p
+            }
+            PanelType.REMOTE -> {
+                val p = RemoteKeyboardPanelView(this).also { remotePanel = it }
+                p.theme = theme
+                p.btState = btKeyboard?.connectionState ?: ConnectionState.IDLE
+                p.wifiState = wifiServer?.connectionState ?: ConnectionState.IDLE
+                p.wifiUrl = wifiServer?.getConnectionUrl() ?: ""
+                p.connectedDeviceName = btKeyboard?.connectedDevice?.name
+                    ?: wifiServer?.connectedDevice?.name ?: ""
+                p.onBluetoothToggle = { toggleBluetooth() }
+                p.onWifiToggle = { toggleWifi() }
                 p
             }
             PanelType.THEME -> {
@@ -522,6 +547,96 @@ class YukiBoardIMEService : InputMethodService() {
         }
 
         return outerFrame
+    }
+
+    // =========================================================================
+    // 遠端鍵盤（藍牙 + WiFi）
+    // =========================================================================
+
+    private fun toggleBluetooth() {
+        val bt = btKeyboard
+        if (bt != null && bt.connectionState != ConnectionState.IDLE) {
+            bt.stop()
+            updateRemotePanelState()
+            return
+        }
+
+        val newBt = BluetoothHidKeyboard(applicationContext).also { btKeyboard = it }
+        newBt.setOnStateChangedListener { state ->
+            updateRemotePanelState()
+        }
+        newBt.setOnRemoteKeyListener { event ->
+            // 收到遠端按鍵 → 注入本地 InputConnection
+            handleRemoteKeyEvent(event)
+        }
+        newBt.setOnRemoteTextListener { text ->
+            currentInputConnection?.commitText(text, 1)
+        }
+        newBt.start()
+        updateRemotePanelState()
+    }
+
+    private fun toggleWifi() {
+        val wifi = wifiServer
+        if (wifi != null && wifi.connectionState != ConnectionState.IDLE) {
+            wifi.stop()
+            updateRemotePanelState()
+            return
+        }
+
+        val newWifi = WifiKeyboardServer(applicationContext).also { wifiServer = it }
+        newWifi.setOnStateChangedListener { state ->
+            updateRemotePanelState()
+        }
+        newWifi.setOnRemoteKeyListener { event ->
+            handleRemoteKeyEvent(event)
+        }
+        newWifi.setOnRemoteTextListener { text ->
+            currentInputConnection?.commitText(text, 1)
+        }
+        newWifi.start()
+        updateRemotePanelState()
+    }
+
+    private fun updateRemotePanelState() {
+        remotePanel?.apply {
+            btState = btKeyboard?.connectionState ?: ConnectionState.IDLE
+            wifiState = wifiServer?.connectionState ?: ConnectionState.IDLE
+            wifiUrl = wifiServer?.getConnectionUrl() ?: ""
+            connectedDeviceName = btKeyboard?.connectedDevice?.name
+                ?: wifiServer?.connectedDevice?.name ?: ""
+            invalidate()
+        }
+    }
+
+    /**
+     * 將本地按鍵同時轉發到遠端裝置（手機→電腦）。
+     */
+    private fun forwardKeyToRemote(keyCode: Int, modifiers: Int = 0) {
+        val event = RemoteKeyEvent(keyCode, KeyAction.PRESS, modifiers)
+        btKeyboard?.takeIf { it.connectionState == ConnectionState.CONNECTED }?.sendKeyEvent(event)
+        wifiServer?.takeIf { it.connectionState == ConnectionState.CONNECTED }?.sendKeyEvent(event)
+    }
+
+    /**
+     * 將本地 commit 的文字同時轉發到遠端裝置。
+     */
+    private fun forwardTextToRemote(text: String) {
+        btKeyboard?.takeIf { it.connectionState == ConnectionState.CONNECTED }?.sendText(text)
+        wifiServer?.takeIf { it.connectionState == ConnectionState.CONNECTED }?.sendText(text)
+    }
+
+    /**
+     * 處理從遠端收到的按鍵事件（電腦→手機）。
+     */
+    private fun handleRemoteKeyEvent(event: RemoteKeyEvent) {
+        val ic = currentInputConnection ?: return
+        if (event.character != null) {
+            ic.commitText(event.character.toString(), 1)
+        } else {
+            val meta = event.modifiers
+            sendKey(ic, event.keyCode, meta)
+        }
     }
 
     // =========================================================================
@@ -844,6 +959,7 @@ class YukiBoardIMEService : InputMethodService() {
                 ic.finishComposingText()
                 ic.commitText(result.text, 1)
                 characterView?.playHappy()
+                forwardTextToRemote(result.text)
             }
             is InputResult.ComposingUpdated -> ic.setComposingText(result.composing, 1)
             is InputResult.ComposingCleared -> ic.finishComposingText()

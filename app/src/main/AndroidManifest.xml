@@ -7,8 +7,16 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- 感測器（搖手機復原 + 陀螺儀游標） -->
     <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
-    <!-- 網路（主題雲端同步預留） -->
+    <!-- 網路（WiFi 遠端鍵盤 + 主題雲端同步） -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 藍牙 HID 鍵盤 -->
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
 
     <!-- OpenGL ES 2.0 需求宣告 -->
     <uses-feature

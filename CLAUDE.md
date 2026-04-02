@@ -119,6 +119,10 @@ MVVM + Clean Architecture
 | `game/WhackAMoleGame.kt` | 打地鼠遊戲 |
 | `game/RhythmGame.kt` | 節奏遊戲 |
 | `game/TypingChallengeGame.kt` | 打字挑戰遊戲 |
+| `remote/RemoteKeyboardService.kt` | 遠端鍵盤介面 + 共用資料模型 |
+| `remote/BluetoothHidKeyboard.kt` | 藍牙 HID 鍵盤實作 |
+| `remote/WifiKeyboardServer.kt` | WiFi WebSocket Server + 內建控制網頁 |
+| `ui/panel/RemoteKeyboardPanelView.kt` | 遠端鍵盤控制面板 |
 | `game/GameMenuView.kt` | 遊戲選單（2x2 卡片） |
 | `game/GameKeyboardView.kt` | 遊戲鍵盤渲染 |
 | `res/xml/method.xml` | IME subtype 宣告（系統讀取） |
@@ -175,6 +179,9 @@ MVVM + Clean Architecture
 - [x] 鍵盤高度調整（拖曳把手，25%~55% 螢幕高度）
 - [x] 鍵盤寬度調整（50%~100% 螢幕寬度）
 - [x] 懸浮鍵盤模式（可拖動 + 固定/關閉按鈕）
+- [x] 藍牙 HID 鍵盤（BluetoothHidDevice API，完整 HID report descriptor）
+- [x] WiFi WebSocket 鍵盤（內建 HTTP/WebSocket Server + 控制網頁）
+- [x] 遠端鍵盤面板（藍牙/WiFi 啟動、狀態顯示、URL 顯示）
 - [x] 遊戲模式（4 款遊戲 + HUD + 計分）
 - [x] 模式切換時角色表情反應
 - [x] 橫向模式佈局（左主鍵盤 + 右工具面板）
@@ -182,7 +189,6 @@ MVVM + Clean Architecture
 ## 待完成項目
 
 - [ ] libchewing JNI 整合：參考 `ChewingInputEngine.kt` 內的注釋
-- [ ] WiFi/藍牙遠端鍵盤功能（RemoteKeyboard 模組）
 - [ ] NextActionPredictor 接 SnowRealmClaw AI
 - [ ] GIF 引擎接 Giphy/Tenor API
 - [ ] 翻譯引擎接 MLKit 或 Google Translate
