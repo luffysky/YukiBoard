@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    鍵盤主佈局。
+    由 YukiBoardIMEService.onCreateInputView() 回傳。
+
+    層次結構（由下到上）：
+      1. KeyboardGLSurfaceView  ← OpenGL ES 流光特效（半透明覆蓋）
+      2. KeyboardView           ← 按鍵 Canvas 繪製
+      3. CharacterView          ← Lottie 角色動畫（鍵盤上方）
+
+    注意：GLSurfaceView 需要 setZOrderOnTop(true)，
+    並在程式碼中呼叫 holder.setFormat(PixelFormat.RGBA_8888) 才能透明疊加。
+-->
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <!-- 鍵盤主體容器（KeyboardView 在程式碼中動態加入，撐起實際高度） -->
+    <FrameLayout
+        android:id="@+id/keyboardContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true">
+
+        <!-- KeyboardView 由 Service 程式碼 addView 加入 -->
+
+        <!-- 流光 GL 覆蓋層（透明疊加在按鍵上方） -->
+        <com.snowrealm.yukiboard.animation.gles.KeyboardGLSurfaceView
+            android:id="@+id/glSurfaceView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@android:color/transparent" />
+
+    </FrameLayout>
+
+    <!-- 角色動畫區域（定位在鍵盤容器上方右側） -->
+    <com.snowrealm.yukiboard.ui.character.CharacterView
+        android:id="@+id/characterView"
+        android:layout_width="120dp"
+        android:layout_height="120dp"
+        android:layout_above="@id/keyboardContainer"
+        android:layout_alignParentEnd="true"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="-40dp"
+        android:elevation="4dp" />
+
+</RelativeLayout>

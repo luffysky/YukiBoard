@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.YukiBoard" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#FF4A90E2</item>
+        <item name="colorPrimaryVariant">#FF253050</item>
+        <item name="colorOnPrimary">#FFFFFFFF</item>
+        <item name="colorSecondary">#FF7FD8FF</item>
+        <item name="android:windowBackground">#FF1A2035</item>
+    </style>
+</resources>

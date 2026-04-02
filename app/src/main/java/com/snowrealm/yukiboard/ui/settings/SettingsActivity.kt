@@ -1,0 +1,272 @@
+package com.snowrealm.yukiboard.ui.settings
+
+import android.content.res.Configuration
+import android.os.Bundle
+import android.widget.LinearLayout
+import android.widget.RadioButton
+import android.widget.RadioGroup
+import android.widget.ScrollView
+import android.widget.SeekBar
+import android.widget.Switch
+import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
+import com.snowrealm.yukiboard.R
+import com.snowrealm.yukiboard.theme.ThemeManager
+import java.util.Locale
+
+class SettingsActivity : AppCompatActivity() {
+
+    private lateinit var themeManager: ThemeManager
+    private lateinit var prefs: YukiPreferences
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        themeManager = ThemeManager.getInstance(this)
+        prefs = YukiPreferences(this)
+
+        val scrollView = ScrollView(this).apply {
+            setBackgroundColor(0xFF1A2035.toInt())
+        }
+
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(32), dp(24), dp(24))
+        }
+
+        // ── 標題 ──
+        root.addView(TextView(this).apply {
+            text = getString(R.string.settings_title)
+            textSize = 24f
+            setTextColor(0xFFE8F4FF.toInt())
+            setPadding(0, 0, 0, dp(24))
+        })
+
+        // ══════════════════════════════════════════════════════════════
+        // 感測器功能
+        // ══════════════════════════════════════════════════════════════
+
+        root.addView(sectionTitle("感測器 / Sensors"))
+
+        // 搖手機復原
+        root.addView(switchRow("搖手機復原 / Shake to Undo",
+            "搖晃手機觸發復原（Ctrl+Z）",
+            prefs.shakeToUndoEnabled
+        ) { prefs.shakeToUndoEnabled = it })
+
+        // 陀螺儀游標
+        root.addView(switchRow("陀螺儀游標 / Gyro Cursor",
+            "長按空白鍵 + 傾斜手機控制游標",
+            prefs.gyroscopeCursorEnabled
+        ) { prefs.gyroscopeCursorEnabled = it })
+
+        // 陀螺儀靈敏度
+        root.addView(TextView(this).apply {
+            text = "陀螺儀靈敏度 / Gyro Sensitivity"
+            textSize = 13f
+            setTextColor(0xFFB0D4FF.toInt())
+            setPadding(dp(8), dp(8), 0, dp(4))
+        })
+
+        val sensitivityLabel = TextView(this).apply {
+            text = "%.1f".format(prefs.gyroscopeSensitivity)
+            textSize = 13f
+            setTextColor(0xFF7FD8FF.toInt())
+            setPadding(dp(8), 0, 0, dp(8))
+        }
+
+        root.addView(SeekBar(this).apply {
+            max = 25  // 0.5 ~ 3.0 → 0~25 steps (step = 0.1)
+            progress = ((prefs.gyroscopeSensitivity - 0.5f) * 10).toInt()
+            setPadding(dp(8), dp(4), dp(8), dp(4))
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                    val value = 0.5f + progress * 0.1f
+                    prefs.gyroscopeSensitivity = value
+                    sensitivityLabel.text = "%.1f".format(value)
+                }
+                override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+                override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+            })
+        })
+        root.addView(sensitivityLabel)
+
+        // App 自動偵測
+        root.addView(switchRow("App 自動切換模式 / Auto Mode Switch",
+            "偵測前景 App 自動切換設計者/開發者模式",
+            prefs.appAutoDetectEnabled
+        ) { prefs.appAutoDetectEnabled = it })
+
+        // 震動回饋
+        root.addView(switchRow("震動回饋 / Haptic Feedback",
+            "按鍵和模式切換時的震動回饋",
+            prefs.hapticFeedbackEnabled
+        ) { prefs.hapticFeedbackEnabled = it })
+
+        // Snippet
+        root.addView(switchRow("Snippet 展開 / Snippets",
+            "開發者模式：輸入縮寫 + Tab 自動展開",
+            prefs.snippetEnabled
+        ) { prefs.snippetEnabled = it })
+
+        root.addView(divider())
+
+        // ══════════════════════════════════════════════════════════════
+        // 主題切換
+        // ══════════════════════════════════════════════════════════════
+
+        root.addView(sectionTitle("主題 / Theme"))
+
+        val themeGroup = RadioGroup(this).apply {
+            orientation = RadioGroup.VERTICAL
+            setPadding(dp(8), dp(4), 0, dp(16))
+        }
+
+        val themes = themeManager.availableThemes
+        themes.forEach { theme ->
+            themeGroup.addView(RadioButton(this).apply {
+                id = theme.id.hashCode()
+                text = theme.displayName
+                setTextColor(0xFFB0D4FF.toInt())
+                isChecked = theme.id == themeManager.currentTheme.id
+            })
+        }
+
+        themeGroup.setOnCheckedChangeListener { _, checkedId ->
+            themes.firstOrNull { it.id.hashCode() == checkedId }?.let {
+                themeManager.currentTheme = it
+            }
+        }
+
+        root.addView(themeGroup)
+
+        // ── 深色/淺色模式 ──
+        root.addView(sectionTitle("外觀模式 / Appearance"))
+
+        val modeGroup = RadioGroup(this).apply {
+            orientation = RadioGroup.VERTICAL
+            setPadding(dp(8), dp(4), 0, dp(16))
+        }
+
+        val currentMode = AppCompatDelegate.getDefaultNightMode()
+
+        val modes = listOf(
+            Triple(1, "跟隨系統 / Follow System", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM),
+            Triple(2, "深色 / Dark", AppCompatDelegate.MODE_NIGHT_YES),
+            Triple(3, "淺色 / Light", AppCompatDelegate.MODE_NIGHT_NO)
+        )
+
+        modes.forEach { (id, label, mode) ->
+            modeGroup.addView(RadioButton(this).apply {
+                this.id = id
+                text = label
+                setTextColor(0xFFB0D4FF.toInt())
+                isChecked = currentMode == mode
+            })
+        }
+
+        modeGroup.setOnCheckedChangeListener { _, checkedId ->
+            modes.firstOrNull { it.first == checkedId }?.let {
+                AppCompatDelegate.setDefaultNightMode(it.third)
+            }
+        }
+
+        root.addView(modeGroup)
+
+        // ── 語言設定 ──
+        root.addView(sectionTitle("語言 / Language"))
+
+        val langGroup = RadioGroup(this).apply {
+            orientation = RadioGroup.VERTICAL
+            setPadding(dp(8), dp(4), 0, dp(16))
+        }
+
+        val currentLang = resources.configuration.locales[0].language
+
+        val langs = listOf(
+            Triple(10, "繁體中文", "zh"),
+            Triple(11, "English", "en")
+        )
+
+        langs.forEach { (id, label, lang) ->
+            langGroup.addView(RadioButton(this).apply {
+                this.id = id
+                text = label
+                setTextColor(0xFFB0D4FF.toInt())
+                isChecked = currentLang == lang
+            })
+        }
+
+        langGroup.setOnCheckedChangeListener { _, checkedId ->
+            langs.firstOrNull { it.first == checkedId }?.let { (_, _, lang) ->
+                val locale = Locale(lang)
+                Locale.setDefault(locale)
+                val config = Configuration(resources.configuration)
+                config.setLocale(locale)
+                @Suppress("DEPRECATION")
+                resources.updateConfiguration(config, resources.displayMetrics)
+                recreate()
+            }
+        }
+
+        root.addView(langGroup)
+
+        scrollView.addView(root)
+        setContentView(scrollView)
+    }
+
+    // ── UI 工具 ──
+
+    private fun sectionTitle(text: String): TextView = TextView(this).apply {
+        this.text = text
+        textSize = 16f
+        setTextColor(0xFF7FD8FF.toInt())
+        setPadding(0, dp(8), 0, dp(4))
+    }
+
+    @Suppress("UseSwitchCompatOrMaterialCode")
+    private fun switchRow(
+        title: String,
+        subtitle: String,
+        initialValue: Boolean,
+        onChanged: (Boolean) -> Unit
+    ): LinearLayout {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+
+            val textContainer = LinearLayout(this@SettingsActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            textContainer.addView(TextView(this@SettingsActivity).apply {
+                text = title
+                textSize = 14f
+                setTextColor(0xFFE8F4FF.toInt())
+            })
+            textContainer.addView(TextView(this@SettingsActivity).apply {
+                text = subtitle
+                textSize = 11f
+                setTextColor(0xFF6688AA.toInt())
+            })
+            addView(textContainer)
+
+            addView(Switch(this@SettingsActivity).apply {
+                isChecked = initialValue
+                setOnCheckedChangeListener { _, checked -> onChanged(checked) }
+            })
+        }
+    }
+
+    private fun divider(): android.view.View = android.view.View(this).apply {
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(1)
+        ).apply { setMargins(0, dp(12), 0, dp(4)) }
+        setBackgroundColor(0xFF2A3555.toInt())
+    }
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
+}
