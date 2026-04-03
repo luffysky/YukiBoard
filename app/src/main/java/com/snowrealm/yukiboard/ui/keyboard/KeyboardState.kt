@@ -127,12 +127,13 @@ data class KeyboardState(
             ),
             // 底行
             listOf(
-                KeyModel.special("Tab", KeyboardView.KEYCODE_TAB, widthWeight = 1.2f),
+                KeyModel.special("⌨返回", KeyboardView.KEYCODE_BACK_NORMAL, widthWeight = 1.5f),
+                KeyModel.special("Tab", KeyboardView.KEYCODE_TAB, widthWeight = 1.0f),
                 KeyModel.special("←", KeyboardView.KEYCODE_ARROW_LEFT),
                 KeyModel.special("→", KeyboardView.KEYCODE_ARROW_RIGHT),
                 KeyModel.special("↑", KeyboardView.KEYCODE_ARROW_UP),
                 KeyModel.special("↓", KeyboardView.KEYCODE_ARROW_DOWN),
-                KeyModel.special(" ", KeyboardView.KEYCODE_SPACE, widthWeight = 2.5f),
+                KeyModel.special(" ", KeyboardView.KEYCODE_SPACE, widthWeight = 2f),
                 KeyModel.special("↵", KeyboardView.KEYCODE_ENTER, widthWeight = 1.3f)
             )
         )
@@ -196,12 +197,13 @@ data class KeyboardState(
             ),
             // 底行
             listOf(
-                KeyModel.special("Tab", KeyboardView.KEYCODE_TAB, widthWeight = 1.2f),
+                KeyModel.special("⌨返回", KeyboardView.KEYCODE_BACK_NORMAL, widthWeight = 1.5f),
+                KeyModel.special("Tab", KeyboardView.KEYCODE_TAB, widthWeight = 1.0f),
                 KeyModel.special("←", KeyboardView.KEYCODE_ARROW_LEFT),
                 KeyModel.special("→", KeyboardView.KEYCODE_ARROW_RIGHT),
                 KeyModel.special("↑", KeyboardView.KEYCODE_ARROW_UP),
                 KeyModel.special("↓", KeyboardView.KEYCODE_ARROW_DOWN),
-                KeyModel.special(" ", KeyboardView.KEYCODE_SPACE, widthWeight = 2.5f),
+                KeyModel.special(" ", KeyboardView.KEYCODE_SPACE, widthWeight = 2f),
                 KeyModel.special("↵", KeyboardView.KEYCODE_ENTER, widthWeight = 1.2f)
             )
         )
@@ -245,6 +247,21 @@ data class KeyboardState(
                 KeyModel.special("↵", KeyboardView.KEYCODE_ENTER, widthWeight = 1.3f)
             )
         )
+
+        // =================================================================
+        // 遊戲模式（QWERTY + 返回鍵）
+        // =================================================================
+        fun gameRows(): List<List<KeyModel>> {
+            val rows = defaultQwertyRows().toMutableList()
+            // 替換最後一行（功能行），加入返回鍵
+            if (rows.size >= 2) {
+                val lastRow = rows.last().toMutableList()
+                // 在最前面加返回鍵
+                lastRow.add(0, KeyModel.special("⌨返回", KeyboardView.KEYCODE_BACK_NORMAL, widthWeight = 1.3f))
+                rows[rows.lastIndex] = lastRow
+            }
+            return rows
+        }
 
         // =================================================================
         // 橫向模式：側邊面板
@@ -427,12 +444,13 @@ data class KeyboardState(
                 KeyModel.special("⌫", KeyboardView.KEYCODE_DELETE, widthWeight = 1.5f)
             ),
             listOf(
+                KeyModel.special("⌨返回", KeyboardView.KEYCODE_BACK_NORMAL, widthWeight = 1.3f),
                 KeyModel.special("←", KeyboardView.KEYCODE_ARROW_LEFT),
                 KeyModel.special("↑", KeyboardView.KEYCODE_ARROW_UP),
                 KeyModel.special("↓", KeyboardView.KEYCODE_ARROW_DOWN),
                 KeyModel.special("→", KeyboardView.KEYCODE_ARROW_RIGHT),
-                KeyModel.special("Tab", KeyboardView.KEYCODE_TAB, widthWeight = 1.2f),
-                KeyModel.special(" ", KeyboardView.KEYCODE_SPACE, widthWeight = 2.5f),
+                KeyModel.special("Tab", KeyboardView.KEYCODE_TAB, widthWeight = 1.0f),
+                KeyModel.special(" ", KeyboardView.KEYCODE_SPACE, widthWeight = 2f),
                 KeyModel.special("↵", KeyboardView.KEYCODE_ENTER, widthWeight = 1.3f)
             )
         )
@@ -466,12 +484,13 @@ data class KeyboardState(
                 KeyModel.special("⌫", KeyboardView.KEYCODE_DELETE, widthWeight = 1.2f)
             ),
             listOf(
-                KeyModel.special("Tab", KeyboardView.KEYCODE_TAB, widthWeight = 1.2f),
+                KeyModel.special("⌨返回", KeyboardView.KEYCODE_BACK_NORMAL, widthWeight = 1.3f),
+                KeyModel.special("Tab", KeyboardView.KEYCODE_TAB, widthWeight = 1.0f),
                 KeyModel.special("←", KeyboardView.KEYCODE_ARROW_LEFT),
                 KeyModel.special("→", KeyboardView.KEYCODE_ARROW_RIGHT),
                 KeyModel.special("↑", KeyboardView.KEYCODE_ARROW_UP),
                 KeyModel.special("↓", KeyboardView.KEYCODE_ARROW_DOWN),
-                KeyModel.special(" ", KeyboardView.KEYCODE_SPACE, widthWeight = 3f),
+                KeyModel.special(" ", KeyboardView.KEYCODE_SPACE, widthWeight = 2.5f),
                 KeyModel.special("↵", KeyboardView.KEYCODE_ENTER, widthWeight = 1.3f)
             )
         )

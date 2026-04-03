@@ -98,6 +98,9 @@ class KeyboardView(context: Context) : View(context) {
         const val KEYCODE_DEV_DSLASH    = -313
         const val KEYCODE_DEV_COMMENT_BLOCK = -314
 
+        // 返回一般模式
+        const val KEYCODE_BACK_NORMAL = -400
+
         private const val LONG_PRESS_DELAY = 400L
         private const val CANDIDATE_BAR_MAX = 6
         private const val EXPAND_GRID_COLS = 5
@@ -411,7 +414,7 @@ class KeyboardView(context: Context) : View(context) {
         KeyboardMode.NORMAL -> KeyboardState.defaultQwertyRows()
         KeyboardMode.DESIGNER -> KeyboardState.designerRows()
         KeyboardMode.DEVELOPER -> KeyboardState.developerRows()
-        KeyboardMode.GAME -> KeyboardState.defaultQwertyRows() // 遊戲模式由 GameKeyboardView 接管
+        KeyboardMode.GAME -> KeyboardState.gameRows()
     }
 
     private fun getLandscapeLayout(mode: KeyboardMode): Pair<List<List<KeyModel>>, List<List<KeyModel>>> =
@@ -429,7 +432,7 @@ class KeyboardView(context: Context) : View(context) {
                 KeyboardState.landscapeDeveloperSidePanel()
             )
             KeyboardMode.GAME -> Pair(
-                KeyboardState.defaultQwertyRows(),
+                KeyboardState.gameRows(),
                 emptyList()
             )
         }
@@ -1005,6 +1008,7 @@ class KeyboardView(context: Context) : View(context) {
                 if (hit != null) {
                     val key = hit.second
                     when {
+                        key.code == KEYCODE_BACK_NORMAL -> switchMode(KeyboardMode.NORMAL)
                         key.code == KEYCODE_SHIFT -> toggleShift()
                         key.code == KEYCODE_CTRL -> toggleCtrl()
                         isCtrlActive && !key.isSpecial -> {
