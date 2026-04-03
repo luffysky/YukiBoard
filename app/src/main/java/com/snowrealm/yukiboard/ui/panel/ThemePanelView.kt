@@ -8,6 +8,7 @@ import android.graphics.RectF
 import android.view.MotionEvent
 import android.view.View
 import com.snowrealm.yukiboard.theme.KeyboardTheme
+import com.snowrealm.yukiboard.ui.settings.YukiPreferences
 
 /**
  * 主題瀏覽面板 — 在鍵盤內直接預覽和切換主題。
@@ -144,6 +145,8 @@ class ThemePanelView(context: Context) : View(context) {
                 val selected = availableThemes.getOrNull(hit.second)
                 if (selected != null) {
                     currentThemeId = selected.id
+                    // 選擇內建主題時關閉自訂背景
+                    YukiPreferences(context).useCustomBackground = false
                     onThemeSelected?.invoke(selected)
                     performClick()
                 }

@@ -7,6 +7,7 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.View
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
@@ -15,6 +16,7 @@ import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
+import kotlinx.coroutines.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import com.snowrealm.yukiboard.R
@@ -320,9 +322,72 @@ class SettingsActivity : AppCompatActivity() {
     // 背景卡片
     // ─────────────────────────────────────────────────────────
 
+    // 預覽用的 ImageView（需在 onActivityResult 更新）
+    private var bgPreviewImage: android.widget.ImageView? = null
+    private var bgPreviewOverlay: View? = null
+    private var bgPreviewLabel: TextView? = null
+
     private fun buildBackgroundCard(): LinearLayout {
         val card = simpleCard("鍵盤背景 / Background")
 
+        // ── 預覽區 ──
+        val previewContainer = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(140)
+            ).apply { setMargins(0, 0, 0, dp(8)) }
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xFF111827.toInt())
+                cornerRadius = dp(8).toFloat()
+            }
+            clipToOutline = true
+            outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: android.graphics.Outline) {
+                    outline.setRoundRect(0, 0, view.width, view.height, dp(8).toFloat())
+                }
+            }
+        }
+
+        val previewImg = android.widget.ImageView(this).apply {
+            scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        }
+        bgPreviewImage = previewImg
+        previewContainer.addView(previewImg)
+
+        // 遮罩覆蓋（模擬鍵盤上的效果）
+        val overlayView = View(this).apply {
+            setBackgroundColor(android.graphics.Color.argb(prefs.bgOverlayAlpha, 0, 0, 0))
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        }
+        bgPreviewOverlay = overlayView
+        previewContainer.addView(overlayView)
+
+        // 無圖提示文字
+        val label = TextView(this).apply {
+            text = "尚未設定背景"
+            setTextColor(0xFF6688AA.toInt())
+            textSize = 13f
+            gravity = android.view.Gravity.CENTER
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        }
+        bgPreviewLabel = label
+        previewContainer.addView(label)
+
+        // 載入現有背景預覽
+        refreshBgPreview()
+
+        card.addView(previewContainer)
+
+        // ── 按鈕列 ──
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(4), dp(4), dp(4), dp(8))
@@ -353,13 +418,215 @@ class SettingsActivity : AppCompatActivity() {
         row.addView(styledButton("清除", 0xFF1E2D4A.toInt(), 0xFFFF6B6B.toInt()) {
             val dir = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getBackgroundDir(this)
             dir.listFiles()?.forEach { it.delete() }
+            prefs.useCustomBackground = false
+            bgPreviewImage?.setImageBitmap(null)
+            bgPreviewLabel?.visibility = View.VISIBLE
             Toast.makeText(this, "已清除背景", Toast.LENGTH_SHORT).show()
         }.apply {
             layoutParams = LinearLayout.LayoutParams(0, dp(40), 0.7f).apply { marginStart = dp(4) }
         })
 
         card.addView(row)
+
+        // ── 遮罩透明度滑桿 ──
+        val alphaLabel = TextView(this).apply {
+            text = "遮罩深度: %d%%".format((prefs.bgOverlayAlpha * 100) / 255)
+            textSize = 12f
+            setTextColor(0xFF7FD8FF.toInt())
+            setPadding(dp(12), dp(8), 0, dp(4))
+        }
+        card.addView(alphaLabel)
+
+        card.addView(SeekBar(this).apply {
+            max = 255
+            progress = prefs.bgOverlayAlpha
+            setPadding(dp(12), dp(4), dp(12), dp(8))
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+                    prefs.bgOverlayAlpha = p
+                    alphaLabel.text = "遮罩深度: %d%%".format((p * 100) / 255)
+                    bgPreviewOverlay?.setBackgroundColor(android.graphics.Color.argb(p, 0, 0, 0))
+                }
+                override fun onStartTrackingTouch(sb: SeekBar?) {}
+                override fun onStopTrackingTouch(sb: SeekBar?) {}
+            })
+        })
+
+        // ── 字體顏色 ──
+        card.addView(buildKeyLabelColorPicker())
+
         return card
+    }
+
+    private fun refreshBgPreview() {
+        val savedBg = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getSavedBackground(this)
+        if (savedBg != null && !com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.isVideoFile(savedBg)) {
+            // 圖片預覽
+            CoroutineScope(Dispatchers.IO).launch {
+                val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = 4 }
+                val bmp = android.graphics.BitmapFactory.decodeFile(savedBg.absolutePath, opts)
+                withContext(Dispatchers.Main) {
+                    bgPreviewImage?.setImageBitmap(bmp)
+                    bgPreviewLabel?.visibility = View.GONE
+                }
+            }
+        } else if (savedBg != null) {
+            // 影片預覽：取第一幀
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val retriever = android.media.MediaMetadataRetriever()
+                    retriever.setDataSource(savedBg.absolutePath)
+                    val frame = retriever.getFrameAtTime(0)
+                    retriever.release()
+                    withContext(Dispatchers.Main) {
+                        bgPreviewImage?.setImageBitmap(frame)
+                        bgPreviewLabel?.text = "🎬 影片背景"
+                        bgPreviewLabel?.visibility = View.VISIBLE
+                        bgPreviewLabel?.setBackgroundColor(0x55000000)
+                    }
+                } catch (_: Exception) {
+                    withContext(Dispatchers.Main) {
+                        bgPreviewLabel?.text = "🎬 影片背景（無法預覽）"
+                        bgPreviewLabel?.visibility = View.VISIBLE
+                    }
+                }
+            }
+        } else {
+            bgPreviewImage?.setImageBitmap(null)
+            bgPreviewLabel?.text = "尚未設定背景"
+            bgPreviewLabel?.visibility = View.VISIBLE
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 字體顏色選擇器
+    // ─────────────────────────────────────────────────────────
+
+    private fun buildKeyLabelColorPicker(): LinearLayout {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(8), dp(8), dp(8), dp(4))
+        }
+
+        container.addView(TextView(this).apply {
+            text = "按鍵字體顏色"
+            textSize = 12f
+            setTextColor(0xFF7FD8FF.toInt())
+            setPadding(dp(4), 0, 0, dp(8))
+        })
+
+        val colors = listOf(
+            0 to "跟隨主題",
+            0xFFFFFFFF.toInt() to "白",
+            0xFF000000.toInt() to "黑",
+            0xFF7FD8FF.toInt() to "冰藍",
+            0xFFFF6B9D.toInt() to "粉",
+            0xFFFFD700.toInt() to "金",
+            0xFF5EEAD4.toInt() to "薄荷",
+            0xFFA78BFA.toInt() to "紫",
+            0xFFFF6B6B.toInt() to "紅",
+            0xFF4ADE80.toInt() to "綠",
+            0xFFFF9500.toInt() to "橘"
+        )
+
+        val currentColor = prefs.customKeyLabelColor
+
+        val colorRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 0, 0, dp(4))
+        }
+
+        // 用 ScrollView 包住讓色盤可滾動
+        val scrollH = android.widget.HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+        }
+
+        // 記住所有色塊 View 方便更新選中狀態
+        val colorViews = mutableListOf<View>()
+
+        colors.forEach { (color, label) ->
+            val isSelected = color == currentColor
+            val circleSize = dp(36)
+            val margin = dp(4)
+
+            val wrapper = FrameLayout(this).apply {
+                layoutParams = LinearLayout.LayoutParams(circleSize + margin * 2, circleSize + dp(18)).apply {
+                    setMargins(margin, 0, margin, 0)
+                }
+            }
+
+            val circle = View(this).apply {
+                layoutParams = FrameLayout.LayoutParams(circleSize, circleSize)
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    shape = android.graphics.drawable.GradientDrawable.OVAL
+                    if (color == 0) {
+                        // 跟隨主題：彩虹漸層圈
+                        setColors(intArrayOf(
+                            0xFFFF6B6B.toInt(), 0xFFFFD700.toInt(), 0xFF4ADE80.toInt(),
+                            0xFF7FD8FF.toInt(), 0xFFA78BFA.toInt(), 0xFFFF6B9D.toInt()
+                        ))
+                        gradientType = android.graphics.drawable.GradientDrawable.SWEEP_GRADIENT
+                    } else {
+                        setColor(color)
+                    }
+                    if (color == 0xFFFFFFFF.toInt() || color == 0) {
+                        setStroke(dp(1), 0xFF555555.toInt())
+                    }
+                    if (isSelected) {
+                        setStroke(dp(2), 0xFF4A90E2.toInt())
+                    }
+                }
+            }
+            wrapper.addView(circle)
+            colorViews.add(circle)
+
+            // 色名
+            wrapper.addView(TextView(this).apply {
+                text = label
+                textSize = 9f
+                setTextColor(0xFF8899AA.toInt())
+                gravity = android.view.Gravity.CENTER_HORIZONTAL
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = circleSize + dp(2) }
+            })
+
+            wrapper.setOnClickListener {
+                prefs.customKeyLabelColor = color
+                // 更新所有選中狀態
+                colorViews.forEachIndexed { i, v ->
+                    val c = colors[i].first
+                    val sel = c == color
+                    v.background = android.graphics.drawable.GradientDrawable().apply {
+                        shape = android.graphics.drawable.GradientDrawable.OVAL
+                        if (c == 0) {
+                            setColors(intArrayOf(
+                                0xFFFF6B6B.toInt(), 0xFFFFD700.toInt(), 0xFF4ADE80.toInt(),
+                                0xFF7FD8FF.toInt(), 0xFFA78BFA.toInt(), 0xFFFF6B9D.toInt()
+                            ))
+                            gradientType = android.graphics.drawable.GradientDrawable.SWEEP_GRADIENT
+                        } else {
+                            setColor(c)
+                        }
+                        if (c == 0xFFFFFFFF.toInt() || c == 0) {
+                            setStroke(dp(1), 0xFF555555.toInt())
+                        }
+                        if (sel) {
+                            setStroke(dp(2), 0xFF4A90E2.toInt())
+                        }
+                    }
+                }
+                Toast.makeText(this, if (color == 0) "字體顏色跟隨主題" else "已更改字體顏色", Toast.LENGTH_SHORT).show()
+            }
+
+            colorRow.addView(wrapper)
+        }
+
+        scrollH.addView(colorRow)
+        container.addView(scrollH)
+
+        return container
     }
 
     // ─────────────────────────────────────────────────────────
@@ -563,6 +830,8 @@ class SettingsActivity : AppCompatActivity() {
             contentResolver.openInputStream(uri)?.use { input ->
                 dest.outputStream().use { output -> input.copyTo(output) }
             }
+            prefs.useCustomBackground = true
+            refreshBgPreview()
             Toast.makeText(this, "背景已設定，重新開啟鍵盤生效", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
             Toast.makeText(this, "背景設定失敗: ${e.message}", Toast.LENGTH_SHORT).show()

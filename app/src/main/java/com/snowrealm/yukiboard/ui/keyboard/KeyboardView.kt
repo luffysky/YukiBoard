@@ -137,6 +137,17 @@ class KeyboardView(context: Context) : View(context) {
     private var isCandidateExpanded: Boolean = false
     /** 是否有自訂背景圖（設為 true 時鍵盤背景變半透明） */
     var hasCustomBackground: Boolean = false
+        set(value) {
+            field = value
+            if (value) {
+                setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                setLayerType(LAYER_TYPE_HARDWARE, null)
+            }
+        }
+    /** 背景遮罩透明度（0=全透明看圖, 255=全黑） */
+    var bgOverlayAlpha: Int = 100
+    /** 自訂字體顏色（0 = 跟隨主題） */
+    var customKeyLabelColor: Int = 0
     private var expandScrollOffset: Float = 0f    // 展開面板捲動偏移
     private var expandTouchStartY: Float = 0f     // 觸控起始 Y（用於滑動偵測）
     private var expandLastTouchY: Float = 0f      // 上一次觸控 Y
@@ -489,8 +500,10 @@ class KeyboardView(context: Context) : View(context) {
 
     private fun drawBackground(canvas: Canvas) {
         if (hasCustomBackground) {
-            // 自訂背景圖存在 → 只畫半透明遮罩讓按鍵可讀
-            canvas.drawColor(0x55000000)
+            // 先清透明，再畫使用者設定的遮罩深度
+            canvas.drawColor(android.graphics.Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
+            val alpha = bgOverlayAlpha.coerceIn(0, 255)
+            canvas.drawColor(android.graphics.Color.argb(alpha, 0, 0, 0))
             return
         }
         val startColor = theme.backgroundGradientStartInt
@@ -521,7 +534,7 @@ class KeyboardView(context: Context) : View(context) {
 
     private fun drawCandidateBar(canvas: Canvas) {
         val barRect = RectF(0f, 0f, width.toFloat(), candidateBarHeight)
-        keyPaint.color = if (hasCustomBackground) applyAlpha(theme.candidateBarColorInt, 0.6f) else theme.candidateBarColorInt
+        keyPaint.color = if (hasCustomBackground) 0x22000000 else theme.candidateBarColorInt
         canvas.drawRect(barRect, keyPaint)
 
         // 模式標示
@@ -656,7 +669,8 @@ class KeyboardView(context: Context) : View(context) {
     }
 
     private fun drawDivider(canvas: Canvas, x: Float) {
-        dividerPaint.color = (theme.keyLabelColorInt and 0x00FFFFFF) or 0x33000000
+        val effectiveLabelColorGlobal = if (customKeyLabelColor != 0) customKeyLabelColor else theme.keyLabelColorInt
+        dividerPaint.color = (effectiveLabelColorGlobal and 0x00FFFFFF) or 0x33000000
         canvas.drawLine(x, candidateBarHeight, x, height.toFloat(), dividerPaint)
     }
 
@@ -711,28 +725,50 @@ class KeyboardView(context: Context) : View(context) {
                     key.isSpecial -> theme.specialKeyColorInt
                     else -> theme.keyColorInt
                 }
-                keyPaint.color = if (hasCustomBackground) applyAlpha(rawKeyColor, 0.55f) else rawKeyColor
                 val cr = theme.keyCornerRadiusDp * density
-                keyPaint.style = Paint.Style.FILL
 
-                // 按鍵陰影（淺色主題才明顯）
-                if (theme.keyShadowRadiusDp > 0f && theme.keyShadowColorInt != 0) {
-                    keyPaint.setShadowLayer(
-                        theme.keyShadowRadiusDp * density,
-                        0f, 1f * density,
-                        theme.keyShadowColorInt
-                    )
-                }
-                canvas.drawRoundRect(rect, cr, cr, keyPaint)
-                keyPaint.clearShadowLayer()
-
-                // 按鍵邊框
-                if (theme.keyBorderWidthDp > 0 && theme.keyBorderColorInt != 0) {
+                if (hasCustomBackground) {
+                    // 自訂背景模式：不畫實底，只畫淡淡的玻璃折射框線
+                    if (isPressed) {
+                        // 按下時顯示微弱高亮
+                        keyPaint.style = Paint.Style.FILL
+                        keyPaint.color = 0x33FFFFFF
+                        canvas.drawRoundRect(rect, cr, cr, keyPaint)
+                    }
+                    // 液態玻璃折射框線（淡白色 + 淡亮頂邊）
                     keyPaint.style = Paint.Style.STROKE
-                    keyPaint.strokeWidth = theme.keyBorderWidthDp * density
-                    keyPaint.color = theme.keyBorderColorInt
+                    keyPaint.strokeWidth = 0.5f * density
+                    keyPaint.color = 0x30FFFFFF
                     canvas.drawRoundRect(rect, cr, cr, keyPaint)
+                    // 頂部亮邊（模擬折射高光）
+                    val topLine = RectF(rect.left + 2 * density, rect.top, rect.right - 2 * density, rect.top + 0.5f * density)
+                    keyPaint.color = 0x40FFFFFF
                     keyPaint.style = Paint.Style.FILL
+                    canvas.drawRoundRect(topLine, 1f * density, 1f * density, keyPaint)
+                    keyPaint.style = Paint.Style.FILL
+                } else {
+                    keyPaint.color = rawKeyColor
+                    keyPaint.style = Paint.Style.FILL
+
+                    // 按鍵陰影（淺色主題才明顯）
+                    if (theme.keyShadowRadiusDp > 0f && theme.keyShadowColorInt != 0) {
+                        keyPaint.setShadowLayer(
+                            theme.keyShadowRadiusDp * density,
+                            0f, 1f * density,
+                            theme.keyShadowColorInt
+                        )
+                    }
+                    canvas.drawRoundRect(rect, cr, cr, keyPaint)
+                    keyPaint.clearShadowLayer()
+
+                    // 按鍵邊框
+                    if (theme.keyBorderWidthDp > 0 && theme.keyBorderColorInt != 0) {
+                        keyPaint.style = Paint.Style.STROKE
+                        keyPaint.strokeWidth = theme.keyBorderWidthDp * density
+                        keyPaint.color = theme.keyBorderColorInt
+                        canvas.drawRoundRect(rect, cr, cr, keyPaint)
+                        keyPaint.style = Paint.Style.FILL
+                    }
                 }
 
                 // 液態玻璃 + 主題裝飾
@@ -749,13 +785,14 @@ class KeyboardView(context: Context) : View(context) {
                     else -> key.label
                 }
 
-                useLabelPaint.color = if (ctrlHint != null) theme.candidateSelectedColorInt else theme.keyLabelColorInt
+                val effectiveLabelColor = if (customKeyLabelColor != 0) customKeyLabelColor else theme.keyLabelColorInt
+                useLabelPaint.color = if (ctrlHint != null) theme.candidateSelectedColorInt else effectiveLabelColor
                 val textY = rect.top + (rect.height() + useLabelPaint.textSize) / 2f - useLabelPaint.descent()
                 canvas.drawText(displayLabel, rect.centerX(), textY, useLabelPaint)
 
                 // Alt hint
                 if (key.altChars.isNotEmpty()) {
-                    altHintPaint.color = (theme.keyLabelColorInt and 0x00FFFFFF) or 0x66000000
+                    altHintPaint.color = (effectiveLabelColor and 0x00FFFFFF) or 0x66000000
                     canvas.drawText("·", rect.right - 4f * density, rect.top + 10f * density, altHintPaint)
                 }
 

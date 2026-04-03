@@ -112,6 +112,13 @@ class YukiPreferences(context: Context) {
     var floatingX: Int by IntPref("floating_x", -1)
     var floatingY: Int by IntPref("floating_y", -1)
 
+    // 自訂背景
+    var useCustomBackground: Boolean by BoolPref("use_custom_bg", false)
+    var bgOverlayAlpha: Int by IntPref("bg_overlay_alpha", 100)
+
+    // 自訂字體顏色（0 = 跟隨主題）
+    var customKeyLabelColor: Int by IntPref("custom_key_label_color", 0)
+
     // ════��═════════════════════════════��════════════════════════
     // 委派實作
     // ════════���════════════════���═════════════════════════════════

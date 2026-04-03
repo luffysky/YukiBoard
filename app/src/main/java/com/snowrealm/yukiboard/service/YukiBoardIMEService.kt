@@ -222,8 +222,9 @@ class YukiBoardIMEService : InputMethodService() {
         // 自訂圖片/影片背景（最底層）
         val bgView = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView(this)
         val savedBg = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getSavedBackground(this)
-        if (savedBg != null) {
-            if (com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.isVideoFile(savedBg)) {
+        val useCustomBg = prefs.useCustomBackground && savedBg != null
+        if (useCustomBg) {
+            if (com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.isVideoFile(savedBg!!)) {
                 bgView.setVideoBackground(savedBg)
             } else {
                 bgView.setImageBackground(savedBg)
@@ -235,10 +236,14 @@ class YukiBoardIMEService : InputMethodService() {
         ))
         backgroundView = bgView
 
-        keyboardContainer.addView(keyboardView)
+        keyboardContainer.addView(keyboardView, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ))
 
-        // 告知 KeyboardView 有自訂背景（讓它變半透明）
-        keyboardView.hasCustomBackground = (savedBg != null)
+        // 只有啟用自訂背景時才改為玻璃模式
+        keyboardView.hasCustomBackground = useCustomBg
+        keyboardView.bgOverlayAlpha = prefs.bgOverlayAlpha
 
         // 套用當前主題
         val currentTheme = ThemeManager.getInstance(this).currentTheme
@@ -334,6 +339,17 @@ class YukiBoardIMEService : InputMethodService() {
         if (prefs.gyroscopeCursorEnabled) gyroController.register()
 
         glSurfaceView?.onResume()
+
+        // 重新檢查自訂背景（設定頁可能已更改）
+        val bgHas = backgroundView?.reloadFromStorage() ?: false
+        val useCustomBg = prefs.useCustomBackground && bgHas
+        if (keyboardView.hasCustomBackground != useCustomBg) {
+            keyboardView.hasCustomBackground = useCustomBg
+            keyboardView.invalidate()
+        }
+        backgroundView?.overlayAlpha = prefs.bgOverlayAlpha
+        keyboardView.bgOverlayAlpha = prefs.bgOverlayAlpha
+        keyboardView.customKeyLabelColor = prefs.customKeyLabelColor
 
         // 遊戲模式恢復
         if (isInGameMode) {
