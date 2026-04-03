@@ -25,6 +25,7 @@
 
     <application
         android:allowBackup="true"
+        android:usesCleartextTraffic="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -55,6 +56,18 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- AI 設定頁面 -->
+        <activity
+            android:name=".ui.settings.AISettingsActivity"
+            android:label="AI 設定"
+            android:exported="false" />
+
+        <!-- 邀請碼頁面 -->
+        <activity
+            android:name=".ui.auth.InviteCodeActivity"
+            android:label="輸入邀請碼"
+            android:exported="false" />
 
     </application>
 

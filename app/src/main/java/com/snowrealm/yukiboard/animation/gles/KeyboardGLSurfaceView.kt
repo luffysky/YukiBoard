@@ -40,6 +40,11 @@ class KeyboardGLSurfaceView @JvmOverloads constructor(
         queueEvent { renderer.alpha = alpha.coerceIn(0f, 1f) }
     }
 
+    /** 動態調整流光顏色（ARGB Int） */
+    fun setFlowColor(colorInt: Int) {
+        queueEvent { renderer.setFlowColor(colorInt) }
+    }
+
     override fun onPause() {
         super.onPause()
         // 省電：暫停渲染

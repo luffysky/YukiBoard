@@ -46,7 +46,7 @@ class ToolbarView(context: Context) : View(context) {
         buttonRects.clear()
 
         // 背景
-        bgPaint.color = theme.candidateBarColorInt
+        bgPaint.color = theme.effectiveToolbarColor()
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
 
         val btnWidth = width.toFloat() / panels.size
@@ -59,13 +59,13 @@ class ToolbarView(context: Context) : View(context) {
 
             // 選中高亮
             if (panel == activePanel) {
-                highlightPaint.color = theme.candidateSelectedColorInt
+                highlightPaint.color = theme.effectiveToolbarActiveColor()
                 highlightPaint.alpha = 60
                 canvas.drawRoundRect(rect, cornerR, cornerR, highlightPaint)
             }
 
             // 圖示
-            iconPaint.color = if (panel == activePanel) theme.candidateSelectedColorInt else theme.candidateTextColorInt
+            iconPaint.color = if (panel == activePanel) theme.effectiveToolbarActiveColor() else theme.effectiveToolbarIconColor()
             val textY = rect.centerY() + iconPaint.textSize / 3f
             canvas.drawText(panel.icon, rect.centerX(), textY, iconPaint)
         }

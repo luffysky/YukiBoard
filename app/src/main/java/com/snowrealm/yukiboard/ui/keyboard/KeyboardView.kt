@@ -4,8 +4,10 @@ import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.RectF
+import android.graphics.Shader
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -113,6 +115,11 @@ class KeyboardView(context: Context) : View(context) {
         onModeChangedListener = listener
     }
 
+    private var onCandidateSelectListener: ((index: Int) -> Unit)? = null
+    fun setOnCandidateSelectListener(listener: (index: Int) -> Unit) {
+        onCandidateSelectListener = listener
+    }
+
     // -------------------------------------------------------------------------
     // 狀態
     // -------------------------------------------------------------------------
@@ -131,6 +138,7 @@ class KeyboardView(context: Context) : View(context) {
     // 繪製用資源
     // -------------------------------------------------------------------------
     private val density = context.resources.displayMetrics.density
+    private val keyDecorator = KeyDecorator(density)
     private val keyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
@@ -286,6 +294,11 @@ class KeyboardView(context: Context) : View(context) {
 
     fun applyTheme(newTheme: KeyboardTheme) {
         theme = newTheme
+        keyDecorator.resetSeeds()
+        // 套用主題字體大小
+        if (newTheme.keyFontSizeSp > 0) {
+            labelPaint.textSize = newTheme.keyFontSizeSp * density
+        }
         invalidate()
     }
 
@@ -431,8 +444,31 @@ class KeyboardView(context: Context) : View(context) {
         }
     }
 
+    private var bgGradient: LinearGradient? = null
+    private var bgGradientWidth = 0
+    private var bgGradientHeight = 0
+    private val bgPaint = Paint()
+
     private fun drawBackground(canvas: Canvas) {
-        canvas.drawColor(theme.backgroundColorInt)
+        val startColor = theme.backgroundGradientStartInt
+        val endColor = theme.backgroundGradientEndInt
+        if (startColor != null && endColor != null) {
+            // 漸層背景（重建 gradient 如果 size 改變）
+            if (bgGradient == null || bgGradientWidth != width || bgGradientHeight != height) {
+                bgGradientWidth = width
+                bgGradientHeight = height
+                bgGradient = LinearGradient(
+                    0f, 0f, 0f, height.toFloat(),
+                    startColor, endColor,
+                    Shader.TileMode.CLAMP
+                )
+            }
+            bgPaint.shader = bgGradient
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
+            bgPaint.shader = null
+        } else {
+            canvas.drawColor(theme.backgroundColorInt)
+        }
     }
 
     private fun drawCandidateBar(canvas: Canvas) {
@@ -467,8 +503,27 @@ class KeyboardView(context: Context) : View(context) {
 
         val slotWidth = width.toFloat() / maxOf(candidates.size, 1)
         candidates.forEachIndexed { i, text ->
-            candidatePaint.color = theme.candidateTextColorInt
-            canvas.drawText(text, slotWidth * i + slotWidth / 2f, candidateBarHeight * 0.65f, candidatePaint)
+            val slotLeft = slotWidth * i
+            val cx = slotLeft + slotWidth / 2f
+
+            // 第一個候選加高亮背景
+            if (i == 0 && candidates.size > 1) {
+                keyPaint.color = theme.candidateSelectedColorInt
+                keyPaint.alpha = 40
+                val pill = RectF(slotLeft + 4 * density, 4 * density, slotLeft + slotWidth - 4 * density, candidateBarHeight - 4 * density)
+                canvas.drawRoundRect(pill, 6 * density, 6 * density, keyPaint)
+                keyPaint.alpha = 255
+                candidatePaint.color = theme.candidateSelectedColorInt
+            } else {
+                candidatePaint.color = theme.candidateTextColorInt
+            }
+            canvas.drawText(text, cx, candidateBarHeight * 0.65f, candidatePaint)
+
+            // 候選詞分隔線
+            if (i > 0) {
+                dividerPaint.color = (theme.candidateTextColorInt and 0x00FFFFFF) or 0x20000000
+                canvas.drawLine(slotLeft, 8 * density, slotLeft, candidateBarHeight - 8 * density, dividerPaint)
+            }
         }
     }
 
@@ -528,7 +583,31 @@ class KeyboardView(context: Context) : View(context) {
                     key.isSpecial -> theme.specialKeyColorInt
                     else -> theme.keyColorInt
                 }
-                canvas.drawRoundRect(rect, keyCornerRadius, keyCornerRadius, keyPaint)
+                val cr = theme.keyCornerRadiusDp * density
+                keyPaint.style = Paint.Style.FILL
+
+                // 按鍵陰影（淺色主題才明顯）
+                if (theme.keyShadowRadiusDp > 0f && theme.keyShadowColorInt != 0) {
+                    keyPaint.setShadowLayer(
+                        theme.keyShadowRadiusDp * density,
+                        0f, 1f * density,
+                        theme.keyShadowColorInt
+                    )
+                }
+                canvas.drawRoundRect(rect, cr, cr, keyPaint)
+                keyPaint.clearShadowLayer()
+
+                // 按鍵邊框
+                if (theme.keyBorderWidthDp > 0 && theme.keyBorderColorInt != 0) {
+                    keyPaint.style = Paint.Style.STROKE
+                    keyPaint.strokeWidth = theme.keyBorderWidthDp * density
+                    keyPaint.color = theme.keyBorderColorInt
+                    canvas.drawRoundRect(rect, cr, cr, keyPaint)
+                    keyPaint.style = Paint.Style.FILL
+                }
+
+                // 液態玻璃 + 主題裝飾
+                keyDecorator.decorate(canvas, rect, theme, rowIndex * 100 + row.indexOf(key), key.isSpecial, isPressed, cr)
 
                 // Label
                 val ctrlHint = if (isCtrlActive && !key.isSpecial) resolveCtrlCombo(key.label) else null
@@ -682,6 +761,15 @@ class KeyboardView(context: Context) : View(context) {
 
                 if (isLongPressTriggered) {
                     isLongPressTriggered = false
+                    return true
+                }
+
+                // 候選列觸控選字
+                if (y < candidateBarHeight && candidates.isNotEmpty()) {
+                    val slotWidth = width.toFloat() / candidates.size
+                    val index = (x / slotWidth).toInt().coerceIn(0, candidates.size - 1)
+                    onCandidateSelectListener?.invoke(index)
+                    performClick()
                     return true
                 }
 

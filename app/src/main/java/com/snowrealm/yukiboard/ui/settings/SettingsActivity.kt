@@ -1,7 +1,10 @@
 package com.snowrealm.yukiboard.ui.settings
 
+import android.content.Intent
 import android.content.res.Configuration
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
@@ -16,6 +19,11 @@ import com.snowrealm.yukiboard.theme.ThemeManager
 import java.util.Locale
 
 class SettingsActivity : AppCompatActivity() {
+
+    companion object {
+        private const val REQUEST_PICK_BG_IMAGE = 9001
+        private const val REQUEST_PICK_BG_VIDEO = 9002
+    }
 
     private lateinit var themeManager: ThemeManager
     private lateinit var prefs: YukiPreferences
@@ -141,6 +149,72 @@ class SettingsActivity : AppCompatActivity() {
 
         root.addView(themeGroup)
 
+        // ── 自訂背景 ──
+        root.addView(sectionTitle("鍵盤背景 / Keyboard Background"))
+
+        val bgLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(8), dp(4), dp(8), dp(16))
+        }
+
+        val pickImageBtn = Button(this).apply {
+            text = "選圖片"
+            setTextColor(0xFFE8F4FF.toInt())
+            background = GradientDrawable().apply {
+                setColor(0xFF2A3A5C.toInt())
+                cornerRadius = dp(8).toFloat()
+            }
+            setOnClickListener {
+                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "image/*"
+                }
+                startActivityForResult(intent, REQUEST_PICK_BG_IMAGE)
+            }
+        }
+        bgLayout.addView(pickImageBtn, LinearLayout.LayoutParams(0, dp(44), 1f).apply {
+            marginEnd = dp(4)
+        })
+
+        val pickVideoBtn = Button(this).apply {
+            text = "選影片"
+            setTextColor(0xFFE8F4FF.toInt())
+            background = GradientDrawable().apply {
+                setColor(0xFF2A3A5C.toInt())
+                cornerRadius = dp(8).toFloat()
+            }
+            setOnClickListener {
+                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "video/*"
+                }
+                startActivityForResult(intent, REQUEST_PICK_BG_VIDEO)
+            }
+        }
+        bgLayout.addView(pickVideoBtn, LinearLayout.LayoutParams(0, dp(44), 1f).apply {
+            marginStart = dp(4)
+            marginEnd = dp(4)
+        })
+
+        val clearBgBtn = Button(this).apply {
+            text = "清除"
+            setTextColor(0xFFFF6B6B.toInt())
+            background = GradientDrawable().apply {
+                setColor(0xFF1E2D4A.toInt())
+                cornerRadius = dp(8).toFloat()
+            }
+            setOnClickListener {
+                val dir = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getBackgroundDir(this@SettingsActivity)
+                dir.listFiles()?.forEach { it.delete() }
+                android.widget.Toast.makeText(this@SettingsActivity, "已清除背景", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+        bgLayout.addView(clearBgBtn, LinearLayout.LayoutParams(0, dp(44), 0.7f).apply {
+            marginStart = dp(4)
+        })
+
+        root.addView(bgLayout)
+
         // ── 深色/淺色模式 ──
         root.addView(sectionTitle("外觀模式 / Appearance"))
 
@@ -212,6 +286,33 @@ class SettingsActivity : AppCompatActivity() {
 
         root.addView(langGroup)
 
+        root.addView(divider())
+
+        // ══════════════════════════════════════════════════════════════
+        // AI / Claw
+        // ══════════════════════════════════════════════════════════════
+
+        root.addView(sectionTitle("AI / Claw"))
+
+        root.addView(Button(this).apply {
+            text = "AI 設定"
+            setTextColor(0xFFFFFFFF.toInt())
+            textSize = 14f
+            background = GradientDrawable().apply {
+                setColor(0xFF4A90E2.toInt())
+                cornerRadius = dp(8).toFloat()
+            }
+            setPadding(dp(16), dp(10), dp(16), dp(10))
+            val lp = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(dp(8), dp(8), 0, dp(16)) }
+            layoutParams = lp
+            setOnClickListener {
+                startActivity(Intent(this@SettingsActivity, AISettingsActivity::class.java))
+            }
+        })
+
         scrollView.addView(root)
         setContentView(scrollView)
     }
@@ -269,4 +370,45 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
+
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode != RESULT_OK || data?.data == null) return
+
+        val uri = data.data!!
+        val bgDir = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getBackgroundDir(this)
+        // 清除舊背景
+        bgDir.listFiles()?.forEach { it.delete() }
+
+        val ext = when (requestCode) {
+            REQUEST_PICK_BG_IMAGE -> {
+                val mime = contentResolver.getType(uri) ?: "image/png"
+                when {
+                    mime.contains("jpeg") || mime.contains("jpg") -> "jpg"
+                    mime.contains("webp") -> "webp"
+                    else -> "png"
+                }
+            }
+            REQUEST_PICK_BG_VIDEO -> {
+                val mime = contentResolver.getType(uri) ?: "video/mp4"
+                when {
+                    mime.contains("webm") -> "webm"
+                    mime.contains("3gp") -> "3gp"
+                    else -> "mp4"
+                }
+            }
+            else -> return
+        }
+
+        val dest = java.io.File(bgDir, "keyboard_bg.$ext")
+        try {
+            contentResolver.openInputStream(uri)?.use { input ->
+                dest.outputStream().use { output -> input.copyTo(output) }
+            }
+            android.widget.Toast.makeText(this, "背景已設定，重新開啟鍵盤生效", android.widget.Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            android.widget.Toast.makeText(this, "背景設定失敗: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
 }

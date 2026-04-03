@@ -21,11 +21,24 @@ class FlowLightRenderer : GLSurfaceView.Renderer {
 
     private var uTimeLoc: Int   = -1
     private var uAlphaLoc: Int  = -1
+    private var uAspectLoc: Int = -1
+    private var uColorLoc: Int  = -1
     private var aPositionLoc: Int = -1
     private var aTexCoordLoc: Int = -1
 
     // 由外部控制
-    var alpha: Float = 0.55f  // 流光整體透明度
+    var alpha: Float = 0.25f  // 水波紋整體透明度
+    private var aspect: Float = 1.0f  // 寬高比
+    private var colorR: Float = 0.9f
+    private var colorG: Float = 0.95f
+    private var colorB: Float = 1.0f
+
+    /** 設定流光顏色（ARGB Int） */
+    fun setFlowColor(colorInt: Int) {
+        colorR = ((colorInt shr 16) and 0xFF) / 255f
+        colorG = ((colorInt shr 8) and 0xFF) / 255f
+        colorB = (colorInt and 0xFF) / 255f
+    }
     private var startTimeMs: Long = System.currentTimeMillis()
 
     // -------------------------------------------------------------------------
@@ -41,6 +54,8 @@ class FlowLightRenderer : GLSurfaceView.Renderer {
 
         uTimeLoc     = GLES20.glGetUniformLocation(programHandle, "uTime")
         uAlphaLoc    = GLES20.glGetUniformLocation(programHandle, "uAlpha")
+        uAspectLoc   = GLES20.glGetUniformLocation(programHandle, "uAspect")
+        uColorLoc    = GLES20.glGetUniformLocation(programHandle, "uColor")
         aPositionLoc = GLES20.glGetAttribLocation(programHandle,  "aPosition")
         aTexCoordLoc = GLES20.glGetAttribLocation(programHandle,  "aTexCoord")
 
@@ -49,6 +64,7 @@ class FlowLightRenderer : GLSurfaceView.Renderer {
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         GLES20.glViewport(0, 0, width, height)
+        aspect = if (height > 0) width.toFloat() / height.toFloat() else 1f
     }
 
     override fun onDrawFrame(gl: GL10?) {
@@ -59,6 +75,8 @@ class FlowLightRenderer : GLSurfaceView.Renderer {
         val elapsedSec = (System.currentTimeMillis() - startTimeMs) / 1000f
         GLES20.glUniform1f(uTimeLoc, elapsedSec)
         GLES20.glUniform1f(uAlphaLoc, alpha)
+        GLES20.glUniform1f(uAspectLoc, aspect)
+        GLES20.glUniform3f(uColorLoc, colorR, colorG, colorB)
 
         // 綁定頂點資料（每頂點：x, y, u, v → 4 floats）
         val stride = 4 * FLOAT_SIZE

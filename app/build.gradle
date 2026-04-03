@@ -1,6 +1,28 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
+    id 'org.jetbrains.kotlin.plugin.serialization'
+}
+
+// 從 .env 載入變數（優先於系統環境變數）
+def localProps = new Properties()
+def envFile = rootProject.file('.env')
+if (envFile.exists()) {
+    envFile.withReader('UTF-8') { reader ->
+        reader.eachLine { line ->
+            line = line.trim()
+            if (line && !line.startsWith('#') && line.contains('=')) {
+                def idx = line.indexOf('=')
+                def key = line.substring(0, idx).trim()
+                def val_ = line.substring(idx + 1).trim()
+                // 去掉引號
+                if ((val_.startsWith('"') && val_.endsWith('"')) || (val_.startsWith("'") && val_.endsWith("'"))) {
+                    val_ = val_.substring(1, val_.length() - 1)
+                }
+                localProps.setProperty(key, val_)
+            }
+        }
+    }
 }
 
 android {
@@ -20,6 +42,16 @@ android {
         ndk {
             abiFilters 'arm64-v8a', 'x86_64'
         }
+
+        // Claw AI 設定
+        buildConfigField "String", "INVITE_HMAC_SECRET", "\"${localProps.getProperty('INVITE_HMAC_SECRET', System.getenv('INVITE_HMAC_SECRET') ?: 'yukiboard_dev_2026')}\""
+        buildConfigField "String", "PLATFORM_API_KEY", "\"${localProps.getProperty('PLATFORM_API_KEY', System.getenv('PLATFORM_API_KEY') ?: '')}\""
+        // Insight Engine 貼圖 + GIF API
+        buildConfigField "String", "INSIGHT_API_BASE_URL", "\"${localProps.getProperty('INSIGHT_API_BASE_URL', System.getenv('INSIGHT_API_BASE_URL') ?: 'https://insight.snowrealm.com')}\""
+        buildConfigField "String", "GIPHY_API_KEY", "\"${localProps.getProperty('GIPHY_API_KEY', System.getenv('GIPHY_API_KEY') ?: '')}\""
+        // AI Provider Keys（開發用，正式版由使用者自行輸入）
+        buildConfigField "String", "OPENAI_API_KEY", "\"${localProps.getProperty('OPENAI_API_KEY', System.getenv('OPENAI_API_KEY') ?: '')}\""
+        buildConfigField "String", "ANTHROPIC_API_KEY", "\"${localProps.getProperty('ANTHROPIC_API_KEY', System.getenv('ANTHROPIC_API_KEY') ?: '')}\""
     }
 
     buildTypes {
@@ -35,6 +67,7 @@ android {
 
     buildFeatures {
         viewBinding true
+        buildConfig true
     }
 
     compileOptions {
@@ -67,11 +100,21 @@ dependencies {
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
 
     // Coroutines
-    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
-    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0'
 
     // Lottie 角色動畫
     implementation 'com.airbnb.android:lottie:6.3.0'
+
+    // Claw AI — 安全儲存
+    implementation 'androidx.security:security-crypto:1.1.0-alpha06'
+
+    // Claw AI — HTTP 客戶端
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
+
+    // Claw AI — JSON 序列化
+    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3'
 
     // OpenGL ES — 由系統提供，無需額外依賴
     // libchewing JNI — 待 native module 整合後加入
