@@ -1,6 +1,7 @@
 package com.snowrealm.yukiboard.ui.auth
 
 import android.animation.ObjectAnimator
+import android.content.Intent
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
@@ -17,6 +18,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.airbnb.lottie.LottieAnimationView
 import com.airbnb.lottie.LottieDrawable
 import com.snowrealm.yukiboard.auth.InviteCodeManager
+import com.snowrealm.yukiboard.ui.settings.AISettingsActivity
 
 class InviteCodeActivity : AppCompatActivity() {
 
@@ -207,7 +209,7 @@ class InviteCodeActivity : AppCompatActivity() {
     }
 
     private fun onSkipClicked() {
-        // TODO: launch AISettingsActivity when it exists
+        startActivity(Intent(this, AISettingsActivity::class.java))
         finish()
     }
 

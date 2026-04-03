@@ -99,6 +99,8 @@ class KeyboardView(context: Context) : View(context) {
         const val KEYCODE_DEV_COMMENT_BLOCK = -314
 
         private const val LONG_PRESS_DELAY = 400L
+        private const val CANDIDATE_BAR_MAX = 6
+        private const val EXPAND_GRID_COLS = 5
     }
 
     // -------------------------------------------------------------------------
@@ -120,12 +122,25 @@ class KeyboardView(context: Context) : View(context) {
         onCandidateSelectListener = listener
     }
 
+    private var onCandidateExpandListener: (() -> Unit)? = null
+    fun setOnCandidateExpandListener(listener: () -> Unit) {
+        onCandidateExpandListener = listener
+    }
+
     // -------------------------------------------------------------------------
     // 狀態
     // -------------------------------------------------------------------------
     private var keyRows: List<List<KeyModel>> = KeyboardState.defaultQwertyRows()
     private var sideRows: List<List<KeyModel>> = emptyList()
     private var candidates: List<String> = emptyList()
+    private var allCandidates: List<String> = emptyList()
+    private var isCandidateExpanded: Boolean = false
+    /** 是否有自訂背景圖（設為 true 時鍵盤背景變半透明） */
+    var hasCustomBackground: Boolean = false
+    private var expandScrollOffset: Float = 0f    // 展開面板捲動偏移
+    private var expandTouchStartY: Float = 0f     // 觸控起始 Y（用於滑動偵測）
+    private var expandLastTouchY: Float = 0f      // 上一次觸控 Y
+    private var expandIsScrolling: Boolean = false // 是否正在滑動中
     private var composingText: String = ""
     private var theme: KeyboardTheme = KeyboardTheme.default()
     private var isShifted: Boolean = false
@@ -288,7 +303,26 @@ class KeyboardView(context: Context) : View(context) {
     }
 
     fun updateCandidates(list: List<String>) {
-        candidates = list
+        allCandidates = list
+        candidates = if (list.size > CANDIDATE_BAR_MAX) list.take(CANDIDATE_BAR_MAX) else list
+        highlightedCandidateIndex = -1
+        isCandidateExpanded = false
+        expandScrollOffset = 0f
+        invalidate()
+    }
+
+    fun collapseCandidatePanel() {
+        isCandidateExpanded = false
+        expandScrollOffset = 0f
+        invalidate()
+    }
+
+    /** Tab 導航高亮的候選詞索引，-1 = 無高亮 */
+    var highlightedCandidateIndex: Int = -1
+        private set
+
+    fun highlightCandidate(index: Int) {
+        highlightedCandidateIndex = index
         invalidate()
     }
 
@@ -442,6 +476,10 @@ class KeyboardView(context: Context) : View(context) {
         } else {
             drawKeysInRegion(canvas, keyRows, 0f, width.toFloat())
         }
+
+        if (isCandidateExpanded && allCandidates.isNotEmpty()) {
+            drawExpandedCandidatePanel(canvas)
+        }
     }
 
     private var bgGradient: LinearGradient? = null
@@ -450,10 +488,14 @@ class KeyboardView(context: Context) : View(context) {
     private val bgPaint = Paint()
 
     private fun drawBackground(canvas: Canvas) {
+        if (hasCustomBackground) {
+            // 自訂背景圖存在 → 只畫半透明遮罩讓按鍵可讀
+            canvas.drawColor(0x55000000)
+            return
+        }
         val startColor = theme.backgroundGradientStartInt
         val endColor = theme.backgroundGradientEndInt
         if (startColor != null && endColor != null) {
-            // 漸層背景（重建 gradient 如果 size 改變）
             if (bgGradient == null || bgGradientWidth != width || bgGradientHeight != height) {
                 bgGradientWidth = width
                 bgGradientHeight = height
@@ -471,9 +513,15 @@ class KeyboardView(context: Context) : View(context) {
         }
     }
 
+    /** 將顏色的 alpha 乘以指定比例 */
+    private fun applyAlpha(color: Int, alphaFactor: Float): Int {
+        val a = ((color ushr 24) * alphaFactor).toInt().coerceIn(0, 255)
+        return (a shl 24) or (color and 0x00FFFFFF)
+    }
+
     private fun drawCandidateBar(canvas: Canvas) {
         val barRect = RectF(0f, 0f, width.toFloat(), candidateBarHeight)
-        keyPaint.color = theme.candidateBarColorInt
+        keyPaint.color = if (hasCustomBackground) applyAlpha(theme.candidateBarColorInt, 0.6f) else theme.candidateBarColorInt
         canvas.drawRect(barRect, keyPaint)
 
         // 模式標示
@@ -501,7 +549,12 @@ class KeyboardView(context: Context) : View(context) {
             canvas.drawText("[$composingText]", 16f, candidateBarHeight * 0.65f, composingPaint)
         }
 
-        val slotWidth = width.toFloat() / maxOf(candidates.size, 1)
+        // 展開按鈕寬度
+        val hasMoreCandidates = allCandidates.size > CANDIDATE_BAR_MAX
+        val expandBtnWidth = if (hasMoreCandidates) 36f * density else 0f
+        val barAvailableWidth = width.toFloat() - expandBtnWidth
+
+        val slotWidth = barAvailableWidth / maxOf(candidates.size, 1)
         candidates.forEachIndexed { i, text ->
             val slotLeft = slotWidth * i
             val cx = slotLeft + slotWidth / 2f
@@ -525,6 +578,81 @@ class KeyboardView(context: Context) : View(context) {
                 canvas.drawLine(slotLeft, 8 * density, slotLeft, candidateBarHeight - 8 * density, dividerPaint)
             }
         }
+
+        // ▼ 展開按鈕
+        if (hasMoreCandidates) {
+            val btnLeft = width.toFloat() - expandBtnWidth
+            // 分隔線
+            dividerPaint.color = (theme.candidateTextColorInt and 0x00FFFFFF) or 0x30000000
+            canvas.drawLine(btnLeft, 6 * density, btnLeft, candidateBarHeight - 6 * density, dividerPaint)
+            // 箭頭符號
+            candidatePaint.color = theme.candidateSelectedColorInt
+            val arrow = if (isCandidateExpanded) "▲" else "▼"
+            canvas.drawText(arrow, btnLeft + expandBtnWidth / 2f, candidateBarHeight * 0.65f, candidatePaint)
+        }
+    }
+
+    private fun drawExpandedCandidatePanel(canvas: Canvas) {
+        val panelTop = candidateBarHeight
+        val panelBottom = height.toFloat()
+        val panelHeight = panelBottom - panelTop
+
+        // 半透明背景覆蓋整個鍵盤區域
+        keyPaint.color = (theme.backgroundColorInt and 0x00FFFFFF) or 0xEE000000.toInt()
+        canvas.drawRect(0f, panelTop, width.toFloat(), panelBottom, keyPaint)
+
+        val cellPadding = 4f * density
+        val cellWidth = width.toFloat() / EXPAND_GRID_COLS
+        val cellHeight = 42f * density
+        val contentPadding = 8f * density
+
+        // 計算總內容高度
+        val totalRows = (allCandidates.size + EXPAND_GRID_COLS - 1) / EXPAND_GRID_COLS
+        val totalContentHeight = totalRows * cellHeight + contentPadding * 2
+        val maxScroll = maxOf(0f, totalContentHeight - panelHeight)
+        expandScrollOffset = expandScrollOffset.coerceIn(0f, maxScroll)
+
+        // 裁剪繪製區域
+        canvas.save()
+        canvas.clipRect(0f, panelTop, width.toFloat(), panelBottom)
+
+        val startY = panelTop + contentPadding - expandScrollOffset
+
+        allCandidates.forEachIndexed { i, text ->
+            val col = i % EXPAND_GRID_COLS
+            val row = i / EXPAND_GRID_COLS
+            val left = col * cellWidth + cellPadding
+            val top = startY + row * cellHeight + cellPadding
+            val right = (col + 1) * cellWidth - cellPadding
+            val bottom = top + cellHeight - 2 * cellPadding
+
+            // 只繪製可見的候選字
+            if (bottom < panelTop || top > panelBottom) return@forEachIndexed
+
+            // 候選字背景
+            keyPaint.color = theme.keyColorInt
+            val rect = RectF(left, top, right, bottom)
+            canvas.drawRoundRect(rect, 6 * density, 6 * density, keyPaint)
+
+            // 候選字文字
+            candidatePaint.color = theme.candidateTextColorInt
+            canvas.drawText(text, left + (right - left) / 2f, top + (bottom - top) * 0.65f, candidatePaint)
+        }
+
+        // 捲動指示條（若可捲動）
+        if (maxScroll > 0f) {
+            val scrollBarWidth = 4f * density
+            val scrollBarHeight = panelHeight * (panelHeight / totalContentHeight)
+            val scrollBarY = panelTop + (expandScrollOffset / maxScroll) * (panelHeight - scrollBarHeight)
+            keyPaint.color = (theme.candidateTextColorInt and 0x00FFFFFF) or 0x66000000
+            canvas.drawRoundRect(
+                RectF(width - scrollBarWidth - 2 * density, scrollBarY,
+                      width - 2 * density, scrollBarY + scrollBarHeight),
+                scrollBarWidth / 2, scrollBarWidth / 2, keyPaint
+            )
+        }
+
+        canvas.restore()
     }
 
     private fun drawDivider(canvas: Canvas, x: Float) {
@@ -576,13 +704,14 @@ class KeyboardView(context: Context) : View(context) {
                 val isPressed = pressedKey == key
                 val isShiftKey = key.code == KEYCODE_SHIFT
                 val isCtrlKey = key.code == KEYCODE_CTRL
-                keyPaint.color = when {
+                val rawKeyColor = when {
                     isPressed -> theme.keyPressedColorInt
                     isShiftKey && (isShifted || isCapsLock) -> theme.keyPressedColorInt
                     isCtrlKey && isCtrlActive -> theme.candidateSelectedColorInt
                     key.isSpecial -> theme.specialKeyColorInt
                     else -> theme.keyColorInt
                 }
+                keyPaint.color = if (hasCustomBackground) applyAlpha(rawKeyColor, 0.55f) else rawKeyColor
                 val cr = theme.keyCornerRadiusDp * density
                 keyPaint.style = Paint.Style.FILL
 
@@ -730,6 +859,13 @@ class KeyboardView(context: Context) : View(context) {
 
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
+                // 展開面板：記錄觸控起始位置
+                if (isCandidateExpanded && y > candidateBarHeight) {
+                    expandTouchStartY = y
+                    expandLastTouchY = y
+                    expandIsScrolling = false
+                    return true
+                }
                 isLongPressTriggered = false
                 val hit = keyRects.firstOrNull { it.first.contains(x, y) }
                 if (hit != null) {
@@ -742,6 +878,19 @@ class KeyboardView(context: Context) : View(context) {
             }
 
             MotionEvent.ACTION_MOVE -> {
+                // 展開面板：滑動捲動
+                if (isCandidateExpanded && y > candidateBarHeight) {
+                    val dy = expandLastTouchY - y
+                    if (!expandIsScrolling && Math.abs(y - expandTouchStartY) > 8 * density) {
+                        expandIsScrolling = true
+                    }
+                    if (expandIsScrolling) {
+                        expandScrollOffset += dy
+                        expandLastTouchY = y
+                        invalidate()
+                    }
+                    return true
+                }
                 val currentRect = longPressRect
                 if (currentRect != null && !currentRect.contains(x, y)) {
                     handler.removeCallbacks(longPressRunnable)
@@ -764,9 +913,51 @@ class KeyboardView(context: Context) : View(context) {
                     return true
                 }
 
+                // 展開面板觸控選字（滑動中不選字）
+                if (isCandidateExpanded && y > candidateBarHeight && allCandidates.isNotEmpty()) {
+                    if (expandIsScrolling) {
+                        expandIsScrolling = false
+                        performClick()
+                        return true
+                    }
+                    val cellWidth = width.toFloat() / EXPAND_GRID_COLS
+                    val cellHeight = 42f * density
+                    val contentPadding = 8f * density
+                    val startY = candidateBarHeight + contentPadding - expandScrollOffset
+                    val col = (x / cellWidth).toInt().coerceIn(0, EXPAND_GRID_COLS - 1)
+                    val row = ((y - startY) / cellHeight).toInt()
+                    if (row >= 0) {
+                        val index = row * EXPAND_GRID_COLS + col
+                        if (index in allCandidates.indices) {
+                            onCandidateSelectListener?.invoke(index)
+                            isCandidateExpanded = false
+                            expandScrollOffset = 0f
+                            invalidate()
+                            performClick()
+                            return true
+                        }
+                    }
+                    // 點擊空白區域收合
+                    isCandidateExpanded = false
+                    expandScrollOffset = 0f
+                    invalidate()
+                    performClick()
+                    return true
+                }
+
                 // 候選列觸控選字
                 if (y < candidateBarHeight && candidates.isNotEmpty()) {
-                    val slotWidth = width.toFloat() / candidates.size
+                    // ▼ 展開按鈕
+                    val hasMore = allCandidates.size > CANDIDATE_BAR_MAX
+                    val expandBtnWidth = if (hasMore) 36f * density else 0f
+                    if (hasMore && x >= width.toFloat() - expandBtnWidth) {
+                        isCandidateExpanded = !isCandidateExpanded
+                        invalidate()
+                        performClick()
+                        return true
+                    }
+                    val barAvailableWidth = width.toFloat() - expandBtnWidth
+                    val slotWidth = barAvailableWidth / candidates.size
                     val index = (x / slotWidth).toInt().coerceIn(0, candidates.size - 1)
                     onCandidateSelectListener?.invoke(index)
                     performClick()

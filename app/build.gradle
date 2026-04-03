@@ -52,6 +52,15 @@ android {
         // AI Provider Keys（開發用，正式版由使用者自行輸入）
         buildConfigField "String", "OPENAI_API_KEY", "\"${localProps.getProperty('OPENAI_API_KEY', System.getenv('OPENAI_API_KEY') ?: '')}\""
         buildConfigField "String", "ANTHROPIC_API_KEY", "\"${localProps.getProperty('ANTHROPIC_API_KEY', System.getenv('ANTHROPIC_API_KEY') ?: '')}\""
+        // OpenWeatherMap
+        buildConfigField "String", "OPENWEATHER_API_KEY", "\"${localProps.getProperty('OPENWEATHER_API_KEY', System.getenv('OPENWEATHER_API_KEY') ?: '')}\""
+        // Supabase（Z幣 + 皮膚商城 + 排行榜）
+        buildConfigField "String", "YUKIBOARD_SUPABASE_URL", "\"${localProps.getProperty('YUKIBOARD_SUPABASE_URL', System.getenv('YUKIBOARD_SUPABASE_URL') ?: '')}\""
+        buildConfigField "String", "YUKIBOARD_SUPABASE_ANON_KEY", "\"${localProps.getProperty('YUKIBOARD_SUPABASE_ANON_KEY', System.getenv('YUKIBOARD_SUPABASE_ANON_KEY') ?: '')}\""
+        // 藍新金流（Z幣儲值）
+        buildConfigField "String", "NEWEBPAY_MERCHANT_ID", "\"${localProps.getProperty('NEWEBPAY_MERCHANT_ID', System.getenv('NEWEBPAY_MERCHANT_ID') ?: '')}\""
+        buildConfigField "String", "NEWEBPAY_HASH_KEY", "\"${localProps.getProperty('NEWEBPAY_HASH_KEY', System.getenv('NEWEBPAY_HASH_KEY') ?: '')}\""
+        buildConfigField "String", "NEWEBPAY_HASH_IV", "\"${localProps.getProperty('NEWEBPAY_HASH_IV', System.getenv('NEWEBPAY_HASH_IV') ?: '')}\""
     }
 
     buildTypes {
@@ -115,6 +124,12 @@ dependencies {
 
     // Claw AI — JSON 序列化
     implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3'
+
+    // 定位（天氣面板用）
+    implementation 'com.google.android.gms:play-services-location:21.1.0'
+
+    // MLKit 翻譯（離線模型）
+    implementation 'com.google.mlkit:translate:17.0.3'
 
     // OpenGL ES — 由系統提供，無需額外依賴
     // libchewing JNI — 待 native module 整合後加入

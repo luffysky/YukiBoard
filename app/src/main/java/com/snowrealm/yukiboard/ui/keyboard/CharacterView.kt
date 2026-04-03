@@ -156,6 +156,7 @@ class CharacterView @JvmOverloads constructor(
     fun playGameStart() = playReaction("game_start")
     fun playGameOver() = playReaction("game_over")
     fun playVictory() = playReaction("victory")
+    fun playFreeze() = playReaction("freeze")
     fun playListening() {
         isIdling = false
         characterAnimation.playReaction("listening", null)  // 持續播放，不回 idle

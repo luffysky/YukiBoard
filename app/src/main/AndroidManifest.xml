@@ -11,6 +11,11 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 懸浮面板 -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- 天氣定位 -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <!-- 藍牙 HID 鍵盤 -->
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
@@ -67,6 +72,12 @@
         <activity
             android:name=".ui.auth.InviteCodeActivity"
             android:label="輸入邀請碼"
+            android:exported="false" />
+
+        <!-- 登入頁面 -->
+        <activity
+            android:name=".ui.auth.LoginActivity"
+            android:label="登入 SnowRealm"
             android:exported="false" />
 
     </application>

@@ -15,14 +15,16 @@ class SnowRealmProvider : AIProvider {
         systemPrompt: String,
         model: String
     ): Flow<String> {
-        throw NotImplementedError("Z幣整合尚未開放")
+        return kotlinx.coroutines.flow.flow {
+            emit("[SnowRealm] Z幣整合尚未開放，請先使用 OpenAI 或 Anthropic。")
+        }
     }
 
     override suspend fun validateKey(apiKey: String): Boolean {
-        throw NotImplementedError("Z幣整合尚未開放")
+        return false
     }
 
     override fun estimateTokenCount(text: String): Int {
-        throw NotImplementedError("Z幣整合尚未開放")
+        return text.length / 4
     }
 }

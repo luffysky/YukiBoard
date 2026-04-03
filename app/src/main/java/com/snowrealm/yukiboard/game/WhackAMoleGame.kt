@@ -81,7 +81,7 @@ class WhackAMoleGame(context: Context) : GameLogic {
         // 生成地鼠
         spawnAccumulator += deltaMs
         if (spawnAccumulator >= spawnInterval && activeMoles.size < maxActiveMoles) {
-            spawnAccumulator = 0
+            spawnAccumulator -= spawnInterval
             spawnMole()
         }
 

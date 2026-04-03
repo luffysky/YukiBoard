@@ -41,6 +41,7 @@ MVVM + Clean Architecture
   │  AppModeDetector                                   │
   │  SpeechEngine (語音輸入)                            │
   │  NextActionPredictor (AI 預留)                      │
+  │  SmartInputManager (糾錯+學詞+預測+習慣)            │
   │  FloatingKeyboardWrapper (懸浮模式)                 │
   └────────────────────────────────────────────────────┘
 ```
@@ -107,6 +108,11 @@ MVVM + Clean Architecture
 | `ui/settings/YukiPreferences.kt` | SharedPreferences 偏好設定封裝 |
 | `input/dictionary/EnglishDictionary.kt` | 英文 Trie 字典（~3000 高頻詞 + 自動更正） |
 | `input/dictionary/UserDictionary.kt` | 使用者自訂詞庫（學習 + 持久化） |
+| `input/smart/SmartInputManager.kt` | 智慧輸入總管（統合糾錯+學詞+預測+習慣） |
+| `input/smart/SmartCorrectionEngine.kt` | 三階段糾錯（鄰近鍵+編輯距離+bigram上下文） |
+| `input/smart/AdaptiveDictionary.kt` | 自適應字典（常用詞自動學習 + 淘汰） |
+| `input/smart/PhrasePredictor.kt` | bigram+trigram 語句預測引擎 |
+| `input/smart/TypingHabitTracker.kt` | 打字習慣追蹤（時段/App 詞頻 + 速度） |
 | `speech/SpeechInputEngine.kt` | 語音輸入引擎介面 |
 | `speech/AndroidSpeechEngine.kt` | Android SpeechRecognizer 實作 |
 | `animation/gles/FlowLightShader.kt` | GLSL 流光 Shader 原始碼 |

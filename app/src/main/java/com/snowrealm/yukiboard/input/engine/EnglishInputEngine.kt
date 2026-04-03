@@ -1,5 +1,6 @@
 package com.snowrealm.yukiboard.input.engine
 
+import android.content.Context
 import com.snowrealm.yukiboard.input.dictionary.EnglishDictionary
 import com.snowrealm.yukiboard.input.router.InputResult
 
@@ -12,10 +13,10 @@ import com.snowrealm.yukiboard.input.router.InputResult
  * - Delete → 刪除最後一個字元；buffer 清空則回報 [InputResult.ComposingCleared]
  * - 內建 Trie 字典，輸入時即時產生候選詞
  */
-class EnglishInputEngine : InputEngine {
+class EnglishInputEngine(context: Context? = null) : InputEngine {
 
     private val buffer = StringBuilder()
-    private val dictionary = EnglishDictionary()
+    private val dictionary = EnglishDictionary(context)
     private var cachedCandidates: List<String> = emptyList()
 
     override val composingText: String get() = buffer.toString()

@@ -79,6 +79,22 @@ class YukiBoardIMEService : InputMethodService() {
     // 語音輸入
     private var speechEngine: SpeechInputEngine? = null
 
+    // 雪凜系統
+    private var yukiCommentEngine: com.snowrealm.yukiboard.yuki.YukiCommentEngine? = null
+    private var yukiSpeechBubble: com.snowrealm.yukiboard.yuki.YukiSpeechBubble? = null
+    private var emotionalCooldown: com.snowrealm.yukiboard.yuki.EmotionalCooldownManager? = null
+    private var toneDetector: com.snowrealm.yukiboard.yuki.ToneDetector? = null
+    private var secretMessageManager: com.snowrealm.yukiboard.yuki.SecretMessageManager? = null
+
+    // 懸浮面板
+    private var floatingPanelManager: com.snowrealm.yukiboard.ui.floating.FloatingPanelManager? = null
+
+    // 打字事件追蹤（微吐槽用）
+    private var consecutiveDeleteCount = 0
+    private var lastDeletedTextLength = 0
+    private var lastTypedChar: Char? = null
+    private var sameCharCount = 0
+
     // 遠端鍵盤
     private var btKeyboard: BluetoothHidKeyboard? = null
     private var wifiServer: WifiKeyboardServer? = null
@@ -132,6 +148,15 @@ class YukiBoardIMEService : InputMethodService() {
 
         // Claw AI（自動從 BuildConfig 匯入 API key）
         clawClient = ClawClient(applicationContext)
+
+        // 雪凜系統
+        yukiCommentEngine = com.snowrealm.yukiboard.yuki.YukiCommentEngine()
+        emotionalCooldown = com.snowrealm.yukiboard.yuki.EmotionalCooldownManager()
+        toneDetector = com.snowrealm.yukiboard.yuki.ToneDetector()
+        secretMessageManager = com.snowrealm.yukiboard.yuki.SecretMessageManager()
+
+        // 懸浮面板管理
+        floatingPanelManager = com.snowrealm.yukiboard.ui.floating.FloatingPanelManager(applicationContext)
     }
 
     override fun onEvaluateInputViewShown(): Boolean = true
@@ -212,6 +237,9 @@ class YukiBoardIMEService : InputMethodService() {
 
         keyboardContainer.addView(keyboardView)
 
+        // 告知 KeyboardView 有自訂背景（讓它變半透明）
+        keyboardView.hasCustomBackground = (savedBg != null)
+
         // 套用當前主題
         val currentTheme = ThemeManager.getInstance(this).currentTheme
         keyboardView.applyTheme(currentTheme)
@@ -246,6 +274,15 @@ class YukiBoardIMEService : InputMethodService() {
         keyboardContainer.addView(charView, charParams)
         characterView = charView
 
+        // 雪凜語音泡泡（顯示微吐槽）
+        val bubble = com.snowrealm.yukiboard.yuki.YukiSpeechBubble(this)
+        val bubbleParams = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT
+        ).apply { gravity = android.view.Gravity.TOP or android.view.Gravity.START }
+        keyboardContainer.addView(bubble, bubbleParams)
+        yukiSpeechBubble = bubble
+
         // 面板容器（覆蓋在鍵盤上方，從頂部對齊）
         panelContainer = FrameLayout(this)
         panelContainer.visibility = View.GONE
@@ -279,6 +316,13 @@ class YukiBoardIMEService : InputMethodService() {
         inputRouter.reset()
         keyboardView.updateEditorInfo(info)
 
+        // 同步智慧輸入開關
+        inputRouter.smartInput.smartCorrectionEnabled = prefs.smartCorrection
+        inputRouter.smartInput.adaptiveDictEnabled = prefs.adaptiveDict
+        inputRouter.smartInput.phrasePredictEnabled = prefs.phrasePredict
+        inputRouter.smartInput.habitTrackEnabled = prefs.habitTracking
+        inputRouter.currentAppPackage = info?.packageName
+
         if (prefs.appAutoDetectEnabled && !manualModeOverride) {
             val detectedMode = appModeDetector.detectMode(info?.packageName)
             if (detectedMode != keyboardView.currentMode) {
@@ -299,6 +343,7 @@ class YukiBoardIMEService : InputMethodService() {
 
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
+        inputRouter.smartInput.persist()
         inputRouter.reset()
         shakeDetector.stop()
         gyroController.deactivate()
@@ -773,11 +818,26 @@ class YukiBoardIMEService : InputMethodService() {
         gameMenuView = null
 
         // 建立遊戲
+        val ctx = applicationContext
         val game: GameLogic = when (gameMode) {
-            GameMode.SNAKE -> SnakeGame(applicationContext)
-            GameMode.WHACK_A_MOLE -> WhackAMoleGame(applicationContext)
-            GameMode.RHYTHM -> RhythmGame(applicationContext)
-            GameMode.TYPING_CHALLENGE -> TypingChallengeGame(applicationContext)
+            GameMode.SNAKE -> SnakeGame(ctx)
+            GameMode.WHACK_A_MOLE -> WhackAMoleGame(ctx)
+            GameMode.RHYTHM -> RhythmGame(ctx)
+            GameMode.TYPING_CHALLENGE -> TypingChallengeGame(ctx)
+            GameMode.WORD_GUARDIAN -> WordGuardianGame(ctx)
+            GameMode.KEYBOARD_TRAVELER -> KeyboardTravelerGame(ctx)
+            GameMode.MOOD_MINER -> MoodMinerGame(ctx)
+            GameMode.BULLET_HELL -> BulletHellMiniGame(ctx)
+            GameMode.ICE_CRYSTAL -> IceCrystalGame(ctx)
+            GameMode.WARSHIP_CRUISE -> WarshipCruiseGame(ctx)
+            GameMode.SPELLING_DUEL -> SpellingDuelGame(ctx)
+            GameMode.KEYBOARD_MINESWEEPER -> KeyboardMinesweeperGame(ctx)
+            GameMode.MEMORY_FLIP -> MemoryFlipGame(ctx)
+            GameMode.YUKI_QUIZ -> YukiQuizGame(ctx)
+            GameMode.COUPLE_QUIZ -> CoupleQuizGame(ctx)
+            GameMode.TYPING_RACE -> TypingRaceGame(ctx)
+            GameMode.RANDOM_CHALLENGE -> RandomChallengeGame(ctx)
+            GameMode.VOICE_GAME -> VoiceGame(ctx)
         }
 
         // 建立遊戲鍵盤 View
@@ -792,13 +852,8 @@ class YukiBoardIMEService : InputMethodService() {
         game.init(gridRows, gridCols)
         gkv.attachGame(game)
 
-        // 遊戲事件回呼
-        when (game) {
-            is SnakeGame -> game.onGameEvent = { handleGameEvent(it, game) }
-            is WhackAMoleGame -> game.onGameEvent = { handleGameEvent(it, game) }
-            is RhythmGame -> game.onGameEvent = { handleGameEvent(it, game) }
-            is TypingChallengeGame -> game.onGameEvent = { handleGameEvent(it, game) }
-        }
+        // 遊戲事件回呼（統一透過反射取 onGameEvent 屬性）
+        setGameEventCallback(game)
 
         keyboardContainer.addView(gkv)
         gameKeyboardView = gkv
@@ -812,6 +867,30 @@ class YukiBoardIMEService : InputMethodService() {
         game.start()
         loop.start()
         gameLoop = loop
+    }
+
+    private fun setGameEventCallback(game: GameLogic) {
+        val callback: (GameEvent) -> Unit = { handleGameEvent(it, game) }
+        when (game) {
+            is SnakeGame -> game.onGameEvent = callback
+            is WhackAMoleGame -> game.onGameEvent = callback
+            is RhythmGame -> game.onGameEvent = callback
+            is TypingChallengeGame -> game.onGameEvent = callback
+            is WordGuardianGame -> game.onGameEvent = callback
+            is KeyboardTravelerGame -> game.onGameEvent = callback
+            is MoodMinerGame -> game.onGameEvent = callback
+            is BulletHellMiniGame -> game.onGameEvent = callback
+            is IceCrystalGame -> game.onGameEvent = callback
+            is WarshipCruiseGame -> game.onGameEvent = callback
+            is SpellingDuelGame -> game.onGameEvent = callback
+            is KeyboardMinesweeperGame -> game.onGameEvent = callback
+            is MemoryFlipGame -> game.onGameEvent = callback
+            is YukiQuizGame -> game.onGameEvent = callback
+            is CoupleQuizGame -> game.onGameEvent = callback
+            is TypingRaceGame -> game.onGameEvent = callback
+            is RandomChallengeGame -> game.onGameEvent = callback
+            is VoiceGame -> game.onGameEvent = callback
+        }
     }
 
     private fun handleGameEvent(event: GameEvent, game: GameLogic) {
@@ -886,7 +965,7 @@ class YukiBoardIMEService : InputMethodService() {
             KeyboardView.KEYCODE_DESIGN_GROUP      -> sendCtrlKey(ic, KeyEvent.KEYCODE_G)
             KeyboardView.KEYCODE_DESIGN_UNGROUP    -> sendCtrlShiftKey(ic, KeyEvent.KEYCODE_G)
             KeyboardView.KEYCODE_DESIGN_DUPLICATE  -> sendCtrlKey(ic, KeyEvent.KEYCODE_D)
-            KeyboardView.KEYCODE_DESIGN_LOCK       -> sendCtrlShiftKey(ic, KeyEvent.KEYCODE_L)
+            KeyboardView.KEYCODE_DESIGN_LOCK       -> sendCtrlShiftKey(ic, KeyEvent.KEYCODE_K)
             KeyboardView.KEYCODE_DESIGN_HIDE       -> sendCtrlKey(ic, KeyEvent.KEYCODE_H)
             KeyboardView.KEYCODE_DESIGN_ALIGN_L    -> sendCtrlShiftKey(ic, KeyEvent.KEYCODE_L)
             KeyboardView.KEYCODE_DESIGN_ALIGN_C    -> sendCtrlShiftKey(ic, KeyEvent.KEYCODE_C)
@@ -987,7 +1066,20 @@ class YukiBoardIMEService : InputMethodService() {
     }
 
     private fun handleTab(ic: InputConnection) {
+        // 優先：Snippet 展開（開發者模式）
         if (tryExpandSnippet(ic)) return
+
+        // 次優先：候選詞有內容時，Tab 移動焦點
+        if (inputRouter.candidates.isNotEmpty()) {
+            val focused = inputRouter.candidateManager.focusNext()
+            if (focused != null) {
+                keyboardView.updateCandidates(inputRouter.candidates)
+                keyboardView.highlightCandidate(inputRouter.candidateManager.focusedIndex)
+                return
+            }
+        }
+
+        // 最後：發送 Tab 鍵
         val meta = if (keyboardView.isShiftActive()) KeyEvent.META_SHIFT_ON else 0
         sendKey(ic, KeyEvent.KEYCODE_TAB, meta)
     }
@@ -1014,6 +1106,18 @@ class YukiBoardIMEService : InputMethodService() {
     }
 
     private fun handleSpace(ic: InputConnection) {
+        // Tab 聚焦候選時，空白鍵 = 確認選中
+        if (inputRouter.candidateManager.hasFocus()) {
+            val confirmed = inputRouter.candidateManager.confirmFocused()
+            if (confirmed != null) {
+                applyInputResult(ic, InputResult.CommitText("$confirmed "))
+                // 記錄提交並觸發下一詞預測
+                inputRouter.selectCandidate(inputRouter.candidateManager.focusedIndex)
+                keyboardView.updateComposingText("")
+                keyboardView.updateCandidates(inputRouter.candidates)
+                return
+            }
+        }
         applyInputResult(ic, inputRouter.processSpace())
     }
 
@@ -1031,11 +1135,37 @@ class YukiBoardIMEService : InputMethodService() {
     private fun applyInputResult(ic: InputConnection, result: InputResult) {
         when (result) {
             is InputResult.CommitText -> {
+                // 情緒冷靜期檢查
+                if (prefs.yukiEmotionalCooldown) {
+                    val cooldownAction = emotionalCooldown?.checkText(result.text)
+                    if (cooldownAction is com.snowrealm.yukiboard.yuki.EmotionalCooldownManager.CooldownAction.Intercept) {
+                        characterView?.playFreeze()
+                        val charAnchor = characterView as? View
+                        if (charAnchor != null) {
+                            yukiSpeechBubble?.show("等一下。這句話確定要發嗎？", charAnchor)
+                        }
+                    }
+                }
+
                 ic.setComposingText("", 0)
                 ic.finishComposingText()
                 ic.commitText(result.text, 1)
                 characterView?.playHappy()
                 forwardTextToRemote(result.text)
+
+                // 微吐槽檢查
+                if (prefs.yukiSarcasticComments && result.text.length == 1) {
+                    val comment = yukiCommentEngine?.onKeystroke(
+                        result.text[0],
+                        ic.getTextBeforeCursor(200, 0)?.length ?: 0
+                    )
+                    if (comment != null) {
+                        val charAnchor = characterView as? View
+                        if (charAnchor != null) {
+                            yukiSpeechBubble?.show(comment, charAnchor)
+                        }
+                    }
+                }
             }
             is InputResult.ComposingUpdated -> ic.setComposingText(result.composing, 1)
             is InputResult.ComposingCleared -> ic.finishComposingText()

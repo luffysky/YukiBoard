@@ -38,12 +38,13 @@ class GameMenuView(
     }
 
     private val cardRects = mutableListOf<Pair<RectF, GameMode>>()
-    private val games = GameMode.entries.toTypedArray()
-    private val cardColors = intArrayOf(
-        0xFF2E7D32.toInt(),  // 綠（蛇）
-        0xFFE65100.toInt(),  // 橘（地鼠）
-        0xFF6A1B9A.toInt(),  // 紫（節奏）
-        0xFF1565C0.toInt()   // 藍（打字）
+    private val tabRects = mutableListOf<Pair<RectF, GameCategory>>()
+    private var selectedCategory = GameCategory.CLASSIC
+    private val categoryColors = mapOf(
+        GameCategory.CLASSIC to 0xFF1565C0.toInt(),
+        GameCategory.ACTION to 0xFFE65100.toInt(),
+        GameCategory.PUZZLE to 0xFF6A1B9A.toInt(),
+        GameCategory.CHALLENGE to 0xFF2E7D32.toInt()
     )
 
     var scoreManager: ScoreManager? = null
@@ -52,27 +53,52 @@ class GameMenuView(
     private val cardPadding = 8f * density
     private val cornerRadius = 12f * density
 
+    private val tabHeight = 30f * density
+    private val tabPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val tabTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+        textSize = 10f * density
+    }
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec).let {
             if (it > 0) it else resources.displayMetrics.widthPixels
         }
-        // 標題 + 2 行卡片
-        val totalHeight = (40f * density + 2 * (cardHeight + cardPadding * 2) + 16f * density).toInt()
+        val games = GameMode.entries.filter { it.category == selectedCategory }
+        val cardsPerRow = ((w - cardPadding) / ((w - cardPadding * 3) / 2f + cardPadding)).toInt().coerceAtLeast(1)
+        val rowCount = (games.size + cardsPerRow - 1) / cardsPerRow
+        val totalHeight = (36f * density + tabHeight + rowCount * (cardHeight + cardPadding) + 16f * density).toInt()
         setMeasuredDimension(w, totalHeight)
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         canvas.drawColor(theme.backgroundColorInt)
-        cardRects.clear()
+        cardRects.clear(); tabRects.clear()
 
         // 標題
         titlePaint.color = theme.keyLabelColorInt
-        canvas.drawText("🎮 選擇遊戲", width / 2f, 28f * density, titlePaint)
+        canvas.drawText("🎮 選擇遊戲", width / 2f, 24f * density, titlePaint)
 
-        // 2x2 卡片排列
+        // 分類 Tab
+        val categories = GameCategory.entries
+        val tabWidth = width.toFloat() / categories.size
+        val tabTop = 30f * density
+        for ((i, cat) in categories.withIndex()) {
+            val left = i * tabWidth
+            val rect = RectF(left, tabTop, left + tabWidth, tabTop + tabHeight)
+            tabRects.add(rect to cat)
+            tabPaint.color = if (cat == selectedCategory) (categoryColors[cat] ?: 0xFF1565C0.toInt()) else theme.backgroundColorInt
+            canvas.drawRect(rect, tabPaint)
+            tabTextPaint.color = if (cat == selectedCategory) 0xFFFFFFFF.toInt() else theme.candidateTextColorInt
+            canvas.drawText(cat.displayName, rect.centerX(), rect.centerY() + 4 * density, tabTextPaint)
+        }
+
+        // 卡片
+        val games = GameMode.entries.filter { it.category == selectedCategory }
         val cardWidth = (width - cardPadding * 3) / 2f
-        val startY = 40f * density
+        val startY = tabTop + tabHeight + cardPadding
+        val baseColor = categoryColors[selectedCategory] ?: 0xFF1565C0.toInt()
 
         games.forEachIndexed { i, mode ->
             val col = i % 2
@@ -82,19 +108,15 @@ class GameMenuView(
             val rect = RectF(left, top, left + cardWidth, top + cardHeight)
             cardRects.add(rect to mode)
 
-            // 卡片背景
-            cardPaint.color = cardColors[i]
+            cardPaint.color = baseColor
             canvas.drawRoundRect(rect, cornerRadius, cornerRadius, cardPaint)
 
-            // 圖示
             iconPaint.color = 0xFFFFFFFF.toInt()
             canvas.drawText(mode.icon, rect.centerX(), rect.centerY() - 2f * density, iconPaint)
 
-            // 名稱
             labelPaint.color = 0xFFFFFFFF.toInt()
             canvas.drawText(mode.displayName, rect.centerX(), rect.bottom - 10f * density, labelPaint)
 
-            // 最高分
             val highScore = scoreManager?.getHighScore(mode) ?: 0
             if (highScore > 0) {
                 highScorePaint.color = 0xCCFFFFFF.toInt()
@@ -105,6 +127,13 @@ class GameMenuView(
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (event.action == MotionEvent.ACTION_UP) {
+            // Tab 點擊
+            for ((rect, cat) in tabRects) {
+                if (rect.contains(event.x, event.y)) {
+                    selectedCategory = cat; requestLayout(); invalidate(); return true
+                }
+            }
+            // 卡片點擊
             val hit = cardRects.firstOrNull { it.first.contains(event.x, event.y) }
             if (hit != null) {
                 onGameSelected(hit.second)

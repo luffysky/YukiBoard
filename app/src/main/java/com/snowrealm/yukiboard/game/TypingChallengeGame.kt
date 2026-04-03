@@ -130,8 +130,9 @@ class TypingChallengeGame(context: Context) : GameLogic {
 
     private fun placeTarget() {
         // 隨機選按鍵位置（排除第一行數字和最後兩行功能鍵）
-        val validRows = (1 until (rows - 2).coerceAtLeast(1))
-        val r = validRows.random()
+        val minRow = 1.coerceAtMost(rows - 1)
+        val maxRow = (rows - 2).coerceIn(minRow, rows - 1)
+        val r = Random.nextInt(minRow, maxRow + 1)
         val c = Random.nextInt(cols)
         val ch = letterPool[Random.nextInt(letterPool.length)]
 

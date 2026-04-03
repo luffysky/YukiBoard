@@ -2,8 +2,10 @@ package com.snowrealm.yukiboard.ui.settings
 
 import android.content.Intent
 import android.content.res.Configuration
+import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.RadioButton
@@ -12,6 +14,7 @@ import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import com.snowrealm.yukiboard.R
@@ -40,7 +43,7 @@ class SettingsActivity : AppCompatActivity() {
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(24), dp(32), dp(24), dp(24))
+            setPadding(dp(16), dp(32), dp(16), dp(24))
         }
 
         // ── 標題 ──
@@ -48,87 +51,251 @@ class SettingsActivity : AppCompatActivity() {
             text = getString(R.string.settings_title)
             textSize = 24f
             setTextColor(0xFFE8F4FF.toInt())
-            setPadding(0, 0, 0, dp(24))
+            setPadding(dp(8), 0, 0, dp(16))
         })
 
-        // ══════════════════════════════════════════════════════════════
-        // 感測器功能
-        // ══════════════════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════════════
+        // 1. AI 功能
+        // ═══════════════════════════════════════════════════════
+        val aiChildren = mutableListOf<View>()
+        root.addView(cardGroup("AI 功能", prefs.aiEnabled, { prefs.aiEnabled = it }, aiChildren) {
+            aiChildren += switchRow("AI 補字預測", "智慧預測下一個詞", prefs.aiPrediction) { prefs.aiPrediction = it }
+            aiChildren += switchRow("雪凜寫手", "幫你寫、回覆、換說法", prefs.aiWriter) { prefs.aiWriter = it }
+            aiChildren += switchRow("即時翻譯", "中英日等多語言翻譯", prefs.aiTranslate) { prefs.aiTranslate = it }
+            aiChildren += switchRow("情聖月老", "讓訊息更有魅力", prefs.aiCupid) { prefs.aiCupid = it }
+            aiChildren += switchRow("AI 語音 (Whisper)", "OpenAI 語音辨識", prefs.aiWhisper) { prefs.aiWhisper = it }
+            aiChildren += switchRow("文法糾錯", "一鍵修正錯字和文法", prefs.aiGrammarCheck) { prefs.aiGrammarCheck = it }
+            aiChildren += switchRow("語氣調整", "正式/casual/可愛/專業", prefs.aiToneAdjust) { prefs.aiToneAdjust = it }
+            aiChildren += switchRow("摘要精簡", "長文縮成一句話", prefs.aiSummarize) { prefs.aiSummarize = it }
+            aiChildren += switchRow("迷因生成", "產生流行語和梗圖文字", prefs.aiMemeText) { prefs.aiMemeText = it }
+            aiChildren += switchRow("Emoji 翻譯", "文字與 Emoji 互轉", prefs.aiEmojiTranslate) { prefs.aiEmojiTranslate = it }
+            aiChildren += switchRow("快速回覆", "建議整句回覆", prefs.aiQuickReply) { prefs.aiQuickReply = it }
+            aiChildren += switchRow("程式碼補全", "開發者模式中 AI 補完", prefs.aiCodeComplete) { prefs.aiCodeComplete = it }
+            aiChildren += switchRow("正則產生器", "描述需求產生 Regex", prefs.aiRegexGen) { prefs.aiRegexGen = it }
+            aiChildren += switchRow("Commit 訊息", "貼上 diff 產生 commit message", prefs.aiCommitMessage) { prefs.aiCommitMessage = it }
+            aiChildren += switchRow("雪凜聊天", "跟雪凜對話，幫你想怎麼說", prefs.aiYukiChat) { prefs.aiYukiChat = it }
+            aiChildren += switchRow("心情日記", "被動偵測打字情緒", prefs.aiMoodDiary) { prefs.aiMoodDiary = it }
+            aiChildren += switchRow("天氣助理", "天氣資訊與穿衣建議", prefs.aiWeather) { prefs.aiWeather = it }
 
-        root.addView(sectionTitle("感測器 / Sensors"))
-
-        // 搖手機復原
-        root.addView(switchRow("搖手機復原 / Shake to Undo",
-            "搖晃手機觸發復原（Ctrl+Z）",
-            prefs.shakeToUndoEnabled
-        ) { prefs.shakeToUndoEnabled = it })
-
-        // 陀螺儀游標
-        root.addView(switchRow("陀螺儀游標 / Gyro Cursor",
-            "長按空白鍵 + 傾斜手機控制游標",
-            prefs.gyroscopeCursorEnabled
-        ) { prefs.gyroscopeCursorEnabled = it })
-
-        // 陀螺儀靈敏度
-        root.addView(TextView(this).apply {
-            text = "陀螺儀靈敏度 / Gyro Sensitivity"
-            textSize = 13f
-            setTextColor(0xFFB0D4FF.toInt())
-            setPadding(dp(8), dp(8), 0, dp(4))
+            // AI 設定按鈕
+            aiChildren += Button(this).apply {
+                text = "AI 設定 / Provider"
+                setTextColor(0xFFFFFFFF.toInt())
+                textSize = 13f
+                background = GradientDrawable().apply {
+                    setColor(0xFF4A90E2.toInt())
+                    cornerRadius = dp(8).toFloat()
+                }
+                setPadding(dp(12), dp(8), dp(12), dp(8))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { setMargins(dp(8), dp(8), 0, dp(4)) }
+                setOnClickListener {
+                    startActivity(Intent(this@SettingsActivity, AISettingsActivity::class.java))
+                }
+            }
         })
 
-        val sensitivityLabel = TextView(this).apply {
-            text = "%.1f".format(prefs.gyroscopeSensitivity)
-            textSize = 13f
-            setTextColor(0xFF7FD8FF.toInt())
-            setPadding(dp(8), 0, 0, dp(8))
+        // ═══════════════════════════════════════════════════════
+        // 2. 雪凜行為
+        // ═══════════════════════════════════════════════════════
+        val yukiChildren = mutableListOf<View>()
+        root.addView(cardGroup("雪凜行為", prefs.yukiSarcasticComments, null, yukiChildren) {
+            yukiChildren += switchRow("微吐槽", "雪凜偶爾的有趣短評", prefs.yukiSarcasticComments) { prefs.yukiSarcasticComments = it }
+            yukiChildren += switchRow("情緒冷靜期", "偵測激烈文字時暫停提醒", prefs.yukiEmotionalCooldown) { prefs.yukiEmotionalCooldown = it }
+            yukiChildren += switchRow("心情日記被動偵測", "自動分析打字情緒", prefs.yukiMoodDiaryPassive) { prefs.yukiMoodDiaryPassive = it }
+            yukiChildren += switchRow("天氣主動提醒", "天氣變化時雪凜提醒", prefs.yukiWeatherAlert) { prefs.yukiWeatherAlert = it }
+            yukiChildren += switchRow("深夜關心", "深夜打字時的溫馨提醒", prefs.yukiLateNightComment) { prefs.yukiLateNightComment = it }
+        })
+
+        // ═══════════════════════════════════════════════════════
+        // 3. 感測器
+        // ═══════════════════════════════════════════════════════
+        val sensorChildren = mutableListOf<View>()
+        root.addView(cardGroup("感測器", null, null, sensorChildren) {
+            sensorChildren += switchRow("搖手機復原", "搖晃手機觸發 Ctrl+Z", prefs.shakeToUndoEnabled) { prefs.shakeToUndoEnabled = it }
+            sensorChildren += switchRow("陀螺儀游標", "長按空白鍵 + 傾斜控制游標", prefs.gyroscopeCursorEnabled) { prefs.gyroscopeCursorEnabled = it }
+
+            // 陀螺儀靈敏度滑桿
+            val sensitivityLabel = TextView(this).apply {
+                text = "靈敏度: %.1f".format(prefs.gyroscopeSensitivity)
+                textSize = 12f
+                setTextColor(0xFF7FD8FF.toInt())
+                setPadding(dp(12), dp(4), 0, dp(4))
+            }
+            sensorChildren += sensitivityLabel
+            sensorChildren += SeekBar(this).apply {
+                max = 25
+                progress = ((prefs.gyroscopeSensitivity - 0.5f) * 10).toInt()
+                setPadding(dp(12), dp(4), dp(12), dp(4))
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+                        val v = 0.5f + p * 0.1f
+                        prefs.gyroscopeSensitivity = v
+                        sensitivityLabel.text = "靈敏度: %.1f".format(v)
+                    }
+                    override fun onStartTrackingTouch(sb: SeekBar?) {}
+                    override fun onStopTrackingTouch(sb: SeekBar?) {}
+                })
+            }
+
+            sensorChildren += switchRow("App 自動切換模式", "偵測前景 App 自動切換模式", prefs.appAutoDetectEnabled) { prefs.appAutoDetectEnabled = it }
+        })
+
+        // ═══════════════════════════════════════════════════════
+        // 4. 動畫特效
+        // ═══════════════════════════════════════════════════════
+        val animChildren = mutableListOf<View>()
+        root.addView(cardGroup("動畫特效", null, null, animChildren) {
+            animChildren += switchRow("流光動畫", "OpenGL ES 流光覆蓋效果", prefs.flowLightEnabled) { prefs.flowLightEnabled = it }
+            animChildren += switchRow("角色動畫", "雪凜 Lottie 浮動角色", prefs.characterAnimEnabled) { prefs.characterAnimEnabled = it }
+            animChildren += switchRow("按鍵粒子效果", "打字時的粒子動畫", prefs.keyParticleEffect) { prefs.keyParticleEffect = it }
+            animChildren += switchRow("按鍵震動", "按鍵時的觸覺回饋", prefs.keyPressVibration) { prefs.keyPressVibration = it }
+            animChildren += switchRow("按鍵音效", "按鍵時的聲音回饋", prefs.keySoundEnabled) { prefs.keySoundEnabled = it }
+        })
+
+        // ═══════════════════════════════════════════════════════
+        // 5. 遊戲
+        // ═══════════════════════════════════════════════════════
+        val gameChildren = mutableListOf<View>()
+        root.addView(cardGroup("遊戲", prefs.gamesEnabled, { prefs.gamesEnabled = it }, gameChildren) {
+            gameChildren += switchRow("背景音樂", "遊戲背景音樂", prefs.gameBackgroundMusic) { prefs.gameBackgroundMusic = it }
+            gameChildren += switchRow("音效", "遊戲音效", prefs.gameSoundEffects) { prefs.gameSoundEffects = it }
+        })
+
+        // ═══════════════════════════════════════════════════════
+        // 6. 輸入行為 + 外觀
+        // ═══════════════════════════════════════════════════════
+        val inputChildren = mutableListOf<View>()
+        root.addView(cardGroup("輸入行為", null, null, inputChildren) {
+            inputChildren += switchRow("滑動輸入", "滑動手勢輸入", prefs.swipeInput) { prefs.swipeInput = it }
+            inputChildren += switchRow("自動更正", "英文自動更正", prefs.autoCorrect) { prefs.autoCorrect = it }
+            inputChildren += switchRow("Snippet 展開", "開發者模式：縮寫 + Tab 展開", prefs.snippetEnabled) { prefs.snippetEnabled = it }
+            inputChildren += switchRow("私房話模式", "AES 加密訊息", prefs.secretMessageMode) { prefs.secretMessageMode = it }
+            inputChildren += switchRow("語氣偵測", "偵測打字語氣", prefs.toneDetection) { prefs.toneDetection = it }
+            inputChildren += switchRow("懸浮面板", "啟用懸浮面板功能", prefs.floatingPanelEnabled) { prefs.floatingPanelEnabled = it }
+            inputChildren += switchRow("遠端鍵盤", "藍牙/WiFi 遠端控制", prefs.remoteKeyboardEnabled) { prefs.remoteKeyboardEnabled = it }
+        })
+
+        // ═══════════════════════════════════════════════════════
+        // 7. 智慧輸入
+        // ═══════════════════════════════════════════════════════
+        val smartChildren = mutableListOf<View>()
+        root.addView(cardGroup("智慧輸入", null, null, smartChildren) {
+            smartChildren += switchRow("智慧糾錯", "AI 偵測打錯字並自動修正", prefs.smartCorrection) { prefs.smartCorrection = it }
+            smartChildren += switchRow("自動學詞", "常用字彙自動加入字典", prefs.adaptiveDict) { prefs.adaptiveDict = it }
+            smartChildren += switchRow("語句預測", "預測下一個可能的詞或片語", prefs.phrasePredict) { prefs.phrasePredict = it }
+            smartChildren += switchRow("習慣追蹤", "學習打字習慣提升預測精準度", prefs.habitTracking) { prefs.habitTracking = it }
+        })
+
+        // ═══════════════════════════════════════════════════════
+        // 主題 / 外觀 / 語言 / 背景（獨立卡片）
+        // ═══════════════════════════════════════════════════════
+        root.addView(buildThemeCard())
+        root.addView(buildBackgroundCard())
+        root.addView(buildAppearanceCard())
+        root.addView(buildLanguageCard())
+
+        scrollView.addView(root)
+        setContentView(scrollView)
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // CardGroup 建構器
+    // ─────────────────────────────────────────────────────────
+
+    /**
+     * 建立一個群組卡片。
+     * @param title 群組標題
+     * @param masterValue 主開關初始值（null = 無主開關）
+     * @param masterSetter 主開關 setter（null = 無主開關）
+     * @param childViews 子項目列表，由 builder 填充
+     * @param builder 在 builder 裡把子 View 加入 childViews
+     */
+    private fun cardGroup(
+        title: String,
+        masterValue: Boolean?,
+        masterSetter: ((Boolean) -> Unit)?,
+        childViews: MutableList<View>,
+        builder: () -> Unit
+    ): LinearLayout {
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = GradientDrawable().apply {
+                setColor(0xFF1E2D4A.toInt())
+                cornerRadius = dp(12).toFloat()
+            }
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(0, 0, 0, dp(12)) }
         }
 
-        root.addView(SeekBar(this).apply {
-            max = 25  // 0.5 ~ 3.0 → 0~25 steps (step = 0.1)
-            progress = ((prefs.gyroscopeSensitivity - 0.5f) * 10).toInt()
-            setPadding(dp(8), dp(4), dp(8), dp(4))
-            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                    val value = 0.5f + progress * 0.1f
-                    prefs.gyroscopeSensitivity = value
-                    sensitivityLabel.text = "%.1f".format(value)
-                }
-                override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-                override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-            })
+        // 群組標題列
+        val titleRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(4), 0, dp(4), dp(8))
+        }
+
+        titleRow.addView(TextView(this).apply {
+            text = title
+            textSize = 16f
+            setTextColor(0xFF7FD8FF.toInt())
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         })
-        root.addView(sensitivityLabel)
 
-        // App 自動偵測
-        root.addView(switchRow("App 自動切換模式 / Auto Mode Switch",
-            "偵測前景 App 自動切換設計者/開發者模式",
-            prefs.appAutoDetectEnabled
-        ) { prefs.appAutoDetectEnabled = it })
+        // 主開關
+        if (masterValue != null && masterSetter != null) {
+            @Suppress("UseSwitchCompatOrMaterialCode")
+            titleRow.addView(Switch(this).apply {
+                isChecked = masterValue
+                setOnCheckedChangeListener { _, checked ->
+                    masterSetter(checked)
+                    childViews.forEach {
+                        it.isEnabled = checked
+                        it.alpha = if (checked) 1.0f else 0.4f
+                    }
+                }
+            })
+        }
 
-        // 震動回饋
-        root.addView(switchRow("震動回饋 / Haptic Feedback",
-            "按鍵和模式切換時的震動回饋",
-            prefs.hapticFeedbackEnabled
-        ) { prefs.hapticFeedbackEnabled = it })
+        card.addView(titleRow)
 
-        // Snippet
-        root.addView(switchRow("Snippet 展開 / Snippets",
-            "開發者模式：輸入縮寫 + Tab 自動展開",
-            prefs.snippetEnabled
-        ) { prefs.snippetEnabled = it })
+        // 分隔線
+        card.addView(View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(1)
+            ).apply { setMargins(0, 0, 0, dp(4)) }
+            setBackgroundColor(0xFF2A3555.toInt())
+        })
 
-        root.addView(divider())
+        // 建構子項目
+        builder()
 
-        // ══════════════════════════════════════════════════════════════
-        // 主題切換
-        // ══════════════════════════════════════════════════════════════
+        // 加入子項目
+        childViews.forEach { child ->
+            card.addView(child)
+            if (masterValue != null) {
+                child.isEnabled = masterValue
+                child.alpha = if (masterValue) 1.0f else 0.4f
+            }
+        }
 
-        root.addView(sectionTitle("主題 / Theme"))
+        return card
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 主題卡片
+    // ─────────────────────────────────────────────────────────
+
+    private fun buildThemeCard(): LinearLayout {
+        val card = simpleCard("主題 / Theme")
 
         val themeGroup = RadioGroup(this).apply {
             orientation = RadioGroup.VERTICAL
-            setPadding(dp(8), dp(4), 0, dp(16))
+            setPadding(dp(8), dp(4), 0, dp(8))
         }
 
         val themes = themeManager.availableThemes
@@ -140,91 +307,74 @@ class SettingsActivity : AppCompatActivity() {
                 isChecked = theme.id == themeManager.currentTheme.id
             })
         }
-
         themeGroup.setOnCheckedChangeListener { _, checkedId ->
             themes.firstOrNull { it.id.hashCode() == checkedId }?.let {
                 themeManager.currentTheme = it
             }
         }
+        card.addView(themeGroup)
+        return card
+    }
 
-        root.addView(themeGroup)
+    // ─────────────────────────────────────────────────────────
+    // 背景卡片
+    // ─────────────────────────────────────────────────────────
 
-        // ── 自訂背景 ──
-        root.addView(sectionTitle("鍵盤背景 / Keyboard Background"))
+    private fun buildBackgroundCard(): LinearLayout {
+        val card = simpleCard("鍵盤背景 / Background")
 
-        val bgLayout = LinearLayout(this).apply {
+        val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(8), dp(4), dp(8), dp(16))
+            setPadding(dp(4), dp(4), dp(4), dp(8))
         }
 
-        val pickImageBtn = Button(this).apply {
-            text = "選圖片"
-            setTextColor(0xFFE8F4FF.toInt())
-            background = GradientDrawable().apply {
-                setColor(0xFF2A3A5C.toInt())
-                cornerRadius = dp(8).toFloat()
+        row.addView(styledButton("選圖片", 0xFF2A3A5C.toInt(), 0xFFE8F4FF.toInt()) {
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE); type = "image/*"
             }
-            setOnClickListener {
-                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                    addCategory(Intent.CATEGORY_OPENABLE)
-                    type = "image/*"
-                }
-                startActivityForResult(intent, REQUEST_PICK_BG_IMAGE)
-            }
-        }
-        bgLayout.addView(pickImageBtn, LinearLayout.LayoutParams(0, dp(44), 1f).apply {
-            marginEnd = dp(4)
+            @Suppress("DEPRECATION")
+            startActivityForResult(intent, REQUEST_PICK_BG_IMAGE)
+        }.apply {
+            layoutParams = LinearLayout.LayoutParams(0, dp(40), 1f).apply { marginEnd = dp(4) }
         })
 
-        val pickVideoBtn = Button(this).apply {
-            text = "選影片"
-            setTextColor(0xFFE8F4FF.toInt())
-            background = GradientDrawable().apply {
-                setColor(0xFF2A3A5C.toInt())
-                cornerRadius = dp(8).toFloat()
+        row.addView(styledButton("選影片", 0xFF2A3A5C.toInt(), 0xFFE8F4FF.toInt()) {
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE); type = "video/*"
             }
-            setOnClickListener {
-                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                    addCategory(Intent.CATEGORY_OPENABLE)
-                    type = "video/*"
-                }
-                startActivityForResult(intent, REQUEST_PICK_BG_VIDEO)
+            @Suppress("DEPRECATION")
+            startActivityForResult(intent, REQUEST_PICK_BG_VIDEO)
+        }.apply {
+            layoutParams = LinearLayout.LayoutParams(0, dp(40), 1f).apply {
+                marginStart = dp(4); marginEnd = dp(4)
             }
-        }
-        bgLayout.addView(pickVideoBtn, LinearLayout.LayoutParams(0, dp(44), 1f).apply {
-            marginStart = dp(4)
-            marginEnd = dp(4)
         })
 
-        val clearBgBtn = Button(this).apply {
-            text = "清除"
-            setTextColor(0xFFFF6B6B.toInt())
-            background = GradientDrawable().apply {
-                setColor(0xFF1E2D4A.toInt())
-                cornerRadius = dp(8).toFloat()
-            }
-            setOnClickListener {
-                val dir = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getBackgroundDir(this@SettingsActivity)
-                dir.listFiles()?.forEach { it.delete() }
-                android.widget.Toast.makeText(this@SettingsActivity, "已清除背景", android.widget.Toast.LENGTH_SHORT).show()
-            }
-        }
-        bgLayout.addView(clearBgBtn, LinearLayout.LayoutParams(0, dp(44), 0.7f).apply {
-            marginStart = dp(4)
+        row.addView(styledButton("清除", 0xFF1E2D4A.toInt(), 0xFFFF6B6B.toInt()) {
+            val dir = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getBackgroundDir(this)
+            dir.listFiles()?.forEach { it.delete() }
+            Toast.makeText(this, "已清除背景", Toast.LENGTH_SHORT).show()
+        }.apply {
+            layoutParams = LinearLayout.LayoutParams(0, dp(40), 0.7f).apply { marginStart = dp(4) }
         })
 
-        root.addView(bgLayout)
+        card.addView(row)
+        return card
+    }
 
-        // ── 深色/淺色模式 ──
-        root.addView(sectionTitle("外觀模式 / Appearance"))
+    // ─────────────────────────────────────────────────────────
+    // 外觀模式卡片
+    // ─────────────────────────────────────────────────────────
 
-        val modeGroup = RadioGroup(this).apply {
+    private fun buildAppearanceCard(): LinearLayout {
+        val card = simpleCard("外觀模式 / Appearance")
+
+        val group = RadioGroup(this).apply {
             orientation = RadioGroup.VERTICAL
-            setPadding(dp(8), dp(4), 0, dp(16))
+            setPadding(dp(8), dp(4), 0, dp(8))
         }
 
         val currentMode = AppCompatDelegate.getDefaultNightMode()
-
         val modes = listOf(
             Triple(1, "跟隨系統 / Follow System", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM),
             Triple(2, "深色 / Dark", AppCompatDelegate.MODE_NIGHT_YES),
@@ -232,47 +382,50 @@ class SettingsActivity : AppCompatActivity() {
         )
 
         modes.forEach { (id, label, mode) ->
-            modeGroup.addView(RadioButton(this).apply {
+            group.addView(RadioButton(this).apply {
                 this.id = id
                 text = label
                 setTextColor(0xFFB0D4FF.toInt())
                 isChecked = currentMode == mode
             })
         }
-
-        modeGroup.setOnCheckedChangeListener { _, checkedId ->
+        group.setOnCheckedChangeListener { _, checkedId ->
             modes.firstOrNull { it.first == checkedId }?.let {
                 AppCompatDelegate.setDefaultNightMode(it.third)
             }
         }
 
-        root.addView(modeGroup)
+        card.addView(group)
+        return card
+    }
 
-        // ── 語言設定 ──
-        root.addView(sectionTitle("語言 / Language"))
+    // ─────────────────────────────────────────────────────────
+    // 語言卡片
+    // ─────────────────────────────────────────────────────────
 
-        val langGroup = RadioGroup(this).apply {
+    private fun buildLanguageCard(): LinearLayout {
+        val card = simpleCard("語言 / Language")
+
+        val group = RadioGroup(this).apply {
             orientation = RadioGroup.VERTICAL
-            setPadding(dp(8), dp(4), 0, dp(16))
+            setPadding(dp(8), dp(4), 0, dp(8))
         }
 
         val currentLang = resources.configuration.locales[0].language
-
         val langs = listOf(
             Triple(10, "繁體中文", "zh"),
             Triple(11, "English", "en")
         )
 
         langs.forEach { (id, label, lang) ->
-            langGroup.addView(RadioButton(this).apply {
+            group.addView(RadioButton(this).apply {
                 this.id = id
                 text = label
                 setTextColor(0xFFB0D4FF.toInt())
                 isChecked = currentLang == lang
             })
         }
-
-        langGroup.setOnCheckedChangeListener { _, checkedId ->
+        group.setOnCheckedChangeListener { _, checkedId ->
             langs.firstOrNull { it.first == checkedId }?.let { (_, _, lang) ->
                 val locale = Locale(lang)
                 Locale.setDefault(locale)
@@ -284,46 +437,41 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
 
-        root.addView(langGroup)
-
-        root.addView(divider())
-
-        // ══════════════════════════════════════════════════════════════
-        // AI / Claw
-        // ══════════════════════════════════════════════════════════════
-
-        root.addView(sectionTitle("AI / Claw"))
-
-        root.addView(Button(this).apply {
-            text = "AI 設定"
-            setTextColor(0xFFFFFFFF.toInt())
-            textSize = 14f
-            background = GradientDrawable().apply {
-                setColor(0xFF4A90E2.toInt())
-                cornerRadius = dp(8).toFloat()
-            }
-            setPadding(dp(16), dp(10), dp(16), dp(10))
-            val lp = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { setMargins(dp(8), dp(8), 0, dp(16)) }
-            layoutParams = lp
-            setOnClickListener {
-                startActivity(Intent(this@SettingsActivity, AISettingsActivity::class.java))
-            }
-        })
-
-        scrollView.addView(root)
-        setContentView(scrollView)
+        card.addView(group)
+        return card
     }
 
-    // ── UI 工具 ──
+    // ─────────────────────────────────────────────────────────
+    // UI 工具方法
+    // ─────────────────────────────────────────────────────────
 
-    private fun sectionTitle(text: String): TextView = TextView(this).apply {
-        this.text = text
-        textSize = 16f
-        setTextColor(0xFF7FD8FF.toInt())
-        setPadding(0, dp(8), 0, dp(4))
+    private fun simpleCard(title: String): LinearLayout {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = GradientDrawable().apply {
+                setColor(0xFF1E2D4A.toInt())
+                cornerRadius = dp(12).toFloat()
+            }
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(0, 0, 0, dp(12)) }
+
+            addView(TextView(this@SettingsActivity).apply {
+                text = title
+                textSize = 16f
+                setTextColor(0xFF7FD8FF.toInt())
+                setPadding(dp(4), 0, 0, dp(8))
+            })
+
+            addView(View(this@SettingsActivity).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, dp(1)
+                ).apply { setMargins(0, 0, 0, dp(4)) }
+                setBackgroundColor(0xFF2A3555.toInt())
+            })
+        }
     }
 
     @Suppress("UseSwitchCompatOrMaterialCode")
@@ -335,7 +483,7 @@ class SettingsActivity : AppCompatActivity() {
     ): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(8), dp(8), dp(8), dp(8))
+            setPadding(dp(8), dp(6), dp(8), dp(6))
 
             val textContainer = LinearLayout(this@SettingsActivity).apply {
                 orientation = LinearLayout.VERTICAL
@@ -360,12 +508,22 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
-    private fun divider(): android.view.View = android.view.View(this).apply {
-        layoutParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            dp(1)
-        ).apply { setMargins(0, dp(12), 0, dp(4)) }
-        setBackgroundColor(0xFF2A3555.toInt())
+    private fun styledButton(
+        label: String,
+        bgColor: Int,
+        textColor: Int,
+        onClick: () -> Unit
+    ): Button {
+        return Button(this).apply {
+            text = label
+            setTextColor(textColor)
+            textSize = 13f
+            background = GradientDrawable().apply {
+                setColor(bgColor)
+                cornerRadius = dp(8).toFloat()
+            }
+            setOnClickListener { onClick() }
+        }
     }
 
     private fun dp(value: Int): Int =
@@ -378,7 +536,6 @@ class SettingsActivity : AppCompatActivity() {
 
         val uri = data.data!!
         val bgDir = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getBackgroundDir(this)
-        // 清除舊背景
         bgDir.listFiles()?.forEach { it.delete() }
 
         val ext = when (requestCode) {
@@ -406,9 +563,9 @@ class SettingsActivity : AppCompatActivity() {
             contentResolver.openInputStream(uri)?.use { input ->
                 dest.outputStream().use { output -> input.copyTo(output) }
             }
-            android.widget.Toast.makeText(this, "背景已設定，重新開啟鍵盤生效", android.widget.Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "背景已設定，重新開啟鍵盤生效", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
-            android.widget.Toast.makeText(this, "背景設定失敗: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "背景設定失敗: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 }

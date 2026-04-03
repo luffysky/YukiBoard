@@ -31,7 +31,14 @@ class LottieCharacterAnimation(private val view: LottieAnimationView) : Characte
 
     override fun playReaction(animationName: String, onEnd: (() -> Unit)?) {
         view.cancelAnimation()
-        view.setAnimation("lottie/yuki_$animationName.json")
+        val asset = "lottie/yuki_$animationName.json"
+        val safeAsset = try {
+            view.context.assets.open(asset).close()
+            asset
+        } catch (_: Exception) {
+            FALLBACK_ASSET
+        }
+        view.setAnimation(safeAsset)
 
         if (onEnd != null) {
             view.repeatCount = 0
@@ -95,5 +102,9 @@ class LottieCharacterAnimation(private val view: LottieAnimationView) : Characte
 
     override fun stop() {
         view.cancelAnimation()
+    }
+
+    companion object {
+        private const val FALLBACK_ASSET = "lottie/yuki_happy.json"
     }
 }

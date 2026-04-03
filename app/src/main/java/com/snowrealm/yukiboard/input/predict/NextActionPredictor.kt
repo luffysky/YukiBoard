@@ -77,49 +77,55 @@ class RuleBasedPredictor : NextActionPredictor {
 
         when (context.keyboardMode) {
             KeyboardMode.DEVELOPER -> {
-                // 開發者模式規則
                 val text = context.textBeforeCursor
 
-                // 剛打了開括號 → 可能需要閉括號
-                if (text.endsWith("(")) {
-                    predictions.add(PredictedAction("insert:)", ")", 0.8f, ActionCategory.OTHER))
-                }
-                if (text.endsWith("{")) {
-                    predictions.add(PredictedAction("insert:}", "}", 0.8f, ActionCategory.OTHER))
-                }
-                if (text.endsWith("[")) {
-                    predictions.add(PredictedAction("insert:]", "]", 0.8f, ActionCategory.OTHER))
-                }
+                // 括號自動配對
+                if (text.endsWith("(")) predictions.add(PredictedAction("insert:)", ")", 0.8f, ActionCategory.OTHER))
+                if (text.endsWith("{")) predictions.add(PredictedAction("insert:}", "}", 0.8f, ActionCategory.OTHER))
+                if (text.endsWith("[")) predictions.add(PredictedAction("insert:]", "]", 0.8f, ActionCategory.OTHER))
 
-                // 偵測可能的 snippet
+                // Snippet 偵測
                 val lastWord = text.trimEnd().split(Regex("\\s+")).lastOrNull() ?: ""
                 when (lastWord) {
-                    "fn", "func" -> predictions.add(
-                        PredictedAction("snippet:fn", "→ function(){}", 0.9f, ActionCategory.SNIPPET)
-                    )
-                    "if" -> predictions.add(
-                        PredictedAction("snippet:if", "→ if(){}", 0.9f, ActionCategory.SNIPPET)
-                    )
-                    "for" -> predictions.add(
-                        PredictedAction("snippet:for", "→ for(){}", 0.9f, ActionCategory.SNIPPET)
-                    )
+                    "fn", "func" -> predictions.add(PredictedAction("snippet:fn", "→ function(){}", 0.9f, ActionCategory.SNIPPET))
+                    "if" -> predictions.add(PredictedAction("snippet:if", "→ if(){}", 0.9f, ActionCategory.SNIPPET))
+                    "for" -> predictions.add(PredictedAction("snippet:for", "→ for(){}", 0.9f, ActionCategory.SNIPPET))
+                    "class" -> predictions.add(PredictedAction("snippet:class", "→ class{}", 0.85f, ActionCategory.SNIPPET))
+                    "try" -> predictions.add(PredictedAction("snippet:try", "→ try/catch", 0.85f, ActionCategory.SNIPPET))
                 }
 
                 // 常見操作提示
-                if (text.lines().size > 5) {
-                    predictions.add(PredictedAction("shortcut:fold", "摺疊", 0.5f, ActionCategory.SHORTCUT))
-                }
+                if (text.lines().size > 5) predictions.add(PredictedAction("shortcut:fold", "摺疊", 0.5f, ActionCategory.SHORTCUT))
+                if (text.length > 200) predictions.add(PredictedAction("shortcut:format", "格式化", 0.4f, ActionCategory.SHORTCUT))
             }
 
             KeyboardMode.DESIGNER -> {
-                // 設計者模式：常用操作提示
                 predictions.add(PredictedAction("shortcut:undo", "復原", 0.4f, ActionCategory.SHORTCUT))
                 predictions.add(PredictedAction("shortcut:group", "群組", 0.3f, ActionCategory.SHORTCUT))
+                predictions.add(PredictedAction("shortcut:align", "對齊", 0.25f, ActionCategory.SHORTCUT))
             }
 
-            KeyboardMode.NORMAL, KeyboardMode.GAME -> {
-                // 一般模式/遊戲模式暫無規則預測
+            KeyboardMode.NORMAL -> {
+                val text = context.textBeforeCursor
+                // 問號結尾 → 可能需要快速回覆
+                if (text.trimEnd().endsWith("?") || text.trimEnd().endsWith("？")) {
+                    predictions.add(PredictedAction("skill:quick_reply", "快速回覆", 0.6f, ActionCategory.OTHER))
+                }
+                // 長文 → 摘要
+                if (text.length > 100) {
+                    predictions.add(PredictedAction("skill:summarize", "摘要", 0.4f, ActionCategory.OTHER))
+                }
             }
+
+            KeyboardMode.GAME -> { /* 遊戲模式不預測 */ }
+        }
+
+        // App 感知預測
+        when {
+            context.appPackage.contains("github") || context.appPackage.contains("gitlab") ->
+                predictions.add(PredictedAction("skill:commit_message", "Commit", 0.5f, ActionCategory.OTHER))
+            context.appPackage.contains("line") || context.appPackage.contains("messenger") || context.appPackage.contains("whatsapp") ->
+                predictions.add(PredictedAction("skill:quick_reply", "快速回覆", 0.45f, ActionCategory.OTHER))
         }
 
         return predictions.sortedByDescending { it.confidence }
@@ -127,5 +133,44 @@ class RuleBasedPredictor : NextActionPredictor {
 
     override fun feedback(actualAction: String) {
         // MVP 不學習，未來由 Claw AI 處理
+    }
+}
+
+/**
+ * AI 增強預測器 — 結合本地規則和 Claw AI 意圖預測。
+ * 先用本地規則快速回應，高信心場景不呼叫 AI 節省 token。
+ */
+class ClawEnhancedPredictor(
+    private val rulePredictor: RuleBasedPredictor = RuleBasedPredictor()
+) : NextActionPredictor {
+
+    /** AI 預測回調（由外部注入 ClawClient） */
+    var aiPredictCallback: ((PredictionContext) -> List<PredictedAction>)? = null
+
+    override fun predict(context: PredictionContext): List<PredictedAction> {
+        val localResults = rulePredictor.predict(context)
+
+        // 若本地規則已有高信心結果（≥0.8），直接回傳不浪費 token
+        if (localResults.any { it.confidence >= 0.8f }) {
+            return localResults
+        }
+
+        // 嘗試 AI 預測
+        val aiResults = try {
+            aiPredictCallback?.invoke(context) ?: emptyList()
+        } catch (_: Exception) {
+            emptyList()
+        }
+
+        // 合併並去重（AI 結果優先）
+        val merged = mutableMapOf<String, PredictedAction>()
+        for (action in localResults) merged[action.actionId] = action
+        for (action in aiResults) merged[action.actionId] = action
+
+        return merged.values.sortedByDescending { it.confidence }
+    }
+
+    override fun feedback(actualAction: String) {
+        rulePredictor.feedback(actualAction)
     }
 }

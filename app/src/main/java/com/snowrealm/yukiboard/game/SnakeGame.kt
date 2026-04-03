@@ -80,7 +80,7 @@ class SnakeGame(context: Context) : GameLogic {
         val currentInterval = (moveInterval - foodEaten * speedUpPerFood).coerceAtLeast(120L)
 
         if (moveAccumulator >= currentInterval) {
-            moveAccumulator = 0
+            moveAccumulator -= currentInterval
             direction = nextDirection
             moveSnake()
         }
