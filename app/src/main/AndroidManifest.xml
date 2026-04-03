@@ -62,6 +62,12 @@
             </intent-filter>
         </activity>
 
+        <!-- 功能說明 & 使用教學 -->
+        <activity
+            android:name=".ui.settings.HelpActivity"
+            android:label="功能說明"
+            android:exported="false" />
+
         <!-- AI 設定頁面 -->
         <activity
             android:name=".ui.settings.AISettingsActivity"

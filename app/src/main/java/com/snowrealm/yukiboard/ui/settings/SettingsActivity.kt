@@ -48,13 +48,31 @@ class SettingsActivity : AppCompatActivity() {
             setPadding(dp(16), dp(32), dp(16), dp(24))
         }
 
-        // ── 標題 ──
-        root.addView(TextView(this).apply {
+        // ── 標題 + 教學按鈕 ──
+        val titleRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(8), 0, dp(8), dp(16))
+        }
+        titleRow.addView(TextView(this).apply {
             text = getString(R.string.settings_title)
             textSize = 24f
             setTextColor(0xFFE8F4FF.toInt())
-            setPadding(dp(8), 0, 0, dp(16))
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         })
+        titleRow.addView(Button(this).apply {
+            text = "功能說明"
+            setTextColor(0xFFFFFFFF.toInt())
+            textSize = 13f
+            background = GradientDrawable().apply {
+                setColor(0xFF2A3A5C.toInt())
+                cornerRadius = dp(8).toFloat()
+            }
+            setPadding(dp(14), dp(6), dp(14), dp(6))
+            setOnClickListener {
+                startActivity(Intent(this@SettingsActivity, HelpActivity::class.java))
+            }
+        })
+        root.addView(titleRow)
 
         // ═══════════════════════════════════════════════════════
         // 1. AI 功能

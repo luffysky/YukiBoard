@@ -310,6 +310,15 @@ class YukiBoardIMEService : InputMethodService() {
             return wrapInFloatingMode(rootContainer)
         }
 
+        // 底部安全間距（避免貼住螢幕底部）
+        val bottomPad = (8 * resources.displayMetrics.density).toInt()
+        val bottomSpacer = View(this).apply {
+            setBackgroundColor(0xFF111827.toInt())
+        }
+        rootContainer.addView(bottomSpacer, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, bottomPad
+        ))
+
         // 寬度調整（非滿版時置中）
         applyKeyboardWidth(rootContainer)
 
@@ -871,7 +880,10 @@ class YukiBoardIMEService : InputMethodService() {
         // 遊戲事件回呼（統一透過反射取 onGameEvent 屬性）
         setGameEventCallback(game)
 
-        keyboardContainer.addView(gkv)
+        keyboardContainer.addView(gkv, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ))
         gameKeyboardView = gkv
         currentGame = game
 

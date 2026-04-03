@@ -49,8 +49,8 @@ class GameKeyboardView(context: Context) : View(context) {
     private val keyRectCache = mutableListOf<Triple<RectF, Int, Int>>() // rect, row, col
     private val keyLabelMap = mutableMapOf<Pair<Int, Int>, String>()    // (row,col) → label
 
-    private val hudHeight = 36f * density
-    private val rowHeight = 48f * density
+    private val hudHeight = 32f * density
+    private var rowHeight = 44f * density
     private val keyPaddingH = 3f * density
     private val keyPaddingV = 3f * density
     private val cornerRadius = 8f * density
@@ -85,8 +85,17 @@ class GameKeyboardView(context: Context) : View(context) {
         val w = MeasureSpec.getSize(widthMeasureSpec).let {
             if (it > 0) it else resources.displayMetrics.widthPixels
         }
-        val totalHeight = (hudHeight + keyRows.size * rowHeight).toInt()
-        setMeasuredDimension(w, totalHeight)
+        val hMode = MeasureSpec.getMode(heightMeasureSpec)
+        val hSize = MeasureSpec.getSize(heightMeasureSpec)
+
+        // 如果父容器有固定高度，動態計算 rowHeight 使所有行都能顯示
+        if (hMode == MeasureSpec.EXACTLY && hSize > 0 && keyRows.isNotEmpty()) {
+            rowHeight = ((hSize - hudHeight) / keyRows.size).coerceAtLeast(28f * density)
+            setMeasuredDimension(w, hSize)
+        } else {
+            val totalHeight = (hudHeight + keyRows.size * rowHeight).toInt()
+            setMeasuredDimension(w, totalHeight)
+        }
     }
 
     override fun onDraw(canvas: Canvas) {
