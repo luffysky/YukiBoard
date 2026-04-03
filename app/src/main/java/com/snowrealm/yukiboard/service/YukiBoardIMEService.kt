@@ -36,6 +36,7 @@ import com.snowrealm.yukiboard.ui.keyboard.KeyboardState
 import com.snowrealm.yukiboard.ui.keyboard.KeyboardView
 import com.snowrealm.yukiboard.ui.panel.*
 import com.snowrealm.yukiboard.ui.settings.SettingsActivity
+import com.snowrealm.yukiboard.claw.ClawClient
 import com.snowrealm.yukiboard.ui.settings.YukiPreferences
 
 class YukiBoardIMEService : InputMethodService() {
@@ -52,9 +53,11 @@ class YukiBoardIMEService : InputMethodService() {
     private lateinit var appModeDetector: AppModeDetector
     private lateinit var prefs: YukiPreferences
 
-    // GL 流光 + Lottie 角色
+    // GL 流光 + Lottie 角色 + 粒子 + 背景
     private var glSurfaceView: KeyboardGLSurfaceView? = null
     private var characterView: CharacterView? = null
+    private var particleView: com.snowrealm.yukiboard.animation.KeyboardParticleView? = null
+    private var backgroundView: com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView? = null
 
     // 面板
     private var activePanel: PanelType? = null
@@ -65,6 +68,13 @@ class YukiBoardIMEService : InputMethodService() {
     private var gifPanel: GifPanelView? = null
     private var stickerPanel: StickerPanelView? = null
     private var themePanel: ThemePanelView? = null
+
+    // 貼圖同步
+    private var stickerRepository: com.snowrealm.yukiboard.sticker.StickerRepository? = null
+
+    // Claw AI
+    var clawClient: ClawClient? = null
+        private set
 
     // 語音輸入
     private var speechEngine: SpeechInputEngine? = null
@@ -115,6 +125,13 @@ class YukiBoardIMEService : InputMethodService() {
                 sendKey(ic, keyCode)
             }
         }
+
+        // 貼圖同步（從 Insight Engine 後台拉取）
+        stickerRepository = com.snowrealm.yukiboard.sticker.StickerRepository(applicationContext)
+        stickerRepository?.syncInBackground()
+
+        // Claw AI（自動從 BuildConfig 匯入 API key）
+        clawClient = ClawClient(applicationContext)
     }
 
     override fun onEvaluateInputViewShown(): Boolean = true
@@ -142,15 +159,7 @@ class YukiBoardIMEService : InputMethodService() {
             LinearLayout.LayoutParams.WRAP_CONTENT
         ))
 
-        // 面板容器（初始隱藏）
-        panelContainer = FrameLayout(this)
-        panelContainer.visibility = View.GONE
-        rootContainer.addView(panelContainer, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ))
-
-        // 鍵盤容器（FrameLayout 疊加鍵盤 + GL + Lottie）
+        // 鍵盤容器（FrameLayout 疊加鍵盤 + GL + Lottie + 面板覆蓋）
         keyboardContainer = FrameLayout(this)
 
         keyboardView = KeyboardView(this)
@@ -167,6 +176,13 @@ class YukiBoardIMEService : InputMethodService() {
                 exitGameMode()
             }
         }
+        keyboardView.setOnCandidateSelectListener { index ->
+            val ic = currentInputConnection ?: return@setOnCandidateSelectListener
+            val result = inputRouter.selectCandidate(index)
+            applyInputResult(ic, result)
+            keyboardView.updateComposingText(inputRouter.composingText)
+            keyboardView.updateCandidates(inputRouter.candidates)
+        }
         keyboardView.setOnSpaceLongPressListener { pressed ->
             if (prefs.gyroscopeCursorEnabled) {
                 if (pressed) {
@@ -178,11 +194,43 @@ class YukiBoardIMEService : InputMethodService() {
             }
         }
 
+        // 自訂圖片/影片背景（最底層）
+        val bgView = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView(this)
+        val savedBg = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getSavedBackground(this)
+        if (savedBg != null) {
+            if (com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.isVideoFile(savedBg)) {
+                bgView.setVideoBackground(savedBg)
+            } else {
+                bgView.setImageBackground(savedBg)
+            }
+        }
+        keyboardContainer.addView(bgView, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ))
+        backgroundView = bgView
+
         keyboardContainer.addView(keyboardView)
+
+        // 套用當前主題
+        val currentTheme = ThemeManager.getInstance(this).currentTheme
+        keyboardView.applyTheme(currentTheme)
+        toolbarView.theme = currentTheme
+
+        // 動態粒子覆蓋層（在鍵盤上方、GL 下方）
+        val pv = com.snowrealm.yukiboard.animation.KeyboardParticleView(this)
+        pv.setTheme(currentTheme)
+        pv.start()
+        keyboardContainer.addView(pv, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ))
+        particleView = pv
 
         // GL 流光透明覆蓋層
         val gl = KeyboardGLSurfaceView(this)
-        gl.setFlowAlpha(0.55f)
+        gl.setFlowAlpha(currentTheme.flowLightAlpha)
+        gl.setFlowColor(currentTheme.flowLightColorInt)
         keyboardContainer.addView(gl, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT
@@ -193,12 +241,19 @@ class YukiBoardIMEService : InputMethodService() {
         val charSize = (56 * resources.displayMetrics.density).toInt()
         val charView = CharacterView(this)
         val charParams = FrameLayout.LayoutParams(charSize, charSize).apply {
-            gravity = android.view.Gravity.TOP or android.view.Gravity.END
-            topMargin = (-12 * resources.displayMetrics.density).toInt()
-            marginEnd = (8 * resources.displayMetrics.density).toInt()
+            gravity = android.view.Gravity.TOP or android.view.Gravity.START
         }
         keyboardContainer.addView(charView, charParams)
         characterView = charView
+
+        // 面板容器（覆蓋在鍵盤上方，從頂部對齊）
+        panelContainer = FrameLayout(this)
+        panelContainer.visibility = View.GONE
+        keyboardContainer.addView(panelContainer, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            android.view.Gravity.TOP
+        ))
 
         // 套用儲存的鍵盤高度
         val screenH = resources.displayMetrics.heightPixels
@@ -271,6 +326,9 @@ class YukiBoardIMEService : InputMethodService() {
         speechEngine?.destroy()
         btKeyboard?.destroy()
         wifiServer?.destroy()
+        stickerRepository?.destroy()
+        particleView?.stop()
+        backgroundView?.destroy()
     }
 
     // =========================================================================
@@ -356,9 +414,10 @@ class YukiBoardIMEService : InputMethodService() {
             PanelType.STICKER -> {
                 val p = StickerPanelView(this).also { stickerPanel = it }
                 p.theme = theme
-                p.onStickerSelected = { sticker ->
-                    // MVP: 插入貼圖名稱（完整實作需 commitContent + FileProvider）
-                    currentInputConnection?.commitText("[${sticker.name}]", 1)
+                p.repository = stickerRepository
+                p.onStickerSelected = { stickerText ->
+                    // 插入 [STICKER]:<url> 格式（同 Insight 私訊）
+                    currentInputConnection?.commitText(stickerText, 1)
                 }
                 p
             }
@@ -386,6 +445,21 @@ class YukiBoardIMEService : InputMethodService() {
                 }
                 p
             }
+            PanelType.CLAW -> {
+                val p = ClawPanelView(this)
+                p.theme = theme
+                p.onSuggestionSelected = { text ->
+                    currentInputConnection?.commitText(text, 1)
+                }
+                p.onClose = { closePanel() }
+                p.onLockTapped = {
+                    startActivity(
+                        Intent(this, com.snowrealm.yukiboard.ui.auth.InviteCodeActivity::class.java)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                }
+                p
+            }
             else -> return
         }
 
@@ -401,9 +475,10 @@ class YukiBoardIMEService : InputMethodService() {
 
     private fun applyTheme(theme: KeyboardTheme) {
         toolbarView.theme = theme
+        keyboardView.applyTheme(theme)
         glSurfaceView?.setFlowAlpha(theme.flowLightAlpha)
-        // KeyboardView 主題由 ThemeManager 全域管理
-        keyboardView.invalidate()
+        glSurfaceView?.setFlowColor(theme.flowLightColorInt)
+        particleView?.setTheme(theme)
     }
 
     // =========================================================================

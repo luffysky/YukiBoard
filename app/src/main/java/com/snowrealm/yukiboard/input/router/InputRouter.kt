@@ -101,6 +101,25 @@ class InputRouter(private val context: Context) {
         return result
     }
 
+    /**
+     * 使用者從候選列選擇第 [index] 個候選字。
+     */
+    fun selectCandidate(index: Int): InputResult {
+        if (activeEngine is ChewingInputEngine) {
+            val result = (activeEngine as ChewingInputEngine).selectCandidateAt(index)
+            updateCandidates()
+            return result
+        }
+        // 英文候選：直接 commit 選中的字
+        val selected = candidateManager.selectAt(index)
+        if (selected != null) {
+            activeEngine.reset()
+            candidateManager.clear()
+            return InputResult.CommitText(selected)
+        }
+        return InputResult.Idle
+    }
+
     fun reset() {
         englishEngine.reset()
         bopomofoEngine.reset()
