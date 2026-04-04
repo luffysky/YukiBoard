@@ -56,6 +56,7 @@ class YukiPreferences(context: Context) {
     // 動畫特效
     // ════════════════════��═══════════════════════��══════════════
     var flowLightEnabled: Boolean by BoolPref("flow_light", true)
+    var vrmCharacterEnabled: Boolean by BoolPref("vrm_character", false)
     var characterAnimEnabled: Boolean by BoolPref("character_anim", true)
     var keyParticleEffect: Boolean by BoolPref("key_particle", true)
     var keyPressVibration: Boolean by BoolPref("key_vibration", true)

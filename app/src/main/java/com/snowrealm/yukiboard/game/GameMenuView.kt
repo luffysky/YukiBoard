@@ -39,6 +39,8 @@ class GameMenuView(
 
     private val cardRects = mutableListOf<Pair<RectF, GameMode>>()
     private val tabRects = mutableListOf<Pair<RectF, GameCategory>>()
+    private val backBtnRect = RectF()
+    var onBackToNormal: (() -> Unit)? = null
     private var selectedCategory = GameCategory.CLASSIC
     private val categoryColors = mapOf(
         GameCategory.CLASSIC to 0xFF1565C0.toInt(),
@@ -75,6 +77,15 @@ class GameMenuView(
         super.onDraw(canvas)
         canvas.drawColor(theme.backgroundColorInt)
         cardRects.clear(); tabRects.clear()
+
+        // ⌨返回 按鈕（左上角）
+        val btnW = 56f * density
+        val btnH = 22f * density
+        backBtnRect.set(6f * density, 4f * density, 6f * density + btnW, 4f * density + btnH)
+        cardPaint.color = theme.specialKeyColorInt
+        canvas.drawRoundRect(backBtnRect, 6f * density, 6f * density, cardPaint)
+        labelPaint.color = theme.keyLabelColorInt
+        canvas.drawText("⌨返回", backBtnRect.centerX(), backBtnRect.centerY() + 4f * density, labelPaint)
 
         // 標題
         titlePaint.color = theme.keyLabelColorInt
@@ -127,6 +138,11 @@ class GameMenuView(
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (event.action == MotionEvent.ACTION_UP) {
+            // ⌨返回
+            if (backBtnRect.contains(event.x, event.y)) {
+                onBackToNormal?.invoke()
+                return true
+            }
             // Tab 點擊
             for ((rect, cat) in tabRects) {
                 if (rect.contains(event.x, event.y)) {

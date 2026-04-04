@@ -155,9 +155,16 @@ class KeyboardView(context: Context) : View(context) {
     // 候選列橫向捲動
     private var candidateScrollX = 0f
     private var candidateLastTouchX = 0f
+    private var candidateDownX = 0f   // ACTION_DOWN 時的 x，用於選字
     private var candidateIsDragging = false
     private var candidateTouchActive = false
-    private val candidateRects = mutableListOf<Pair<RectF, Int>>() // rect → index in allCandidates
+    // 候選字���度快取（每次 draw 時更新）
+    private var candWidthsCache: List<Float> = emptyList()
+    private var candFixedLeftCache = 0f
+    private var candGapCache = 0f
+    // 右側展開箭頭���域
+    private val expandArrowWidth by lazy { 28f * density }
+    private var hasExpandArrow = false
     /** 是否有自訂背景圖（設為 true 時鍵盤背景變半透明） */
     var hasCustomBackground: Boolean = false
         set(value) {
@@ -287,6 +294,18 @@ class KeyboardView(context: Context) : View(context) {
             @Suppress("DEPRECATION")
             vibrator.vibrate(50)
         }
+    }
+
+    fun showToast(msg: String) {
+        modeToastText = msg
+        modeToastEndTime = System.currentTimeMillis() + modeToastDuration
+        invalidate()
+        handler.postDelayed({
+            if (modeToastText == msg) {
+                modeToastText = null
+                invalidate()
+            }
+        }, modeToastDuration)
     }
 
     private fun showModeToast(mode: KeyboardMode) {
@@ -648,7 +667,7 @@ class KeyboardView(context: Context) : View(context) {
         keyPaint.color = if (hasCustomBackground) 0x22000000 else theme.candidateBarColorInt
         canvas.drawRect(barRect, keyPaint)
 
-        candidateRects.clear()
+        hasExpandArrow = false
 
         // 模式標示
         if (currentMode != KeyboardMode.NORMAL) {
@@ -706,21 +725,30 @@ class KeyboardView(context: Context) : View(context) {
         // 候選字區域（橫向捲動）
         if (candidates.isEmpty()) return
 
-        val candPadH = 14f * density  // 每個候選字左右 padding
-        val candGap = 2f * density    // 候選字間距
+        val candPadH = 14f * density
+        val candGap = 2f * density
         candidatePaint.textAlign = Paint.Align.CENTER
         candidatePaint.textSize = 15f * density
 
-        // 計算每個候選字的實際寬度
+        // 計算每個候選字寬度並快取（供 touch 用）
         val candWidths = candidates.map { candidatePaint.measureText(it) + candPadH * 2 }
+        candWidthsCache = candWidths
+        candFixedLeftCache = fixedLeft
+        candGapCache = candGap
+
         val totalCandWidth = candWidths.sum() + candGap * (candidates.size - 1).coerceAtLeast(0)
-        val scrollAreaWidth = width.toFloat() - fixedLeft
+
+        // 右側預留展開箭頭空間（候選 > 5 個時顯示）
+        val showArrow = allCandidates.size > 5
+        hasExpandArrow = showArrow
+        val arrowSpace = if (showArrow) expandArrowWidth else 0f
+        val scrollAreaWidth = width.toFloat() - fixedLeft - arrowSpace
         val maxScroll = (totalCandWidth - scrollAreaWidth).coerceAtLeast(0f)
         candidateScrollX = candidateScrollX.coerceIn(0f, maxScroll)
 
-        // clip 候選字區域
+        // clip 候選字區域（不含箭頭區域）
         canvas.save()
-        canvas.clipRect(fixedLeft, 0f, width.toFloat(), candidateBarHeight)
+        canvas.clipRect(fixedLeft, 0f, width.toFloat() - arrowSpace, candidateBarHeight)
 
         var drawX = fixedLeft - candidateScrollX
         candidates.forEachIndexed { i, text ->
@@ -729,9 +757,7 @@ class KeyboardView(context: Context) : View(context) {
             val right = drawX + cw
             val cx = left + cw / 2f
 
-            // 只繪製可見的
-            if (right > fixedLeft && left < width.toFloat()) {
-                // 第一個候選加高亮背景
+            if (right > fixedLeft && left < width.toFloat() - arrowSpace) {
                 if (i == 0 && candidates.size > 1) {
                     keyPaint.color = theme.candidateSelectedColorInt
                     keyPaint.alpha = 40
@@ -744,14 +770,10 @@ class KeyboardView(context: Context) : View(context) {
                 }
                 canvas.drawText(text, cx, candidateBarHeight * 0.65f, candidatePaint)
 
-                // 分隔線
                 if (i > 0) {
                     dividerPaint.color = (theme.candidateTextColorInt and 0x00FFFFFF) or 0x20000000
                     canvas.drawLine(left, 8 * density, left, candidateBarHeight - 8 * density, dividerPaint)
                 }
-
-                // 記錄觸控區域（螢幕座標）
-                candidateRects.add(RectF(left.coerceAtLeast(fixedLeft), 0f, right.coerceAtMost(width.toFloat()), candidateBarHeight) to i)
             }
 
             drawX = right + candGap
@@ -759,18 +781,54 @@ class KeyboardView(context: Context) : View(context) {
 
         canvas.restore()
 
-        // 右側漸層遮罩提示（有更多候選可捲動時）
-        if (candidateScrollX < maxScroll && maxScroll > 0f) {
-            val fadeW = 24f * density
-            val fadeLeft = width.toFloat() - fadeW
+        // 右側漸層遮罩
+        if (maxScroll > 0f) {
+            val fadeW = 20f * density
+            val fadeRight = width.toFloat() - arrowSpace
+            val fadeLeft = fadeRight - fadeW
             val fadePaint = Paint()
             fadePaint.shader = android.graphics.LinearGradient(
-                fadeLeft, 0f, width.toFloat(), 0f,
+                fadeLeft, 0f, fadeRight, 0f,
                 0x00000000, (theme.candidateBarColorInt and 0x00FFFFFF) or 0xCC000000.toInt(),
                 android.graphics.Shader.TileMode.CLAMP
             )
-            canvas.drawRect(fadeLeft, 0f, width.toFloat(), candidateBarHeight, fadePaint)
+            canvas.drawRect(fadeLeft, 0f, fadeRight, candidateBarHeight, fadePaint)
         }
+
+        // 展開箭頭 ▼
+        if (showArrow) {
+            val arrowLeft = width.toFloat() - arrowSpace
+            // 分隔線
+            dividerPaint.color = (theme.candidateTextColorInt and 0x00FFFFFF) or 0x30000000
+            canvas.drawLine(arrowLeft, 6 * density, arrowLeft, candidateBarHeight - 6 * density, dividerPaint)
+            // 箭頭
+            candidatePaint.textAlign = Paint.Align.CENTER
+            candidatePaint.textSize = 14f * density
+            candidatePaint.color = theme.candidateTextColorInt
+            val arrowText = if (isCandidateExpanded) "▲" else "▼"
+            canvas.drawText(arrowText, arrowLeft + arrowSpace / 2f, candidateBarHeight * 0.65f, candidatePaint)
+            candidatePaint.textSize = 15f * density
+        }
+    }
+
+    /**
+     * 根據螢幕觸控 x 座標算出對應的候選字 index。
+     * 使用與 drawCandidateBar 相同的 width 計算邏輯，避免座標系不匹配。
+     */
+    private fun hitTestCandidateIndex(touchX: Float): Int {
+        val widths = candWidthsCache
+        if (widths.isEmpty()) return -1
+        val gap = candGapCache
+        // 觸控的 x 在邏輯座標系的位置 = 螢幕 x - fixedLeft + scrollX
+        val logicalX = touchX - candFixedLeftCache + candidateScrollX
+        if (logicalX < 0) return -1
+        var accum = 0f
+        for (i in widths.indices) {
+            val right = accum + widths[i]
+            if (logicalX < right) return i
+            accum = right + gap
+        }
+        return -1
     }
 
     private fun drawExpandedCandidatePanel(canvas: Canvas) {
@@ -1092,9 +1150,10 @@ class KeyboardView(context: Context) : View(context) {
 
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
-                // 候選列橫向捲動：記錄起始位置
+                // 候選列觸控（含展開箭頭）
                 if (y < candidateBarHeight && candidates.isNotEmpty()) {
                     candidateLastTouchX = x
+                    candidateDownX = x
                     candidateIsDragging = false
                     candidateTouchActive = true
                     return true
@@ -1202,7 +1261,7 @@ class KeyboardView(context: Context) : View(context) {
                     return true
                 }
 
-                // 候選列觸控選字（使用繪製時記錄的 candidateRects）
+                // 候選列觸控選字
                 if (candidateTouchActive && candidates.isNotEmpty()) {
                     candidateTouchActive = false
                     if (candidateIsDragging) {
@@ -1210,12 +1269,18 @@ class KeyboardView(context: Context) : View(context) {
                         performClick()
                         return true
                     }
-                    // 補回捲動偏移：candidateRects 記錄的是帶 scrollX 偏移的繪製座標
-                    val adjustedX = x + candidateScrollX
-                    val hitY = candidateBarHeight / 2f  // 固定在候選列中央，避免手指滑出
-                    val hit = candidateRects.firstOrNull { it.first.contains(adjustedX, hitY) }
-                    if (hit != null) {
-                        onCandidateSelectListener?.invoke(hit.second)
+                    // 展開箭頭：點擊右側 ▼ 區域
+                    if (hasExpandArrow && candidateDownX >= width.toFloat() - expandArrowWidth) {
+                        isCandidateExpanded = !isCandidateExpanded
+                        expandScrollOffset = 0f
+                        invalidate()
+                        performClick()
+                        return true
+                    }
+                    // 用 ACTION_DOWN 的 x 算出候選字 index（不依���繪製時的 rect）
+                    val idx = hitTestCandidateIndex(candidateDownX)
+                    if (idx >= 0 && idx < candidates.size) {
+                        onCandidateSelectListener?.invoke(idx)
                         performClick()
                         return true
                     }

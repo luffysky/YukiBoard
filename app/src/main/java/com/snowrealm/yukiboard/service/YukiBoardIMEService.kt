@@ -315,10 +315,15 @@ class YukiBoardIMEService : InputMethodService() {
         ))
         glSurfaceView = gl
 
-        // 雪凜角色（VRM 3D）浮動在左上角，失敗時自動 fallback Lottie
+        // 雪凜角色浮動在左上角
+        // VRM 在 IME SurfaceView 下容易出問題，預設 Lottie；使用者可在設定開啟 VRM
         val charSize = (72 * resources.displayMetrics.density).toInt()
         val charView = CharacterView(this)
-        charView.initVrmMode()
+        if (prefs.vrmCharacterEnabled) {
+            charView.initVrmMode()
+        } else {
+            charView.initLottieMode()
+        }
         val charParams = FrameLayout.LayoutParams(charSize, charSize).apply {
             gravity = android.view.Gravity.TOP or android.view.Gravity.START
         }
@@ -907,6 +912,19 @@ class YukiBoardIMEService : InputMethodService() {
             return
         }
 
+        // 檢查麥克風權限
+        if (android.content.pm.PackageManager.PERMISSION_GRANTED !=
+            checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)) {
+            // IME 無法直接彈出權限對話框，開啟設定頁讓使用者手動授權
+            val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = android.net.Uri.fromParts("package", packageName, null)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+            keyboardView.showToast("請授權麥克風權限後再試")
+            return
+        }
+
         if (speechEngine == null) {
             speechEngine = AndroidSpeechEngine(applicationContext)
         }
@@ -1212,6 +1230,10 @@ class YukiBoardIMEService : InputMethodService() {
             startGame(selectedGame)
         }
         menu.scoreManager = ScoreManager(applicationContext)
+        menu.onBackToNormal = {
+            exitGameMode()
+            keyboardView.switchMode(KeyboardMode.NORMAL)
+        }
         keyboardContainer.addView(menu)
         gameMenuView = menu
     }
