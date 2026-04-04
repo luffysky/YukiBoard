@@ -101,6 +101,11 @@ class KeyboardView(context: Context) : View(context) {
         // 返回一般模式
         const val KEYCODE_BACK_NORMAL = -400
 
+        // 數字/符號鍵盤切換
+        const val KEYCODE_SWITCH_NUMBERS = -500  // 切到數字符號鍵盤
+        const val KEYCODE_SWITCH_SYMBOLS = -501  // 切到更多符號鍵盤
+        const val KEYCODE_SWITCH_ABC     = -502  // 切回字母鍵盤
+
         private const val LONG_PRESS_DELAY = 400L
         private const val CANDIDATE_BAR_MAX = 6
         private const val EXPAND_GRID_COLS = 5
@@ -162,6 +167,10 @@ class KeyboardView(context: Context) : View(context) {
     private var isCtrlActive: Boolean = false
     var currentMode: KeyboardMode = KeyboardMode.NORMAL
         private set
+
+    /** 子佈局：NORMAL 模式下可切換數字/符號鍵盤 */
+    private enum class SubLayout { ABC, NUMBERS, SYMBOLS }
+    private var subLayout: SubLayout = SubLayout.ABC
 
     // -------------------------------------------------------------------------
     // 繪製用資源
@@ -411,7 +420,11 @@ class KeyboardView(context: Context) : View(context) {
     }
 
     private fun getPortraitLayout(mode: KeyboardMode): List<List<KeyModel>> = when (mode) {
-        KeyboardMode.NORMAL -> KeyboardState.defaultQwertyRows()
+        KeyboardMode.NORMAL -> when (subLayout) {
+            SubLayout.ABC -> KeyboardState.defaultQwertyRows()
+            SubLayout.NUMBERS -> KeyboardState.numberSymbolRows()
+            SubLayout.SYMBOLS -> KeyboardState.moreSymbolRows()
+        }
         KeyboardMode.DESIGNER -> KeyboardState.designerRows()
         KeyboardMode.DEVELOPER -> KeyboardState.developerRows()
         KeyboardMode.GAME -> KeyboardState.gameRows()
@@ -419,10 +432,20 @@ class KeyboardView(context: Context) : View(context) {
 
     private fun getLandscapeLayout(mode: KeyboardMode): Pair<List<List<KeyModel>>, List<List<KeyModel>>> =
         when (mode) {
-            KeyboardMode.NORMAL -> Pair(
-                KeyboardState.landscapeQwertyRows(),
-                KeyboardState.landscapeNormalSidePanel()
-            )
+            KeyboardMode.NORMAL -> when (subLayout) {
+                SubLayout.ABC -> Pair(
+                    KeyboardState.landscapeQwertyRows(),
+                    KeyboardState.landscapeNormalSidePanel()
+                )
+                SubLayout.NUMBERS -> Pair(
+                    KeyboardState.numberSymbolRows(),
+                    KeyboardState.landscapeNormalSidePanel()
+                )
+                SubLayout.SYMBOLS -> Pair(
+                    KeyboardState.moreSymbolRows(),
+                    KeyboardState.landscapeNormalSidePanel()
+                )
+            }
             KeyboardMode.DESIGNER -> Pair(
                 KeyboardState.landscapeDesignerRows(),
                 KeyboardState.landscapeDesignerSidePanel()
@@ -440,10 +463,18 @@ class KeyboardView(context: Context) : View(context) {
     fun switchMode(mode: KeyboardMode) {
         if (mode == currentMode) return
         currentMode = mode
+        subLayout = SubLayout.ABC
         rebuildLayoutForOrientation()
         vibrateModeSwitch()
         showModeToast(mode)
         onModeChangedListener?.invoke(mode)
+    }
+
+    private fun switchSubLayout(target: SubLayout) {
+        if (subLayout == target) return
+        subLayout = target
+        rebuildLayoutForOrientation()
+        invalidate()
     }
 
     // -------------------------------------------------------------------------
@@ -560,19 +591,23 @@ class KeyboardView(context: Context) : View(context) {
             return
         }
 
+        // composing text 佔用寬度（注音組合顯示在最左邊）
+        var composingWidth = 0f
         if (composingText.isNotEmpty()) {
             composingPaint.color = theme.composingTextColorInt
-            canvas.drawText("[$composingText]", 16f, candidateBarHeight * 0.65f, composingPaint)
+            val displayText = "[$composingText]"
+            canvas.drawText(displayText, 16f, candidateBarHeight * 0.65f, composingPaint)
+            composingWidth = composingPaint.measureText(displayText) + 24f * density
         }
 
         // 展開按鈕寬度
         val hasMoreCandidates = allCandidates.size > CANDIDATE_BAR_MAX
         val expandBtnWidth = if (hasMoreCandidates) 36f * density else 0f
-        val barAvailableWidth = width.toFloat() - expandBtnWidth
+        val barAvailableWidth = width.toFloat() - expandBtnWidth - composingWidth
 
         val slotWidth = barAvailableWidth / maxOf(candidates.size, 1)
         candidates.forEachIndexed { i, text ->
-            val slotLeft = slotWidth * i
+            val slotLeft = composingWidth + slotWidth * i
             val cx = slotLeft + slotWidth / 2f
 
             // 第一個候選加高亮背景
@@ -996,9 +1031,18 @@ class KeyboardView(context: Context) : View(context) {
                         performClick()
                         return true
                     }
-                    val barAvailableWidth = width.toFloat() - expandBtnWidth
+                    // composing 佔用寬度
+                    val compW = if (composingText.isNotEmpty()) {
+                        composingPaint.measureText("[$composingText]") + 24f * density
+                    } else 0f
+                    // 點在 composing 區域內不選字
+                    if (x < compW) {
+                        performClick()
+                        return true
+                    }
+                    val barAvailableWidth = width.toFloat() - expandBtnWidth - compW
                     val slotWidth = barAvailableWidth / candidates.size
-                    val index = (x / slotWidth).toInt().coerceIn(0, candidates.size - 1)
+                    val index = ((x - compW) / slotWidth).toInt().coerceIn(0, candidates.size - 1)
                     onCandidateSelectListener?.invoke(index)
                     performClick()
                     return true
@@ -1009,6 +1053,9 @@ class KeyboardView(context: Context) : View(context) {
                     val key = hit.second
                     when {
                         key.code == KEYCODE_BACK_NORMAL -> switchMode(KeyboardMode.NORMAL)
+                        key.code == KEYCODE_SWITCH_NUMBERS -> switchSubLayout(SubLayout.NUMBERS)
+                        key.code == KEYCODE_SWITCH_SYMBOLS -> switchSubLayout(SubLayout.SYMBOLS)
+                        key.code == KEYCODE_SWITCH_ABC -> switchSubLayout(SubLayout.ABC)
                         key.code == KEYCODE_SHIFT -> toggleShift()
                         key.code == KEYCODE_CTRL -> toggleCtrl()
                         isCtrlActive && !key.isSpecial -> {

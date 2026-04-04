@@ -28,6 +28,7 @@ import com.snowrealm.yukiboard.speech.AndroidSpeechEngine
 import com.snowrealm.yukiboard.speech.SpeechInputEngine
 import com.snowrealm.yukiboard.theme.KeyboardTheme
 import com.snowrealm.yukiboard.theme.ThemeManager
+import com.snowrealm.yukiboard.ui.keyboard.KeyModel
 import com.snowrealm.yukiboard.ui.keyboard.CharacterView
 import com.snowrealm.yukiboard.ui.keyboard.FloatingKeyboardWrapper
 import com.snowrealm.yukiboard.ui.keyboard.KeyboardMode
@@ -38,6 +39,13 @@ import com.snowrealm.yukiboard.ui.panel.*
 import com.snowrealm.yukiboard.ui.settings.SettingsActivity
 import com.snowrealm.yukiboard.claw.ClawClient
 import com.snowrealm.yukiboard.ui.settings.YukiPreferences
+import com.snowrealm.yukiboard.gif.GiphyApiClient
+import com.snowrealm.yukiboard.translate.TranslateEngine
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 class YukiBoardIMEService : InputMethodService() {
 
@@ -69,12 +77,20 @@ class YukiBoardIMEService : InputMethodService() {
     private var stickerPanel: StickerPanelView? = null
     private var themePanel: ThemePanelView? = null
 
-    // 貼圖同步
+    // 貼圖同步 + 下載管理
     private var stickerRepository: com.snowrealm.yukiboard.sticker.StickerRepository? = null
+    private var stickerDownloadManager: com.snowrealm.yukiboard.sticker.StickerPackDownloadManager? = null
+
+    // 非同步
+    private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     // Claw AI
     var clawClient: ClawClient? = null
         private set
+
+    // GIF + 翻譯
+    private var giphyClient: GiphyApiClient? = null
+    private var translateEngine: TranslateEngine? = null
 
     // 語音輸入
     private var speechEngine: SpeechInputEngine? = null
@@ -142,12 +158,17 @@ class YukiBoardIMEService : InputMethodService() {
             }
         }
 
-        // 貼圖同步（從 Insight Engine 後台拉取）
+        // 貼圖同步 + 下載管理
         stickerRepository = com.snowrealm.yukiboard.sticker.StickerRepository(applicationContext)
         stickerRepository?.syncInBackground()
+        stickerDownloadManager = com.snowrealm.yukiboard.sticker.StickerPackDownloadManager(applicationContext)
 
         // Claw AI（自動從 BuildConfig 匯入 API key）
         clawClient = ClawClient(applicationContext)
+
+        // GIF + 翻譯引擎
+        giphyClient = GiphyApiClient()
+        translateEngine = TranslateEngine()
 
         // 雪凜系統
         yukiCommentEngine = com.snowrealm.yukiboard.yuki.YukiCommentEngine()
@@ -270,9 +291,11 @@ class YukiBoardIMEService : InputMethodService() {
         ))
         glSurfaceView = gl
 
-        // Lottie 角色浮動在右上角
-        val charSize = (56 * resources.displayMetrics.density).toInt()
+        // 雪凜角色（VRM 3D 或 Lottie）浮動在左上角
+        val charSize = (72 * resources.displayMetrics.density).toInt()
         val charView = CharacterView(this)
+        // 使用 VRM 模式：從 Insight Engine 載入 Yukirin.vrm
+        charView.initVrmMode()
         val charParams = FrameLayout.LayoutParams(charSize, charSize).apply {
             gravity = android.view.Gravity.TOP or android.view.Gravity.START
         }
@@ -397,8 +420,11 @@ class YukiBoardIMEService : InputMethodService() {
         btKeyboard?.destroy()
         wifiServer?.destroy()
         stickerRepository?.destroy()
+        stickerDownloadManager?.destroy()
         particleView?.stop()
         backgroundView?.destroy()
+        translateEngine?.close()
+        serviceScope.cancel()
     }
 
     // =========================================================================
@@ -470,14 +496,32 @@ class YukiBoardIMEService : InputMethodService() {
                 p.onTranslatedSelected = { translated ->
                     currentInputConnection?.commitText(translated, 1)
                 }
+                val engine = translateEngine
+                if (engine != null) {
+                    p.translationProvider = { source, fromLang, toLang, callback ->
+                        serviceScope.launch {
+                            val result = engine.translate(source, fromLang, toLang)
+                            callback(result)
+                        }
+                    }
+                }
                 p
             }
             PanelType.GIF -> {
                 val p = GifPanelView(this).also { gifPanel = it }
                 p.theme = theme
                 p.onGifSelected = { gif ->
-                    // MVP: 插入 GIF URL 文字（完整實作需 commitContent）
                     currentInputConnection?.commitText(gif.fullUrl, 1)
+                }
+                val gifClient = giphyClient
+                if (gifClient != null && gifClient.isAvailable()) {
+                    p.onSearch = { query, callback ->
+                        serviceScope.launch {
+                            val results = if (query.isBlank()) gifClient.fetchTrending()
+                                          else gifClient.search(query)
+                            callback(results)
+                        }
+                    }
                 }
                 p
             }
@@ -485,8 +529,8 @@ class YukiBoardIMEService : InputMethodService() {
                 val p = StickerPanelView(this).also { stickerPanel = it }
                 p.theme = theme
                 p.repository = stickerRepository
+                p.downloadManager = stickerDownloadManager
                 p.onStickerSelected = { stickerText ->
-                    // 插入 [STICKER]:<url> 格式（同 Insight 私訊）
                     currentInputConnection?.commitText(stickerText, 1)
                 }
                 p
@@ -518,6 +562,25 @@ class YukiBoardIMEService : InputMethodService() {
             PanelType.CLAW -> {
                 val p = ClawPanelView(this)
                 p.theme = theme
+                p.clawClient = clawClient
+                p.setCurrentMode(
+                    when (keyboardView.currentMode) {
+                        KeyboardMode.DEVELOPER -> "developer"
+                        else -> "normal"
+                    }
+                )
+                p.inputTextProvider = {
+                    val ic = currentInputConnection
+                    val selected = ic?.getSelectedText(0)?.toString()
+                    if (!selected.isNullOrEmpty()) selected
+                    else ic?.getTextBeforeCursor(500, 0)?.toString() ?: ""
+                }
+                p.appPackageProvider = {
+                    inputRouter.currentAppPackage ?: ""
+                }
+                p.keyboardModeProvider = {
+                    keyboardView.currentMode
+                }
                 p.onSuggestionSelected = { text ->
                     currentInputConnection?.commitText(text, 1)
                 }
@@ -968,6 +1031,8 @@ class YukiBoardIMEService : InputMethodService() {
     private fun handleKeyPress(keyCode: Int, label: String) {
         val ic: InputConnection = currentInputConnection ?: return
 
+        ic.beginBatchEdit()
+        try {
         when (keyCode) {
             KeyboardView.KEYCODE_SHIFT, KeyboardView.KEYCODE_CTRL -> { }
 
@@ -1035,9 +1100,28 @@ class YukiBoardIMEService : InputMethodService() {
                 sendKey(ic, KeyEvent.KEYCODE_DPAD_LEFT)
             }
 
+            // 子佈局切換鍵（由 KeyboardView 內部處理，不需 IME 動作）
+            KeyboardView.KEYCODE_SWITCH_NUMBERS,
+            KeyboardView.KEYCODE_SWITCH_SYMBOLS,
+            KeyboardView.KEYCODE_SWITCH_ABC,
+            KeyboardView.KEYCODE_BACK_NORMAL -> { }
+
             else -> {
-                val result = inputRouter.processInput(label)
-                applyInputResult(ic, result)
+                val ch = label.firstOrNull()
+                // 非字母、非注音符號 → 直接 commit（數字、標點、符號）
+                val isBopomofo = ch != null && (ch in '\u3105'..'\u312F' || ch in '\u02CA'..'\u02CB' || ch == '\u02C7' || ch == '\u02D9')
+                if (ch != null && !ch.isLetter() && !isBopomofo) {
+                    // 先提交正在組合的文字
+                    val composing = inputRouter.composingText
+                    if (composing.isNotEmpty()) {
+                        applyInputResult(ic, InputResult.CommitText(composing))
+                        inputRouter.reset()
+                    }
+                    ic.commitText(label, 1)
+                } else {
+                    val result = inputRouter.processInput(label)
+                    applyInputResult(ic, result)
+                }
             }
         }
 
@@ -1046,6 +1130,9 @@ class YukiBoardIMEService : InputMethodService() {
 
         keyboardView.updateComposingText(inputRouter.composingText)
         keyboardView.updateCandidates(inputRouter.candidates)
+        } finally {
+            ic.endBatchEdit()
+        }
     }
 
     // =========================================================================
@@ -1152,12 +1239,18 @@ class YukiBoardIMEService : InputMethodService() {
     private fun handleSwitchLang() {
         inputRouter.toggleLanguage()
         characterView?.playSwitchLang()
-        val rows = if (inputRouter.inputMode == com.snowrealm.yukiboard.input.router.InputMode.BOPOMOFO) {
-            KeyboardState.bopomofoRows()
-        } else {
-            KeyboardState.defaultQwertyRows()
-        }
-        keyboardView.updateKeyRows(rows)
+        keyboardView.updateKeyRows(rowsForInputMode(inputRouter.inputMode))
+    }
+
+    /** 根據輸入模式取得對應鍵盤佈局 */
+    private fun rowsForInputMode(mode: com.snowrealm.yukiboard.input.router.InputMode): List<List<KeyModel>> = when (mode) {
+        com.snowrealm.yukiboard.input.router.InputMode.BOPOMOFO -> KeyboardState.bopomofoRows()
+        com.snowrealm.yukiboard.input.router.InputMode.PINYIN -> KeyboardState.pinyinRows()
+        com.snowrealm.yukiboard.input.router.InputMode.CANGJIE,
+        com.snowrealm.yukiboard.input.router.InputMode.SPEED_CANGJIE -> KeyboardState.cangjieRows()
+        com.snowrealm.yukiboard.input.router.InputMode.JAPANESE -> KeyboardState.japaneseRows()
+        com.snowrealm.yukiboard.input.router.InputMode.KOREAN -> KeyboardState.koreanRows()
+        else -> KeyboardState.defaultQwertyRows()
     }
 
     private fun applyInputResult(ic: InputConnection, result: InputResult) {

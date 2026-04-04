@@ -58,8 +58,8 @@ class SnowRealmAuthClient(context: Context) {
     /** Email + 密碼登入 */
     suspend fun loginWithEmail(email: String, password: String): AuthResult =
         withContext(Dispatchers.IO) {
-            val body = """{"email":"$email","password":"$password"}"""
-            postAuth("/api/auth/login", body)
+            val body = """{"username":"$email","password":"$password"}"""
+            postAuth("/api/auth/login", body, email)
         }
 
     /** 第三方 OAuth token 交換（LINE / Google） */
@@ -81,7 +81,7 @@ class SnowRealmAuthClient(context: Context) {
         val token = getToken() ?: return@withContext null
         val request = Request.Builder()
             .url("$baseUrl/api/auth/me")
-            .header("Authorization", "Bearer $token")
+            .header("Cookie", "admin_session=$token")
             .get().build()
 
         try {
@@ -91,7 +91,21 @@ class SnowRealmAuthClient(context: Context) {
                 return@withContext null
             }
             val responseBody = response.body?.string() ?: return@withContext null
-            json.decodeFromString<UserProfile>(responseBody)
+            val me = json.decodeFromString<MeResponse>(responseBody)
+            val user = UserProfile(
+                id = me.userId,
+                email = me.userName,
+                displayName = me.userName,
+                role = me.role,
+                tenantId = me.tenantId
+            )
+            // 儲存使用者資料
+            prefs.edit()
+                .putString(KEY_USER_ID, user.id)
+                .putString(KEY_EMAIL, user.email)
+                .putString(KEY_DISPLAY_NAME, user.displayName)
+                .apply()
+            user
         } catch (_: Exception) { null }
     }
 
@@ -124,7 +138,15 @@ class SnowRealmAuthClient(context: Context) {
 
     fun getToken(): String? = prefs.getString(KEY_TOKEN, null)
 
-    private fun postAuth(path: String, body: String): AuthResult {
+    /** WebView OAuth 登入後直接存 token（後續呼叫 fetchMe 取用戶資料） */
+    fun saveTokenDirectly(token: String) {
+        prefs.edit()
+            .putString(KEY_TOKEN, token)
+            .putLong(KEY_TOKEN_EXPIRY, System.currentTimeMillis() + TOKEN_LIFETIME_MS)
+            .apply()
+    }
+
+    private fun postAuth(path: String, body: String, loginEmail: String = ""): AuthResult {
         val request = Request.Builder()
             .url("$baseUrl$path")
             .post(body.toRequestBody("application/json".toMediaType()))
@@ -135,23 +157,43 @@ class SnowRealmAuthClient(context: Context) {
             val responseBody = response.body?.string() ?: return AuthResult.Error("空回應")
 
             if (!response.isSuccessful) {
-                return AuthResult.Error("登入失敗 (${response.code})")
+                // 嘗試解析伺服器錯誤訊息
+                val errorMsg = try {
+                    json.decodeFromString<ErrorResponse>(responseBody).error
+                } catch (_: Exception) { null }
+                return AuthResult.Error(errorMsg ?: "登入失敗 (${response.code})")
             }
 
-            val authResponse = json.decodeFromString<AuthResponse>(responseBody)
-            saveSession(authResponse)
-            AuthResult.Success(authResponse.user)
+            // 從 Set-Cookie 取 JWT token
+            val token = response.headers("Set-Cookie")
+                .firstOrNull { it.startsWith("admin_session=") }
+                ?.substringAfter("admin_session=")
+                ?.substringBefore(";")
+
+            // 解析回應 body
+            val loginResponse = json.decodeFromString<LoginResponse>(responseBody)
+
+            val user = UserProfile(
+                id = loginResponse.user?.id ?: "",
+                email = loginEmail,
+                displayName = loginResponse.user?.displayName ?: loginEmail,
+                role = loginResponse.user?.role ?: "",
+                tenantId = loginResponse.user?.tenantId ?: loginResponse.slug ?: ""
+            )
+
+            saveSession(token, user)
+            AuthResult.Success(user)
         } catch (e: Exception) {
             AuthResult.Error("網路錯誤: ${e.message}")
         }
     }
 
-    private fun saveSession(auth: AuthResponse) {
+    private fun saveSession(token: String?, user: UserProfile) {
         prefs.edit()
-            .putString(KEY_TOKEN, auth.token)
-            .putString(KEY_USER_ID, auth.user.id)
-            .putString(KEY_EMAIL, auth.user.email)
-            .putString(KEY_DISPLAY_NAME, auth.user.displayName)
+            .putString(KEY_TOKEN, token ?: "")
+            .putString(KEY_USER_ID, user.id)
+            .putString(KEY_EMAIL, user.email)
+            .putString(KEY_DISPLAY_NAME, user.displayName)
             .putLong(KEY_TOKEN_EXPIRY, System.currentTimeMillis() + TOKEN_LIFETIME_MS)
             .apply()
     }
@@ -164,14 +206,40 @@ class SnowRealmAuthClient(context: Context) {
     }
 
     @Serializable
-    data class AuthResponse(val token: String, val user: UserProfile)
+    data class ErrorResponse(val error: String = "")
+
+    @Serializable
+    data class LoginResponse(
+        val success: Boolean = false,
+        val slug: String? = null,
+        val user: LoginUser? = null
+    )
+
+    @Serializable
+    data class LoginUser(
+        val id: String = "",
+        val role: String = "",
+        val tenantId: String = "",
+        val displayName: String = ""
+    )
+
+    @Serializable
+    data class MeResponse(
+        val userId: String = "",
+        val userName: String = "",
+        val role: String = "",
+        val tenantId: String = "",
+        val tenantName: String = "",
+        val adminTitle: String = ""
+    )
 
     @Serializable
     data class UserProfile(
         val id: String,
         val email: String,
         val displayName: String = "",
-        val avatarUrl: String = "",
+        val role: String = "",
+        val tenantId: String = "",
         val zCoinBalance: Int = 0
     )
 
@@ -182,5 +250,14 @@ class SnowRealmAuthClient(context: Context) {
         private const val KEY_DISPLAY_NAME = "display_name"
         private const val KEY_TOKEN_EXPIRY = "token_expiry"
         private const val TOKEN_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000L // 7 days
+
+        @Volatile
+        private var instance: SnowRealmAuthClient? = null
+
+        fun getInstance(context: Context): SnowRealmAuthClient {
+            return instance ?: synchronized(this) {
+                instance ?: SnowRealmAuthClient(context.applicationContext).also { instance = it }
+            }
+        }
     }
 }

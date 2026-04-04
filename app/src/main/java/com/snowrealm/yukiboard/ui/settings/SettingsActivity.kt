@@ -68,8 +68,26 @@ class SettingsActivity : AppCompatActivity() {
                 cornerRadius = dp(8).toFloat()
             }
             setPadding(dp(14), dp(6), dp(14), dp(6))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { marginEnd = dp(8) }
             setOnClickListener {
                 startActivity(Intent(this@SettingsActivity, HelpActivity::class.java))
+            }
+        })
+        titleRow.addView(Button(this).apply {
+            val auth = com.snowrealm.yukiboard.auth.SnowRealmAuthClient(this@SettingsActivity)
+            text = if (auth.isLoggedIn) auth.currentDisplayName ?: "帳號" else "登入"
+            setTextColor(0xFFFFFFFF.toInt())
+            textSize = 13f
+            background = GradientDrawable().apply {
+                setColor(if (auth.isLoggedIn) 0xFF1B6B3A.toInt() else 0xFF4A90E2.toInt())
+                cornerRadius = dp(8).toFloat()
+            }
+            setPadding(dp(14), dp(6), dp(14), dp(6))
+            setOnClickListener {
+                startActivity(Intent(this@SettingsActivity, com.snowrealm.yukiboard.ui.auth.LoginActivity::class.java))
             }
         })
         root.addView(titleRow)

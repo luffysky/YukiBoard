@@ -2,38 +2,36 @@ package com.snowrealm.yukiboard.input.router
 
 import android.content.Context
 import com.snowrealm.yukiboard.input.candidate.CandidateManager
-import com.snowrealm.yukiboard.input.engine.ChewingInputEngine
-import com.snowrealm.yukiboard.input.engine.EnglishInputEngine
-import com.snowrealm.yukiboard.input.engine.InputEngine
+import com.snowrealm.yukiboard.input.engine.*
 import com.snowrealm.yukiboard.input.smart.SmartInputManager
 
 /**
- * 中英混合輸入路由核心。
+ * 多語言輸入路由核心。
  *
- * ## 雙軌並行邏輯
+ * 支援輸入法：
+ * - ENGLISH — 英文 QWERTY
+ * - BOPOMOFO — 注音輸入
+ * - PINYIN — 拼音輸入
+ * - CANGJIE — 倉頡輸入
+ * - SPEED_CANGJIE — 速成（簡易倉頡）
+ * - JAPANESE — 日文羅馬字→假名→漢字
+ * - KOREAN — 韓文 Jamo 組合
  *
- * ```
- * 按鍵輸入
- *    │
- *    ├─ 模式鎖定中（ENGLISH / BOPOMOFO）──► 直接交給對應引擎
- *    │
- *    └─ AUTO 模式
- *         │
- *         ├─ 字元是注音聲符 [ㄅ-ㄩ] ──► 切換到 BOPOMOFO 軌道
- *         ├─ 字元是 ASCII 字母       ──► 切換到 ENGLISH 軌道
- *         └─ 其他（數字/符號）       ──► 直接 commit
- * ```
- *
- * 雙軌並行：兩個引擎各自維護組字緩衝，切換模式時前一軌道若有未提交
- * 的 composing，先強制 commit，再將控制權交給另一軌道。
+ * 切換模式時前一軌道若有未提交的 composing，先強制 commit。
  */
 class InputRouter(private val context: Context) {
 
     // -------------------------------------------------------------------------
-    // 引擎
+    // 引擎（lazy 初始化，避免啟動時全載入）
     // -------------------------------------------------------------------------
     private val englishEngine: InputEngine = EnglishInputEngine(context)
     private val bopomofoEngine: InputEngine = ChewingInputEngine(context)
+    private val pinyinEngine: InputEngine by lazy { PinyinInputEngine() }
+    private val cangjieEngine: InputEngine by lazy { CangjieInputEngine(speedMode = false) }
+    private val speedCangjieEngine: InputEngine by lazy { CangjieInputEngine(speedMode = true) }
+    private val japaneseEngine: InputEngine by lazy { JapaneseInputEngine() }
+    private val koreanEngine: InputEngine by lazy { KoreanInputEngine() }
+
     val candidateManager = CandidateManager()
     val smartInput = SmartInputManager(context)
 
@@ -45,8 +43,17 @@ class InputRouter(private val context: Context) {
     // 目前 App 套件名（供習慣追蹤用）
     var currentAppPackage: String? = null
 
+    // 語言循環順序（使用者可自訂，預設全開）
+    var enabledModes: List<InputMode> = listOf(
+        InputMode.ENGLISH,
+        InputMode.BOPOMOFO,
+        InputMode.PINYIN,
+        InputMode.CANGJIE,
+        InputMode.JAPANESE,
+        InputMode.KOREAN,
+    )
+
     init {
-        // 讓 SmartInputManager 參考英文字典
         if (englishEngine is EnglishInputEngine) {
             smartInput.setDictionary(
                 com.snowrealm.yukiboard.input.dictionary.EnglishDictionary(context)
@@ -66,27 +73,39 @@ class InputRouter(private val context: Context) {
     // 語言切換
     // -------------------------------------------------------------------------
 
+    /** 循環切換到下一個已啟用的輸入法 */
     fun toggleLanguage() {
-        val next = if (currentMode == InputMode.ENGLISH) InputMode.BOPOMOFO else InputMode.ENGLISH
-        switchTo(next)
+        if (enabledModes.size <= 1) return
+        val currentIndex = enabledModes.indexOf(currentMode)
+        val nextIndex = (currentIndex + 1) % enabledModes.size
+        switchTo(enabledModes[nextIndex])
     }
 
-    private fun switchTo(mode: InputMode) {
+    /** 直接切換到指定模式 */
+    fun switchTo(mode: InputMode) {
         if (mode == currentMode) return
         // 切換前先提交當前 composing
-        activeEngine.forceCommit()
+        val commitResult = activeEngine.forceCommit()
         currentMode = mode
-        activeEngine = if (mode == InputMode.ENGLISH) englishEngine else bopomofoEngine
+        activeEngine = engineForMode(mode)
+        candidateManager.clear()
+    }
+
+    private fun engineForMode(mode: InputMode): InputEngine = when (mode) {
+        InputMode.ENGLISH -> englishEngine
+        InputMode.BOPOMOFO -> bopomofoEngine
+        InputMode.PINYIN -> pinyinEngine
+        InputMode.CANGJIE -> cangjieEngine
+        InputMode.SPEED_CANGJIE -> speedCangjieEngine
+        InputMode.JAPANESE -> japaneseEngine
+        InputMode.KOREAN -> koreanEngine
+        InputMode.AUTO -> englishEngine
     }
 
     // -------------------------------------------------------------------------
     // 輸入處理
     // -------------------------------------------------------------------------
 
-    /**
-     * 處理普通字元輸入。
-     * 在 AUTO 模式下會依字元自動切軌，其餘模式直接轉給活躍引擎。
-     */
     fun processInput(label: String): InputResult {
         if (label.isEmpty()) return InputResult.Idle
 
@@ -109,6 +128,9 @@ class InputRouter(private val context: Context) {
 
     fun processSpace(): InputResult {
         val result = activeEngine.processSpace()
+        if (result is InputResult.CommitText) {
+            onTextCommitted(result.text)
+        }
         updateCandidates()
         return result
     }
@@ -127,26 +149,31 @@ class InputRouter(private val context: Context) {
      * 使用者從候選列選擇第 [index] 個候選字。
      */
     fun selectCandidate(index: Int): InputResult {
-        if (activeEngine is ChewingInputEngine) {
-            val result = (activeEngine as ChewingInputEngine).selectCandidateAt(index)
-            if (result is InputResult.CommitText) onTextCommitted(result.text)
-            updateCandidates()
-            return result
+        // 各引擎有各自的 selectCandidateAt 實作
+        val result = when (val eng = activeEngine) {
+            is ChewingInputEngine -> eng.selectCandidateAt(index)
+            is PinyinInputEngine -> eng.selectCandidateAt(index)
+            is CangjieInputEngine -> eng.selectCandidateAt(index)
+            is JapaneseInputEngine -> eng.selectCandidateAt(index)
+            else -> {
+                // 英文/韓文：通用候選選擇
+                val selected = candidateManager.selectAt(index)
+                if (selected != null) {
+                    activeEngine.reset()
+                    candidateManager.clear()
+                    onTextCommitted(selected)
+                    return InputResult.CommitText(selected)
+                }
+                return InputResult.Idle
+            }
         }
-        // 英文候選：直接 commit 選中的字
-        val selected = candidateManager.selectAt(index)
-        if (selected != null) {
-            activeEngine.reset()
-            candidateManager.clear()
-            onTextCommitted(selected)
-            return InputResult.CommitText(selected)
-        }
-        return InputResult.Idle
+        if (result is InputResult.CommitText) onTextCommitted(result.text)
+        updateCandidates()
+        return result
     }
 
     fun reset() {
-        englishEngine.reset()
-        bopomofoEngine.reset()
+        activeEngine.reset()
         candidateManager.clear()
     }
 
@@ -154,18 +181,13 @@ class InputRouter(private val context: Context) {
     // AUTO 模式自動偵測
     // -------------------------------------------------------------------------
 
-    /**
-     * 根據輸入字元判斷應走哪條軌道。
-     *
-     * 偵測規則：
-     * - 注音符號（Unicode CJK 注音符號區 U+3105..U+312F）→ BOPOMOFO
-     * - 英文字母 A-Za-z → ENGLISH
-     * - 其他（數字、標點）→ 保持當前模式
-     */
     private fun autoDetectAndSwitch(label: String) {
         val char = label[0]
         val targetMode = when {
             char in '\u3105'..'\u312F' -> InputMode.BOPOMOFO
+            char in '\u3131'..'\u3163' -> InputMode.KOREAN  // 韓文 Jamo
+            char in '\u3041'..'\u309F' -> InputMode.JAPANESE // 平假名
+            char in '\u30A0'..'\u30FF' -> InputMode.JAPANESE // 片假名
             char.isLetter()            -> InputMode.ENGLISH
             else                       -> currentMode
         }
@@ -178,27 +200,24 @@ class InputRouter(private val context: Context) {
         val raw = activeEngine.getCandidates().toMutableList()
         val composing = activeEngine.composingText
 
-        // 追加智慧糾錯候選（插在前面）
-        if (composing.isNotEmpty()) {
+        // 對英文模式追加智慧糾錯候選
+        if (currentMode == InputMode.ENGLISH && composing.isNotEmpty()) {
             val corrections = smartInput.getCorrectionCandidates(composing, lastCommittedWord)
             if (corrections.isNotEmpty()) {
-                // 糾錯候選放最前，去除重複
                 val merged = (corrections + raw).distinct()
                 candidateManager.update(merged)
                 return
             }
 
-            // 追加自適應字典建議
             val adaptive = smartInput.adaptiveDictionary.suggest(composing, 3)
             raw.addAll(adaptive.filter { it !in raw })
 
-            // 追加帶前綴的語句預測
             val prefixed = smartInput.getPhrasePredictionsWithPrefix(composing, 3)
             raw.addAll(prefixed.filter { it !in raw })
         }
 
-        // composing 為空時 = 剛提交完一個詞，顯示下一詞預測
-        if (composing.isEmpty()) {
+        // composing 為空時顯示下一詞預測
+        if (composing.isEmpty() && currentMode == InputMode.ENGLISH) {
             val predictions = smartInput.getPhrasePredictions(5)
             if (predictions.isNotEmpty()) {
                 raw.addAll(predictions.filter { it !in raw })
@@ -213,23 +232,21 @@ class InputRouter(private val context: Context) {
         val trimmed = text.trim()
         if (trimmed.isBlank()) return
 
-        // 判斷是否含 CJK 字元
         val hasCjk = trimmed.any { it.code in 0x4E00..0x9FFF || it.code in 0x3400..0x4DBF }
+        val hasKana = trimmed.any { it.code in 0x3040..0x30FF }
+        val hasHangul = trimmed.any { it.code in 0xAC00..0xD7AF }
 
-        if (hasCjk) {
-            // 中文：逐字記錄 bigram（字→字），同時也記錄整個詞組
+        if (hasCjk || hasKana || hasHangul) {
             for (ch in trimmed) {
                 if (ch.isWhitespace()) continue
                 val charStr = ch.toString()
                 smartInput.onWordCommitted(charStr, currentAppPackage)
                 lastCommittedWord = charStr
             }
-            // 如果是多字詞組，也整體記錄（讓 adaptive dict 學詞組）
             if (trimmed.length > 1) {
                 smartInput.onWordCommitted(trimmed, currentAppPackage)
             }
         } else {
-            // 英文：按空格拆詞
             val words = trimmed.split("\\s+".toRegex())
             for (word in words) {
                 if (word.isNotBlank()) {
@@ -245,7 +262,16 @@ class InputRouter(private val context: Context) {
 // 輔助資料類型
 // ─────────────────────────────────────────────────────────────────────────────
 
-enum class InputMode { ENGLISH, BOPOMOFO, AUTO }
+enum class InputMode(val displayName: String, val shortLabel: String) {
+    ENGLISH("English", "EN"),
+    BOPOMOFO("注音", "注"),
+    PINYIN("拼音", "拼"),
+    CANGJIE("倉頡", "倉"),
+    SPEED_CANGJIE("速成", "速"),
+    JAPANESE("日本語", "あ"),
+    KOREAN("한국어", "한"),
+    AUTO("自動", "A"),
+}
 
 /**
  * 引擎操作結果。密封類讓 Service 端做模式匹配而非 if-else 鏈。

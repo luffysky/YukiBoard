@@ -2,12 +2,14 @@ package com.snowrealm.yukiboard.claw
 
 import android.content.Context
 import com.snowrealm.yukiboard.auth.InviteCodeManager
+import com.snowrealm.yukiboard.auth.SnowRealmAuthClient
 import com.snowrealm.yukiboard.claw.provider.AIProviderManager
 import com.snowrealm.yukiboard.claw.skills.*
 
 class ClawClient(context: Context) {
     private val providerManager = AIProviderManager.getInstance(context)
     private val inviteManager = InviteCodeManager(context)
+    private val authClient = SnowRealmAuthClient.getInstance(context)
     private val budgetManager = TokenBudgetManager(context)
 
     private val appContext = context.applicationContext
@@ -51,7 +53,7 @@ class ClawClient(context: Context) {
      */
     fun isAvailable(): Boolean {
         return providerManager.hasValidConfig() &&
-               (inviteManager.isActivated() || hasOwnApiKey())
+               (inviteManager.isActivated() || hasOwnApiKey() || authClient.isLoggedIn)
     }
 
     /**
@@ -62,6 +64,7 @@ class ClawClient(context: Context) {
      */
     fun getRemainingTokens(): Int {
         if (hasOwnApiKey()) return Int.MAX_VALUE
+        if (authClient.isLoggedIn) return Int.MAX_VALUE  // 平台禮遇由 server 判斷
         if (inviteManager.isActivated()) return inviteManager.getRemainingTokens()
         return 0
     }

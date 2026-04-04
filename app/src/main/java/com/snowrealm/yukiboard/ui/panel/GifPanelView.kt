@@ -1,26 +1,38 @@
 package com.snowrealm.yukiboard.ui.panel
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.net.Uri
 import android.view.MotionEvent
 import android.view.View
+import com.snowrealm.yukiboard.gif.GifImageCache
 import com.snowrealm.yukiboard.theme.KeyboardTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
- * GIF 搜尋面板 — 搜尋 + 網格顯示 GIF。
+ * GIF 搜尋面板 — 搜尋 + 網格顯示 GIF 預覽圖。
  *
- * MVP 架構：
- * - 搜尋框輸入關鍵字
- * - 預設顯示趨勢 GIF 分類標籤
- * - 實際 GIF 載入由外部 GifProvider 處理（Giphy API / Tenor API）
- * - 點擊 GIF 透過 InputConnection.commitContent() 插入
+ * 使用 GifImageCache 非同步載入預覽 Bitmap，
+ * 載入完成後自動 invalidate 更新畫面。
  */
 class GifPanelView(context: Context) : View(context) {
 
     private val density = context.resources.displayMetrics.density
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private val imageCache = GifImageCache(context)
+
+    // 已載入的預覽 bitmap 快取（url → bitmap）
+    private val loadedBitmaps = mutableMapOf<String, Bitmap?>()
+    // 正在載入中的 URL
+    private val loadingUrls = mutableSetOf<String>()
+
     private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
@@ -34,6 +46,7 @@ class GifPanelView(context: Context) : View(context) {
         textSize = 13f * density
     }
     private val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
 
     var theme: KeyboardTheme = KeyboardTheme.default()
         set(value) { field = value; invalidate() }
@@ -46,12 +59,15 @@ class GifPanelView(context: Context) : View(context) {
 
     private var searchQuery = ""
     private var gifResults = listOf<GifItem>()
+    private var isLoading = false
     private val tagRects = mutableListOf<Pair<RectF, String>>()
     private val gifRects = mutableListOf<Pair<RectF, Int>>()
 
+    private var scrollOffset = 0f
+    private var lastTouchY = 0f
+    private var isDragging = false
+
     private val searchBarH = 36f * density
-    private val tagBarH = 30f * density
-    private val gifCellSize get() = (width / 3f).coerceAtLeast(80f * density)
     private val cornerR = 8f * density
 
     private val trendingTags = listOf(
@@ -77,20 +93,25 @@ class GifPanelView(context: Context) : View(context) {
         // 搜尋列
         drawSearchBar(canvas)
 
+        if (isLoading) {
+            textPaint.color = theme.effectiveAccentColor()
+            val dots = ".".repeat(((System.currentTimeMillis() / 500) % 4).toInt())
+            canvas.drawText("搜尋中$dots", width / 2f, height / 2f, textPaint)
+            postInvalidateDelayed(500)
+            return
+        }
+
         if (gifResults.isEmpty()) {
-            // 趨勢標籤
             drawTrendingTags(canvas)
 
-            // 提示
             textPaint.color = theme.candidateTextColorInt
             textPaint.alpha = 100
             canvas.drawText(
-                if (onSearch == null) "GIF 引擎未連接 — 請在設定中配置 API Key" else "點擊標籤或輸入關鍵字搜尋 GIF",
+                if (onSearch == null) "GIF 引擎未連接" else "點擊標籤或輸入關鍵字搜尋 GIF",
                 width / 2f, height / 2f + 20 * density, textPaint
             )
             textPaint.alpha = 255
         } else {
-            // GIF 網格（顯示標題佔位，實際圖片需 Glide/Coil 載入）
             drawGifGrid(canvas)
         }
     }
@@ -99,7 +120,6 @@ class GifPanelView(context: Context) : View(context) {
         bgPaint.color = theme.candidateBarColorInt
         canvas.drawRect(0f, 0f, width.toFloat(), searchBarH, bgPaint)
 
-        // 搜尋框
         val searchRect = RectF(8 * density, 4 * density, width - 8 * density, searchBarH - 4 * density)
         cardPaint.color = theme.keyColorInt
         canvas.drawRoundRect(searchRect, cornerR, cornerR, cardPaint)
@@ -109,7 +129,7 @@ class GifPanelView(context: Context) : View(context) {
         } else {
             theme.keyLabelColorInt
         }
-        val displayText = searchQuery.ifEmpty { "🔍 搜尋 GIF..." }
+        val displayText = searchQuery.ifEmpty { "\uD83D\uDD0D 搜尋 GIF..." }
         canvas.drawText(displayText, searchRect.left + 12 * density, searchRect.centerY() + searchPaint.textSize / 3f, searchPaint)
     }
 
@@ -143,61 +163,148 @@ class GifPanelView(context: Context) : View(context) {
         val startY = searchBarH + 4 * density
         val cols = 3
         val cellW = width / cols.toFloat()
-        val cellH = gifCellSize * 0.75f
+        val cellH = cellW * 0.75f
+
+        canvas.save()
+        canvas.clipRect(0f, startY, width.toFloat(), height.toFloat())
 
         gifResults.forEachIndexed { i, gif ->
             val col = i % cols
             val row = i / cols
             val x = col * cellW
-            val y = startY + row * cellH
+            val y = startY + row * cellH + scrollOffset
 
-            if (y > height) return@forEachIndexed
+            if (y + cellH < startY || y > height) return@forEachIndexed
 
             val rect = RectF(x + 2 * density, y + 2 * density, x + cellW - 2 * density, y + cellH - 2 * density)
             gifRects.add(rect to i)
 
-            // 佔位卡片（實際使用時用 Glide 載入縮圖）
+            // 背景卡片
             cardPaint.color = theme.keyColorInt
             canvas.drawRoundRect(rect, cornerR, cornerR, cardPaint)
 
-            // 顯示標題
-            textPaint.color = theme.candidateTextColorInt
-            textPaint.textSize = 10f * density
-            val label = gif.title.take(12)
-            canvas.drawText(label, rect.centerX(), rect.centerY(), textPaint)
-            textPaint.textSize = 13f * density
+            // 嘗試取得已載入的 bitmap
+            val bitmap = loadedBitmaps[gif.previewUrl]
+            if (bitmap != null && !bitmap.isRecycled) {
+                // 繪製 bitmap，保持比例填滿
+                drawBitmapFill(canvas, bitmap, rect)
+            } else {
+                // 顯示載入佔位
+                textPaint.color = theme.candidateTextColorInt
+                textPaint.alpha = 80
+                textPaint.textSize = 10f * density
+                val label = gif.title.take(12).ifEmpty { "GIF" }
+                canvas.drawText(label, rect.centerX(), rect.centerY() - 4 * density, textPaint)
+                textPaint.textSize = 20f * density
+                canvas.drawText("\uD83C\uDFAC", rect.centerX(), rect.centerY() + 16 * density, textPaint)
+                textPaint.textSize = 13f * density
+                textPaint.alpha = 255
 
-            // GIF 標記
-            tagPaint.color = theme.candidateSelectedColorInt
-            canvas.drawText("GIF", rect.centerX(), rect.centerY() + 14 * density, tagPaint)
+                // 發起非同步載入
+                loadPreviewAsync(gif.previewUrl)
+            }
+        }
+
+        canvas.restore()
+    }
+
+    /** 繪製 Bitmap 填滿 RectF（center crop） */
+    private fun drawBitmapFill(canvas: Canvas, bmp: Bitmap, dst: RectF) {
+        val bw = bmp.width.toFloat()
+        val bh = bmp.height.toFloat()
+        val dw = dst.width()
+        val dh = dst.height()
+
+        val scale = maxOf(dw / bw, dh / bh)
+        val sw = dw / scale
+        val sh = dh / scale
+        val sx = (bw - sw) / 2f
+        val sy = (bh - sh) / 2f
+
+        val src = android.graphics.Rect(sx.toInt(), sy.toInt(), (sx + sw).toInt(), (sy + sh).toInt())
+        val dstRect = android.graphics.Rect(dst.left.toInt(), dst.top.toInt(), dst.right.toInt(), dst.bottom.toInt())
+
+        canvas.save()
+        canvas.clipRect(dst)
+        // 圓角裁切
+        val path = android.graphics.Path()
+        path.addRoundRect(dst, cornerR, cornerR, android.graphics.Path.Direction.CW)
+        canvas.clipPath(path)
+        canvas.drawBitmap(bmp, src, dstRect, bitmapPaint)
+        canvas.restore()
+    }
+
+    /** 非同步載入預覽圖 */
+    private fun loadPreviewAsync(url: String) {
+        if (url in loadedBitmaps || url in loadingUrls) return
+        loadingUrls.add(url)
+        scope.launch {
+            val bmp = imageCache.getPreviewBitmap(url)
+            loadedBitmaps[url] = bmp
+            loadingUrls.remove(url)
+            post { invalidate() }
         }
     }
 
     /** 外部呼叫：設定搜尋文字並執行搜尋 */
     fun search(query: String) {
         searchQuery = query
+        isLoading = true
+        gifResults = emptyList()
+        scrollOffset = 0f
+        invalidate()
+
         onSearch?.invoke(query) { results ->
             gifResults = results
+            isLoading = false
             post { invalidate() }
         }
-        invalidate()
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (event.action == MotionEvent.ACTION_UP) {
-            // 標籤
-            val tagHit = tagRects.firstOrNull { it.first.contains(event.x, event.y) }
-            if (tagHit != null) {
-                search(tagHit.second)
-                performClick()
+        when (event.action) {
+            MotionEvent.ACTION_DOWN -> {
+                lastTouchY = event.y
+                isDragging = false
                 return true
             }
+            MotionEvent.ACTION_MOVE -> {
+                if (gifResults.isNotEmpty()) {
+                    val dy = event.y - lastTouchY
+                    if (Math.abs(dy) > 5 * density) isDragging = true
+                    if (isDragging) {
+                        scrollOffset += dy
+                        val cols = 3
+                        val cellH = (width / cols.toFloat()) * 0.75f
+                        val totalRows = (gifResults.size + cols - 1) / cols
+                        val contentH = totalRows * cellH
+                        val viewH = height - searchBarH - 4 * density
+                        val minScroll = -(contentH - viewH).coerceAtLeast(0f)
+                        scrollOffset = scrollOffset.coerceIn(minScroll, 0f)
+                        lastTouchY = event.y
+                        invalidate()
+                    }
+                }
+                return true
+            }
+            MotionEvent.ACTION_UP -> {
+                if (!isDragging) {
+                    // 標籤
+                    val tagHit = tagRects.firstOrNull { it.first.contains(event.x, event.y) }
+                    if (tagHit != null) {
+                        search(tagHit.second)
+                        performClick()
+                        return true
+                    }
 
-            // GIF 項目
-            val gifHit = gifRects.firstOrNull { it.first.contains(event.x, event.y) }
-            if (gifHit != null && gifHit.second < gifResults.size) {
-                onGifSelected?.invoke(gifResults[gifHit.second])
-                performClick()
+                    // GIF 項目
+                    val gifHit = gifRects.firstOrNull { it.first.contains(event.x, event.y) }
+                    if (gifHit != null && gifHit.second < gifResults.size) {
+                        onGifSelected?.invoke(gifResults[gifHit.second])
+                        performClick()
+                        return true
+                    }
+                }
                 return true
             }
         }
@@ -207,6 +314,11 @@ class GifPanelView(context: Context) : View(context) {
     override fun performClick(): Boolean {
         super.performClick()
         return true
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        scope.cancel()
     }
 
     /** GIF 項目資料 */

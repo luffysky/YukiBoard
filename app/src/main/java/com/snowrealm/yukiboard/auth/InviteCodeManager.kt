@@ -75,6 +75,8 @@ class InviteCodeManager(context: Context) {
 
     fun isActivated(): Boolean = prefs.getString("invite_code", null) != null
 
+    fun getActivatedCode(): String? = prefs.getString("invite_code", null)
+
     fun getCodeType(): InviteCodeType? {
         val typeName = prefs.getString("invite_type", null) ?: return null
         return try { InviteCodeType.valueOf(typeName) } catch (_: Exception) { null }

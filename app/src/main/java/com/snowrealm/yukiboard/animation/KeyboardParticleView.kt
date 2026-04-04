@@ -20,7 +20,16 @@ import kotlin.random.Random
  * - matcha: 茶葉漂浮
  * - midnight_gold: 金箔飄落
  */
+@android.annotation.SuppressLint("ClickableViewAccessibility")
 class KeyboardParticleView(context: Context) : View(context) {
+
+    init {
+        // 讓觸控事件穿透到下方的 KeyboardView
+        isClickable = false
+        isFocusable = false
+    }
+
+    override fun onTouchEvent(event: android.view.MotionEvent?): Boolean = false
 
     private val density = context.resources.displayMetrics.density
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)

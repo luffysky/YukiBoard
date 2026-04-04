@@ -1,8 +1,10 @@
 package com.snowrealm.yukiboard.animation.gles
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.opengl.GLSurfaceView
 import android.util.AttributeSet
+import android.view.MotionEvent
 
 /**
  * 鍵盤流光 [GLSurfaceView]。
@@ -26,6 +28,9 @@ class KeyboardGLSurfaceView @JvmOverloads constructor(
     val renderer = FlowLightRenderer()
 
     init {
+        // 讓觸控事件穿透到下方的 KeyboardView
+        isClickable = false
+        isFocusable = false
         setEGLContextClientVersion(2)
         // 需要 alpha 通道讓流光透明疊加
         setEGLConfigChooser(8, 8, 8, 8, 16, 0)
@@ -44,6 +49,9 @@ class KeyboardGLSurfaceView @JvmOverloads constructor(
     fun setFlowColor(colorInt: Int) {
         queueEvent { renderer.setFlowColor(colorInt) }
     }
+
+    @SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(event: MotionEvent?): Boolean = false
 
     override fun onPause() {
         super.onPause()

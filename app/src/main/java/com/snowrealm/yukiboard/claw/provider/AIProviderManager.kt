@@ -8,6 +8,8 @@ import com.snowrealm.yukiboard.BuildConfig
 
 class AIProviderManager private constructor(context: Context) {
 
+    private val appContext: Context = context.applicationContext
+
     companion object {
         private const val PREFS_NAME = "yukiboard_ai_secure"
         private const val KEY_SELECTED_PROVIDER = "selected_provider"
@@ -63,10 +65,11 @@ class AIProviderManager private constructor(context: Context) {
             saveApiKey(AIProviderType.OPENAI, openaiKey)
         }
 
-        // Set default provider: prefer Anthropic, fall back to OpenAI
+        // Set default provider: prefer Anthropic → OpenAI → SnowRealm (proxy)
         when {
             anthropicKey.isNotBlank() -> setSelectedProvider(AIProviderType.ANTHROPIC)
             openaiKey.isNotBlank() -> setSelectedProvider(AIProviderType.OPENAI)
+            else -> setSelectedProvider(AIProviderType.SNOWREALM)
         }
 
         prefs.edit().putBoolean(KEY_BUILDCONFIG_IMPORTED, true).apply()
@@ -78,7 +81,7 @@ class AIProviderManager private constructor(context: Context) {
             when (type) {
                 AIProviderType.OPENAI -> OpenAIProvider(apiKey)
                 AIProviderType.ANTHROPIC -> AnthropicProvider(apiKey)
-                AIProviderType.SNOWREALM -> SnowRealmProvider()
+                AIProviderType.SNOWREALM -> SnowRealmProvider(appContext)
             }
         }
     }
@@ -122,6 +125,7 @@ class AIProviderManager private constructor(context: Context) {
 
     fun hasValidConfig(): Boolean {
         val type = getSelectedProviderType()
+        if (type == AIProviderType.SNOWREALM) return true  // 用邀請碼，不需 API key
         val key = getApiKey(type)
         return !key.isNullOrBlank()
     }

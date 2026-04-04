@@ -2,6 +2,8 @@ plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
     id 'org.jetbrains.kotlin.plugin.serialization'
+    id 'com.google.gms.google-services'
+    id 'com.google.firebase.appdistribution'
 }
 
 // 從 .env 載入變數（優先於系統環境變數）
@@ -131,9 +133,16 @@ dependencies {
     // MLKit 翻譯（離線模型）
     implementation 'com.google.mlkit:translate:17.0.3'
 
+    // Filament 3D 渲染（VRM 角色）
+    implementation 'com.google.android.filament:filament-android:1.51.6'
+    implementation 'com.google.android.filament:filament-utils-android:1.51.6'
+    implementation 'com.google.android.filament:gltfio-android:1.51.6'
+
     // OpenGL ES — 由系統提供，無需額外依賴
-    // libchewing JNI — 待 native module 整合後加入
-    // implementation files('libs/libchewing-android.aar')
+
+    // Firebase
+    implementation platform('com.google.firebase:firebase-bom:33.7.0')
+    implementation 'com.google.firebase:firebase-analytics'
 
     // Testing
     testImplementation 'junit:junit:4.13.2'
