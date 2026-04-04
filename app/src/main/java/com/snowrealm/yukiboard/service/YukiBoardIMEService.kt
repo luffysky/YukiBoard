@@ -275,6 +275,7 @@ class YukiBoardIMEService : InputMethodService() {
 
         // 自訂圖片/影片背景（最底層）
         val bgView = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView(this)
+        bgView.scaleMode = prefs.bgScaleMode
         bgView.offsetX = prefs.bgOffsetX
         bgView.offsetY = prefs.bgOffsetY
         val savedBg = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getSavedBackground(this)
@@ -419,6 +420,7 @@ class YukiBoardIMEService : InputMethodService() {
         applyTransparentMode()
 
         // 重新檢查自訂背景（設定頁可能已更改）
+        backgroundView?.scaleMode = prefs.bgScaleMode
         backgroundView?.offsetX = prefs.bgOffsetX
         backgroundView?.offsetY = prefs.bgOffsetY
         val bgHas = backgroundView?.reloadFromStorage() ?: false

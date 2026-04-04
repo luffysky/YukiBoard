@@ -43,6 +43,10 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
     var offsetY: Float = 0.5f
         set(value) { field = value.coerceIn(0f, 1f); applyOffset() }
 
+    // 0=保持比例(center-crop) 1=整張塞入(fit-xy stretch)
+    var scaleMode: Int = 0
+        set(value) { field = value; applyOffset() }
+
     private var bmpWidth = 0
     private var bmpHeight = 0
 
@@ -166,28 +170,33 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
         }
     }
 
-    /** 根據 offsetX/offsetY 重新計算 matrix */
+    /** 根據 offsetX/offsetY + scaleMode 重新計算 matrix */
     private fun applyOffset() {
         val iv = imageView ?: return
         val vw = iv.width.toFloat()
         val vh = iv.height.toFloat()
         if (vw <= 0 || vh <= 0 || bmpWidth <= 0 || bmpHeight <= 0) return
 
-        val scale = maxOf(vw / bmpWidth, vh / bmpHeight) * scaleFactor
-        val scaledW = bmpWidth * scale
-        val scaledH = bmpHeight * scale
-
-        // 可平移範圍：圖片超出 View 的部分
-        val maxDx = (scaledW - vw).coerceAtLeast(0f)
-        val maxDy = (scaledH - vh).coerceAtLeast(0f)
-
-        // offsetX 0.0=最左(dx=0)，0.5=置中，1.0=最右(dx=-maxDx)
-        val dx = -maxDx * offsetX
-        val dy = -maxDy * offsetY
-
         imageMatrix.reset()
-        imageMatrix.setScale(scale, scale)
-        imageMatrix.postTranslate(dx, dy)
+
+        if (scaleMode == 1) {
+            // 整張塞入（FIT_XY）：拉伸填滿，忽略比例
+            val sx = vw / bmpWidth
+            val sy = vh / bmpHeight
+            imageMatrix.setScale(sx, sy)
+        } else {
+            // 保持比例（CENTER_CROP）：等比縮放 + 偏移裁切
+            val scale = maxOf(vw / bmpWidth, vh / bmpHeight) * scaleFactor
+            val scaledW = bmpWidth * scale
+            val scaledH = bmpHeight * scale
+            val maxDx = (scaledW - vw).coerceAtLeast(0f)
+            val maxDy = (scaledH - vh).coerceAtLeast(0f)
+            val dx = -maxDx * offsetX
+            val dy = -maxDy * offsetY
+            imageMatrix.setScale(scale, scale)
+            imageMatrix.postTranslate(dx, dy)
+        }
+
         savedMatrix.set(imageMatrix)
         iv.imageMatrix = imageMatrix
     }

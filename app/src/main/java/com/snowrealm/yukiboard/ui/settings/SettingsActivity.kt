@@ -494,6 +494,51 @@ class SettingsActivity : AppCompatActivity() {
             })
         })
 
+        // ── 顯示比例切換 ──
+        val scaleModeRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(12), dp(8), dp(12), dp(4))
+        }
+        val scaleModeLabel = TextView(this).apply {
+            text = "顯示比例:"
+            textSize = 12f
+            setTextColor(0xFF7FD8FF.toInt())
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+        scaleModeRow.addView(scaleModeLabel)
+
+        val btnCrop = android.widget.Button(this).apply {
+            text = "保持比例"
+            textSize = 11f
+            setTextColor(if (prefs.bgScaleMode == 0) 0xFF111827.toInt() else 0xFFE8F4FF.toInt())
+            setBackgroundColor(if (prefs.bgScaleMode == 0) 0xFF7FD8FF.toInt() else 0xFF2A3A5C.toInt())
+            setPadding(dp(8), 0, dp(8), 0)
+            layoutParams = LinearLayout.LayoutParams(0, dp(32), 1f).apply { marginStart = dp(8) }
+        }
+        val btnFit = android.widget.Button(this).apply {
+            text = "整張塞入"
+            textSize = 11f
+            setTextColor(if (prefs.bgScaleMode == 1) 0xFF111827.toInt() else 0xFFE8F4FF.toInt())
+            setBackgroundColor(if (prefs.bgScaleMode == 1) 0xFF7FD8FF.toInt() else 0xFF2A3A5C.toInt())
+            setPadding(dp(8), 0, dp(8), 0)
+            layoutParams = LinearLayout.LayoutParams(0, dp(32), 1f).apply { marginStart = dp(4) }
+        }
+        btnCrop.setOnClickListener {
+            prefs.bgScaleMode = 0
+            btnCrop.setTextColor(0xFF111827.toInt()); btnCrop.setBackgroundColor(0xFF7FD8FF.toInt())
+            btnFit.setTextColor(0xFFE8F4FF.toInt()); btnFit.setBackgroundColor(0xFF2A3A5C.toInt())
+            updateBgPreviewMatrix()
+        }
+        btnFit.setOnClickListener {
+            prefs.bgScaleMode = 1
+            btnFit.setTextColor(0xFF111827.toInt()); btnFit.setBackgroundColor(0xFF7FD8FF.toInt())
+            btnCrop.setTextColor(0xFFE8F4FF.toInt()); btnCrop.setBackgroundColor(0xFF2A3A5C.toInt())
+            updateBgPreviewMatrix()
+        }
+        scaleModeRow.addView(btnCrop)
+        scaleModeRow.addView(btnFit)
+        card.addView(scaleModeRow)
+
         // ── 背景位置 X 拉桿 ──
         val xLabel = TextView(this).apply {
             text = "水平位置 X: %d%%".format((prefs.bgOffsetX * 100).toInt())
@@ -623,7 +668,7 @@ class SettingsActivity : AppCompatActivity() {
         bgVideoTexture = null
     }
 
-    /** 根據 prefs 的 bgOffsetX/Y 更新預覽圖的 Matrix */
+    /** 根據 prefs 的 bgOffsetX/Y + bgScaleMode 更新預覽圖的 Matrix */
     private fun updateBgPreviewMatrix() {
         val iv = bgPreviewImage ?: return
         val drawable = iv.drawable ?: return
@@ -636,17 +681,22 @@ class SettingsActivity : AppCompatActivity() {
             val vh = iv.height.toFloat()
             if (vw <= 0 || vh <= 0) return@post
 
-            val scale = maxOf(vw / bmpW, vh / bmpH)
-            val scaledW = bmpW * scale
-            val scaledH = bmpH * scale
-            val maxDx = (scaledW - vw).coerceAtLeast(0f)
-            val maxDy = (scaledH - vh).coerceAtLeast(0f)
-            val dx = -maxDx * prefs.bgOffsetX
-            val dy = -maxDy * prefs.bgOffsetY
-
             val matrix = android.graphics.Matrix()
-            matrix.setScale(scale, scale)
-            matrix.postTranslate(dx, dy)
+            if (prefs.bgScaleMode == 1) {
+                // 整張塞入（拉伸填滿）
+                matrix.setScale(vw / bmpW, vh / bmpH)
+            } else {
+                // 保持比例（裁切）
+                val scale = maxOf(vw / bmpW, vh / bmpH)
+                val scaledW = bmpW * scale
+                val scaledH = bmpH * scale
+                val maxDx = (scaledW - vw).coerceAtLeast(0f)
+                val maxDy = (scaledH - vh).coerceAtLeast(0f)
+                val dx = -maxDx * prefs.bgOffsetX
+                val dy = -maxDy * prefs.bgOffsetY
+                matrix.setScale(scale, scale)
+                matrix.postTranslate(dx, dy)
+            }
             iv.imageMatrix = matrix
         }
     }

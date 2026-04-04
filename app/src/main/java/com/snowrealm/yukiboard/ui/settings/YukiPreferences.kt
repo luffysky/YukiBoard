@@ -118,6 +118,7 @@ class YukiPreferences(context: Context) {
     var bgOverlayAlpha: Int by IntPref("bg_overlay_alpha", 100)
     var bgOffsetX: Float by FloatPref("bg_offset_x", 0.5f)   // 0.0=最左 ~ 1.0=最右
     var bgOffsetY: Float by FloatPref("bg_offset_y", 0.5f)   // 0.0=最上 ~ 1.0=最下
+    var bgScaleMode: Int by IntPref("bg_scale_mode", 0)       // 0=保持比例(裁切) 1=整張塞入(拉伸)
 
     // 透明鍵盤（透視到底層 App）
     var transparentKeyboard: Boolean by BoolPref("transparent_keyboard", false)

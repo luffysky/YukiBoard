@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 10
-        versionName "0.3.6"
+        versionCode 11
+        versionName "0.3.7"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -75,7 +75,7 @@ android {
             debuggable true
             firebaseAppDistribution {
                 groups = "testers"
-                releaseNotes = "v${android.defaultConfig.versionName}\n- GIF 搜尋框支援 CJK 組字輸入\n- 語音辨識新增 7 語言（共 17 語）\n- 候選字依前後文 bigram/trigram 排序\n- 記憶翻牌開局 2 秒展示牌面\n- 背景圖片 XY 位置拉桿 + 預覽修正"
+                releaseNotes = "v${android.defaultConfig.versionName}\n- 背景圖片/影片顯示比例選擇（保持比例 / 整張塞入）\n- 背景 XY 位置拉桿 + 預覽同步\n- 影片預覽可播放\n- 日文假名/片假名切換 + 180 詞庫\n- 韓文 200 常用詞庫\n- WeatherSkill GPS 自動取得天氣\n- WhisperSkill AI 語音後處理"
             }
         }
     }
