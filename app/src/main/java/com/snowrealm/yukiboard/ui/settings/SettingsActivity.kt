@@ -376,7 +376,8 @@ class SettingsActivity : AppCompatActivity() {
         // ── 預覽區 ──
         val previewContainer = FrameLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(180)
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (resources.displayMetrics.heightPixels * prefs.keyboardHeightRatio).toInt().coerceIn(dp(100), dp(300))
             ).apply { setMargins(0, 0, 0, dp(8)) }
             background = android.graphics.drawable.GradientDrawable().apply {
                 setColor(0xFF111827.toInt())
@@ -588,6 +589,30 @@ class SettingsActivity : AppCompatActivity() {
             })
         })
 
+        // ── 鍵盤高度拉桿 ──
+        val heightPct = ((prefs.keyboardHeightRatio - 0.25f) / 0.30f * 100).toInt().coerceIn(0, 100)
+        val kbHeightLabel = TextView(this).apply {
+            text = "鍵盤高度: %d%%".format(heightPct)
+            textSize = 12f
+            setTextColor(0xFF7FD8FF.toInt())
+            setPadding(dp(12), dp(8), 0, dp(4))
+        }
+        card.addView(kbHeightLabel)
+        card.addView(SeekBar(this).apply {
+            max = 100   // 0=25%, 100=55%
+            progress = heightPct
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+                    prefs.keyboardHeightRatio = 0.25f + p / 100f * 0.30f
+                    kbHeightLabel.text = "鍵盤高度: %d%%".format(p)
+                    updateFullPreviewHeight()
+                }
+                override fun onStartTrackingTouch(sb: SeekBar?) {}
+                override fun onStopTrackingTouch(sb: SeekBar?) {}
+            })
+        })
+
         // ── 按鍵大小拉桿 ──
         val keySizeLabel = TextView(this).apply {
             text = "按鍵大小: %d%%".format(prefs.keyScalePercent)
@@ -793,6 +818,21 @@ class SettingsActivity : AppCompatActivity() {
     // 鍵盤完整預覽（背景 + 遮罩 + 按鍵）
     // ─────────────────────────────────────────────────────────
 
+    /** 根據 keyboardHeightRatio 更新完整預覽 + 背景預覽的高度 */
+    private fun updateFullPreviewHeight() {
+        val screenH = resources.displayMetrics.heightPixels
+        val newH = (screenH * prefs.keyboardHeightRatio).toInt().coerceIn(dp(100), dp(300))
+        fullPreviewView?.let { v ->
+            v.layoutParams = v.layoutParams?.apply { height = newH }
+            v.requestLayout(); v.invalidate()
+        }
+        bgPreviewContainer?.let { c ->
+            c.layoutParams = c.layoutParams?.apply { height = newH }
+            c.requestLayout()
+            updateBgPreviewMatrix()
+        }
+    }
+
     private fun buildFullKeyboardPreview(): View {
         val theme = themeManager.currentTheme
         val savedBg = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getSavedBackground(this)
@@ -804,7 +844,8 @@ class SettingsActivity : AppCompatActivity() {
             } catch (_: Exception) { null }
         } else null
 
-        val previewHeight = dp(160)
+        val screenH = resources.displayMetrics.heightPixels
+        val previewHeight = (screenH * prefs.keyboardHeightRatio).toInt().coerceIn(dp(100), dp(300))
         val dens = resources.displayMetrics.density
 
         return object : View(this@SettingsActivity) {

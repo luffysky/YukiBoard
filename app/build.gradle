@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 15
-        versionName "0.4.1"
+        versionCode 16
+        versionName "0.4.2"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -75,7 +75,7 @@ android {
             debuggable true
             firebaseAppDistribution {
                 groups = "testers"
-                releaseNotes = "v${android.defaultConfig.versionName}\n- 修正按鍵大小拉桿：調整個別按鍵間距，鍵盤高度不變\n- 按鍵透明度拉桿\n- 鍵盤完整預覽同步所有設定"
+                releaseNotes = "v${android.defaultConfig.versionName}\n- 鍵盤高度拉桿（25%~55% 螢幕高度）\n- 按鍵大小 + 透明度拉桿\n- 預覽高度隨鍵盤高度同步變化"
             }
         }
     }
