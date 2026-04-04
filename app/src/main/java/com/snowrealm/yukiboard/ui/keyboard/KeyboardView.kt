@@ -152,6 +152,11 @@ class KeyboardView(context: Context) : View(context) {
     private var candidates: List<String> = emptyList()
     private var allCandidates: List<String> = emptyList()
     private var isCandidateExpanded: Boolean = false
+    // 候選列橫向捲動
+    private var candidateScrollX = 0f
+    private var candidateLastTouchX = 0f
+    private var candidateIsDragging = false
+    private val candidateRects = mutableListOf<Pair<RectF, Int>>() // rect → index in allCandidates
     /** 是否有自訂背景圖（設為 true 時鍵盤背景變半透明） */
     var hasCustomBackground: Boolean = false
         set(value) {
@@ -377,7 +382,8 @@ class KeyboardView(context: Context) : View(context) {
     fun updateCandidates(list: List<String>) {
         if (allCandidates == list) return
         allCandidates = list
-        candidates = if (list.size > CANDIDATE_BAR_MAX) list.take(CANDIDATE_BAR_MAX) else list
+        candidates = list  // 不再截斷，全部由橫向捲動顯示
+        candidateScrollX = 0f
         highlightedCandidateIndex = -1
         isCandidateExpanded = false
         expandScrollOffset = 0f
@@ -641,6 +647,8 @@ class KeyboardView(context: Context) : View(context) {
         keyPaint.color = if (hasCustomBackground) 0x22000000 else theme.candidateBarColorInt
         canvas.drawRect(barRect, keyPaint)
 
+        candidateRects.clear()
+
         // 模式標示
         if (currentMode != KeyboardMode.NORMAL) {
             val modeTag = "${currentMode.icon} ${currentMode.displayName}"
@@ -684,73 +692,83 @@ class KeyboardView(context: Context) : View(context) {
             return
         }
 
-        // 語言標籤（常駐顯示在左側）
-        val langLabel = when (currentInputMode) {
-            com.snowrealm.yukiboard.input.router.InputMode.ENGLISH -> "EN"
-            com.snowrealm.yukiboard.input.router.InputMode.BOPOMOFO -> "中文 [注音]"
-            com.snowrealm.yukiboard.input.router.InputMode.PINYIN -> "中文 [拼音]"
-            com.snowrealm.yukiboard.input.router.InputMode.CANGJIE -> "中文 [倉頡]"
-            com.snowrealm.yukiboard.input.router.InputMode.SPEED_CANGJIE -> "中文 [速成]"
-            com.snowrealm.yukiboard.input.router.InputMode.JAPANESE -> "日本語 [ローマ字]"
-            com.snowrealm.yukiboard.input.router.InputMode.KOREAN -> "한국어"
-            com.snowrealm.yukiboard.input.router.InputMode.AUTO -> "AUTO"
-        }
-        altHintPaint.color = (theme.candidateTextColorInt and 0x00FFFFFF) or 0x60000000
-        altHintPaint.textSize = 10f * density
-        altHintPaint.textAlign = Paint.Align.LEFT
-        canvas.drawText(langLabel, 8f * density, candidateBarHeight * 0.65f, altHintPaint)
-        altHintPaint.textAlign = Paint.Align.RIGHT  // 還原
-        val langLabelWidth = altHintPaint.measureText(langLabel) + 16f * density
-
-        // composing text（顯示在語言標籤右側）
-        var composingWidth = langLabelWidth
+        // composing text（左側固定區域）
+        var fixedLeft = 4f * density
         if (composingText.isNotEmpty()) {
             composingPaint.color = theme.composingTextColorInt
             val displayText = "[$composingText]"
-            canvas.drawText(displayText, langLabelWidth + 4f * density, candidateBarHeight * 0.65f, composingPaint)
-            composingWidth = langLabelWidth + composingPaint.measureText(displayText) + 12f * density
+            composingPaint.textAlign = Paint.Align.LEFT
+            canvas.drawText(displayText, fixedLeft, candidateBarHeight * 0.65f, composingPaint)
+            fixedLeft += composingPaint.measureText(displayText) + 8f * density
         }
 
-        // 展開按鈕寬度
-        val hasMoreCandidates = allCandidates.size > CANDIDATE_BAR_MAX
-        val expandBtnWidth = if (hasMoreCandidates) 36f * density else 0f
-        val barAvailableWidth = width.toFloat() - expandBtnWidth - composingWidth
+        // 候選字區域（橫向捲動）
+        if (candidates.isEmpty()) return
 
-        val slotWidth = barAvailableWidth / maxOf(candidates.size, 1)
+        val candPadH = 14f * density  // 每個候選字左右 padding
+        val candGap = 2f * density    // 候選字間距
+        candidatePaint.textAlign = Paint.Align.CENTER
+        candidatePaint.textSize = 15f * density
+
+        // 計算每個候選字的實際寬度
+        val candWidths = candidates.map { candidatePaint.measureText(it) + candPadH * 2 }
+        val totalCandWidth = candWidths.sum() + candGap * (candidates.size - 1).coerceAtLeast(0)
+        val scrollAreaWidth = width.toFloat() - fixedLeft
+        val maxScroll = (totalCandWidth - scrollAreaWidth).coerceAtLeast(0f)
+        candidateScrollX = candidateScrollX.coerceIn(0f, maxScroll)
+
+        // clip 候選字區域
+        canvas.save()
+        canvas.clipRect(fixedLeft, 0f, width.toFloat(), candidateBarHeight)
+
+        var drawX = fixedLeft - candidateScrollX
         candidates.forEachIndexed { i, text ->
-            val slotLeft = composingWidth + slotWidth * i
-            val cx = slotLeft + slotWidth / 2f
+            val cw = candWidths[i]
+            val left = drawX
+            val right = drawX + cw
+            val cx = left + cw / 2f
 
-            // 第一個候選加高亮背景
-            if (i == 0 && candidates.size > 1) {
-                keyPaint.color = theme.candidateSelectedColorInt
-                keyPaint.alpha = 40
-                val pill = RectF(slotLeft + 4 * density, 4 * density, slotLeft + slotWidth - 4 * density, candidateBarHeight - 4 * density)
-                canvas.drawRoundRect(pill, 6 * density, 6 * density, keyPaint)
-                keyPaint.alpha = 255
-                candidatePaint.color = theme.candidateSelectedColorInt
-            } else {
-                candidatePaint.color = theme.candidateTextColorInt
-            }
-            canvas.drawText(text, cx, candidateBarHeight * 0.65f, candidatePaint)
+            // 只繪製可見的
+            if (right > fixedLeft && left < width.toFloat()) {
+                // 第一個候選加高亮背景
+                if (i == 0 && candidates.size > 1) {
+                    keyPaint.color = theme.candidateSelectedColorInt
+                    keyPaint.alpha = 40
+                    val pill = RectF(left + 2 * density, 4 * density, right - 2 * density, candidateBarHeight - 4 * density)
+                    canvas.drawRoundRect(pill, 6 * density, 6 * density, keyPaint)
+                    keyPaint.alpha = 255
+                    candidatePaint.color = theme.candidateSelectedColorInt
+                } else {
+                    candidatePaint.color = theme.candidateTextColorInt
+                }
+                canvas.drawText(text, cx, candidateBarHeight * 0.65f, candidatePaint)
 
-            // 候選詞分隔線
-            if (i > 0) {
-                dividerPaint.color = (theme.candidateTextColorInt and 0x00FFFFFF) or 0x20000000
-                canvas.drawLine(slotLeft, 8 * density, slotLeft, candidateBarHeight - 8 * density, dividerPaint)
+                // 分隔線
+                if (i > 0) {
+                    dividerPaint.color = (theme.candidateTextColorInt and 0x00FFFFFF) or 0x20000000
+                    canvas.drawLine(left, 8 * density, left, candidateBarHeight - 8 * density, dividerPaint)
+                }
+
+                // 記錄觸控區域（螢幕座標）
+                candidateRects.add(RectF(left.coerceAtLeast(fixedLeft), 0f, right.coerceAtMost(width.toFloat()), candidateBarHeight) to i)
             }
+
+            drawX = right + candGap
         }
 
-        // ▼ 展開按鈕
-        if (hasMoreCandidates) {
-            val btnLeft = width.toFloat() - expandBtnWidth
-            // 分隔線
-            dividerPaint.color = (theme.candidateTextColorInt and 0x00FFFFFF) or 0x30000000
-            canvas.drawLine(btnLeft, 6 * density, btnLeft, candidateBarHeight - 6 * density, dividerPaint)
-            // 箭頭符號
-            candidatePaint.color = theme.candidateSelectedColorInt
-            val arrow = if (isCandidateExpanded) "▲" else "▼"
-            canvas.drawText(arrow, btnLeft + expandBtnWidth / 2f, candidateBarHeight * 0.65f, candidatePaint)
+        canvas.restore()
+
+        // 右側漸層遮罩提示（有更多候選可捲動時）
+        if (candidateScrollX < maxScroll && maxScroll > 0f) {
+            val fadeW = 24f * density
+            val fadeLeft = width.toFloat() - fadeW
+            val fadePaint = Paint()
+            fadePaint.shader = android.graphics.LinearGradient(
+                fadeLeft, 0f, width.toFloat(), 0f,
+                0x00000000, (theme.candidateBarColorInt and 0x00FFFFFF) or 0xCC000000.toInt(),
+                android.graphics.Shader.TileMode.CLAMP
+            )
+            canvas.drawRect(fadeLeft, 0f, width.toFloat(), candidateBarHeight, fadePaint)
         }
     }
 
@@ -1073,6 +1091,12 @@ class KeyboardView(context: Context) : View(context) {
 
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
+                // 候選列橫向捲動：記錄起始位置
+                if (y < candidateBarHeight && candidates.isNotEmpty()) {
+                    candidateLastTouchX = x
+                    candidateIsDragging = false
+                    return true
+                }
                 // 展開面板：記錄觸控起始位置
                 if (isCandidateExpanded && y > candidateBarHeight) {
                     expandTouchStartY = y
@@ -1093,6 +1117,19 @@ class KeyboardView(context: Context) : View(context) {
             }
 
             MotionEvent.ACTION_MOVE -> {
+                // 候選列橫向捲動
+                if (y < candidateBarHeight && candidates.isNotEmpty()) {
+                    val dx = candidateLastTouchX - x
+                    if (!candidateIsDragging && Math.abs(dx) > 8 * density) {
+                        candidateIsDragging = true
+                    }
+                    if (candidateIsDragging) {
+                        candidateScrollX += dx
+                        candidateLastTouchX = x
+                        invalidate()
+                    }
+                    return true
+                }
                 // 展開面板：滑動捲動
                 if (isCandidateExpanded && y > candidateBarHeight) {
                     val dy = expandLastTouchY - y
@@ -1162,42 +1199,19 @@ class KeyboardView(context: Context) : View(context) {
                     return true
                 }
 
-                // 候選列觸控選字
+                // 候選列觸控選字（使用繪製時記錄的 candidateRects）
                 if (y < candidateBarHeight && candidates.isNotEmpty()) {
-                    // ▼ 展開按鈕
-                    val hasMore = allCandidates.size > CANDIDATE_BAR_MAX
-                    val expandBtnWidth = if (hasMore) 36f * density else 0f
-                    if (hasMore && x >= width.toFloat() - expandBtnWidth) {
-                        isCandidateExpanded = !isCandidateExpanded
-                        invalidate()
+                    if (candidateIsDragging) {
+                        candidateIsDragging = false
                         performClick()
                         return true
                     }
-                    // 語言標籤 + composing 佔用寬度（與繪製邏輯一致）
-                    val langLabel = when (currentInputMode) {
-                        com.snowrealm.yukiboard.input.router.InputMode.ENGLISH -> "EN"
-                        com.snowrealm.yukiboard.input.router.InputMode.BOPOMOFO -> "中文 [注音]"
-                        com.snowrealm.yukiboard.input.router.InputMode.PINYIN -> "中文 [拼音]"
-                        com.snowrealm.yukiboard.input.router.InputMode.CANGJIE -> "中文 [倉頡]"
-                        com.snowrealm.yukiboard.input.router.InputMode.SPEED_CANGJIE -> "中文 [速成]"
-                        com.snowrealm.yukiboard.input.router.InputMode.JAPANESE -> "日本語 [ローマ字]"
-                        com.snowrealm.yukiboard.input.router.InputMode.KOREAN -> "한국어"
-                        com.snowrealm.yukiboard.input.router.InputMode.AUTO -> "AUTO"
-                    }
-                    altHintPaint.textSize = 10f * density
-                    val langLabelWidth = altHintPaint.measureText(langLabel) + 16f * density
-                    val compW = if (composingText.isNotEmpty()) {
-                        langLabelWidth + composingPaint.measureText("[$composingText]") + 12f * density
-                    } else langLabelWidth
-                    // 點在 composing 區域內不選字
-                    if (x < compW) {
+                    val hit = candidateRects.firstOrNull { it.first.contains(x, y) }
+                    if (hit != null) {
+                        onCandidateSelectListener?.invoke(hit.second)
                         performClick()
                         return true
                     }
-                    val barAvailableWidth = width.toFloat() - expandBtnWidth - compW
-                    val slotWidth = barAvailableWidth / candidates.size
-                    val index = ((x - compW) / slotWidth).toInt().coerceIn(0, candidates.size - 1)
-                    onCandidateSelectListener?.invoke(index)
                     performClick()
                     return true
                 }
