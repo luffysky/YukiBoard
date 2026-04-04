@@ -69,10 +69,34 @@ class SnowRealmAuthClient(context: Context) {
             postAuth("/api/auth/oauth", body)
         }
 
-    /** 註冊新帳號 */
-    suspend fun register(email: String, password: String, name: String): AuthResult =
+    /** 發送驗證碼（註冊前必須） */
+    suspend fun sendVerificationCode(email: String): SendCodeResult =
         withContext(Dispatchers.IO) {
-            val body = """{"email":"$email","password":"$password","displayName":"$name"}"""
+            val body = """{"email":"$email","purpose":"register"}"""
+            val request = Request.Builder()
+                .url("$baseUrl/api/auth/send-code")
+                .post(body.toRequestBody("application/json".toMediaType()))
+                .build()
+            try {
+                val response = client.newCall(request).execute()
+                val responseBody = response.body?.string() ?: return@withContext SendCodeResult.Error("空回應")
+                if (!response.isSuccessful) {
+                    val errorMsg = try {
+                        json.decodeFromString<ErrorResponse>(responseBody).error
+                    } catch (_: Exception) { null }
+                    return@withContext SendCodeResult.Error(errorMsg ?: "發送失敗 (${response.code})")
+                }
+                val result = json.decodeFromString<SendCodeResponse>(responseBody)
+                SendCodeResult.Success(result.codeId)
+            } catch (e: Exception) {
+                SendCodeResult.Error("網路錯誤: ${e.message}")
+            }
+        }
+
+    /** 註冊新帳號（需先 sendVerificationCode） */
+    suspend fun register(email: String, password: String, name: String, codeId: String, code: String): AuthResult =
+        withContext(Dispatchers.IO) {
+            val body = """{"email":"$email","password":"$password","displayName":"$name","codeId":"$codeId","code":"$code"}"""
             postAuth("/api/auth/register", body)
         }
 
@@ -173,12 +197,37 @@ class SnowRealmAuthClient(context: Context) {
             // 解析回應 body
             val loginResponse = json.decodeFromString<LoginResponse>(responseBody)
 
+            // 先存 token
+            val tenantId = loginResponse.user?.tenantId ?: loginResponse.slug ?: ""
+            val userId = loginResponse.user?.id ?: ""
+            prefs.edit()
+                .putString(KEY_TOKEN, token ?: "")
+                .putString(KEY_USER_ID, userId)
+                .putString(KEY_EMAIL, loginEmail)
+                .putLong(KEY_TOKEN_EXPIRY, System.currentTimeMillis() + TOKEN_LIFETIME_MS)
+                .apply()
+
+            // 用 token 拿完整用戶資料（displayName 只有 /me 有）
+            val me = if (!token.isNullOrBlank()) {
+                try {
+                    val meReq = Request.Builder()
+                        .url("$baseUrl/api/auth/me")
+                        .header("Cookie", "admin_session=$token")
+                        .get().build()
+                    val meResp = client.newCall(meReq).execute()
+                    if (meResp.isSuccessful) {
+                        val meBody = meResp.body?.string()
+                        if (meBody != null) json.decodeFromString<MeResponse>(meBody) else null
+                    } else null
+                } catch (_: Exception) { null }
+            } else null
+
             val user = UserProfile(
-                id = loginResponse.user?.id ?: "",
-                email = loginEmail,
-                displayName = loginResponse.user?.displayName ?: loginEmail,
-                role = loginResponse.user?.role ?: "",
-                tenantId = loginResponse.user?.tenantId ?: loginResponse.slug ?: ""
+                id = me?.userId ?: userId,
+                email = me?.userName ?: loginEmail,
+                displayName = me?.userName ?: loginEmail,
+                role = me?.role ?: loginResponse.user?.role ?: "",
+                tenantId = me?.tenantId ?: tenantId
             )
 
             saveSession(token, user)
@@ -205,8 +254,20 @@ class SnowRealmAuthClient(context: Context) {
         data class Error(val message: String) : AuthResult()
     }
 
+    sealed class SendCodeResult {
+        data class Success(val codeId: String) : SendCodeResult()
+        data class Error(val message: String) : SendCodeResult()
+    }
+
     @Serializable
     data class ErrorResponse(val error: String = "")
+
+    @Serializable
+    data class SendCodeResponse(
+        val success: Boolean = false,
+        val codeId: String = "",
+        val channel: String = ""
+    )
 
     @Serializable
     data class LoginResponse(

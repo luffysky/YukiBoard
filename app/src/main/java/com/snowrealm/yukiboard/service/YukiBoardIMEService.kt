@@ -456,7 +456,7 @@ class YukiBoardIMEService : InputMethodService() {
      * 將遠端貼圖以圖片方式傳送給目標 App（透過 commitContent API）。
      * 先下載到 cache，再用 FileProvider 提供 content URI。
      */
-    private fun commitStickerImage(url: String) {
+    private fun commitImageContent(url: String) {
         serviceScope.launch(Dispatchers.IO) {
             try {
                 val cacheDir = java.io.File(cacheDir, "stickers").also { it.mkdirs() }
@@ -621,7 +621,7 @@ class YukiBoardIMEService : InputMethodService() {
                 val p = GifPanelView(this).also { gifPanel = it }
                 p.theme = theme
                 p.onGifSelected = { gif ->
-                    currentInputConnection?.commitText(gif.fullUrl, 1)
+                    commitImageContent(gif.fullUrl)
                 }
                 val gifClient = giphyClient
                 if (gifClient != null && gifClient.isAvailable()) {
@@ -643,7 +643,7 @@ class YukiBoardIMEService : InputMethodService() {
                 p.onStickerSelected = { stickerText ->
                     if (stickerText.startsWith("[STICKER]:")) {
                         val url = stickerText.removePrefix("[STICKER]:")
-                        commitStickerImage(url)
+                        commitImageContent(url)
                     } else {
                         currentInputConnection?.commitText(stickerText, 1)
                     }

@@ -5,7 +5,6 @@ import android.content.Intent
 import android.graphics.*
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
-import android.os.Build
 import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
@@ -28,7 +27,7 @@ import kotlinx.coroutines.withContext
 /**
  * SnowRealm 帳號登入頁面 — 液態玻璃風格。
  *
- * Email 登入 / LINE OAuth / Google OAuth（WebView）
+ * Email 登入 / 註冊（含驗證碼）/ LINE OAuth / Google OAuth（WebView）
  */
 class LoginActivity : AppCompatActivity() {
 
@@ -37,11 +36,14 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var emailInput: EditText
     private lateinit var passwordInput: EditText
     private lateinit var nameInput: EditText
+    private lateinit var codeInput: EditText
+    private lateinit var sendCodeBtn: View
     private lateinit var loginBtn: View
     private lateinit var registerToggle: TextView
     private lateinit var webViewContainer: FrameLayout
     private var webView: WebView? = null
     private var isRegisterMode = false
+    private var pendingCodeId: String? = null
 
     private val baseUrl get() = BuildConfig.INSIGHT_API_BASE_URL.trimEnd('/')
 
@@ -80,7 +82,6 @@ class LoginActivity : AppCompatActivity() {
         val d = resources.displayMetrics.density
         val pad = (24 * d).toInt()
 
-        // 最外層 FrameLayout（背景 + 玻璃卡片 + WebView 層）
         val frame = FrameLayout(this).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -88,18 +89,15 @@ class LoginActivity : AppCompatActivity() {
             )
         }
 
-        // ── 漸層背景 ──
         frame.background = GradientDrawable(
             GradientDrawable.Orientation.TL_BR,
             intArrayOf(0xFF0A0E1A.toInt(), 0xFF121836.toInt(), 0xFF0D1B2A.toInt())
         )
 
-        // ── 裝飾光暈 ──
         frame.addView(createGlowOrb(d, 120, 0x3000B4D8.toInt(), -40, -20))
         frame.addView(createGlowOrb(d, 180, 0x2040E0D0.toInt(), 160, 500))
         frame.addView(createGlowOrb(d, 100, 0x20C084FC.toInt(), 220, 120))
 
-        // ── 捲動容器 ──
         val scroll = ScrollView(this).apply {
             isVerticalScrollBarEnabled = false
             clipToPadding = false
@@ -112,35 +110,26 @@ class LoginActivity : AppCompatActivity() {
             setPadding(pad, 0, pad, pad)
         }
 
-        // ── 雪花 icon + 標題 ──
+        // 雪花 icon + 標題
         root.addView(TextView(this).apply {
-            text = "❄"
-            textSize = 48f
-            gravity = Gravity.CENTER
+            text = "❄"; textSize = 48f; gravity = Gravity.CENTER
             setPadding(0, 0, 0, (8 * d).toInt())
         })
         root.addView(TextView(this).apply {
-            text = "SnowRealm"
-            textSize = 28f
-            setTextColor(Color.WHITE)
+            text = "SnowRealm"; textSize = 28f; setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
             typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
             setPadding(0, 0, 0, (4 * d).toInt())
         })
         root.addView(TextView(this).apply {
-            text = "帳號登入"
-            textSize = 14f
-            setTextColor(0x99FFFFFF.toInt())
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, (24 * d).toInt())
+            text = "帳號登入"; textSize = 14f; setTextColor(0x99FFFFFF.toInt())
+            gravity = Gravity.CENTER; setPadding(0, 0, 0, (24 * d).toInt())
         })
 
-        // ── 狀態文字 ──
+        // 狀態文字
         statusText = TextView(this).apply {
-            textSize = 13f
-            setTextColor(0xFFFF6B6B.toInt())
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, (12 * d).toInt())
+            textSize = 13f; setTextColor(0xFFFF6B6B.toInt())
+            gravity = Gravity.CENTER; setPadding(0, 0, 0, (12 * d).toInt())
         }
         root.addView(statusText)
 
@@ -166,16 +155,38 @@ class LoginActivity : AppCompatActivity() {
             InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD, d)
         cardContent.addView(passwordInput)
 
+        // 驗證碼（註冊模式）
+        val codeRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            visibility = View.GONE
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = (10 * d).toInt() }
+        }
+        codeInput = createGlassInput("驗證碼", InputType.TYPE_CLASS_NUMBER, d).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginEnd = (8 * d).toInt()
+            }
+        }
+        codeRow.addView(codeInput)
+        sendCodeBtn = createGlassButton("發送驗證碼", 0xFF6C63FF.toInt(), d) { doSendCode() }.apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                topMargin = (8 * d).toInt()
+            }
+            setPadding((12 * d).toInt(), (14 * d).toInt(), (12 * d).toInt(), (14 * d).toInt())
+        }
+        codeRow.addView(sendCodeBtn)
+        cardContent.addView(codeRow)
+
         // 登入按鈕
         loginBtn = createGlassButton("登入", 0xFF00B4D8.toInt(), d) { doLogin() }
         cardContent.addView(loginBtn)
 
         // 註冊切換
         registerToggle = TextView(this).apply {
-            text = "沒有帳號？註冊"
-            textSize = 13f
-            setTextColor(0xFF80D8FF.toInt())
-            gravity = Gravity.CENTER
+            text = "沒有帳號？註冊"; textSize = 13f
+            setTextColor(0xFF80D8FF.toInt()); gravity = Gravity.CENTER
             setPadding(0, (12 * d).toInt(), 0, 0)
             setOnClickListener { toggleRegisterMode() }
         }
@@ -184,7 +195,7 @@ class LoginActivity : AppCompatActivity() {
         glassCard.addView(cardContent)
         root.addView(glassCard)
 
-        // ── 分隔線 ──
+        // 分隔線
         root.addView(createDividerRow(d))
 
         // ── 玻璃卡片：OAuth ──
@@ -193,48 +204,38 @@ class LoginActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
             setPadding((20 * d).toInt(), (16 * d).toInt(), (20 * d).toInt(), (16 * d).toInt())
         }
-
         oauthContent.addView(createGlassButton("LINE 登入", 0xFF06C755.toInt(), d) {
             openOAuthWebView("$baseUrl/api/auth/line")
         })
         oauthContent.addView(createGlassButton("Google 登入", 0xFF4285F4.toInt(), d) {
             openOAuthWebView("$baseUrl/api/auth/google")
         })
-
         oauthCard.addView(oauthContent)
         root.addView(oauthCard)
 
-        // ── 跳過 ──
+        // 跳過
         root.addView(TextView(this).apply {
-            text = "先跳過"
-            textSize = 14f
-            setTextColor(0x66FFFFFF.toInt())
-            gravity = Gravity.CENTER
-            setPadding(0, (20 * d).toInt(), 0, 0)
+            text = "先跳過"; textSize = 14f; setTextColor(0x66FFFFFF.toInt())
+            gravity = Gravity.CENTER; setPadding(0, (20 * d).toInt(), 0, 0)
             setOnClickListener { finish() }
         })
 
         scroll.addView(root)
         frame.addView(scroll)
 
-        // ── WebView 層（OAuth 用，預設隱藏）──
+        // WebView 層
         webViewContainer = FrameLayout(this).apply {
             visibility = View.GONE
             setBackgroundColor(0xF0000000.toInt())
         }
-        // 關閉按鈕
         val closeBtn = TextView(this).apply {
-            text = "✕"
-            textSize = 20f
-            setTextColor(Color.WHITE)
+            text = "✕"; textSize = 20f; setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
             val s = (44 * d).toInt()
             layoutParams = FrameLayout.LayoutParams(s, s).apply {
                 gravity = Gravity.TOP or Gravity.END
-                topMargin = (40 * d).toInt()
-                rightMargin = (12 * d).toInt()
+                topMargin = (40 * d).toInt(); rightMargin = (12 * d).toInt()
             }
-            setBackgroundResource(android.R.color.transparent)
             elevation = 10f
             setOnClickListener { dismissWebView() }
         }
@@ -248,31 +249,21 @@ class LoginActivity : AppCompatActivity() {
     // 玻璃 UI 元件工廠
     // =========================================================================
 
-    /** 液態玻璃卡片：半透明 + 圓角 + 漸層邊框 */
     private fun createGlassCard(d: Float): FrameLayout {
         val card = FrameLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                bottomMargin = (12 * d).toInt()
-            }
+            ).apply { bottomMargin = (12 * d).toInt() }
         }
-
-        // 邊框層（漸層描邊）
         val border = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            cornerRadius = 20 * d
+            shape = GradientDrawable.RECTANGLE; cornerRadius = 20 * d
             setStroke((1.5f * d).toInt(), 0x30FFFFFF.toInt())
         }
-
-        // 填充層（半透明玻璃）
         val fill = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            cornerRadius = 20 * d
+            shape = GradientDrawable.RECTANGLE; cornerRadius = 20 * d
             setColor(0x1AFFFFFF.toInt())
         }
-
         card.background = LayerDrawable(arrayOf(fill, border))
         card.clipToOutline = true
         card.outlineProvider = object : android.view.ViewOutlineProvider() {
@@ -280,54 +271,37 @@ class LoginActivity : AppCompatActivity() {
                 outline.setRoundRect(0, 0, view.width, view.height, 20 * d)
             }
         }
-
         return card
     }
 
-    /** 液態玻璃輸入框 */
     private fun createGlassInput(hint: String, type: Int, d: Float): EditText {
         return EditText(this).apply {
-            this.hint = hint
-            this.inputType = type
-            textSize = 15f
-            setTextColor(Color.WHITE)
-            setHintTextColor(0x66FFFFFF.toInt())
+            this.hint = hint; this.inputType = type; textSize = 15f
+            setTextColor(Color.WHITE); setHintTextColor(0x66FFFFFF.toInt())
             setPadding((16 * d).toInt(), (14 * d).toInt(), (16 * d).toInt(), (14 * d).toInt())
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                bottomMargin = (10 * d).toInt()
-            }
+            ).apply { bottomMargin = (10 * d).toInt() }
             background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                cornerRadius = 12 * d
-                setColor(0x15FFFFFF.toInt())
-                setStroke((1 * d).toInt(), 0x20FFFFFF.toInt())
+                shape = GradientDrawable.RECTANGLE; cornerRadius = 12 * d
+                setColor(0x15FFFFFF.toInt()); setStroke((1 * d).toInt(), 0x20FFFFFF.toInt())
             }
         }
     }
 
-    /** 液態玻璃按鈕 */
     private fun createGlassButton(text: String, accentColor: Int, d: Float, onClick: () -> Unit): View {
         return TextView(this).apply {
-            this.text = text
-            textSize = 15f
-            setTextColor(Color.WHITE)
-            typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
+            this.text = text; textSize = 15f; setTextColor(Color.WHITE)
+            typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER
             setPadding(0, (14 * d).toInt(), 0, (14 * d).toInt())
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = (8 * d).toInt()
-            }
-            // 半透明帶色按鈕
+            ).apply { topMargin = (8 * d).toInt() }
             val baseAlpha = (accentColor and 0x00FFFFFF) or 0x40000000
             background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                cornerRadius = 14 * d
+                shape = GradientDrawable.RECTANGLE; cornerRadius = 14 * d
                 setColor(baseAlpha)
                 setStroke((1 * d).toInt(), (accentColor and 0x00FFFFFF) or 0x60000000)
             }
@@ -336,37 +310,29 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 
-    /** 裝飾光暈圓 */
     private fun createGlowOrb(d: Float, sizeDp: Int, color: Int, xDp: Int, yDp: Int): View {
         return View(this).apply {
             val s = (sizeDp * d).toInt()
             layoutParams = FrameLayout.LayoutParams(s, s).apply {
-                leftMargin = (xDp * d).toInt()
-                topMargin = (yDp * d).toInt()
+                leftMargin = (xDp * d).toInt(); topMargin = (yDp * d).toInt()
             }
             background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(color)
+                shape = GradientDrawable.OVAL; setColor(color)
             }
         }
     }
 
-    /** 分隔線 + 文字 */
     private fun createDividerRow(d: Float): LinearLayout {
         return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
             setPadding(0, (8 * d).toInt(), 0, (8 * d).toInt())
-
             val line = { View(this@LoginActivity).apply {
                 layoutParams = LinearLayout.LayoutParams(0, (1 * d).toInt(), 1f)
                 setBackgroundColor(0x30FFFFFF.toInt())
             }}
             addView(line())
             addView(TextView(this@LoginActivity).apply {
-                text = "  或  "
-                textSize = 12f
-                setTextColor(0x66FFFFFF.toInt())
+                text = "  或  "; textSize = 12f; setTextColor(0x66FFFFFF.toInt())
             })
             addView(line())
         }
@@ -379,16 +345,62 @@ class LoginActivity : AppCompatActivity() {
     private fun toggleRegisterMode() {
         isRegisterMode = !isRegisterMode
         nameInput.visibility = if (isRegisterMode) View.VISIBLE else View.GONE
+        // codeRow is nameInput's parent's child — find it
+        val cardContent = nameInput.parent as LinearLayout
+        // codeRow is at index 4 (nameInput=0, email=1, password=2, codeRow=3)
+        val codeRow = cardContent.getChildAt(3)
+        codeRow.visibility = if (isRegisterMode) View.VISIBLE else View.GONE
         (loginBtn as TextView).text = if (isRegisterMode) "註冊" else "登入"
         registerToggle.text = if (isRegisterMode) "已有帳號？登入" else "沒有帳號？註冊"
+        pendingCodeId = null
+        statusText.text = ""
+    }
+
+    /** 發送驗證碼 */
+    private fun doSendCode() {
+        val email = emailInput.text.toString().trim()
+        if (email.isBlank()) {
+            statusText.setTextColor(0xFFFF6B6B.toInt())
+            statusText.text = "請先填寫 Email"
+            return
+        }
+
+        sendCodeBtn.isEnabled = false
+        statusText.setTextColor(0x99FFFFFF.toInt())
+        statusText.text = "發送驗證碼中..."
+
+        CoroutineScope(Dispatchers.Main).launch {
+            val result = authClient.sendVerificationCode(email)
+            withContext(Dispatchers.Main) {
+                sendCodeBtn.isEnabled = true
+                when (result) {
+                    is SnowRealmAuthClient.SendCodeResult.Success -> {
+                        pendingCodeId = result.codeId
+                        statusText.setTextColor(0xFF40E0D0.toInt())
+                        statusText.text = "驗證碼已發送到 $email"
+                    }
+                    is SnowRealmAuthClient.SendCodeResult.Error -> {
+                        statusText.setTextColor(0xFFFF6B6B.toInt())
+                        statusText.text = result.message
+                    }
+                }
+            }
+        }
     }
 
     private fun doLogin() {
         val email = emailInput.text.toString().trim()
         val password = passwordInput.text.toString()
         if (email.isBlank() || password.isBlank()) {
-            statusText.text = "請填寫帳號和密碼"
-            return
+            statusText.text = "請填寫帳號和密碼"; return
+        }
+
+        if (isRegisterMode) {
+            val code = codeInput.text.toString().trim()
+            if (pendingCodeId.isNullOrBlank() || code.isBlank()) {
+                statusText.setTextColor(0xFFFF6B6B.toInt())
+                statusText.text = "請先發送並填入驗證碼"; return
+            }
         }
 
         loginBtn.isEnabled = false
@@ -398,7 +410,8 @@ class LoginActivity : AppCompatActivity() {
         CoroutineScope(Dispatchers.Main).launch {
             val result = if (isRegisterMode) {
                 val name = nameInput.text.toString().trim().ifBlank { email.substringBefore("@") }
-                authClient.register(email, password, name)
+                val code = codeInput.text.toString().trim()
+                authClient.register(email, password, name, pendingCodeId!!, code)
             } else {
                 authClient.loginWithEmail(email, password)
             }
@@ -426,7 +439,6 @@ class LoginActivity : AppCompatActivity() {
     // =========================================================================
 
     private fun openOAuthWebView(url: String) {
-        // 清除舊 cookie 確保乾淨登入
         CookieManager.getInstance().apply {
             setAcceptCookie(true)
             removeAllCookies(null)
@@ -445,20 +457,20 @@ class LoginActivity : AppCompatActivity() {
 
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                    val loadUrl = request.url.toString()
-                    // OAuth 完成後會重定向到 /insight-admin/ — 攔截並讀 cookie
-                    if (loadUrl.contains("/insight-admin/") || loadUrl.contains("/login?")) {
-                        extractSessionAndFinish()
-                        return true
-                    }
+                    // 讓所有 URL 正常載入（不攔截），確保 cookie 能正常寫入
                     return false
                 }
 
                 override fun onPageFinished(view: WebView, url: String) {
                     super.onPageFinished(view, url)
-                    // 也在頁面載完時檢查（某些 redirect 不走 shouldOverrideUrlLoading）
-                    if (url.contains("/insight-admin/")) {
-                        extractSessionAndFinish()
+                    // 每次頁面載完都檢查是否拿到 admin_session cookie
+                    if (url.contains("/insight-admin") || url.contains("/dashboard")) {
+                        tryExtractSession()
+                    }
+                    // 也在任何頁面結束時檢查 cookie（以防 redirect 路徑不同）
+                    val cookies = CookieManager.getInstance().getCookie(baseUrl)
+                    if (cookies != null && cookies.contains("admin_session=")) {
+                        tryExtractSession()
                     }
                 }
             }
@@ -470,7 +482,12 @@ class LoginActivity : AppCompatActivity() {
         wv.loadUrl(url)
     }
 
-    private fun extractSessionAndFinish() {
+    private var isExtractingSession = false
+
+    private fun tryExtractSession() {
+        if (isExtractingSession) return
+        isExtractingSession = true
+
         val cookies = CookieManager.getInstance().getCookie(baseUrl) ?: ""
         val token = cookies.split(";")
             .map { it.trim() }
@@ -478,28 +495,22 @@ class LoginActivity : AppCompatActivity() {
             ?.substringAfter("admin_session=")
 
         if (!token.isNullOrBlank()) {
-            // 用 token 取使用者資料
             CoroutineScope(Dispatchers.Main).launch {
                 authClient.saveTokenDirectly(token)
                 val user = authClient.fetchMe()
                 withContext(Dispatchers.Main) {
+                    isExtractingSession = false
                     dismissWebView()
                     if (user != null) {
                         statusText.setTextColor(0xFF40E0D0.toInt())
                         statusText.text = "歡迎 ${user.displayName}！"
-                        setResult(RESULT_OK)
-                        finish()
-                    } else {
-                        // token 拿到了但 /me 失敗，還是算登入成功
-                        setResult(RESULT_OK)
-                        finish()
                     }
+                    setResult(RESULT_OK)
+                    finish()
                 }
             }
         } else {
-            dismissWebView()
-            statusText.setTextColor(0xFFFF6B6B.toInt())
-            statusText.text = "登入失敗，請重試"
+            isExtractingSession = false
         }
     }
 
