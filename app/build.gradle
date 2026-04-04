@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 18
-        versionName "0.4.4"
+        versionCode 19
+        versionName "0.4.5"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -75,7 +75,7 @@ android {
             debuggable true
             firebaseAppDistribution {
                 groups = "testers"
-                releaseNotes = "v${android.defaultConfig.versionName}\n- 修正設定頁調整鍵盤高度後不生效\n- onStartInputView 同步鍵盤容器高度"
+                releaseNotes = "v${android.defaultConfig.versionName}\n- 修正天氣 API Key 未帶入（.env key 名稱不匹配）\n- 背景圖設定即時生效"
             }
         }
     }
