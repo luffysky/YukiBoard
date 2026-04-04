@@ -301,6 +301,8 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
             return true
         }
         if (currentType == BackgroundType.IMAGE && !isVideoFile(savedBg) && imageView != null) {
+            // 圖片已載入，但 offset/scaleMode 可能已變更，重新套用
+            applyOffset()
             return true
         }
 
