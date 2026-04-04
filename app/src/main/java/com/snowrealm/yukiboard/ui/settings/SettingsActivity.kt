@@ -865,11 +865,11 @@ class SettingsActivity : AppCompatActivity() {
                 val hasBg = bmp != null && prefs.useCustomBackground
                 val scalePct = prefs.keyScalePercent
                 val keyAlpha = prefs.keyOpacity
-                val baseRowH = h / rows.size
-                val rowH = baseRowH * scalePct / 100f
-                val yOffset = (h - rows.size * rowH) / 2f  // 垂直居中
-                val padH = 2f * dens
-                val padV = 2f * dens
+                val rowH = h / rows.size
+                val yOffset = 0f
+                val scaleInv = (200 - scalePct) / 100f  // 130→0.7, 100→1.0, 70→1.3
+                val padH = 2f * dens * scaleInv
+                val padV = 2f * dens * scaleInv
                 val cr = theme.keyCornerRadiusDp * dens * 0.6f
                 val fontSize = 10f * dens * scalePct / 100f
                 textPaint.textSize = fontSize

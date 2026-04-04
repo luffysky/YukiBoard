@@ -179,9 +179,9 @@ class KeyboardView(context: Context) : View(context) {
     var bgOverlayAlpha: Int = 100
     /** 自訂字體顏色（0 = 跟隨主題） */
     var customKeyLabelColor: Int = 0
-    /** 按鍵大小比例 70~130（百分比），影響行高和字體大小 */
+    /** 按鍵大小比例 70~130（百分比），調整按鍵內縮間距，鍵盤高度不變 */
     var keyScalePercent: Int = 100
-        set(value) { field = value.coerceIn(70, 130); requestLayout(); invalidate() }
+        set(value) { field = value.coerceIn(70, 130); invalidate() }
     /** 按鍵背景不透明度 0~255 */
     var keyOpacity: Int = 255
         set(value) { field = value.coerceIn(0, 255); invalidate() }
@@ -588,8 +588,7 @@ class KeyboardView(context: Context) : View(context) {
             mainRowCount
         }
 
-        val baseRowH = if (isLandscape) rowHeightLandscape else rowHeightPortrait
-        val preferredRowH = baseRowH * keyScalePercent / 100f
+        val preferredRowH = if (isLandscape) rowHeightLandscape else rowHeightPortrait
         val preferredHeight = candidateBarHeight + effectiveRowCount * preferredRowH + bottomPadding
 
         val heightMode = MeasureSpec.getMode(heightMeasureSpec)
@@ -937,9 +936,9 @@ class KeyboardView(context: Context) : View(context) {
         val isSide = (left > 0f)
         val useLabelPaint = if (isSide) sideLabelPaint else labelPaint
         if (isSide) {
-            sideLabelPaint.textSize = 12f * density * keyScalePercent / 100f
+            sideLabelPaint.textSize = 12f * density
         } else {
-            labelPaint.textSize = (if (theme.keyFontSizeSp > 0) theme.keyFontSizeSp else 18f) * density * keyScalePercent / 100f
+            labelPaint.textSize = (if (theme.keyFontSizeSp > 0) theme.keyFontSizeSp else 18f) * density
         }
 
         val totalUnits = rows.maxOfOrNull { row ->
@@ -951,14 +950,19 @@ class KeyboardView(context: Context) : View(context) {
             var x = left
             val unitWidth = regionWidth / totalUnits
 
+            // keyScalePercent: 100=正常，70=按鍵縮小（padding 加大），130=按鍵放大（padding 縮小）
+            val scaleInv = (200 - keyScalePercent) / 100f  // 130→0.7, 100→1.0, 70→1.3
+            val padH = keyPaddingH * scaleInv
+            val padV = keyPaddingV * scaleInv
+
             row.forEach { key ->
                 val keyWidth = unitWidth * key.widthWeight
                 val touchRect = RectF(x, top, x + keyWidth, top + rh)
                 val rect = RectF(
-                    x + keyPaddingH,
-                    top + keyPaddingV,
-                    x + keyWidth - keyPaddingH,
-                    top + rh - keyPaddingV
+                    x + padH,
+                    top + padV,
+                    x + keyWidth - padH,
+                    top + rh - padV
                 )
                 keyEntries.add(KeyEntry(touchRect, rect, key))
 
