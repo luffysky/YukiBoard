@@ -54,6 +54,8 @@ class YukiBoardIMEService : InputMethodService() {
     private lateinit var toolbarView: ToolbarView
     private lateinit var panelContainer: FrameLayout
     private lateinit var keyboardContainer: FrameLayout
+    private var panelControlBar: View? = null
+    private var isPanelBehindKeyboard = false
     private lateinit var keyboardView: KeyboardView
     private lateinit var inputRouter: InputRouter
     private lateinit var snippetManager: SnippetManager
@@ -763,6 +765,15 @@ class YukiBoardIMEService : InputMethodService() {
         }
 
         panelContainer.addView(panelView)
+
+        // 加入面板控制列（透明度 + 圖層交換）
+        showPanelControlBar()
+
+        // 重設圖層順序
+        if (isPanelBehindKeyboard) {
+            isPanelBehindKeyboard = false
+            panelContainer.bringToFront()
+        }
     }
 
     private fun closePanel() {
@@ -770,6 +781,107 @@ class YukiBoardIMEService : InputMethodService() {
         toolbarView.activePanel = null
         panelContainer.removeAllViews()
         panelContainer.visibility = View.GONE
+        hidePanelControlBar()
+        // 確保圖層正常
+        if (isPanelBehindKeyboard) {
+            isPanelBehindKeyboard = false
+            panelContainer.bringToFront()
+        }
+    }
+
+    /**
+     * 面板控制列：透明度滑桿 + 圖層交換按鈕。
+     * 放在 toolbarView 和 keyboardContainer 之間。
+     */
+    private fun showPanelControlBar() {
+        hidePanelControlBar()
+
+        val dp = resources.displayMetrics.density
+        val bar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setBackgroundColor(0xCC1A1A2E.toInt())
+            setPadding((8 * dp).toInt(), (2 * dp).toInt(), (8 * dp).toInt(), (2 * dp).toInt())
+        }
+
+        // 透明度標籤
+        val label = android.widget.TextView(this).apply {
+            text = "面板透明度"
+            textSize = 10f
+            setTextColor(0xFF8899AA.toInt())
+            setPadding(0, 0, (6 * dp).toInt(), 0)
+        }
+        bar.addView(label)
+
+        // 透明度滑桿
+        val slider = android.widget.SeekBar(this).apply {
+            max = 255
+            progress = 255
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(sb: android.widget.SeekBar?, p: Int, fromUser: Boolean) {
+                    panelContainer.alpha = p / 255f
+                }
+                override fun onStartTrackingTouch(sb: android.widget.SeekBar?) {}
+                override fun onStopTrackingTouch(sb: android.widget.SeekBar?) {}
+            })
+        }
+        bar.addView(slider)
+
+        // 圖層交換按鈕
+        val swapBtn = android.widget.TextView(this).apply {
+            text = "⇅ 輸入"
+            textSize = 11f
+            setTextColor(0xFF7FD8FF.toInt())
+            setPadding((10 * dp).toInt(), (6 * dp).toInt(), (10 * dp).toInt(), (6 * dp).toInt())
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xFF2A2A4A.toInt())
+                cornerRadius = 6 * dp
+            }
+            setOnClickListener { togglePanelLayer() }
+        }
+        bar.addView(swapBtn)
+
+        // 插入到 rootContainer，位於 toolbarView 之後、keyboardContainer 之前
+        val toolbarIndex = rootContainer.indexOfChild(toolbarView)
+        rootContainer.addView(bar, toolbarIndex + 1, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ))
+        panelControlBar = bar
+    }
+
+    private fun hidePanelControlBar() {
+        panelControlBar?.let { rootContainer.removeView(it) }
+        panelControlBar = null
+        panelContainer.alpha = 1f
+    }
+
+    /** 交換面板與鍵盤的圖層：面板到後面 → 可打字；再按一次 → 面板回前面 */
+    private fun togglePanelLayer() {
+        isPanelBehindKeyboard = !isPanelBehindKeyboard
+        if (isPanelBehindKeyboard) {
+            // 面板移到鍵盤後面：讓 keyboardView 接收觸控
+            keyboardView.bringToFront()
+            // 更新按鈕文字
+            (panelControlBar as? LinearLayout)?.let { bar ->
+                val btn = bar.getChildAt(bar.childCount - 1)
+                if (btn is android.widget.TextView) {
+                    btn.text = "⇅ 面板"
+                    btn.setTextColor(0xFFFFD700.toInt())
+                }
+            }
+        } else {
+            // 面板回到前面
+            panelContainer.bringToFront()
+            (panelControlBar as? LinearLayout)?.let { bar ->
+                val btn = bar.getChildAt(bar.childCount - 1)
+                if (btn is android.widget.TextView) {
+                    btn.text = "⇅ 輸入"
+                    btn.setTextColor(0xFF7FD8FF.toInt())
+                }
+            }
+        }
     }
 
     private fun applyTheme(theme: KeyboardTheme) {
