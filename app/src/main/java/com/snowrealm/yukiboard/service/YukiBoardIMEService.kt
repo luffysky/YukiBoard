@@ -394,6 +394,17 @@ class YukiBoardIMEService : InputMethodService() {
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         inputRouter.reset()
+
+        // 重新套用鍵盤高度（設定頁可能已修改）
+        val screenH = resources.displayMetrics.heightPixels
+        val kbHeight = (screenH * prefs.keyboardHeightRatio).toInt()
+        keyboardContainer.layoutParams?.let { lp ->
+            if (lp.height != kbHeight) {
+                lp.height = kbHeight
+                keyboardContainer.requestLayout()
+            }
+        }
+
         // 同步鍵盤顯示的語言（保留使用者上次選擇的輸入法）
         keyboardView.currentInputMode = inputRouter.inputMode
         keyboardView.updateKeyRows(rowsForInputMode(inputRouter.inputMode))

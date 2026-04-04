@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 16
-        versionName "0.4.2"
+        versionCode 17
+        versionName "0.4.3"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -75,7 +75,7 @@ android {
             debuggable true
             firebaseAppDistribution {
                 groups = "testers"
-                releaseNotes = "v${android.defaultConfig.versionName}\n- 鍵盤高度拉桿（25%~55% 螢幕高度）\n- 按鍵大小 + 透明度拉桿\n- 預覽高度隨鍵盤高度同步變化"
+                releaseNotes = "v${android.defaultConfig.versionName}\n- 修正設定頁調整鍵盤高度後不生效\n- onStartInputView 同步鍵盤容器高度"
             }
         }
     }
