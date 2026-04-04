@@ -140,6 +140,11 @@ class YukiBoardIMEService : InputMethodService() {
         appModeDetector = AppModeDetector()
         prefs = YukiPreferences(applicationContext)
 
+        // 預熱注音索引（IO 執行緒，避免首次按鍵凍結 UI）
+        serviceScope.launch(Dispatchers.IO) {
+            inputRouter.warmUpChewing()
+        }
+
         shakeDetector = ShakeDetector(applicationContext)
         shakeDetector.setOnShakeListener {
             if (prefs.shakeToUndoEnabled) {
@@ -262,8 +267,8 @@ class YukiBoardIMEService : InputMethodService() {
         val bgView = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView(this)
         val savedBg = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getSavedBackground(this)
         val useCustomBg = prefs.useCustomBackground && savedBg != null
-        if (useCustomBg) {
-            if (com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.isVideoFile(savedBg!!)) {
+        if (useCustomBg && savedBg != null) {
+            if (com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.isVideoFile(savedBg)) {
                 bgView.setVideoBackground(savedBg)
             } else {
                 bgView.setImageBackground(savedBg)

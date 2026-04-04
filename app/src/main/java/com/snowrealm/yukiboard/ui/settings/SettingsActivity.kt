@@ -904,6 +904,7 @@ class SettingsActivity : AppCompatActivity() {
             Triple(11, "English", "en")
         )
 
+        var isInitializing = true
         langs.forEach { (id, label, lang) ->
             group.addView(RadioButton(this).apply {
                 this.id = id
@@ -912,7 +913,9 @@ class SettingsActivity : AppCompatActivity() {
                 isChecked = currentLang == lang
             })
         }
+        isInitializing = false
         group.setOnCheckedChangeListener { _, checkedId ->
+            if (isInitializing) return@setOnCheckedChangeListener
             langs.firstOrNull { it.first == checkedId }?.let { (_, _, lang) ->
                 val locale = Locale(lang)
                 Locale.setDefault(locale)
@@ -1019,9 +1022,8 @@ class SettingsActivity : AppCompatActivity() {
     @Suppress("DEPRECATION")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (resultCode != RESULT_OK || data?.data == null) return
-
-        val uri = data.data!!
+        if (resultCode != RESULT_OK) return
+        val uri = data?.data ?: return
         val bgDir = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getBackgroundDir(this)
         bgDir.listFiles()?.forEach { it.delete() }
 

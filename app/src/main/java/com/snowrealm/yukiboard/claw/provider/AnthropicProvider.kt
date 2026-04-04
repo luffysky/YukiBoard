@@ -105,16 +105,13 @@ class AnthropicProvider(private val apiKey: String) : AIProvider {
                         val data = line.removePrefix("data: ").trim()
                         try {
                             val jsonObject = json.parseToJsonElement(data).jsonObject
-                            val deltaType = jsonObject["type"]?.jsonPrimitive?.content
-                            if (deltaType == "content_block_delta") {
-                                val delta = jsonObject["delta"]?.jsonObject
-                                if (delta != null) {
-                                    val textDeltaType = delta["type"]?.jsonPrimitive?.content
-                                    if (textDeltaType == "text_delta") {
-                                        val text = delta["text"]?.jsonPrimitive?.content
-                                        if (!text.isNullOrEmpty()) {
-                                            emit(text)
-                                        }
+                            val delta = jsonObject["delta"]?.jsonObject
+                            if (delta != null) {
+                                val textDeltaType = delta["type"]?.jsonPrimitive?.content
+                                if (textDeltaType == "text_delta") {
+                                    val text = delta["text"]?.jsonPrimitive?.content
+                                    if (!text.isNullOrEmpty()) {
+                                        emit(text)
                                     }
                                 }
                             }

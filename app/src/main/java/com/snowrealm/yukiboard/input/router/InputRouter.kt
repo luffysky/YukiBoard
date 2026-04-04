@@ -177,6 +177,11 @@ class InputRouter(private val context: Context) {
         candidateManager.clear()
     }
 
+    /** 預熱注音引擎索引（在 IO 執行緒呼叫） */
+    fun warmUpChewing() {
+        (bopomofoEngine as? ChewingInputEngine)?.warmUp()
+    }
+
     // -------------------------------------------------------------------------
     // AUTO 模式自動偵測
     // -------------------------------------------------------------------------
@@ -243,8 +248,8 @@ class InputRouter(private val context: Context) {
             }
 
             // 5. 完全匹配 composing 加分（使用者可能就是要打這個詞）
-            if (scored.containsKey(composing.lowercase())) {
-                scored[composing.lowercase()] = scored[composing.lowercase()]!! + 3f
+            scored[composing.lowercase()]?.let { prev ->
+                scored[composing.lowercase()] = prev + 3f
             }
         } else {
             // composing 為空：下一詞預測 + 情境建議

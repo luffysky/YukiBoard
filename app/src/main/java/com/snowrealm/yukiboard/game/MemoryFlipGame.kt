@@ -72,8 +72,10 @@ class MemoryFlipGame(context: Context) : GameLogic {
             firstFlip = pos
         } else if (secondFlip == null && pos != firstFlip) {
             secondFlip = pos
-            val (r1, c1) = firstFlip!!
-            val (r2, c2) = secondFlip!!
+            val flip1 = firstFlip ?: return
+            val flip2 = secondFlip ?: return
+            val (r1, c1) = flip1
+            val (r2, c2) = flip2
 
             if (symbols[r1][c1] == symbols[r2][c2]) {
                 // 配對成功

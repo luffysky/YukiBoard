@@ -88,8 +88,9 @@ class TranslateEngine {
     // ─────────────── 內部 ───────────────
 
     private fun getOrCreateTranslator(from: String, to: String): Translator {
-        if (from == currentFromLang && to == currentToLang && currentTranslator != null) {
-            return currentTranslator!!
+        val cached = currentTranslator
+        if (from == currentFromLang && to == currentToLang && cached != null) {
+            return cached
         }
 
         currentTranslator?.close()

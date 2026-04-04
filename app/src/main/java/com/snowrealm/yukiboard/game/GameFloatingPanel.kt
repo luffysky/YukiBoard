@@ -110,14 +110,15 @@ class GameFloatingPanel(
             val rect = RectF(left, top, left + cardSize, top + cardSize)
             cardRects.add(rect to mode)
 
-            cardPaint.color = getCategoryColor(selectedCategory)
+            val isLocked = mode == GameMode.VOICE_GAME
+            cardPaint.color = if (isLocked) 0xFF444444.toInt() else getCategoryColor(selectedCategory)
             canvas.drawRoundRect(rect, cornerRadius, cornerRadius, cardPaint)
 
-            iconPaint.color = 0xFFFFFFFF.toInt()
-            canvas.drawText(mode.icon, rect.centerX(), rect.centerY(), iconPaint)
+            iconPaint.color = if (isLocked) 0xFF888888.toInt() else 0xFFFFFFFF.toInt()
+            canvas.drawText(if (isLocked) "🔒" else mode.icon, rect.centerX(), rect.centerY(), iconPaint)
 
-            labelPaint.color = 0xFFFFFFFF.toInt()
-            canvas.drawText(mode.displayName, rect.centerX(), rect.bottom - 6 * density, labelPaint)
+            labelPaint.color = if (isLocked) 0xFF888888.toInt() else 0xFFFFFFFF.toInt()
+            canvas.drawText(if (isLocked) "即將推出" else mode.displayName, rect.centerX(), rect.bottom - 6 * density, labelPaint)
 
             val hs = scoreManager?.getHighScore(mode) ?: 0
             if (hs > 0) {
@@ -138,7 +139,13 @@ class GameFloatingPanel(
             MotionEvent.ACTION_MOVE -> {
                 val dy = event.y - lastTouchY
                 if (event.y > titleHeight + tabHeight) {
-                    scrollY = (scrollY + dy).coerceAtMost(0f)
+                    val games = GameMode.entries.filter { it.category == selectedCategory }
+                    val cardsPerRow = ((width - cardPadding) / (cardSize + cardPadding)).toInt().coerceAtLeast(1)
+                    val totalRows = (games.size + cardsPerRow - 1) / cardsPerRow
+                    val totalContentHeight = totalRows * (cardSize + cardPadding)
+                    val visibleHeight = height - titleHeight - tabHeight - cardPadding
+                    val maxScrollUp = -(totalContentHeight - visibleHeight).coerceAtLeast(0f)
+                    scrollY = (scrollY + dy).coerceIn(maxScrollUp, 0f)
                     lastTouchY = event.y
                     invalidate()
                 }
@@ -154,6 +161,7 @@ class GameFloatingPanel(
                 // 卡片點擊
                 for ((rect, mode) in cardRects) {
                     if (rect.contains(event.x, event.y)) {
+                        if (mode == GameMode.VOICE_GAME) return true // 鎖定中
                         onGameSelected(mode); return true
                     }
                 }

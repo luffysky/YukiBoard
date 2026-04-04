@@ -257,4 +257,14 @@ class GameKeyboardView(context: Context) : View(context) {
         super.performClick()
         return true
     }
+
+    /** View 從視窗移除時通知外部清理遊戲迴圈 */
+    var onDetached: (() -> Unit)? = null
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        game?.destroy()
+        game = null
+        onDetached?.invoke()
+    }
 }

@@ -9,7 +9,7 @@ import kotlin.random.Random
  * 顯示打散的字母，玩家按正確順序拼出單字。
  * 連續拼對加分加速，拼錯扣時間。
  */
-class SpellingDuelGame(context: Context) : GameLogic {
+class SpellingDuelGame(private val context: Context) : GameLogic {
 
     override val gameMode = GameMode.SPELLING_DUEL
     override var status = GameStatus.IDLE; private set
@@ -75,7 +75,7 @@ class SpellingDuelGame(context: Context) : GameLogic {
     override fun destroy() { status = GameStatus.IDLE }
 
     private fun pickNewWord() {
-        currentWord = WORDS[Random.nextInt(WORDS.size)]
+        currentWord = words[Random.nextInt(words.size)]
         shuffledChars = currentWord.toList().shuffled()
     }
 
@@ -120,14 +120,25 @@ class SpellingDuelGame(context: Context) : GameLogic {
         }
     }
 
+    private fun loadWords(): List<String> {
+        return try {
+            context.resources.openRawResource(com.snowrealm.yukiboard.R.raw.spelling_words)
+                .bufferedReader().readLines()
+                .map { it.trim().uppercase() }
+                .filter { it.isNotEmpty() && it.length in 3..10 }
+                .distinct()
+        } catch (_: Exception) {
+            FALLBACK_WORDS
+        }
+    }
+
+    private val words: List<String> by lazy { loadWords() }
+
     companion object {
         const val GAME_DURATION_MS = 60_000L
-        private val WORDS = listOf(
+        private val FALLBACK_WORDS = listOf(
             "SNOW", "YUKI", "TYPE", "GAME", "PLAY", "CODE", "FIRE", "RAIN",
-            "STAR", "MOON", "LOVE", "COOL", "FAST", "HERO", "DARK", "LITE",
-            "JUMP", "WORD", "QUIZ", "FLIP", "DUEL", "MINE", "SHIP", "RACE",
-            "HAPPY", "WORLD", "DREAM", "MAGIC", "NIGHT", "CLOUD", "OCEAN",
-            "CRYSTAL", "WEATHER", "KEYBOARD", "ANDROID", "TRAVEL"
+            "STAR", "MOON", "LOVE", "COOL", "FAST", "HERO", "DARK", "LITE"
         )
     }
 }

@@ -411,7 +411,13 @@ class LoginActivity : AppCompatActivity() {
             val result = if (isRegisterMode) {
                 val name = nameInput.text.toString().trim().ifBlank { email.substringBefore("@") }
                 val code = codeInput.text.toString().trim()
-                authClient.register(email, password, name, pendingCodeId!!, code)
+                val codeId = pendingCodeId ?: run {
+                    statusText.setTextColor(0xFFFF6B6B.toInt())
+                    statusText.text = "請先完成邀請碼驗證"
+                    loginBtn.isEnabled = true
+                    return@launch
+                }
+                authClient.register(email, password, name, codeId, code)
             } else {
                 authClient.loginWithEmail(email, password)
             }

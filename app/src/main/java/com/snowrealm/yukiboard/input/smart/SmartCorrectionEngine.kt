@@ -111,7 +111,7 @@ class SmartCorrectionEngine(
         val boostSet = COMMON_BIGRAMS[lower] ?: return
         for (word in boostSet) {
             if (candidates.containsKey(word)) {
-                candidates[word] = candidates[word]!! + 5.0f
+                candidates[word] = (candidates[word] ?: 0f) + 5.0f
             }
         }
     }

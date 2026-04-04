@@ -206,7 +206,8 @@ class VrmCharacterView @JvmOverloads constructor(
                 override fun onNativeWindowChanged(surface: android.view.Surface) {
                     swapChain?.let { engine?.destroySwapChain(it) }
                     swapChain = engine?.createSwapChain(surface, SwapChainFlags.CONFIG_TRANSPARENT)
-                    displayHelper?.attach(renderer!!, this@VrmCharacterView.display)
+                    val r = renderer ?: return
+                    displayHelper?.attach(r, this@VrmCharacterView.display)
                 }
                 override fun onDetachedFromSurface() {
                     displayHelper?.detach()
@@ -663,7 +664,7 @@ class VrmCharacterView @JvmOverloads constructor(
         view?.let { eng.destroyView(it) }
         scene?.let { eng.destroyScene(it) }
         renderer?.let { eng.destroyRenderer(it) }
-        camera?.let { eng.destroyCameraComponent(camera!!.entity) }
+        camera?.let { c -> eng.destroyCameraComponent(c.entity) }
 
         resourceLoader?.destroy()
         assetLoader?.destroy()

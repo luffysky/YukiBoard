@@ -321,6 +321,13 @@ class ChewingInputEngine(private val context: Context) : InputEngine {
         return seen.toList()
     }
 
+    /** 預熱索引（在 IO 執行緒呼叫，避免首次按鍵凍結 UI） */
+    fun warmUp() {
+        prefixCache
+        reverseIndex
+        nextCharIndex
+    }
+
     // ─── 前綴快取：注音前綴(1-2字元) → 常用單字 ───
     private val prefixCache: Map<String, List<String>> by lazy { buildPrefixCache() }
 
