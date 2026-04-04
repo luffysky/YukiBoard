@@ -734,7 +734,12 @@ class YukiBoardIMEService : InputMethodService() {
                     keyboardView.currentMode
                 }
                 p.onSuggestionSelected = { text ->
-                    currentInputConnection?.commitText(text, 1)
+                    val ic = currentInputConnection
+                    if (ic != null) {
+                        // 清除輸入框原有內容，替換為 AI 結果，讓用戶可直接傳送
+                        ic.performContextMenuAction(android.R.id.selectAll)
+                        ic.commitText(text, 1)
+                    }
                 }
                 p.onClose = { closePanel() }
                 p.onLockTapped = {

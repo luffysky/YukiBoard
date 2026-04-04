@@ -47,6 +47,11 @@ class AdaptiveDictionary(context: Context) {
         save(entry)
     }
 
+    /** 取得詞彙使用頻率（0 = 未學過） */
+    fun getFrequency(word: String): Int {
+        return entries[word.lowercase()]?.frequency ?: 0
+    }
+
     /** 查詢是否為已知詞（含自動學習的） */
     fun isKnownWord(word: String): Boolean {
         val entry = entries[word.lowercase()] ?: return false

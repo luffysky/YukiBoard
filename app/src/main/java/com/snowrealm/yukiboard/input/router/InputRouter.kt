@@ -200,9 +200,18 @@ class InputRouter(private val context: Context) {
         val raw = activeEngine.getCandidates()
         val composing = activeEngine.composingText
 
-        // 非英文模式直接用引擎候選
+        // 非英文模式：引擎候選 + 自適應字典排序
         if (currentMode != InputMode.ENGLISH) {
-            candidateManager.update(raw)
+            if (raw.size > 1) {
+                // 用自適應字典提升使用者常用字的排名
+                val boosted = raw.sortedWith(compareByDescending<String> { word ->
+                    val entry = smartInput.adaptiveDictionary.getFrequency(word)
+                    if (entry > 0) entry + 100 else 0  // 有使用記錄的優先
+                }.thenBy { raw.indexOf(it) })  // 其他保持原順序
+                candidateManager.update(boosted)
+            } else {
+                candidateManager.update(raw)
+            }
             return
         }
 

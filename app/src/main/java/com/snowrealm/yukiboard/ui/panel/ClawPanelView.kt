@@ -300,7 +300,7 @@ class ClawResultCardView(context: Context) : View(context) {
                 hintPaint.color = theme.candidateTextColorInt
                 hintPaint.alpha = 120
                 hintPaint.textAlign = Paint.Align.RIGHT
-                canvas.drawText("點擊插入 →", rect.right - textPadding, rect.bottom - 6f * density, hintPaint)
+                canvas.drawText("點擊替換 ↩", rect.right - textPadding, rect.bottom - 6f * density, hintPaint)
             }
 
             cardRects.add(rect to i)
