@@ -63,8 +63,7 @@ class CharacterView @JvmOverloads constructor(
     init {
         isClickable = false
         isFocusable = false
-        // 預設使用 Lottie 模式
-        initLottieMode()
+        // 不在 init 初始化，由外部呼叫 initLottieMode() 或 initVrmMode()
     }
 
     // =========================================================================

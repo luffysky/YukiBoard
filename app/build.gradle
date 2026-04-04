@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 19
-        versionName "0.4.5"
+        versionCode 20
+        versionName "0.4.6"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -75,7 +75,7 @@ android {
             debuggable true
             firebaseAppDistribution {
                 groups = "testers"
-                releaseNotes = "v${android.defaultConfig.versionName}\n- 修正天氣 API Key 未帶入（.env key 名稱不匹配）\n- 背景圖設定即時生效"
+                releaseNotes = "v${android.defaultConfig.versionName}\n- 修正雪凜角色不顯示（GL 流光改用 TextureView）\n- 修正 CharacterView 重複初始化"
             }
         }
     }
