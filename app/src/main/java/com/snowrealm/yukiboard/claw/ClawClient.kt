@@ -14,35 +14,39 @@ class ClawClient(context: Context) {
 
     private val appContext = context.applicationContext
 
-    private val skills: Map<String, ClawSkill> by lazy {
+    /** 每次動態取 provider，確保切換 Provider 後 Skill 使用新的 */
+    private fun getSkill(skillId: String): ClawSkill? {
         val provider = providerManager.getCurrentProvider()
-        listOf(
-            // --- 原有 Skills ---
-            AIPredictionSkill(provider),
-            WriterSkill(appContext, provider),
-            TranslateSkill(appContext, provider),
-            CupidSkill(appContext, provider),
-            ContextSkill(),
-            AnimationSkill(provider),
-            WhisperSkill(),
-            // --- T1: 文字處理 ---
-            GrammarCheckSkill(appContext, provider),
-            ToneAdjustSkill(provider),
-            SummarizeSkill(provider),
-            // --- T2: 社交娛樂 ---
-            MemeTextSkill(appContext, provider),
-            EmojiTranslateSkill(provider),
-            QuickReplySkill(provider),
-            // --- T3: 開發者 ---
-            CodeCompleteSkill(provider),
-            RegexGenSkill(provider),
-            CommitMessageSkill(provider),
-            // --- T4: 情境 ---
-            YukiChatSkill(appContext, provider),
-            MoodDiarySkill(provider),
-            WeatherSkill(appContext, provider)
-        ).associateBy { it.id }
+        return when (skillId) {
+            "ai_prediction"   -> AIPredictionSkill(provider)
+            "writer"          -> WriterSkill(appContext, provider)
+            "translate"       -> TranslateSkill(appContext, provider)
+            "cupid"           -> CupidSkill(appContext, provider)
+            "context"         -> ContextSkill()
+            "animation"       -> AnimationSkill(provider)
+            "whisper"         -> WhisperSkill()
+            "grammar_check"   -> GrammarCheckSkill(appContext, provider)
+            "tone_adjust"     -> ToneAdjustSkill(provider)
+            "summarize"       -> SummarizeSkill(provider)
+            "meme_text"       -> MemeTextSkill(appContext, provider)
+            "emoji_translate" -> EmojiTranslateSkill(provider)
+            "quick_reply"     -> QuickReplySkill(provider)
+            "code_complete"   -> CodeCompleteSkill(provider)
+            "regex_gen"       -> RegexGenSkill(provider)
+            "commit_message"  -> CommitMessageSkill(provider)
+            "yuki_chat"       -> YukiChatSkill(appContext, provider)
+            "mood_diary"      -> MoodDiarySkill(provider)
+            "weather"         -> WeatherSkill(appContext, provider)
+            else              -> null
+        }
     }
+
+    private val allSkillIds = listOf(
+        "ai_prediction", "writer", "translate", "cupid", "context",
+        "animation", "whisper", "grammar_check", "tone_adjust", "summarize",
+        "meme_text", "emoji_translate", "quick_reply", "code_complete",
+        "regex_gen", "commit_message", "yuki_chat", "mood_diary", "weather"
+    )
 
     /**
      * AI 功能是否可用。
@@ -70,7 +74,7 @@ class ClawClient(context: Context) {
     }
 
     suspend fun executeSkill(skillId: String, input: ClawInput): ClawOutput {
-        val skill = skills[skillId] ?: throw IllegalArgumentException("Unknown skill: $skillId")
+        val skill = getSkill(skillId) ?: throw IllegalArgumentException("Unknown skill: $skillId")
 
         // 額度檢查（唯一來源：InviteCodeManager 或 自帶Key）
         val remaining = getRemainingTokens()
@@ -96,5 +100,5 @@ class ClawClient(context: Context) {
         return !key.isNullOrBlank()
     }
 
-    fun getAvailableSkills(): List<ClawSkill> = skills.values.toList()
+    fun getAvailableSkills(): List<ClawSkill> = allSkillIds.mapNotNull { getSkill(it) }
 }

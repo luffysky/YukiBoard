@@ -1210,10 +1210,10 @@ class KeyboardView(context: Context) : View(context) {
                         performClick()
                         return true
                     }
-                    // 用 ACTION_DOWN 的 x 座標做 hit test（避免手指微偏）
-                    val hitX = x
+                    // 補回捲動偏移：candidateRects 記錄的是帶 scrollX 偏移的繪製座標
+                    val adjustedX = x + candidateScrollX
                     val hitY = candidateBarHeight / 2f  // 固定在候選列中央，避免手指滑出
-                    val hit = candidateRects.firstOrNull { it.first.contains(hitX, hitY) }
+                    val hit = candidateRects.firstOrNull { it.first.contains(adjustedX, hitY) }
                     if (hit != null) {
                         onCandidateSelectListener?.invoke(hit.second)
                         performClick()

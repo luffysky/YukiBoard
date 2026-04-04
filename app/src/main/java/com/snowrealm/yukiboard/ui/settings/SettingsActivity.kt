@@ -31,6 +31,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private val activityScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var isRestarting = false
     private lateinit var themeManager: ThemeManager
     private lateinit var prefs: YukiPreferences
 
@@ -918,13 +919,19 @@ class SettingsActivity : AppCompatActivity() {
         group.setOnCheckedChangeListener { _, checkedId ->
             if (isInitializing) return@setOnCheckedChangeListener
             langs.firstOrNull { it.first == checkedId }?.let { (_, _, lang) ->
-                val locale = Locale(lang)
-                Locale.setDefault(locale)
-                val config = Configuration(resources.configuration)
-                config.setLocale(locale)
-                @Suppress("DEPRECATION")
-                resources.updateConfiguration(config, resources.displayMetrics)
-                recreate()
+                if (!isRestarting) {
+                    isRestarting = true
+                    val locale = Locale(lang)
+                    Locale.setDefault(locale)
+                    val config = Configuration(resources.configuration)
+                    config.setLocale(locale)
+                    @Suppress("DEPRECATION")
+                    resources.updateConfiguration(config, resources.displayMetrics)
+                    // 用 Intent 重啟取代 recreate()，避免 Android 13+ 多次 configuration change
+                    val restart = intent
+                    finish()
+                    startActivity(restart)
+                }
             }
         }
 
