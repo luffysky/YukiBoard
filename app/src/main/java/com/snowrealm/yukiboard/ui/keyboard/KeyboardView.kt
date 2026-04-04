@@ -135,6 +135,15 @@ class KeyboardView(context: Context) : View(context) {
         onCandidateExpandListener = listener
     }
 
+    private var onLanguageSelectedListener: ((RadialLanguageMenu.LanguageOption) -> Unit)? = null
+    fun setOnLanguageSelectedListener(listener: (RadialLanguageMenu.LanguageOption) -> Unit) {
+        onLanguageSelectedListener = listener
+    }
+
+    /** 當前輸入法模式（供環形語言選單顯示用） */
+    var currentInputMode: com.snowrealm.yukiboard.input.router.InputMode =
+        com.snowrealm.yukiboard.input.router.InputMode.ENGLISH
+
     // -------------------------------------------------------------------------
     // 狀態
     // -------------------------------------------------------------------------
@@ -296,6 +305,11 @@ class KeyboardView(context: Context) : View(context) {
                 isLongPressTriggered = true
                 vibrateShort()
                 showRadialModeMenu(rect)
+            }
+            key.code == KEYCODE_SWITCH_LANG -> {
+                isLongPressTriggered = true
+                vibrateShort()
+                showRadialLanguageMenu(rect)
             }
             key.code == KEYCODE_SPACE -> {
                 isLongPressTriggered = true
@@ -920,6 +934,32 @@ class KeyboardView(context: Context) : View(context) {
 
         val xOff = (anchorRect.centerX() - (110 * density)).toInt().coerceAtLeast(0)
         val yOff = -(height - anchorRect.top.toInt() + (200 * density).toInt())
+        popup.showAtLocation(this, Gravity.BOTTOM or Gravity.START, xOff, -yOff)
+        popupWindow = popup
+    }
+
+    private fun showRadialLanguageMenu(anchorRect: RectF) {
+        dismissPopup()
+
+        val menu = RadialLanguageMenu(context, theme, currentInputMode) { selectedOption ->
+            dismissPopup()
+            onLanguageSelectedListener?.invoke(selectedOption)
+        }
+
+        val menuSize = (220 * density + 50 * density).toInt()
+        val popup = PopupWindow(
+            menu,
+            menuSize,
+            menuSize,
+            true
+        ).apply {
+            isOutsideTouchable = true
+            setBackgroundDrawable(null)
+            setOnDismissListener { popupWindow = null }
+        }
+
+        val xOff = (anchorRect.centerX() - menuSize / 2f).toInt().coerceAtLeast(0)
+        val yOff = -(height - anchorRect.top.toInt() + (menuSize / 2f + 20 * density).toInt())
         popup.showAtLocation(this, Gravity.BOTTOM or Gravity.START, xOff, -yOff)
         popupWindow = popup
     }

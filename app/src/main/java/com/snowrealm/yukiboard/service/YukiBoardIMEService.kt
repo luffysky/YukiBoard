@@ -29,6 +29,7 @@ import com.snowrealm.yukiboard.speech.SpeechInputEngine
 import com.snowrealm.yukiboard.theme.KeyboardTheme
 import com.snowrealm.yukiboard.theme.ThemeManager
 import com.snowrealm.yukiboard.ui.keyboard.KeyModel
+import com.snowrealm.yukiboard.ui.keyboard.RadialLanguageMenu
 import com.snowrealm.yukiboard.ui.keyboard.CharacterView
 import com.snowrealm.yukiboard.ui.keyboard.FloatingKeyboardWrapper
 import com.snowrealm.yukiboard.ui.keyboard.KeyboardMode
@@ -236,6 +237,21 @@ class YukiBoardIMEService : InputMethodService() {
                     gyroController.activate()
                 } else {
                     gyroController.deactivate()
+                }
+            }
+        }
+        keyboardView.setOnLanguageSelectedListener { option ->
+            when (option) {
+                is RadialLanguageMenu.LanguageOption.Language -> {
+                    inputRouter.switchTo(option.mode)
+                    characterView?.playSwitchLang()
+                    keyboardView.currentInputMode = option.mode
+                    keyboardView.updateKeyRows(rowsForInputMode(option.mode))
+                }
+                is RadialLanguageMenu.LanguageOption.Emoji -> {
+                    // 切換到 Emoji 面板
+                    toolbarView.activePanel = com.snowrealm.yukiboard.ui.panel.PanelType.EMOJI
+                    toolbarView.onPanelSelected?.invoke(com.snowrealm.yukiboard.ui.panel.PanelType.EMOJI)
                 }
             }
         }
@@ -1239,6 +1255,7 @@ class YukiBoardIMEService : InputMethodService() {
     private fun handleSwitchLang() {
         inputRouter.toggleLanguage()
         characterView?.playSwitchLang()
+        keyboardView.currentInputMode = inputRouter.inputMode
         keyboardView.updateKeyRows(rowsForInputMode(inputRouter.inputMode))
     }
 
