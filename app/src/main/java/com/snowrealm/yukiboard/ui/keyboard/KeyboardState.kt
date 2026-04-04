@@ -259,21 +259,22 @@ data class KeyboardState(
             listOf(
                 KeyModel.char("@"), KeyModel.char("#"),
                 KeyModel.char("$", altChars = listOf("¥", "€", "£", "¢")),
-                KeyModel.char("%"), KeyModel.char("&"),
+                KeyModel.char("_"), KeyModel.char("&"),
                 KeyModel.char("-", altChars = listOf("–", "—", "·")),
                 KeyModel.char("+", altChars = listOf("±")),
                 KeyModel.char("(", altChars = listOf("（", "「", "『", "【", "〔")),
                 KeyModel.char(")", altChars = listOf("）", "」", "』", "】", "〕")),
-                KeyModel.char("/")
+                KeyModel.char("/", altChars = listOf("\\"))
             ),
             listOf(
                 KeyModel.special("#+=", KeyboardView.KEYCODE_SWITCH_SYMBOLS, widthWeight = 1.5f),
-                KeyModel.char("*"), KeyModel.char("\""),
-                KeyModel.char("'", altChars = listOf("'", "'", "‚", "‛")),
+                KeyModel.char("*"), KeyModel.char("\"", altChars = listOf("\u201C", "\u201D", "\u201E")),
+                KeyModel.char("'", altChars = listOf("\u2018", "\u2019", "\u201A", "\u201B")),
                 KeyModel.char(":", altChars = listOf("：")),
                 KeyModel.char(";", altChars = listOf("；")),
-                KeyModel.char("!", altChars = listOf("！")),
-                KeyModel.char("?", altChars = listOf("？")),
+                KeyModel.char("!", altChars = listOf("！", "¡")),
+                KeyModel.char("?", altChars = listOf("？", "¿")),
+                KeyModel.char("%"),
                 KeyModel.special("⌫", KeyboardView.KEYCODE_DELETE, widthWeight = 1.5f)
             ),
             // 中文常用標點列
@@ -299,33 +300,36 @@ data class KeyboardState(
         fun moreSymbolRows(): List<List<KeyModel>> = listOf(
             listOf(
                 KeyModel.char("~"), KeyModel.char("`"),
-                KeyModel.char("|"), KeyModel.char("•"),
-                KeyModel.char("√"), KeyModel.char("π"),
+                KeyModel.char("|"), KeyModel.char("•", altChars = listOf("‣", "⁃", "◦")),
+                KeyModel.char("√"), KeyModel.char("π", altChars = listOf("Ω", "µ", "λ")),
                 KeyModel.char("÷"), KeyModel.char("×"),
-                KeyModel.char("¶"), KeyModel.char("∆")
+                KeyModel.char("§", altChars = listOf("¶")), KeyModel.char("∆", altChars = listOf("∞", "≈", "≠"))
             ),
             listOf(
-                KeyModel.char("£"), KeyModel.char("¥"),
-                KeyModel.char("€"), KeyModel.char("¢"),
-                KeyModel.char("^"), KeyModel.char("°"),
-                KeyModel.char("="), KeyModel.char("{"),
-                KeyModel.char("}"), KeyModel.char("\\")
+                KeyModel.char("^"), KeyModel.char("°", altChars = listOf("℃", "℉")),
+                KeyModel.char("=", altChars = listOf("≠", "≈", "≤", "≥")),
+                KeyModel.char("{"), KeyModel.char("}"),
+                KeyModel.char("\\"), KeyModel.char("["),
+                KeyModel.char("]"), KeyModel.char("<"),
+                KeyModel.char(">")
             ),
             listOf(
                 KeyModel.special("?123", KeyboardView.KEYCODE_SWITCH_NUMBERS, widthWeight = 1.5f),
                 KeyModel.char("©"), KeyModel.char("®"),
-                KeyModel.char("™"), KeyModel.char("✓"),
-                KeyModel.char("["), KeyModel.char("]"),
-                KeyModel.char("<"), KeyModel.char(">"),
+                KeyModel.char("™"), KeyModel.char("✓", altChars = listOf("✗", "✔", "✘")),
+                KeyModel.char("♥", altChars = listOf("♡", "♣", "♠", "♦")),
+                KeyModel.char("★", altChars = listOf("☆", "✦", "✧")),
+                KeyModel.char("→", altChars = listOf("←", "↑", "↓", "↔", "⇒")),
                 KeyModel.special("⌫", KeyboardView.KEYCODE_DELETE, widthWeight = 1.5f)
             ),
-            // 中文標點 + 書名號
+            // 中文標點 + 書名號 + 貨幣
             listOf(
                 KeyModel.char("《"), KeyModel.char("》"),
                 KeyModel.char("〈"), KeyModel.char("〉"),
                 KeyModel.char("【"), KeyModel.char("】"),
                 KeyModel.char("『"), KeyModel.char("』"),
-                KeyModel.char("〔"), KeyModel.char("〕")
+                KeyModel.char("£", altChars = listOf("¥", "€", "¢", "₩", "₿")),
+                KeyModel.char("¥", altChars = listOf("€", "£", "₩", "₿"))
             ),
             listOf(
                 KeyModel.special("ABC", KeyboardView.KEYCODE_SWITCH_ABC, widthWeight = 1.5f),
