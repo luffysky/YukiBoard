@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 11
-        versionName "0.3.7"
+        versionCode 12
+        versionName "0.3.8"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -75,7 +75,7 @@ android {
             debuggable true
             firebaseAppDistribution {
                 groups = "testers"
-                releaseNotes = "v${android.defaultConfig.versionName}\n- 背景圖片/影片顯示比例選擇（保持比例 / 整張塞入）\n- 背景 XY 位置拉桿 + 預覽同步\n- 影片預覽可播放\n- 日文假名/片假名切換 + 180 詞庫\n- 韓文 200 常用詞庫\n- WeatherSkill GPS 自動取得天氣\n- WhisperSkill AI 語音後處理"
+                releaseNotes = "v${android.defaultConfig.versionName}\n- 修正注音/日/韓鍵盤會跳回英文的 bug\n- 背景顯示比例選擇（保持比例 / 整張塞入）\n- 背景 XY 位置拉桿 + 預覽同步"
             }
         }
     }

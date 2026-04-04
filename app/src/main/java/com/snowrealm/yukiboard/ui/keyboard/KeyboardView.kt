@@ -498,7 +498,7 @@ class KeyboardView(context: Context) : View(context) {
 
     private fun getPortraitLayout(mode: KeyboardMode): List<List<KeyModel>> = when (mode) {
         KeyboardMode.NORMAL -> when (subLayout) {
-            SubLayout.ABC -> KeyboardState.defaultQwertyRows()
+            SubLayout.ABC -> rowsForCurrentInputMode()
             SubLayout.NUMBERS -> KeyboardState.numberSymbolRows()
             SubLayout.SYMBOLS -> KeyboardState.moreSymbolRows()
         }
@@ -507,11 +507,22 @@ class KeyboardView(context: Context) : View(context) {
         KeyboardMode.GAME -> KeyboardState.gameRows()
     }
 
+    /** 根據 currentInputMode 回傳對應的字母佈局 */
+    private fun rowsForCurrentInputMode(): List<List<KeyModel>> = when (currentInputMode) {
+        com.snowrealm.yukiboard.input.router.InputMode.BOPOMOFO -> KeyboardState.bopomofoRows()
+        com.snowrealm.yukiboard.input.router.InputMode.PINYIN -> KeyboardState.pinyinRows()
+        com.snowrealm.yukiboard.input.router.InputMode.CANGJIE,
+        com.snowrealm.yukiboard.input.router.InputMode.SPEED_CANGJIE -> KeyboardState.cangjieRows()
+        com.snowrealm.yukiboard.input.router.InputMode.JAPANESE -> KeyboardState.japaneseRows()
+        com.snowrealm.yukiboard.input.router.InputMode.KOREAN -> KeyboardState.koreanRows()
+        else -> KeyboardState.defaultQwertyRows()
+    }
+
     private fun getLandscapeLayout(mode: KeyboardMode): Pair<List<List<KeyModel>>, List<List<KeyModel>>> =
         when (mode) {
             KeyboardMode.NORMAL -> when (subLayout) {
                 SubLayout.ABC -> Pair(
-                    KeyboardState.landscapeQwertyRows(),
+                    rowsForCurrentInputMode(),
                     KeyboardState.landscapeNormalSidePanel()
                 )
                 SubLayout.NUMBERS -> Pair(
