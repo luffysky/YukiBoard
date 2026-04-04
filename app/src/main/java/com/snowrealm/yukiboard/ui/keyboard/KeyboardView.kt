@@ -212,18 +212,26 @@ class KeyboardView(context: Context) : View(context) {
         textSize = 7f * density
     }
 
-    // 所有按鍵的點擊區域（主鍵盤 + 側邊面板）
-    private val keyRects = mutableListOf<Pair<RectF, KeyModel>>()
+    // 按鍵區域：touchRect（整個格子，用於觸控判定）+ visualRect（扣 padding，用於繪製）
+    private data class KeyEntry(val touchRect: RectF, val visualRect: RectF, val key: KeyModel)
+    private val keyEntries = mutableListOf<KeyEntry>()
+    // 舊 keyRects 保留為 alias 供向下相容
+    private val keyRects: List<Pair<RectF, KeyModel>>
+        get() = keyEntries.map { it.touchRect to it.key }
 
     // 佈局常數
     private val candidateBarHeight = 40f * density
     private val keyPaddingH = 3f * density
     private val keyPaddingV = 4f * density
     private val keyCornerRadius = 8f * density
+    private val bottomPadding = 8f * density
 
-    // 直向行高 vs 橫向行高
+    // 直向行高 vs 橫向行高（預設值，實際可能被容器高度壓縮）
     private val rowHeightPortrait = 52f * density
     private val rowHeightLandscape = 42f * density
+
+    /** 實際使用的行高，由 onMeasure 動態計算以適配容器 */
+    private var actualRowHeight = rowHeightPortrait
 
     /** 橫向側邊面板占螢幕寬度比例 */
     private val sidePanelRatio = 0.28f
@@ -249,6 +257,9 @@ class KeyboardView(context: Context) : View(context) {
     fun setOnSpaceLongPressListener(listener: (Boolean) -> Unit) {
         onSpaceLongPressListener = listener
     }
+
+    /** 是否啟用按鍵震動，由外部設定 */
+    var hapticEnabled = true
 
     fun vibrateShort() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -285,7 +296,7 @@ class KeyboardView(context: Context) : View(context) {
         get() = context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     private val rowHeight: Float
-        get() = if (isLandscape) rowHeightLandscape else rowHeightPortrait
+        get() = actualRowHeight
 
     // -------------------------------------------------------------------------
     // 長按相關
@@ -508,7 +519,27 @@ class KeyboardView(context: Context) : View(context) {
             mainRowCount
         }
 
-        val totalHeight = (candidateBarHeight + effectiveRowCount * rowHeight).toInt()
+        val preferredRowH = if (isLandscape) rowHeightLandscape else rowHeightPortrait
+        val preferredHeight = candidateBarHeight + effectiveRowCount * preferredRowH + bottomPadding
+
+        val heightMode = MeasureSpec.getMode(heightMeasureSpec)
+        val heightSize = MeasureSpec.getSize(heightMeasureSpec)
+
+        val totalHeight: Int
+        if ((heightMode == MeasureSpec.EXACTLY || heightMode == MeasureSpec.AT_MOST)
+            && heightSize > 0 && heightSize < preferredHeight) {
+            // 容器空間不夠，按比例壓縮行高（保留 bottomPadding）
+            totalHeight = heightSize
+            actualRowHeight = if (effectiveRowCount > 0) {
+                (heightSize - candidateBarHeight - bottomPadding) / effectiveRowCount
+            } else {
+                preferredRowH
+            }
+        } else {
+            totalHeight = preferredHeight.toInt()
+            actualRowHeight = preferredRowH
+        }
+
         setMeasuredDimension(w, totalHeight)
     }
 
@@ -523,7 +554,7 @@ class KeyboardView(context: Context) : View(context) {
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        keyRects.clear()
+        keyEntries.clear()
         drawBackground(canvas)
         drawCandidateBar(canvas)
 
@@ -758,13 +789,14 @@ class KeyboardView(context: Context) : View(context) {
 
             row.forEach { key ->
                 val keyWidth = unitWidth * key.widthWeight
+                val touchRect = RectF(x, top, x + keyWidth, top + rh)
                 val rect = RectF(
                     x + keyPaddingH,
                     top + keyPaddingV,
                     x + keyWidth - keyPaddingH,
                     top + rh - keyPaddingV
                 )
-                keyRects.add(rect to key)
+                keyEntries.add(KeyEntry(touchRect, rect, key))
 
                 // 按鍵背景
                 val isPressed = pressedKey == key
@@ -982,12 +1014,13 @@ class KeyboardView(context: Context) : View(context) {
                     return true
                 }
                 isLongPressTriggered = false
-                val hit = keyRects.firstOrNull { it.first.contains(x, y) }
+                val hit = keyEntries.firstOrNull { it.touchRect.contains(x, y) }
                 if (hit != null) {
-                    pressedKey = hit.second
-                    longPressKey = hit.second
-                    longPressRect = hit.first
+                    pressedKey = hit.key
+                    longPressKey = hit.key
+                    longPressRect = hit.touchRect
                     handler.postDelayed(longPressRunnable, LONG_PRESS_DELAY)
+                    if (hapticEnabled) vibrateShort()
                     invalidate()
                 }
             }
@@ -1088,9 +1121,9 @@ class KeyboardView(context: Context) : View(context) {
                     return true
                 }
 
-                val hit = keyRects.firstOrNull { it.first.contains(x, y) }
+                val hit = keyEntries.firstOrNull { it.touchRect.contains(x, y) }
                 if (hit != null) {
-                    val key = hit.second
+                    val key = hit.key
                     when {
                         key.code == KEYCODE_BACK_NORMAL -> switchMode(KeyboardMode.NORMAL)
                         key.code == KEYCODE_SWITCH_NUMBERS -> switchSubLayout(SubLayout.NUMBERS)

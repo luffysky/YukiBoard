@@ -281,6 +281,7 @@ class YukiBoardIMEService : InputMethodService() {
         // 只有啟用自訂背景時才改為玻璃模式
         keyboardView.hasCustomBackground = useCustomBg
         keyboardView.bgOverlayAlpha = prefs.bgOverlayAlpha
+        keyboardView.hapticEnabled = prefs.keyPressVibration
 
         // 套用當前主題
         val currentTheme = ThemeManager.getInstance(this).currentTheme
@@ -367,6 +368,9 @@ class YukiBoardIMEService : InputMethodService() {
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         inputRouter.reset()
+        // 同步鍵盤顯示的語言（保留使用者上次選擇的輸入法）
+        keyboardView.currentInputMode = inputRouter.inputMode
+        keyboardView.updateKeyRows(rowsForInputMode(inputRouter.inputMode))
         keyboardView.updateEditorInfo(info)
 
         // 同步智慧輸入開關
@@ -398,6 +402,7 @@ class YukiBoardIMEService : InputMethodService() {
         backgroundView?.overlayAlpha = prefs.bgOverlayAlpha
         keyboardView.bgOverlayAlpha = prefs.bgOverlayAlpha
         keyboardView.customKeyLabelColor = prefs.customKeyLabelColor
+        keyboardView.hapticEnabled = prefs.keyPressVibration
 
         // 遊戲模式恢復
         if (isInGameMode) {
@@ -446,6 +451,77 @@ class YukiBoardIMEService : InputMethodService() {
     // =========================================================================
     // 面板切換系統
     // =========================================================================
+
+    /**
+     * 將遠端貼圖以圖片方式傳送給目標 App（透過 commitContent API）。
+     * 先下載到 cache，再用 FileProvider 提供 content URI。
+     */
+    private fun commitStickerImage(url: String) {
+        serviceScope.launch(Dispatchers.IO) {
+            try {
+                val cacheDir = java.io.File(cacheDir, "stickers").also { it.mkdirs() }
+                val ext = when {
+                    url.contains(".gif", true) -> ".gif"
+                    url.contains(".webp", true) -> ".webp"
+                    url.contains(".png", true) -> ".png"
+                    else -> ".png"
+                }
+                val mimeType = when (ext) {
+                    ".gif" -> "image/gif"
+                    ".webp" -> "image/webp"
+                    else -> "image/png"
+                }
+                val fileName = "sticker_${url.hashCode()}$ext"
+                val file = java.io.File(cacheDir, fileName)
+
+                if (!file.exists()) {
+                    val conn = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+                    conn.connectTimeout = 8000
+                    conn.readTimeout = 8000
+                    conn.inputStream.use { input ->
+                        file.outputStream().use { output -> input.copyTo(output) }
+                    }
+                    conn.disconnect()
+                }
+
+                val authority = "$packageName.fileprovider"
+                val contentUri = androidx.core.content.FileProvider.getUriForFile(
+                    this@YukiBoardIMEService, authority, file
+                )
+                val editorInfo = currentInputEditorInfo
+                val ic = currentInputConnection ?: return@launch
+
+                // 檢查目標 App 是否支援此 MIME type
+                val supported = editorInfo?.contentMimeTypes?.any {
+                    android.content.ClipDescription.compareMimeTypes(it, mimeType)
+                } == true
+
+                if (supported) {
+                    val inputContentInfo = androidx.core.view.inputmethod.InputContentInfoCompat(
+                        contentUri,
+                        android.content.ClipDescription("sticker", arrayOf(mimeType)),
+                        null
+                    )
+                    val flag = if (android.os.Build.VERSION.SDK_INT >= 25)
+                        androidx.core.view.inputmethod.InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION
+                    else 0
+                    androidx.core.view.inputmethod.InputConnectionCompat.commitContent(
+                        ic, editorInfo, inputContentInfo, flag, null
+                    )
+                } else {
+                    // 目標 App 不支援圖片插入，fallback 傳 URL
+                    launch(Dispatchers.Main) {
+                        ic.commitText(url, 1)
+                    }
+                }
+            } catch (e: Exception) {
+                // 下載失敗，fallback 傳 URL
+                launch(Dispatchers.Main) {
+                    currentInputConnection?.commitText(url, 1)
+                }
+            }
+        }
+    }
 
     private fun handlePanelToggle(panel: PanelType) {
         // 再次點擊同一面板 → 關閉
@@ -561,7 +637,12 @@ class YukiBoardIMEService : InputMethodService() {
                 p.repository = stickerRepository
                 p.downloadManager = stickerDownloadManager
                 p.onStickerSelected = { stickerText ->
-                    currentInputConnection?.commitText(stickerText, 1)
+                    if (stickerText.startsWith("[STICKER]:")) {
+                        val url = stickerText.removePrefix("[STICKER]:")
+                        commitStickerImage(url)
+                    } else {
+                        currentInputConnection?.commitText(stickerText, 1)
+                    }
                 }
                 p
             }
@@ -585,7 +666,45 @@ class YukiBoardIMEService : InputMethodService() {
                 p.availableThemes = tm.availableThemes
                 p.onThemeSelected = { selected ->
                     tm.currentTheme = selected
+                    prefs.useCustomBackground = false
                     applyTheme(selected)
+                }
+                p.onPickBackground = {
+                    try {
+                        val intent = android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT).apply {
+                            addCategory(android.content.Intent.CATEGORY_OPENABLE)
+                            type = "image/*"
+                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        startActivity(intent)
+                    } catch (_: Exception) {}
+                }
+                p.onPickVideo = {
+                    try {
+                        val intent = android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT).apply {
+                            addCategory(android.content.Intent.CATEGORY_OPENABLE)
+                            type = "video/*"
+                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        startActivity(intent)
+                    } catch (_: Exception) {}
+                }
+                p.onClearBackground = {
+                    val dir = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getBackgroundDir(this)
+                    dir.listFiles()?.forEach { it.delete() }
+                    prefs.useCustomBackground = false
+                    backgroundView?.reloadFromStorage()
+                    keyboardView.hasCustomBackground = false
+                    keyboardView.invalidate()
+                }
+                p.onOverlayAlphaChanged = { alpha ->
+                    backgroundView?.overlayAlpha = alpha
+                    keyboardView.bgOverlayAlpha = alpha
+                    keyboardView.invalidate()
+                }
+                p.onLabelColorChanged = { color ->
+                    keyboardView.customKeyLabelColor = color
+                    keyboardView.invalidate()
                 }
                 p
             }
