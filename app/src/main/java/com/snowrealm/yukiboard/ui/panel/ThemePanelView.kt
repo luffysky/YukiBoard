@@ -1,22 +1,19 @@
 package com.snowrealm.yukiboard.ui.panel
 
 import android.content.Context
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.LinearGradient
-import android.graphics.Paint
-import android.graphics.RectF
-import android.graphics.Shader
+import android.graphics.*
 import android.view.MotionEvent
 import android.view.View
 import com.snowrealm.yukiboard.theme.KeyboardTheme
+import com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView
+import com.snowrealm.yukiboard.ui.keyboard.KeyboardState
 import com.snowrealm.yukiboard.ui.settings.YukiPreferences
 
 /**
  * 主題瀏覽面板 — 在鍵盤內直接預覽和切換主題、背景、字體顏色。
  *
- * 三區塊：主題列表 → 背景控制 → 字體顏色
- * 可上下捲動。
+ * 五區塊：主題列表 → 背景控制 → 背景調整 → 字體顏色 → 鍵盤預覽
+ * 可上下捲動。設定與 SettingsActivity 雙向同步（都讀寫同一份 prefs）。
  */
 class ThemePanelView(context: Context) : View(context) {
 
@@ -44,6 +41,7 @@ class ThemePanelView(context: Context) : View(context) {
         textSize = 11f * density
     }
     private val sliderPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val previewBgMatrix = Matrix()
 
     var theme: KeyboardTheme = KeyboardTheme.default()
         set(value) { field = value; invalidate() }
@@ -60,11 +58,17 @@ class ThemePanelView(context: Context) : View(context) {
     var onOverlayAlphaChanged: ((Int) -> Unit)? = null
     /** 字體顏色變更回呼 */
     var onLabelColorChanged: ((Int) -> Unit)? = null
+    /** 比例/偏移/鍵盤參數變更回呼（通知 IME 即時套用） */
+    var onBackgroundSettingsChanged: (() -> Unit)? = null
 
     var currentThemeId: String = "snow_dark"
         set(value) { field = value; invalidate() }
 
     var availableThemes: List<KeyboardTheme> = KeyboardTheme.all()
+        set(value) { field = value; invalidate() }
+
+    /** 背景預覽 bitmap（由外部載入後設定） */
+    var previewBgBitmap: Bitmap? = null
         set(value) { field = value; invalidate() }
 
     private val themeRects = mutableListOf<Pair<RectF, Int>>()
@@ -77,9 +81,19 @@ class ThemePanelView(context: Context) : View(context) {
     private var pickVideoRect: RectF? = null
     private var clearBgRect: RectF? = null
 
-    // 遮罩滑桿
-    private var sliderTrackRect: RectF? = null
-    private var isDraggingSlider = false
+    // 比例模式按鈕
+    private var scaleCropRect: RectF? = null
+    private var scaleFitRect: RectF? = null
+
+    // 滑桿定義
+    private enum class SliderId { OVERLAY, OFFSET_X, OFFSET_Y }
+    private data class SliderDef(val id: SliderId, var trackRect: RectF = RectF())
+    private val sliders = listOf(
+        SliderDef(SliderId.OVERLAY),
+        SliderDef(SliderId.OFFSET_X),
+        SliderDef(SliderId.OFFSET_Y)
+    )
+    private var draggingSlider: SliderId? = null
 
     // 字體顏色
     private data class ColorEntry(val color: Int, val label: String)
@@ -96,13 +110,34 @@ class ThemePanelView(context: Context) : View(context) {
         ColorEntry(0xFF4ADE80.toInt(), "綠"),
         ColorEntry(0xFFFF9500.toInt(), "橘")
     )
-    private val colorRects = mutableListOf<Pair<RectF, Int>>() // rect to color value
+    private val colorRects = mutableListOf<Pair<RectF, Int>>()
 
     // 捲動
     private var scrollY = 0f
     private var contentHeight = 0f
     private var lastTouchY = 0f
     private var isDragging = false
+
+    /** 載入/重新載入背景預覽 bitmap */
+    fun reloadPreviewBitmap() {
+        val savedBg = KeyboardBackgroundView.getSavedBackground(context)
+        previewBgBitmap = if (savedBg != null) {
+            if (KeyboardBackgroundView.isVideoFile(savedBg)) {
+                try {
+                    val retriever = android.media.MediaMetadataRetriever()
+                    retriever.setDataSource(savedBg.absolutePath)
+                    val frame = retriever.getFrameAtTime(0)
+                    retriever.release()
+                    frame
+                } catch (_: Exception) { null }
+            } else {
+                try {
+                    val opts = BitmapFactory.Options().apply { inSampleSize = 4 }
+                    BitmapFactory.decodeFile(savedBg.absolutePath, opts)
+                } catch (_: Exception) { null }
+            }
+        } else null
+    }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec).let {
@@ -115,10 +150,9 @@ class ThemePanelView(context: Context) : View(context) {
         super.onDraw(canvas)
         themeRects.clear()
         colorRects.clear()
-        pickImgRect = null
-        pickVideoRect = null
-        clearBgRect = null
-        sliderTrackRect = null
+        pickImgRect = null; pickVideoRect = null; clearBgRect = null
+        scaleCropRect = null; scaleFitRect = null
+        sliders.forEach { it.trackRect.setEmpty() }
 
         bgPaint.color = theme.effectivePanelBackground()
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
@@ -132,24 +166,33 @@ class ThemePanelView(context: Context) : View(context) {
         // ═══ 區塊 1: 主題列表 ═══
         curY = drawSectionTitle(canvas, "主題", curY)
         curY = drawThemeCards(canvas, curY)
-
         curY += sectionGap
 
-        // ═══ 區塊 2: 背景控制 ═══
+        // ═══ 區塊 2: 背景控制（選圖/選影片/清除） ═══
         curY = drawSectionTitle(canvas, "鍵盤背景", curY)
-        curY = drawBackgroundControls(canvas, curY)
-
+        curY = drawBackgroundButtons(canvas, curY)
         curY += sectionGap
 
-        // ═══ 區塊 3: 字體顏色 ═══
+        // ═══ 區塊 3: 背景調整（遮罩、比例、XY） ═══
+        curY = drawSectionTitle(canvas, "背景調整", curY)
+        curY = drawBackgroundAdjust(canvas, curY)
+        curY += sectionGap
+
+        // ═══ 區塊 4: 字體顏色 ═══
         curY = drawSectionTitle(canvas, "按鍵字體顏色", curY)
         curY = drawColorPicker(canvas, curY)
+        curY += sectionGap
+
+        // ═══ 區塊 5: 鍵盤完整預覽 ═══
+        curY = drawSectionTitle(canvas, "鍵盤預覽", curY)
+        curY = drawKeyboardPreview(canvas, curY)
 
         curY += pad
         contentHeight = curY
-
         canvas.restore()
     }
+
+    // ──────────────── Section drawing ────────────────
 
     private fun drawSectionTitle(canvas: Canvas, title: String, y: Float): Float {
         titlePaint.color = theme.candidateTextColorInt
@@ -162,9 +205,8 @@ class ThemePanelView(context: Context) : View(context) {
     // ─── 主題卡片 ───
 
     private fun drawThemeCards(canvas: Canvas, startY: Float): Float {
-        val cardW = 120f * density
         val cardH = 72f * density
-        val cols = ((width - pad) / (cardW + pad)).toInt().coerceAtLeast(2)
+        val cols = ((width - pad) / (120f * density + pad)).toInt().coerceAtLeast(2)
         val actualCardW = (width - pad * (cols + 1)) / cols
 
         var y = startY
@@ -177,40 +219,30 @@ class ThemePanelView(context: Context) : View(context) {
             val rect = RectF(x, cy, x + actualCardW, cy + cardH)
             themeRects.add(rect to i)
 
-            // 卡片背景
             cardPaint.color = t.backgroundColorInt
             canvas.drawRoundRect(rect, cornerR, cornerR, cardPaint)
 
-            // 選中邊框
             if (t.id == currentThemeId) {
-                val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    style = Paint.Style.STROKE
-                    strokeWidth = 2.5f * density
+                val bp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    style = Paint.Style.STROKE; strokeWidth = 2.5f * density
                     color = theme.candidateSelectedColorInt
                 }
-                canvas.drawRoundRect(rect, cornerR, cornerR, borderPaint)
+                canvas.drawRoundRect(rect, cornerR, cornerR, bp)
             }
 
-            // 迷你鍵盤預覽
+            // mini keys
             val keyY = rect.top + 10 * density
-            val keyH = 16f * density
-            val keyW = 24f * density
-            val keyPad = 3f * density
-            val keyStartX = rect.left + 10 * density
-
+            val keyH = 16f * density; val keyW = 24f * density; val kp = 3f * density
+            val kx = rect.left + 10 * density
             for (k in 0 until 3) {
                 previewKeyPaint.color = if (k == 2) t.specialKeyColorInt else t.keyColorInt
-                val kr = RectF(
-                    keyStartX + k * (keyW + keyPad), keyY,
-                    keyStartX + k * (keyW + keyPad) + keyW, keyY + keyH
-                )
+                val kr = RectF(kx + k * (keyW + kp), keyY, kx + k * (keyW + kp) + keyW, keyY + keyH)
                 canvas.drawRoundRect(kr, 3f * density, 3f * density, previewKeyPaint)
-                textPaint.color = t.keyLabelColorInt
-                textPaint.textSize = 8f * density
+                textPaint.color = t.keyLabelColorInt; textPaint.textSize = 8f * density
                 canvas.drawText(listOf("Q", "W", "⏎")[k], kr.centerX(), kr.centerY() + 3f * density, textPaint)
             }
 
-            // 候選列預覽
+            // candidate bar
             val barY = keyY + keyH + 4 * density
             previewKeyPaint.color = t.candidateBarColorInt
             canvas.drawRoundRect(
@@ -218,108 +250,136 @@ class ThemePanelView(context: Context) : View(context) {
                 2f * density, 2f * density, previewKeyPaint
             )
 
-            // 主題名稱
-            textPaint.textSize = 10f * density
-            textPaint.color = t.keyLabelColorInt
+            textPaint.textSize = 10f * density; textPaint.color = t.keyLabelColorInt
             canvas.drawText(t.displayName, rect.centerX(), rect.bottom - 5 * density, textPaint)
             textPaint.textSize = 12f * density
 
-            // 選中勾號
             if (t.id == currentThemeId) {
                 checkPaint.color = theme.candidateSelectedColorInt
                 canvas.drawText("✓", rect.right - 12 * density, rect.top + 14 * density, checkPaint)
             }
-
             y = cy + cardH + pad
         }
-
         return y
     }
 
-    // ─── 背景控制 ───
+    // ─── 背景按鈕（選圖片/選影片/清除） ───
 
-    private fun drawBackgroundControls(canvas: Canvas, startY: Float): Float {
-        var y = startY
+    private fun drawBackgroundButtons(canvas: Canvas, startY: Float): Float {
         val btnH = 30f * density
         val btnW = (width - pad * 4) / 3f
         val btnR = 6f * density
 
-        // 選圖片
-        val r1 = RectF(pad, y, pad + btnW, y + btnH)
+        val r1 = RectF(pad, startY, pad + btnW, startY + btnH)
         pickImgRect = r1
         drawButton(canvas, r1, "選圖片", btnR, theme.keyColorInt)
 
-        // 選影片
-        val r2 = RectF(pad * 2 + btnW, y, pad * 2 + btnW * 2, y + btnH)
+        val r2 = RectF(pad * 2 + btnW, startY, pad * 2 + btnW * 2, startY + btnH)
         pickVideoRect = r2
         drawButton(canvas, r2, "選影片", btnR, theme.keyColorInt)
 
-        // 清除
-        val r3 = RectF(pad * 3 + btnW * 2, y, pad * 3 + btnW * 3, y + btnH)
+        val r3 = RectF(pad * 3 + btnW * 2, startY, pad * 3 + btnW * 3, startY + btnH)
         clearBgRect = r3
         drawButton(canvas, r3, "清除", btnR, 0xFF3A2020.toInt())
 
-        y += btnH + 10 * density
+        return startY + btnH + 6 * density
+    }
 
-        // 遮罩深度滑桿
-        val alpha = prefs.bgOverlayAlpha
-        val pct = alpha / 255f
-        val labelText = "遮罩深度: %d%%".format((alpha * 100) / 255)
-        textPaint.textSize = 11f * density
-        textPaint.color = theme.candidateTextColorInt
-        textPaint.textAlign = Paint.Align.LEFT
-        canvas.drawText(labelText, pad + 4 * density, y + textPaint.textSize, textPaint)
-        textPaint.textAlign = Paint.Align.CENTER
-        y += textPaint.textSize + 6 * density
+    // ─── 背景調整（遮罩、比例、XY） ───
 
+    private fun drawBackgroundAdjust(canvas: Canvas, startY: Float): Float {
+        var y = startY
         val trackH = 6f * density
         val trackLeft = pad + 4 * density
         val trackRight = width - pad - 4 * density
-        val trackRect = RectF(trackLeft, y, trackRight, y + trackH)
-        sliderTrackRect = trackRect
 
-        // 軌道背景
+        // 遮罩深度滑桿
+        y = drawSliderRow(canvas, y, "遮罩深度", SliderId.OVERLAY,
+            prefs.bgOverlayAlpha / 255f, "%d%%".format((prefs.bgOverlayAlpha * 100) / 255),
+            trackLeft, trackRight, trackH)
+
+        // 顯示比例切換
+        y += 4 * density
+        textPaint.textSize = 11f * density
+        textPaint.color = theme.candidateTextColorInt
+        textPaint.textAlign = Paint.Align.LEFT
+        canvas.drawText("顯示比例:", pad + 4 * density, y + textPaint.textSize, textPaint)
+        textPaint.textAlign = Paint.Align.CENTER
+        y += textPaint.textSize + 4 * density
+
+        val btnH = 26f * density
+        val btnW = (width - pad * 3) / 2f
+        val btnR = 6f * density
+        val isCrop = prefs.bgScaleMode == 0
+
+        val rc = RectF(pad, y, pad + btnW, y + btnH)
+        scaleCropRect = rc
+        cardPaint.color = if (isCrop) theme.effectiveAccentColor() else theme.keyColorInt
+        canvas.drawRoundRect(rc, btnR, btnR, cardPaint)
+        btnTextPaint.color = if (isCrop) 0xFF111827.toInt() else theme.candidateTextColorInt
+        canvas.drawText("保持比例", rc.centerX(), rc.centerY() + btnTextPaint.textSize / 3f, btnTextPaint)
+
+        val rf = RectF(pad * 2 + btnW, y, pad * 2 + btnW * 2, y + btnH)
+        scaleFitRect = rf
+        cardPaint.color = if (!isCrop) theme.effectiveAccentColor() else theme.keyColorInt
+        canvas.drawRoundRect(rf, btnR, btnR, cardPaint)
+        btnTextPaint.color = if (!isCrop) 0xFF111827.toInt() else theme.candidateTextColorInt
+        canvas.drawText("整張塞入", rf.centerX(), rf.centerY() + btnTextPaint.textSize / 3f, btnTextPaint)
+
+        y += btnH + 8 * density
+
+        // X 偏移滑桿
+        y = drawSliderRow(canvas, y, "水平位置 X", SliderId.OFFSET_X,
+            prefs.bgOffsetX, "%d%%".format((prefs.bgOffsetX * 100).toInt()),
+            trackLeft, trackRight, trackH)
+
+        // Y 偏移滑桿
+        y = drawSliderRow(canvas, y, "垂直位置 Y", SliderId.OFFSET_Y,
+            prefs.bgOffsetY, "%d%%".format((prefs.bgOffsetY * 100).toInt()),
+            trackLeft, trackRight, trackH)
+
+        return y
+    }
+
+    /** 繪製一條滑桿列（標籤 + 軌道 + 手把），回傳底部 Y */
+    private fun drawSliderRow(
+        canvas: Canvas, startY: Float, label: String, id: SliderId,
+        pct: Float, valueText: String,
+        trackLeft: Float, trackRight: Float, trackH: Float
+    ): Float {
+        var y = startY
+        textPaint.textSize = 11f * density
+        textPaint.color = theme.candidateTextColorInt
+        textPaint.textAlign = Paint.Align.LEFT
+        canvas.drawText("$label: $valueText", pad + 4 * density, y + textPaint.textSize, textPaint)
+        textPaint.textAlign = Paint.Align.CENTER
+        y += textPaint.textSize + 6 * density
+
+        val trackRect = RectF(trackLeft, y, trackRight, y + trackH)
+        sliders.first { it.id == id }.trackRect.set(trackRect)
+
+        // track bg
         sliderPaint.color = theme.keyColorInt
+        sliderPaint.style = Paint.Style.FILL
         canvas.drawRoundRect(trackRect, trackH / 2, trackH / 2, sliderPaint)
 
-        // 填充部分
+        // fill
         val fillRect = RectF(trackLeft, y, trackLeft + (trackRight - trackLeft) * pct, y + trackH)
-        sliderPaint.color = theme.effectiveAccentColor()
-        sliderPaint.alpha = 180
+        sliderPaint.color = theme.effectiveAccentColor(); sliderPaint.alpha = 180
         canvas.drawRoundRect(fillRect, trackH / 2, trackH / 2, sliderPaint)
         sliderPaint.alpha = 255
 
-        // 滑桿手把
+        // thumb
         val thumbX = trackLeft + (trackRight - trackLeft) * pct
         val thumbR = 8f * density
         sliderPaint.color = 0xFFFFFFFF.toInt()
         canvas.drawCircle(thumbX, y + trackH / 2, thumbR, sliderPaint)
         sliderPaint.color = theme.effectiveAccentColor()
-        sliderPaint.style = Paint.Style.STROKE
-        sliderPaint.strokeWidth = 1.5f * density
+        sliderPaint.style = Paint.Style.STROKE; sliderPaint.strokeWidth = 1.5f * density
         canvas.drawCircle(thumbX, y + trackH / 2, thumbR, sliderPaint)
         sliderPaint.style = Paint.Style.FILL
 
-        y += trackH + 14 * density
-
-        return y
-    }
-
-    private fun drawButton(canvas: Canvas, rect: RectF, label: String, cornerR: Float, bgColor: Int) {
-        cardPaint.color = bgColor
-        canvas.drawRoundRect(rect, cornerR, cornerR, cardPaint)
-
-        // 邊框
-        cardPaint.style = Paint.Style.STROKE
-        cardPaint.strokeWidth = 1f * density
-        cardPaint.color = theme.candidateTextColorInt
-        cardPaint.alpha = 40
-        canvas.drawRoundRect(rect, cornerR, cornerR, cardPaint)
-        cardPaint.style = Paint.Style.FILL
-        cardPaint.alpha = 255
-
-        btnTextPaint.color = theme.candidateTextColorInt
-        canvas.drawText(label, rect.centerX(), rect.centerY() + btnTextPaint.textSize / 3f, btnTextPaint)
+        return y + trackH + 10 * density
     }
 
     // ─── 字體顏色 ───
@@ -335,15 +395,11 @@ class ThemePanelView(context: Context) : View(context) {
             val rect = RectF(x - dotR, y - dotR, x + dotR, y + dotR)
             colorRects.add(rect to entry.color)
 
-            // 圓形色塊
             if (entry.color == 0) {
-                // 跟隨主題：彩虹漸層
                 val gradient = LinearGradient(
                     rect.left, rect.top, rect.right, rect.bottom,
-                    intArrayOf(
-                        0xFFFF6B6B.toInt(), 0xFFFFD700.toInt(), 0xFF4ADE80.toInt(),
-                        0xFF7FD8FF.toInt(), 0xFFA78BFA.toInt()
-                    ),
+                    intArrayOf(0xFFFF6B6B.toInt(), 0xFFFFD700.toInt(), 0xFF4ADE80.toInt(),
+                        0xFF7FD8FF.toInt(), 0xFFA78BFA.toInt()),
                     null, Shader.TileMode.CLAMP
                 )
                 cardPaint.shader = gradient
@@ -354,42 +410,142 @@ class ThemePanelView(context: Context) : View(context) {
                 canvas.drawCircle(x, y, dotR - 2 * density, cardPaint)
             }
 
-            // 深色邊框（白色和跟隨主題需要）
             if (entry.color == 0xFFFFFFFF.toInt() || entry.color == 0 || entry.color == 0xFF000000.toInt()) {
-                cardPaint.style = Paint.Style.STROKE
-                cardPaint.strokeWidth = 1f * density
+                cardPaint.style = Paint.Style.STROKE; cardPaint.strokeWidth = 1f * density
                 cardPaint.color = 0xFF555555.toInt()
                 canvas.drawCircle(x, y, dotR - 2 * density, cardPaint)
                 cardPaint.style = Paint.Style.FILL
             }
 
-            // 選中框
             if (entry.color == currentColor) {
-                cardPaint.style = Paint.Style.STROKE
-                cardPaint.strokeWidth = 2.5f * density
+                cardPaint.style = Paint.Style.STROKE; cardPaint.strokeWidth = 2.5f * density
                 cardPaint.color = theme.candidateSelectedColorInt
                 canvas.drawCircle(x, y, dotR, cardPaint)
                 cardPaint.style = Paint.Style.FILL
             }
 
-            // 色名
-            textPaint.textSize = 8f * density
-            textPaint.color = theme.candidateTextColorInt
+            textPaint.textSize = 8f * density; textPaint.color = theme.candidateTextColorInt
             textPaint.alpha = 160
             canvas.drawText(entry.label, x, y + dotR + 10 * density, textPaint)
-            textPaint.alpha = 255
-            textPaint.textSize = 12f * density
+            textPaint.alpha = 255; textPaint.textSize = 12f * density
 
             x += dotR * 2 + gap
         }
-
         return startY + dotR * 2 + 18 * density
+    }
+
+    // ─── 鍵盤完整預覽 ───
+
+    private fun drawKeyboardPreview(canvas: Canvas, startY: Float): Float {
+        val pvW = width - pad * 2
+        val pvH = 100f * density
+        val pvRect = RectF(pad, startY, pad + pvW, startY + pvH)
+
+        // 背景
+        cardPaint.color = theme.backgroundColorInt
+        canvas.drawRoundRect(pvRect, cornerR, cornerR, cardPaint)
+
+        canvas.save()
+        canvas.clipRect(pvRect)
+
+        // 背景圖片
+        val bmp = previewBgBitmap
+        if (bmp != null && prefs.useCustomBackground) {
+            previewBgMatrix.reset()
+            if (prefs.bgScaleMode == 1) {
+                previewBgMatrix.setScale(pvW / bmp.width, pvH / bmp.height)
+                previewBgMatrix.postTranslate(pvRect.left, pvRect.top)
+            } else {
+                val scale = maxOf(pvW / bmp.width, pvH / bmp.height)
+                val sw = bmp.width * scale; val sh = bmp.height * scale
+                val maxDx = (sw - pvW).coerceAtLeast(0f)
+                val maxDy = (sh - pvH).coerceAtLeast(0f)
+                previewBgMatrix.setScale(scale, scale)
+                previewBgMatrix.postTranslate(
+                    pvRect.left - maxDx * prefs.bgOffsetX,
+                    pvRect.top - maxDy * prefs.bgOffsetY
+                )
+            }
+            canvas.drawBitmap(bmp, previewBgMatrix, null)
+
+            // 遮罩
+            previewKeyPaint.color = Color.argb(prefs.bgOverlayAlpha, 0, 0, 0)
+            previewKeyPaint.style = Paint.Style.FILL
+            canvas.drawRect(pvRect, previewKeyPaint)
+        }
+
+        // 繪製迷你鍵盤按鍵
+        val rows = KeyboardState.defaultQwertyRows()
+        val hasBg = bmp != null && prefs.useCustomBackground
+        val keyAlpha = prefs.keyOpacity
+        val rowH = pvH / rows.size
+        val cr = theme.keyCornerRadiusDp * density * 0.5f
+        val fontSize = 8f * density
+        val totalUnits = rows.maxOf { row -> row.sumOf { it.widthWeight.toDouble() }.toFloat() }
+
+        rows.forEachIndexed { rowIdx, row ->
+            val top = pvRect.top + rowIdx * rowH
+            var kx = pvRect.left
+            val unitW = pvW / totalUnits
+            val padH = 1.5f * density; val padV = 1.5f * density
+
+            row.forEach { key ->
+                val keyW = unitW * key.widthWeight
+                val kr = RectF(kx + padH, top + padV, kx + keyW - padH, top + rowH - padV)
+
+                if (hasBg) {
+                    previewKeyPaint.style = Paint.Style.STROKE
+                    previewKeyPaint.strokeWidth = 0.5f * density
+                    previewKeyPaint.color = Color.argb((keyAlpha * 0.3f).toInt().coerceIn(0, 255), 255, 255, 255)
+                    canvas.drawRoundRect(kr, cr, cr, previewKeyPaint)
+                } else {
+                    val baseColor = if (key.isSpecial) theme.specialKeyColorInt else theme.keyColorInt
+                    val a = ((baseColor ushr 24) * keyAlpha / 255).coerceIn(0, 255)
+                    previewKeyPaint.color = (a shl 24) or (baseColor and 0x00FFFFFF)
+                    previewKeyPaint.style = Paint.Style.FILL
+                    canvas.drawRoundRect(kr, cr, cr, previewKeyPaint)
+                }
+
+                val label = key.label
+                if (label.isNotEmpty() && label.length <= 3) {
+                    textPaint.textSize = fontSize
+                    textPaint.color = if (prefs.customKeyLabelColor != 0) prefs.customKeyLabelColor
+                        else theme.keyLabelColorInt
+                    val textY = kr.top + (kr.height() + fontSize) / 2f - textPaint.descent()
+                    canvas.drawText(label, kr.centerX(), textY, textPaint)
+                }
+                kx += keyW
+            }
+        }
+        textPaint.textSize = 12f * density
+
+        canvas.restore()
+
+        // 邊框
+        cardPaint.style = Paint.Style.STROKE; cardPaint.strokeWidth = 1f * density
+        cardPaint.color = theme.candidateTextColorInt; cardPaint.alpha = 40
+        canvas.drawRoundRect(pvRect, cornerR, cornerR, cardPaint)
+        cardPaint.style = Paint.Style.FILL; cardPaint.alpha = 255
+
+        return startY + pvH + pad
+    }
+
+    private fun drawButton(canvas: Canvas, rect: RectF, label: String, cornerR: Float, bgColor: Int) {
+        cardPaint.color = bgColor
+        canvas.drawRoundRect(rect, cornerR, cornerR, cardPaint)
+
+        cardPaint.style = Paint.Style.STROKE; cardPaint.strokeWidth = 1f * density
+        cardPaint.color = theme.candidateTextColorInt; cardPaint.alpha = 40
+        canvas.drawRoundRect(rect, cornerR, cornerR, cardPaint)
+        cardPaint.style = Paint.Style.FILL; cardPaint.alpha = 255
+
+        btnTextPaint.color = theme.candidateTextColorInt
+        canvas.drawText(label, rect.centerX(), rect.centerY() + btnTextPaint.textSize / 3f, btnTextPaint)
     }
 
     // ─── 觸控 ───
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        // 將螢幕座標轉為內容座標（考慮捲動）
         val cx = event.x
         val cy = event.y - scrollY
 
@@ -398,45 +554,36 @@ class ThemePanelView(context: Context) : View(context) {
                 lastTouchY = event.y
                 isDragging = false
 
-                // 滑桿拖曳開始
-                sliderTrackRect?.let { track ->
-                    val thumbY = track.centerY()
-                    if (cy > thumbY - 20 * density && cy < thumbY + 20 * density
-                        && cx > track.left - 10 * density && cx < track.right + 10 * density) {
-                        isDraggingSlider = true
-                        updateSlider(cx)
+                // 檢查是否點中任何滑桿
+                for (s in sliders) {
+                    if (s.trackRect.isEmpty) continue
+                    val ty = s.trackRect.centerY()
+                    if (cy > ty - 20 * density && cy < ty + 20 * density
+                        && cx > s.trackRect.left - 10 * density && cx < s.trackRect.right + 10 * density) {
+                        draggingSlider = s.id
+                        handleSliderUpdate(s.id, cx, s.trackRect)
                         return true
                     }
                 }
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
-                if (isDraggingSlider) {
-                    updateSlider(cx)
+                val ds = draggingSlider
+                if (ds != null) {
+                    val track = sliders.first { it.id == ds }.trackRect
+                    handleSliderUpdate(ds, cx, track)
                     return true
                 }
                 val dy = event.y - lastTouchY
-                if (!isDragging && Math.abs(dy) > 8 * density) {
-                    isDragging = true
-                }
+                if (!isDragging && Math.abs(dy) > 8 * density) isDragging = true
                 if (isDragging) {
-                    scrollY += dy
-                    clampScroll()
-                    lastTouchY = event.y
-                    invalidate()
+                    scrollY += dy; clampScroll(); lastTouchY = event.y; invalidate()
                 }
                 return true
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                if (isDraggingSlider) {
-                    isDraggingSlider = false
-                    return true
-                }
-
-                if (isDragging) {
-                    isDragging = false
-                    return true
-                }
+                if (draggingSlider != null) { draggingSlider = null; return true }
+                if (isDragging) { isDragging = false; return true }
 
                 // 主題卡片
                 val themeHit = themeRects.firstOrNull { it.first.contains(cx, cy) }
@@ -451,36 +598,58 @@ class ThemePanelView(context: Context) : View(context) {
                     return true
                 }
 
-                // 選圖片
+                // 背景按鈕
                 pickImgRect?.let { if (it.contains(cx, cy)) { onPickBackground?.invoke(); performClick(); return true } }
-                // 選影片
                 pickVideoRect?.let { if (it.contains(cx, cy)) { onPickVideo?.invoke(); performClick(); return true } }
-                // 清除背景
                 clearBgRect?.let { if (it.contains(cx, cy)) { onClearBackground?.invoke(); performClick(); return true } }
+
+                // 比例模式切換
+                scaleCropRect?.let {
+                    if (it.contains(cx, cy)) {
+                        prefs.bgScaleMode = 0
+                        onBackgroundSettingsChanged?.invoke()
+                        invalidate(); performClick(); return true
+                    }
+                }
+                scaleFitRect?.let {
+                    if (it.contains(cx, cy)) {
+                        prefs.bgScaleMode = 1
+                        onBackgroundSettingsChanged?.invoke()
+                        invalidate(); performClick(); return true
+                    }
+                }
 
                 // 字體顏色
                 val colorHit = colorRects.firstOrNull { it.first.contains(cx, cy) }
                 if (colorHit != null) {
                     prefs.customKeyLabelColor = colorHit.second
                     onLabelColorChanged?.invoke(colorHit.second)
-                    invalidate()
-                    performClick()
-                    return true
+                    invalidate(); performClick(); return true
                 }
 
-                performClick()
-                return true
+                performClick(); return true
             }
         }
         return true
     }
 
-    private fun updateSlider(x: Float) {
-        val track = sliderTrackRect ?: return
+    private fun handleSliderUpdate(id: SliderId, x: Float, track: RectF) {
         val pct = ((x - track.left) / track.width()).coerceIn(0f, 1f)
-        val alpha = (pct * 255).toInt()
-        prefs.bgOverlayAlpha = alpha
-        onOverlayAlphaChanged?.invoke(alpha)
+        when (id) {
+            SliderId.OVERLAY -> {
+                val alpha = (pct * 255).toInt()
+                prefs.bgOverlayAlpha = alpha
+                onOverlayAlphaChanged?.invoke(alpha)
+            }
+            SliderId.OFFSET_X -> {
+                prefs.bgOffsetX = pct
+                onBackgroundSettingsChanged?.invoke()
+            }
+            SliderId.OFFSET_Y -> {
+                prefs.bgOffsetY = pct
+                onBackgroundSettingsChanged?.invoke()
+            }
+        }
         invalidate()
     }
 

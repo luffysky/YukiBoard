@@ -369,6 +369,7 @@ class SettingsActivity : AppCompatActivity() {
     private var bgVideoPlayer: android.media.MediaPlayer? = null
     private var bgVideoTexture: android.view.TextureView? = null
     private var fullPreviewView: View? = null
+    private var fullPreviewBgBitmap: android.graphics.Bitmap? = null
 
     private fun buildBackgroundCard(): LinearLayout {
         val card = simpleCard("鍵盤背景 / Background")
@@ -461,11 +462,15 @@ class SettingsActivity : AppCompatActivity() {
         })
 
         row.addView(styledButton("清除", 0xFF1E2D4A.toInt(), 0xFFFF6B6B.toInt()) {
+            stopVideoPreview()
             val dir = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getBackgroundDir(this)
             dir.listFiles()?.forEach { it.delete() }
             prefs.useCustomBackground = false
             bgPreviewImage?.setImageBitmap(null)
+            bgPreviewLabel?.text = "尚未設定背景"
             bgPreviewLabel?.visibility = View.VISIBLE
+            fullPreviewBgBitmap = null
+            fullPreviewView?.invalidate()
             Toast.makeText(this, "已清除背景", Toast.LENGTH_SHORT).show()
         }.apply {
             layoutParams = LinearLayout.LayoutParams(0, dp(40), 0.7f).apply { marginStart = dp(4) }
@@ -812,6 +817,9 @@ class SettingsActivity : AppCompatActivity() {
             bgPreviewLabel?.text = "尚未設定背景"
             bgPreviewLabel?.visibility = View.VISIBLE
         }
+        // 同步更新鍵盤完整預覽的背景
+        reloadFullPreviewBitmap()
+        fullPreviewView?.invalidate()
     }
 
     // ─────────────────────────────────────────────────────────
@@ -833,16 +841,30 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
+    /** 重新載入完整預覽的背景 bitmap（圖片或影片第一幀） */
+    private fun reloadFullPreviewBitmap() {
+        val savedBg = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getSavedBackground(this)
+        fullPreviewBgBitmap = if (savedBg != null) {
+            if (com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.isVideoFile(savedBg)) {
+                try {
+                    val retriever = android.media.MediaMetadataRetriever()
+                    retriever.setDataSource(savedBg.absolutePath)
+                    val frame = retriever.getFrameAtTime(0)
+                    retriever.release()
+                    frame
+                } catch (_: Exception) { null }
+            } else {
+                try {
+                    val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = 4 }
+                    android.graphics.BitmapFactory.decodeFile(savedBg.absolutePath, opts)
+                } catch (_: Exception) { null }
+            }
+        } else null
+    }
+
     private fun buildFullKeyboardPreview(): View {
         val theme = themeManager.currentTheme
-        val savedBg = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getSavedBackground(this)
-        val bgBitmap: android.graphics.Bitmap? = if (savedBg != null &&
-            !com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.isVideoFile(savedBg)) {
-            try {
-                val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = 4 }
-                android.graphics.BitmapFactory.decodeFile(savedBg.absolutePath, opts)
-            } catch (_: Exception) { null }
-        } else null
+        reloadFullPreviewBitmap()
 
         val screenH = resources.displayMetrics.heightPixels
         val previewHeight = (screenH * prefs.keyboardHeightRatio).toInt().coerceIn(dp(100), dp(300))
@@ -852,7 +874,6 @@ class SettingsActivity : AppCompatActivity() {
             private val keyPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
             private val textPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                 textAlign = android.graphics.Paint.Align.CENTER
-                color = if (prefs.customKeyLabelColor != 0) prefs.customKeyLabelColor else theme.keyLabelColorInt
             }
             private val bgMatrix = android.graphics.Matrix()
 
@@ -879,7 +900,7 @@ class SettingsActivity : AppCompatActivity() {
                 if (w <= 0 || h <= 0) return
 
                 // 1. 背景圖片
-                val bmp = bgBitmap
+                val bmp = fullPreviewBgBitmap
                 if (bmp != null && prefs.useCustomBackground) {
                     bgMatrix.reset()
                     if (prefs.bgScaleMode == 1) {
@@ -1078,6 +1099,7 @@ class SettingsActivity : AppCompatActivity() {
                         }
                     }
                 }
+                fullPreviewView?.invalidate()
                 Toast.makeText(this, if (color == 0) "字體顏色跟隨主題" else "已更改字體顏色", Toast.LENGTH_SHORT).show()
             }
 
@@ -1115,6 +1137,7 @@ class SettingsActivity : AppCompatActivity() {
                             }
                         }
                     }
+                    fullPreviewView?.invalidate()
                     Toast.makeText(this@SettingsActivity, "已設定自訂顏色", Toast.LENGTH_SHORT).show()
                 }
             }
@@ -1428,6 +1451,7 @@ class SettingsActivity : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode != RESULT_OK) return
         val uri = data?.data ?: return
+        stopVideoPreview()
         val bgDir = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getBackgroundDir(this)
         bgDir.listFiles()?.forEach { it.delete() }
 

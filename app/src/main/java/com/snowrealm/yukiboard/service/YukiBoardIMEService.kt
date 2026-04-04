@@ -510,29 +510,36 @@ class YukiBoardIMEService : InputMethodService() {
     private fun commitImageContent(url: String) {
         serviceScope.launch(Dispatchers.IO) {
             try {
-                val cacheDir = java.io.File(cacheDir, "stickers").also { it.mkdirs() }
+                val stickerDir = java.io.File(cacheDir, "stickers").also { it.mkdirs() }
+                // 從 URL path 判斷副檔名（忽略 query 參數）
+                val urlPath = try { java.net.URL(url).path } catch (_: Exception) { url }
                 val ext = when {
-                    url.contains(".gif", true) -> ".gif"
-                    url.contains(".webp", true) -> ".webp"
-                    url.contains(".png", true) -> ".png"
-                    else -> ".png"
+                    urlPath.contains(".gif", true) -> ".gif"
+                    urlPath.contains(".webp", true) -> ".webp"
+                    urlPath.contains(".png", true) -> ".png"
+                    urlPath.contains(".jpg", true) || urlPath.contains(".jpeg", true) -> ".jpg"
+                    else -> ".gif"  // Giphy 預設為 GIF
                 }
                 val mimeType = when (ext) {
                     ".gif" -> "image/gif"
                     ".webp" -> "image/webp"
+                    ".jpg" -> "image/jpeg"
                     else -> "image/png"
                 }
                 val fileName = "sticker_${url.hashCode()}$ext"
-                val file = java.io.File(cacheDir, fileName)
+                val file = java.io.File(stickerDir, fileName)
 
-                if (!file.exists()) {
-                    val conn = java.net.URL(url).openConnection() as java.net.HttpURLConnection
-                    conn.connectTimeout = 8000
-                    conn.readTimeout = 8000
-                    conn.inputStream.use { input ->
+                if (!file.exists() || file.length() == 0L) {
+                    val client = okhttp3.OkHttpClient.Builder()
+                        .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                        .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                        .build()
+                    val request = okhttp3.Request.Builder().url(url).build()
+                    val response = client.newCall(request).execute()
+                    if (!response.isSuccessful) throw Exception("HTTP ${response.code}")
+                    response.body?.byteStream()?.use { input ->
                         file.outputStream().use { output -> input.copyTo(output) }
-                    }
-                    conn.disconnect()
+                    } ?: throw Exception("Empty response body")
                 }
 
                 val authority = "$packageName.fileprovider"
@@ -559,19 +566,25 @@ class YukiBoardIMEService : InputMethodService() {
                 } catch (_: Exception) { false }
 
                 if (!committed) {
-                    // commitContent 失敗，改用剪貼簿複製圖片讓使用者貼上
+                    // commitContent 失敗，改用剪貼簿複製 URI 讓使用者長按貼上
                     launch(Dispatchers.Main) {
-                        val clip = android.content.ClipData.newUri(
-                            contentResolver, "sticker", contentUri
-                        )
-                        val cm = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                        cm.setPrimaryClip(clip)
-                        ic.commitText("[已複製貼圖到剪貼簿]", 1)
+                        try {
+                            val clip = android.content.ClipData.newUri(
+                                contentResolver, "sticker", contentUri
+                            )
+                            val cm = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                            cm.setPrimaryClip(clip)
+                            android.widget.Toast.makeText(this@YukiBoardIMEService, "GIF 已複製，請長按貼上", android.widget.Toast.LENGTH_SHORT).show()
+                        } catch (_: Exception) {
+                            // 剪貼簿也失敗，直接貼 URL
+                            ic.commitText(url, 1)
+                        }
                     }
                 }
             } catch (e: Exception) {
                 // 下載失敗，fallback 傳 URL
                 launch(Dispatchers.Main) {
+                    android.widget.Toast.makeText(this@YukiBoardIMEService, "GIF 下載失敗，已貼上連結", android.widget.Toast.LENGTH_SHORT).show()
                     currentInputConnection?.commitText(url, 1)
                 }
             }
@@ -719,10 +732,12 @@ class YukiBoardIMEService : InputMethodService() {
                 p.theme = theme
                 p.currentThemeId = tm.currentTheme.id
                 p.availableThemes = tm.availableThemes
+                p.reloadPreviewBitmap()
                 p.onThemeSelected = { selected ->
                     tm.currentTheme = selected
                     prefs.useCustomBackground = false
                     applyTheme(selected)
+                    p.previewBgBitmap = null
                 }
                 p.onPickBackground = {
                     try {
@@ -751,6 +766,7 @@ class YukiBoardIMEService : InputMethodService() {
                     backgroundView?.reloadFromStorage()
                     keyboardView.hasCustomBackground = false
                     keyboardView.invalidate()
+                    p.previewBgBitmap = null
                 }
                 p.onOverlayAlphaChanged = { alpha ->
                     backgroundView?.overlayAlpha = alpha
@@ -759,6 +775,16 @@ class YukiBoardIMEService : InputMethodService() {
                 }
                 p.onLabelColorChanged = { color ->
                     keyboardView.customKeyLabelColor = color
+                    keyboardView.invalidate()
+                }
+                p.onBackgroundSettingsChanged = {
+                    // 即時套用比例/偏移變更到實際鍵盤背景
+                    backgroundView?.let { bg ->
+                        bg.scaleMode = prefs.bgScaleMode
+                        bg.offsetX = prefs.bgOffsetX
+                        bg.offsetY = prefs.bgOffsetY
+                        bg.reloadFromStorage()
+                    }
                     keyboardView.invalidate()
                 }
                 p
@@ -1463,6 +1489,7 @@ class YukiBoardIMEService : InputMethodService() {
                         }
                         keyboardView.updateComposingText(inputRouter.composingText)
                         keyboardView.updateCandidates(inputRouter.candidates)
+                        gp.updateComposingHint(inputRouter.composingText)
                     } else {
                         gp.onCharInput(label)
                     }

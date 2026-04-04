@@ -21,8 +21,11 @@ class WriterSkill(private val context: Context, private val provider: AIProvider
     var writerMode: WriterMode = WriterMode.WRITE
 
     override suspend fun execute(input: ClawInput): ClawOutput {
-        val promptTemplate = context.resources.openRawResource(R.raw.claw_writer_prompt)
-            .bufferedReader().readText()
+        val promptTemplate = try {
+            context.resources.openRawResource(R.raw.claw_writer_prompt).bufferedReader().readText()
+        } catch (_: Exception) {
+            "你是寫作助手。任務：{task}。風格參考：{context_style}。\n\n用戶輸入：{input}\n\n提供 3 個版本，用 --- 分隔。"
+        }
 
         val contextStyle = ContextSkill.getContextStyle(input.appPackage)
         val prompt = promptTemplate

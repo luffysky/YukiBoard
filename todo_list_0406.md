@@ -91,15 +91,27 @@
 
 ---
 
-## 待修復（明日優先）
+## 已修復（v0.4.3~v0.4.7）
 
-### Skill 修復
-- [ ] **CupidSkill** — 加 try-catch fallback（R.raw.claw_cupid_male/female_prompt 缺失時會 crash）
-- [ ] **WriterSkill** — 加 try-catch fallback（R.raw.claw_writer_prompt 缺失時會 crash）
+### v0.4.3~v0.4.5 修復
+- ✅ **.env 天氣 API Key 名稱修正** — `OPEN_WEATHER_MAP_API_KEY` → `OPENWEATHER_API_KEY`
+- ✅ **背景圖片設定即時生效** — `onStartInputView` 同步 bgScaleMode/keyScale/keyOpacity
+- ✅ **鍵盤高度即時生效** — `onStartInputView` 重新計算 kbHeight 並 requestLayout
 
-### 設定頁 / UI
-- [ ] **鍵盤完整預覽** — 影片背景時預覽只顯示靜態底色，考慮截取影片第一幀
-- [ ] **字體顏色拉桿** — 調整後鍵盤完整預覽的字色要同步更新
+### v0.4.6 修復
+- ✅ **雪凜角色不顯示** — GL 流光從 GLSurfaceView（setZOrderOnTop 遮擋）改為 TextureView + 手動 EGL
+- ✅ **CharacterView 重複初始化** — 移除 init 裡的 initLottieMode()
+- ✅ **Emoji 面板擴充** — 12 分類、1400+ emoji、支援滑動捲動
+
+### v0.4.7 修復
+- ✅ **CupidSkill** — 加 try-catch fallback（prompt 缺失時 inline prompt 替代）
+- ✅ **WriterSkill** — 加 try-catch fallback（prompt 缺失時 inline prompt 替代）
+- ✅ **鍵盤完整預覽** — 影片背景截取第一幀作為預覽（MediaMetadataRetriever）
+- ✅ **字體顏色拉桿** — 調整後預覽字色即時同步（fullPreviewView.invalidate）
+- ✅ **影片背景比例/XY 調整** — TextureView.setTransform(Matrix) 支援 scaleMode + offsetX/Y
+- ✅ **清除/切換背景修復** — 切換前先 stopVideoPreview()，避免影片佔住無法清除
+- ✅ **GIF 傳送改善** — 下載改 OkHttp + URL path 副檔名判斷 + commitContent fallback Toast
+- ✅ **GIF 搜尋框 CJK 組字提示** — 搜尋框顯示組字中的注音/拼音 hint
 
 ---
 

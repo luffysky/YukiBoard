@@ -62,6 +62,7 @@ class GifPanelView(context: Context) : View(context) {
     private var isLoading = false
     private var isInputMode = false
     private val inputBuffer = StringBuilder()
+    private var composingHint = ""  // CJK 組字中顯示
     private var searchBarRect = RectF()
     private val tagRects = mutableListOf<Pair<RectF, String>>()
     private val gifRects = mutableListOf<Pair<RectF, Int>>()
@@ -141,7 +142,9 @@ class GifPanelView(context: Context) : View(context) {
             canvas.drawRoundRect(searchBarRect, cornerR, cornerR, borderPaint)
         }
 
-        val currentText = if (isInputMode) inputBuffer.toString() else searchQuery
+        val currentText = if (isInputMode) {
+            if (composingHint.isNotEmpty()) inputBuffer.toString() + composingHint else inputBuffer.toString()
+        } else searchQuery
         searchPaint.color = if (currentText.isEmpty()) {
             theme.candidateTextColorInt.and(0x00FFFFFF).or(0x80000000.toInt())
         } else {
@@ -417,6 +420,13 @@ class GifPanelView(context: Context) : View(context) {
     fun onComposedTextInput(text: String) {
         if (!isInputMode) return
         inputBuffer.append(text)
+        composingHint = ""
+        invalidate()
+    }
+
+    /** 更新 CJK 組字中的提示文字（尚未提交） */
+    fun updateComposingHint(hint: String) {
+        composingHint = hint
         invalidate()
     }
 

@@ -49,6 +49,8 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
 
     private var bmpWidth = 0
     private var bmpHeight = 0
+    private var videoWidth = 0
+    private var videoHeight = 0
 
     enum class BackgroundType { NONE, IMAGE, VIDEO }
 
@@ -201,6 +203,34 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
         iv.imageMatrix = imageMatrix
     }
 
+    /** 影片背景的 transform（scale + offset） */
+    private fun applyVideoTransform() {
+        val tv = textureView ?: return
+        val vw = tv.width.toFloat()
+        val vh = tv.height.toFloat()
+        if (vw <= 0 || vh <= 0 || videoWidth <= 0 || videoHeight <= 0) return
+
+        val matrix = Matrix()
+
+        if (scaleMode == 1) {
+            // 整張塞入：拉伸填滿
+            matrix.setScale(vw / videoWidth, vh / videoHeight)
+        } else {
+            // 保持比例：center-crop + offset
+            val scale = maxOf(vw / videoWidth, vh / videoHeight)
+            val scaledW = videoWidth * scale
+            val scaledH = videoHeight * scale
+            val maxDx = (scaledW - vw).coerceAtLeast(0f)
+            val maxDy = (scaledH - vh).coerceAtLeast(0f)
+            val dx = -maxDx * offsetX
+            val dy = -maxDy * offsetY
+            matrix.setScale(scale, scale)
+            matrix.postTranslate(dx, dy)
+        }
+
+        tv.setTransform(matrix)
+    }
+
     /**
      * 設定影片背景。
      * @param file 影片檔案路徑
@@ -224,7 +254,12 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
                         isLooping = true
                         setVolume(0f, 0f)
                         prepareAsync()
-                        setOnPreparedListener { it.start() }
+                        setOnPreparedListener { player ->
+                            this@KeyboardBackgroundView.videoWidth = player.videoWidth
+                            this@KeyboardBackgroundView.videoHeight = player.videoHeight
+                            applyVideoTransform()
+                            player.start()
+                        }
                     }
                     mediaPlayer = mp
                 } catch (e: Exception) {
@@ -232,7 +267,9 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
                 }
             }
 
-            override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, h: Int) {}
+            override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, h: Int) {
+                applyVideoTransform()
+            }
             override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
                 releaseMediaPlayer()
                 return true
@@ -265,7 +302,12 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
                         isLooping = true
                         setVolume(0f, 0f)
                         prepareAsync()
-                        setOnPreparedListener { it.start() }
+                        setOnPreparedListener { player ->
+                            this@KeyboardBackgroundView.videoWidth = player.videoWidth
+                            this@KeyboardBackgroundView.videoHeight = player.videoHeight
+                            applyVideoTransform()
+                            player.start()
+                        }
                     }
                     mediaPlayer = mp
                 } catch (e: Exception) {
@@ -273,7 +315,9 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
                 }
             }
 
-            override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, h: Int) {}
+            override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, h: Int) {
+                applyVideoTransform()
+            }
             override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
                 releaseMediaPlayer()
                 return true
@@ -298,6 +342,8 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
 
         // 已經載入同類型就不重複載入（影片重新載入會閃）
         if (currentType == BackgroundType.VIDEO && isVideoFile(savedBg) && mediaPlayer != null) {
+            // 影片已載入，但 offset/scaleMode 可能已變更，重新套用
+            applyVideoTransform()
             return true
         }
         if (currentType == BackgroundType.IMAGE && !isVideoFile(savedBg) && imageView != null) {

@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 20
-        versionName "0.4.6"
+        versionCode 22
+        versionName "0.4.8"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -75,7 +75,7 @@ android {
             debuggable true
             firebaseAppDistribution {
                 groups = "testers"
-                releaseNotes = "v${android.defaultConfig.versionName}\n- 修正雪凜角色不顯示（GL 流光改用 TextureView）\n- 修正 CharacterView 重複初始化"
+                releaseNotes = "v${android.defaultConfig.versionName}\n- 主題面板整合完整背景設定（比例/XY/遮罩/預覽）\n- 鍵盤面板與設定頁雙向同步\n- 設定頁鍵盤預覽即時更新背景"
             }
         }
     }
