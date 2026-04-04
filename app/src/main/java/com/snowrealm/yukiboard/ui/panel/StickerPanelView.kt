@@ -60,11 +60,12 @@ class StickerPanelView(context: Context) : View(context) {
         set(value) {
             field = value
             remotePacks = value?.packs ?: emptyList()
+            applyFilter()
             value?.onPacksUpdated = {
                 remotePacks = value.packs
+                applyFilter()
                 post { invalidate() }
             }
-            invalidate()
         }
 
     /** 下載管理器（由 IMEService 注入） */
@@ -79,7 +80,31 @@ class StickerPanelView(context: Context) : View(context) {
         }
 
     private var remotePacks: List<RemoteStickerPack> = emptyList()
+    private var filteredPacks: List<RemoteStickerPack> = emptyList()
     private var selectedPackIndex = 0
+
+    /** 分類過濾：all / free / character / seasonal */
+    var filterCategory: String = "all"
+        set(value) {
+            field = value
+            applyFilter()
+        }
+
+    private fun applyFilter() {
+        filteredPacks = when (filterCategory) {
+            "free" -> remotePacks.filter { it.id.startsWith("yuki") || it.stickers.all { s -> s.url.startsWith("local:") } }
+            "character" -> remotePacks.filter { p ->
+                CHAR_KEYWORDS.any { p.name.contains(it, ignoreCase = true) || p.id.contains(it, ignoreCase = true) }
+            }
+            "seasonal" -> remotePacks.filter { p ->
+                SEASON_KEYWORDS.any { p.name.contains(it, ignoreCase = true) || p.id.contains(it, ignoreCase = true) }
+            }
+            else -> remotePacks
+        }
+        selectedPackIndex = 0
+        scrollOffsetY = 0f
+        invalidate()
+    }
     private val packRects = mutableListOf<Pair<RectF, Int>>()
     private val stickerRects = mutableListOf<Pair<RectF, Int>>()
     private var downloadBtnRect: RectF? = null
@@ -117,7 +142,7 @@ class StickerPanelView(context: Context) : View(context) {
         bgPaint.color = theme.effectivePanelBackground()
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
 
-        if (remotePacks.isEmpty()) {
+        if (filteredPacks.isEmpty()) {
             emptyPaint.color = theme.candidateTextColorInt
             emptyPaint.alpha = 120
             canvas.drawText("正在同步貼圖...", width / 2f, height / 2f, emptyPaint)
@@ -138,7 +163,7 @@ class StickerPanelView(context: Context) : View(context) {
         bgPaint.color = theme.candidateBarColorInt
         canvas.drawRect(0f, 0f, width.toFloat(), headerH, bgPaint)
 
-        val pack = remotePacks.getOrNull(selectedPackIndex)
+        val pack = filteredPacks.getOrNull(selectedPackIndex)
         val packName = pack?.name ?: ""
         val packId = pack?.id ?: ""
 
@@ -243,9 +268,9 @@ class StickerPanelView(context: Context) : View(context) {
         canvas.drawRect(0f, barTop, width.toFloat(), height.toFloat(), bgPaint)
 
         val maxPackWidth = 56f * density
-        val packW = (width.toFloat() / remotePacks.size.coerceAtLeast(1)).coerceAtMost(maxPackWidth)
+        val packW = (width.toFloat() / filteredPacks.size.coerceAtLeast(1)).coerceAtMost(maxPackWidth)
 
-        remotePacks.forEachIndexed { i, pack ->
+        filteredPacks.forEachIndexed { i, pack ->
             val left = i * packW
             val rect = RectF(left, barTop, left + packW, height.toFloat())
             packRects.add(rect to i)
@@ -291,7 +316,7 @@ class StickerPanelView(context: Context) : View(context) {
     }
 
     private fun drawStickerGrid(canvas: Canvas) {
-        val pack = remotePacks.getOrNull(selectedPackIndex) ?: return
+        val pack = filteredPacks.getOrNull(selectedPackIndex) ?: return
         val stickers = pack.stickers
         val cols = pack.columnsPerRow.coerceIn(2, 8)
         val cellW = width / cols.toFloat()
@@ -384,7 +409,7 @@ class StickerPanelView(context: Context) : View(context) {
                     // 下載當前包
                     downloadBtnRect?.let { rect ->
                         if (rect.contains(event.x, event.y)) {
-                            val pack = remotePacks.getOrNull(selectedPackIndex)
+                            val pack = filteredPacks.getOrNull(selectedPackIndex)
                             if (pack != null) downloadManager?.downloadPack(pack)
                             performClick()
                             return true
@@ -413,7 +438,7 @@ class StickerPanelView(context: Context) : View(context) {
                     // 貼圖選擇
                     val stickerHit = stickerRects.firstOrNull { it.first.contains(event.x, event.y) }
                     if (stickerHit != null) {
-                        val pack = remotePacks.getOrNull(selectedPackIndex)
+                        val pack = filteredPacks.getOrNull(selectedPackIndex)
                         val sticker = pack?.stickers?.getOrNull(stickerHit.second)
                         if (sticker != null) {
                             val text = if (sticker.url.startsWith("local:")) {
@@ -434,7 +459,7 @@ class StickerPanelView(context: Context) : View(context) {
     }
 
     private fun clampScroll() {
-        val pack = remotePacks.getOrNull(selectedPackIndex) ?: return
+        val pack = filteredPacks.getOrNull(selectedPackIndex) ?: return
         val cols = pack.columnsPerRow.coerceIn(2, 8)
         val cellH = width / cols.toFloat()
         val rows = (pack.stickers.size + cols - 1) / cols
@@ -451,5 +476,10 @@ class StickerPanelView(context: Context) : View(context) {
 
     fun onDestroyView() {
         scope.cancel()
+    }
+
+    companion object {
+        private val CHAR_KEYWORDS = listOf("雪凜", "yuki", "角色", "character", "animal", "動物")
+        private val SEASON_KEYWORDS = listOf("節日", "seasonal", "春", "夏", "秋", "冬", "新年", "聖誕", "halloween", "christmas", "spring", "summer", "autumn", "winter")
     }
 }

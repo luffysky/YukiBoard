@@ -2,17 +2,35 @@ package com.snowrealm.yukiboard.currency
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 
 /**
  * Z幣錢包管理器 — 本地快取 + Supabase 同步。
  *
  * 餘額以 Supabase 為主，本地僅做快取。
  * 離線時允許暫時使用本地餘額，上線後同步。
+ *
+ * 使用 EncryptedSharedPreferences 保護金額與交易紀錄。
  */
 class ZCoinManager(context: Context) {
 
-    private val prefs: SharedPreferences =
+    private val prefs: SharedPreferences = try {
+        val masterKey = MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        EncryptedSharedPreferences.create(
+            context,
+            "yukiboard_zcoin_enc",
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    } catch (e: Exception) {
+        Log.w("ZCoinManager", "EncryptedSharedPreferences failed, fallback", e)
         context.getSharedPreferences("yukiboard_zcoin", Context.MODE_PRIVATE)
+    }
 
     /** 本地快取餘額 */
     var balance: Int

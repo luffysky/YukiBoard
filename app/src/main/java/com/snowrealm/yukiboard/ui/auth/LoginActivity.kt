@@ -19,10 +19,7 @@ import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import com.snowrealm.yukiboard.BuildConfig
 import com.snowrealm.yukiboard.auth.SnowRealmAuthClient
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 
 /**
  * SnowRealm 帳號登入頁面 — 液態玻璃風格。
@@ -44,6 +41,7 @@ class LoginActivity : AppCompatActivity() {
     private var webView: WebView? = null
     private var isRegisterMode = false
     private var pendingCodeId: String? = null
+    private val activityScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private val baseUrl get() = BuildConfig.INSIGHT_API_BASE_URL.trimEnd('/')
 
@@ -369,7 +367,7 @@ class LoginActivity : AppCompatActivity() {
         statusText.setTextColor(0x99FFFFFF.toInt())
         statusText.text = "發送驗證碼中..."
 
-        CoroutineScope(Dispatchers.Main).launch {
+        activityScope.launch {
             val result = authClient.sendVerificationCode(email)
             withContext(Dispatchers.Main) {
                 sendCodeBtn.isEnabled = true
@@ -407,7 +405,7 @@ class LoginActivity : AppCompatActivity() {
         statusText.setTextColor(0x99FFFFFF.toInt())
         statusText.text = "處理中..."
 
-        CoroutineScope(Dispatchers.Main).launch {
+        activityScope.launch {
             val result = if (isRegisterMode) {
                 val name = nameInput.text.toString().trim().ifBlank { email.substringBefore("@") }
                 val code = codeInput.text.toString().trim()
@@ -501,7 +499,7 @@ class LoginActivity : AppCompatActivity() {
             ?.substringAfter("admin_session=")
 
         if (!token.isNullOrBlank()) {
-            CoroutineScope(Dispatchers.Main).launch {
+            activityScope.launch {
                 authClient.saveTokenDirectly(token)
                 val user = authClient.fetchMe()
                 withContext(Dispatchers.Main) {
@@ -527,6 +525,11 @@ class LoginActivity : AppCompatActivity() {
         }
         webView = null
         webViewContainer.visibility = View.GONE
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        activityScope.cancel()
     }
 
     companion object {

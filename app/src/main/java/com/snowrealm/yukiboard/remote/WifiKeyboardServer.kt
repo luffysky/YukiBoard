@@ -41,6 +41,7 @@ class WifiKeyboardServer(context: Context) : RemoteKeyboardService {
         private const val TAG = "WifiKbServer"
         const val DEFAULT_PORT = 8765
         private const val WEBSOCKET_GUID = "258EAFA5-E914-47DA-95CA-5AB5DC76E97B"
+        private fun generatePin(): String = (1000..9999).random().toString()
     }
 
     private val appContext = context.applicationContext
@@ -55,6 +56,10 @@ class WifiKeyboardServer(context: Context) : RemoteKeyboardService {
     private var remoteTextListener: ((String) -> Unit)? = null
 
     var port: Int = DEFAULT_PORT
+
+    /** 4 位連線 PIN — 顯示在面板，WebSocket 握手時驗證 */
+    var connectionPin: String = generatePin()
+        private set
 
     override var connectionState: ConnectionState = ConnectionState.IDLE
         private set(value) {
@@ -84,6 +89,7 @@ class WifiKeyboardServer(context: Context) : RemoteKeyboardService {
     override fun start() {
         if (running.get()) return
 
+        connectionPin = generatePin()
         running.set(true)
         connectionState = ConnectionState.LISTENING
 
@@ -168,6 +174,9 @@ class WifiKeyboardServer(context: Context) : RemoteKeyboardService {
                 val firstLine = reader.readLine() ?: return@Thread
 
                 if (firstLine.contains("GET") && firstLine.contains("HTTP")) {
+                    // 解析請求路徑
+                    val path = firstLine.split(" ").getOrNull(1) ?: "/"
+
                     // HTTP 請求
                     val headers = mutableMapOf<String, String>()
                     var line = reader.readLine()
@@ -182,8 +191,16 @@ class WifiKeyboardServer(context: Context) : RemoteKeyboardService {
 
                     val wsKey = headers["Sec-WebSocket-Key"]
                     if (wsKey != null) {
-                        // WebSocket upgrade
-                        upgradeToWebSocket(socket, wsKey)
+                        // WebSocket upgrade — 驗證 PIN
+                        val pinParam = path.substringAfter("pin=", "").substringBefore("&").substringBefore(" ")
+                        if (pinParam == connectionPin) {
+                            upgradeToWebSocket(socket, wsKey)
+                        } else {
+                            val reject = "HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\nInvalid PIN"
+                            socket.getOutputStream().write(reject.toByteArray())
+                            socket.close()
+                            Log.w(TAG, "WebSocket rejected: wrong PIN from ${socket.inetAddress}")
+                        }
                     } else {
                         // 普通 HTTP → 回傳控制頁面
                         serveControlPage(socket)
@@ -396,9 +413,15 @@ button {
 </head>
 <body>
 <h1>❄ YukiBoard Remote</h1>
-<div id="status" class="status connecting">連線中...</div>
+<div id="status" class="status connecting">請輸入 PIN 碼連線</div>
 
-<textarea id="textInput" placeholder="在這裡輸入文字，會即時傳送到手機..."></textarea>
+<div id="pinBox" style="margin-bottom:16px;text-align:center;">
+    <input id="pinInput" type="text" maxlength="4" placeholder="輸入 4 位 PIN 碼"
+        style="width:160px;padding:10px;font-size:20px;text-align:center;background:#1a2035;border:1px solid #2a3555;border-radius:8px;color:#e8f4ff;letter-spacing:8px;">
+    <br><button class="btn-primary" style="margin-top:8px;" onclick="connectWithPin()">連線</button>
+</div>
+
+<textarea id="textInput" placeholder="在這裡輸入文字，會即時傳送到手機..." style="display:none;"></textarea>
 
 <div class="btn-row">
     <button class="btn-primary" onclick="sendCurrentText()">傳送全部</button>
@@ -432,14 +455,25 @@ button {
 <script>
 let ws = null;
 let reconnectTimer = null;
+let currentPin = '';
+
+function connectWithPin() {
+    const pin = document.getElementById('pinInput').value.trim();
+    if (pin.length !== 4) { setStatus('disconnected', 'PIN 碼需為 4 位數'); return; }
+    currentPin = pin;
+    connect();
+}
 
 function connect() {
-    const wsUrl = 'ws://' + location.host;
+    if (!currentPin) return;
+    const wsUrl = 'ws://' + location.host + '/?pin=' + currentPin;
     ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
         setStatus('connected', '已連線');
-        addLog('WebSocket 已連線');
+        addLog('WebSocket 已連線（PIN 驗證通過）');
+        document.getElementById('pinBox').style.display = 'none';
+        document.getElementById('textInput').style.display = '';
     };
 
     ws.onclose = () => {
@@ -449,7 +483,7 @@ function connect() {
     };
 
     ws.onerror = () => {
-        setStatus('disconnected', '連線錯誤');
+        setStatus('disconnected', '連線錯誤（PIN 碼錯誤？）');
     };
 
     ws.onmessage = (event) => {
@@ -504,7 +538,9 @@ function clearInput() {
     document.getElementById('textInput').value = '';
 }
 
-connect();
+document.getElementById('pinInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') connectWithPin();
+});
 </script>
 </body>
 </html>

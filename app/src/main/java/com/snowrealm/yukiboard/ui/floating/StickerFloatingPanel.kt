@@ -106,9 +106,7 @@ class StickerFloatingPanel(
     }
 
     private fun filterStickers(category: String) {
-        // TODO: StickerPanelView 加入 filter 方法後串接
-        // 目前顯示全部
-        stickerView?.invalidate()
+        stickerView?.filterCategory = category
     }
 
     private fun dp(value: Int): Int = dpToPx(value)

@@ -28,6 +28,7 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
     private var textureView: TextureView? = null
     private var mediaPlayer: MediaPlayer? = null
     private var overlayView: View? = null
+    private val bgScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     // 遮罩透明度（0~255），預設 120 讓文字可讀
     var overlayAlpha: Int = 120
@@ -98,7 +99,7 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
         }
 
-        CoroutineScope(Dispatchers.IO).launch {
+        bgScope.launch(Dispatchers.IO) {
             val opts = BitmapFactory.Options().apply { inSampleSize = 2 }
             val bmp = BitmapFactory.decodeFile(file.absolutePath, opts)
             withContext(Dispatchers.Main) {
@@ -126,7 +127,7 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
         }
 
-        CoroutineScope(Dispatchers.IO).launch {
+        bgScope.launch(Dispatchers.IO) {
             try {
                 val input = context.contentResolver.openInputStream(uri)
                 val bmp = BitmapFactory.decodeStream(input)
@@ -307,6 +308,7 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
     }
 
     fun destroy() {
+        bgScope.cancel()
         clearBackground()
     }
 

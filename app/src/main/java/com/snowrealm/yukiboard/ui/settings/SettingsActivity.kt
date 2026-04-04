@@ -30,6 +30,7 @@ class SettingsActivity : AppCompatActivity() {
         private const val REQUEST_PICK_BG_VIDEO = 9002
     }
 
+    private val activityScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private lateinit var themeManager: ThemeManager
     private lateinit var prefs: YukiPreferences
 
@@ -525,7 +526,7 @@ class SettingsActivity : AppCompatActivity() {
         val savedBg = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getSavedBackground(this)
         if (savedBg != null && !com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.isVideoFile(savedBg)) {
             // 圖片預覽
-            CoroutineScope(Dispatchers.IO).launch {
+            activityScope.launch(Dispatchers.IO) {
                 val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = 4 }
                 val bmp = android.graphics.BitmapFactory.decodeFile(savedBg.absolutePath, opts)
                 withContext(Dispatchers.Main) {
@@ -535,7 +536,7 @@ class SettingsActivity : AppCompatActivity() {
             }
         } else if (savedBg != null) {
             // 影片預覽：取第一幀
-            CoroutineScope(Dispatchers.IO).launch {
+            activityScope.launch(Dispatchers.IO) {
                 try {
                     val retriever = android.media.MediaMetadataRetriever()
                     retriever.setDataSource(savedBg.absolutePath)
@@ -1058,5 +1059,10 @@ class SettingsActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Toast.makeText(this, "背景設定失敗: ${e.message}", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        activityScope.cancel()
     }
 }

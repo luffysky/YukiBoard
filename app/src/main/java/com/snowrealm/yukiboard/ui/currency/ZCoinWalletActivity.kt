@@ -14,15 +14,14 @@ import com.snowrealm.yukiboard.auth.SnowRealmAuthClient
 import com.snowrealm.yukiboard.currency.NewebpayClient
 import com.snowrealm.yukiboard.currency.ZCoinApi
 import com.snowrealm.yukiboard.currency.ZCoinManager
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 
 /**
  * Z幣錢包頁面 — 餘額 + 交易紀錄 + 儲值。
  */
 class ZCoinWalletActivity : AppCompatActivity() {
 
+    private val activityScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private lateinit var zCoinManager: ZCoinManager
     private lateinit var authClient: SnowRealmAuthClient
     private lateinit var newebpay: NewebpayClient
@@ -110,7 +109,7 @@ class ZCoinWalletActivity : AppCompatActivity() {
         balanceText.text = "${zCoinManager.balance} Z幣"
 
         if (authClient.isLoggedIn) {
-            CoroutineScope(Dispatchers.Main).launch {
+            activityScope.launch {
                 val api = ZCoinApi()
                 val userId = authClient.currentUserId ?: return@launch
                 val token = authClient.getToken() ?: return@launch
@@ -164,6 +163,11 @@ class ZCoinWalletActivity : AppCompatActivity() {
                 "&TradeSha=${params.tradeSha}" +
                 "&Version=${params.version}"
         webView.postUrl(params.postUrl, postData.toByteArray())
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        activityScope.cancel()
     }
 
     companion object {
