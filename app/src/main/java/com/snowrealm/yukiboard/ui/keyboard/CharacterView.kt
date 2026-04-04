@@ -13,6 +13,7 @@ import com.snowrealm.yukiboard.animation.LottieCharacterAnimation
 import com.snowrealm.yukiboard.animation.VrmCharacterAnimation
 import com.snowrealm.yukiboard.animation.VrmCharacterView
 import com.snowrealm.yukiboard.claw.skills.AnimationProfile
+import android.util.Log
 import kotlin.random.Random
 
 /**
@@ -118,7 +119,7 @@ class CharacterView @JvmOverloads constructor(
             vv.postDelayed({ playIdle() }, 2000)
         } catch (e: Throwable) {
             // VRM/Filament 初始化失敗（含 native lib 缺失），fallback 回 Lottie
-            e.printStackTrace()
+            Log.e("CharacterView", "VRM init failed, fallback to Lottie: ${e.javaClass.simpleName}: ${e.message}", e)
             // 清理可能半建的 VRM view
             vrmView?.let { removeView(it) }
             vrmView = null

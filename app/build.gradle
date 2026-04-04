@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 7
-        versionName "0.3.3"
+        versionCode 8
+        versionName "0.3.4"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -75,7 +75,7 @@ android {
             debuggable true
             firebaseAppDistribution {
                 groups = "testers"
-                releaseNotes = "v${android.defaultConfig.versionName}\n- 修正選字選不中（捲動偏移 + 引擎索引映射）\n- 修正設定頁自動關閉（語言切換 recreate 改 Intent 重啟）\n- 修正 AI Skill 切換 Provider 後不更新\n- 遊戲模式⌨返回按鈕\n- 按鍵間距加大"
+                releaseNotes = "v${android.defaultConfig.versionName}\n- 修正選字選不中\n- 修正設定頁自動關閉\n- AI Skill 切 Provider 即時生效\n- 雪凜 Lottie 改為 Q 版角色（VRM fallback 時不再是純色圓圈）\n- VRM 載入失敗加 log 輸出"
             }
         }
     }
