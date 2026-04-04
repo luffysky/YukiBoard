@@ -1,0 +1,315 @@
+# YukiBoard 待辦清單 — 2026-04-06
+
+> 整合 todo-list-0405 + 總任��包 + 滑動輸入任務包 + Games_add + Games_bug
+> ~~刪除線~~ = 已完成 / ✅ = 已完成
+> 版本：**v0.3.1**（versionCode 5）
+
+---
+
+## 已完成
+
+### v0.1.x — 核心鍵盤
+- ✅ QWERTY 英文鍵盤 + 注音鍵盤（McBopomofo 字典 + 多音節）
+- ✅ 數字鍵盤 / 符號鍵盤 / ABC↔#+= 切換
+- ✅ 英文 Trie 字典 ~20000 高頻詞
+- ✅ 使用者自訂詞庫（學習 + SharedPreferences 持久化）
+- ✅ 智慧輸入（糾錯 + 學詞 + bigram/trigram 預測 + 習慣追蹤）
+
+### v0.2.0 — 多語言 + VRM + Supabase
+- ✅ 拼音 / 倉頡 / 速成 / 日文 / 韓文輸入引擎
+- ✅ InputRouter 7 模���循環切換 + 環形語言選單
+- ✅ 三模���系統（一般/設計者/開發者）+ 遊戲模式
+- ✅ 工具列 + 9 面板���語音/翻譯/GIF/表情/顔文字/貼圖/剪貼簿/主題/設定��
+- ✅ Lottie 角色 + VRM 3D 角色（Filament + 程序化骨骼動畫 9 種 + morph targets）
+- ✅ OpenGL ES 流光特效 + 粒子特效
+- ✅ 感測器：搖手機復原 / 陀螺儀游標 / 語���輸入
+- ✅ 藍牙 HID + WiFi WebSocket 鍵盤
+- ✅ 鍵盤高度/寬度調整 + 懸浮鍵盤 + 橫向模式
+- ✅ 自訂背景圖/影片 + 雙指縮放 + 自訂字體顏色
+- ✅ SnowRealmAuthClient + LoginActivity + 邀請碼系統
+- ✅ Claw AI 面板 + Provider 系統（OpenAI / Anthropic / SnowRealm）
+- ✅ Supabase 建表 + Insight Engine API + Firebase App Distribution
+
+### v0.3.0 — 透明鍵盤 + 多語言語音 + 字色自訂
+- ✅ 透明鍵盤模式（可調透明度）
+- ✅ 多國語言語音辨識（10 ��系）
+- ✅ 自訂字體顏色（RGB 滑桿 + HEX 輸入）
+- ✅ 面板透明度調整 + 面板/鍵盤圖層交換
+
+### v0.3.1 — Bug 修復 + 注音排列
+- ✅ Batch 1 全 19 項 Bug 修復（null safety / scope leaks / encrypted wallet / WiFi PIN）
+- ✅ 注音鍵盤改回大千式標準排列（ㄦ移至底行）
+- ✅ Firebase App Distribution testers 群組通知
+
+---
+
+## 當前版本待實作（v0.4.0）
+
+### 批次 A — 滑動輸入 + RIME 詞庫（8 步）
+
+#### A-1 RIME 詞庫轉換腳本
+- [ ] 下載 RIME 詞庫（bopomofo_tw.dict.yaml + terra_pinyin.dict.yaml）→ `scripts/dicts/`
+- [ ] 新增 `scripts/convert_rime_dict.py`（拼音→注音轉換 + SQLite 輸出）
+- [ ] `app/build.gradle` 加入 `convertRimeDict` task（build 前自動執行）
+- [ ] `app/src/main/assets/.gitignore` 排除 rime_bopomofo.db
+
+#### A-2 RimeDictionary.kt（Android 查詢層）
+- [ ] 新增 `input/dictionary/RimeDictionary.kt`
+  - assets → filesDir 複製（首次啟動）
+  - 精確查詢（含聲調）+ 去聲調模糊匹配 + 前綴匹配（滑動用）
+  - `query()` / `queryPrefix()` / `isAvailable()` / `close()`
+
+#### A-3 滑動手勢偵測
+- [ ] 新增 `input/swipe/SwipeGestureDetector.kt`（點擊 vs 滑動區分，12dp 閾值）
+- [ ] 新增 `input/swipe/BopomofoSwipeDecoder.kt`（座標序��� → 注音符號序列，去連續重複��
+- [ ] 新增 `input/swipe/SwipeCandidateRanker.kt`（合併 ChewingEngine + RimeDict 結果排序）
+
+#### A-4 ChewingInputEngine 擴充
+- [ ] 新增 `lookupByBopomofoSequence(bopomofoSeq)` — 連續注��查詞（供滑動輸入用）
+  - 完整序列查詢 + 子序列查詞 + 前綴匹配
+
+#### A-5 KeyboardView 滑動整合
+- [ ] 滑動軌跡視覺效果（淡紫色半透明 Path + 外發光 + 起點圓點）
+- [ ] `onTouchEvent` 根據 `prefs.swipeInputEnabled` 切換點擊/滑動模式
+- [ ] `notifyBopomofoLayout()` 在注音鍵盤 layout 後通知 decoder
+- [ ] `onSwipeInput` 回呼接口
+
+#### A-6 YukiBoardIMEService 整合
+- [ ] `onCreateInputView()` 初始化 RimeDictionary（IO thread）
+- [ ] 設定 `keyboardView.onSwipeInput` 回呼
+- [ ] `handleSwipeInput()` → SwipeCandidateRanker → 更新候選列
+
+#### A-7 YukiPreferences 開關
+- [ ] `swipeInputEnabled: Boolean`（預設 true）
+- [ ] `rimeDictEnabled: Boolean`（預設 true）
+- [ ] SettingsActivity 輸入行為群組加入對應開關
+
+#### A-8 候選字視覺標示
+- [ ] 滑動候選���記淡紫色 #B39DDB + 左側 ≈ 符號
+- [ ] `markSwipeCandidates()` 方法
+
+---
+
+### 批次 B — 全功���開關設定系統（總任務包 第二批）
+
+- [ ] YukiPreferences 補齊所有開關（AI 18 項 + 雪凜 5 項 + 感測器 3 項 + 動畫 5 項 + 遊戲 3 項 + 懸浮面板 3 項 + 輸入行為 7 項）
+- [ ] SettingsActivity 重構 6 群組 CardView（AI/雪凜/感測器/動畫/遊戲/輸入）
+- [ ] 主開關關閉時子項目灰化（alpha 0.4 + disabled）
+
+---
+
+### 批次 C — 智慧候選字升級（總任務包 第九批）
+
+- [ ] 注音自適應學習（ChewingAdaptiveDict — 用戶選字頻率排序）
+- [ ] 中文���下文串聯預測（chineseNgramIndex — 上一字→下一字）
+- [ ] 讀取輸入框上下文（getTextBeforeCursor → currentContextText）
+- [ ] 候選字視覺分類標示（DICTIONARY/ADAPTIVE/PREDICTION/CORRECTION/AI 五種顏色）
+
+---
+
+### 批次 D — AI Skill 全面升級（總任務包 第六批）
+
+- [ ] GrammarCheckSkill — ���法糾錯（200 token）
+- [ ] ToneAdjustSkill — 語氣調整 正式/輕鬆/可愛/專業（300 token）
+- [ ] SummarizeSkill — 摘要精簡（300 token）
+- [ ] MemeTextSkill — 迷因/流��語（200 token）
+- [ ] EmojiTranslateSkill — 文字↔Emoji���100 token）
+- [ ] QuickReplySkill — 整句回覆建議（400 token）
+- [ ] CodeCompleteSkill — 程式碼補全（500 token，開發者模式）
+- [ ] RegexGenSkill — 正則產生��（300 token，開發者模式）
+- [ ] CommitMessageSkill — Commit 訊息（400 token，開發者模式）
+- [ ] YukiChatSkill — 雪凜聊天（600 token）
+- [ ] MoodDiarySkill — 心情日記（0-200 token）
+- [ ] WeatherSkill — 天氣助理（0-300 token）
+- [ ] Prompt 模板 6 ���（res/raw/claw_*_prompt.txt）
+- [ ] ClawToolbar 更新（天氣/遊戲按鈕 + Token 顏��指示 + 動態 Skill 過濾）
+- [ ] RadialModeMenu 加入 GAME ��式（四選項 90°）
+
+---
+
+### 批次 E — AI Provider 擴充（總任務包 第七批）
+
+- [ ] GeminiProvider.kt（免費 1500 次/天）
+- [ ] GroqProvider.kt（免費限額，速度最快）
+- [ ] GeminiNanoProvider.kt（Android 14+ 本地離線）
+- [ ] AIProviderType enum 更新（+GEMINI/GROQ/GEMINI_NANO）
+- [ ] 首次使用預設邏輯（Nano ��先 → Gemini → 用戶選擇）
+- [ ] ApiGuideActivity.kt（5 平台申��教學 + 雪凜推薦語���
+
+---
+
+### 批次 F — 雪凜人格系統（總任務包 第五批）
+
+- [ ] YukiCommentEngine.kt — 微吐槽（打錯字/刪全文/打字變慢/深夜/遊戲�� → 隨機短句 + 10 分鐘冷卻）
+- [ ] EmotionalCooldownManager.kt — 情緒冷靜期（觸發詞庫 + 結冰動畫 + 鍵盤鎖 1 秒 + 確認對話框）
+- [ ] SecretMessageManager.kt — 私房話 AES-256-GCM（格式 `[YB🔐] {base64}`）
+- [ ] ToneDetector.kt — 語氣偵測（本地關鍵字 0 token���NEGATIVE/SAD 時雪凜回應）
+
+---
+
+### 批次 G — 語境預測 + WhisperSkill（總任務包 第十批）
+
+- [ ] NextActionPredictor 本地 intentPatterns（0 token）+ AI 意圖預測（邀請碼解鎖）
+- [ ] WhisperSkill 實作（MediaRecorder + OpenAI Whisper API multipart ���傳）
+- [ ] InviteCodeActivity UI 美化 + 驗證流���完整化
+- [ ] TokenBudgetManager 每日重置邏輯
+
+---
+
+### 批次 H — API 串接 + 環境（總任務包 第十一批）
+
+- [ ] GiphyApiClient.kt（trending + search）→ GifPanelView 串接
+- [ ] 翻譯引擎接 MLKit Translation 離��模型 → TranslatePanelView
+- [ ] `.env.example` 範本檔案
+- [ ] CLAUDE.md 補充各 Key 用途與申請網址
+
+---
+
+### 批次 I — 懸浮面板群完善（總任務包 第三、四批）
+
+- [ ] FloatingPanelManager（showPanel/hidePanel/togglePanel/dismissAll + prefs 檢查）
+- [ ] gesture/ 子目錄（DragGestureHandler / PinchGestureHandler / ResizeHandle）
+- [ ] 靠邊吸附（40dp 閾值 + 200ms 動畫）
+- [ ] WeatherFloatingPanel（OpenWeatherMap + 30 分快取 + 雪凜天氣短句 + 6 小時預報）
+- [ ] ClawResultFloatingPanel 完善（streaming typewriter + 版本切換 + 複製/插��）
+
+---
+
+## 下個版本（v0.5.0）
+
+### 新增遊戲（Games_add.md 規劃 + 總任務包 第八批）
+
+**現有 8 款（含 4 原始 + 4 新增）：**
+- ✅ SnakeGame / WhackAMoleGame / RhythmGame / TypingChallengeGame
+- ✅ WordGuardianGame / SpellingDuelGame / MemoryFlipGame / KeyboardMinesweeperGame
+
+**待實�� 13 款：**
+
+| ���型 | 遊戲 | 核心機制 |
+|------|------|---------|
+| 放置型 | KeyboardTravelerGame 🏃 | 招財跑酷，打字=移動，停頓=坐下吃便當 |
+| 放置型 | WarshipCruiseGame 🚢 | 戰艦巡航，打字=動力 |
+| 收集型 | MoodMinerGame 💎 | 情緒採礦，打字情緒生原石 + 每週週報 |
+| 收集型 | IceCrystalGame ❄️ | 冰晶收集，完整長句掉落冰晶 |
+| 動作型 | BulletHellMiniGame ✈️ | 極簡彈幕，Swipe 閃避 15-30 秒局 |
+| 角色型 | YukiQuizGame 🌸 | 雪凜問答，按鍵作答 |
+| 角色型 | CoupleQuizGame 💘 | 情��測驗，結果截圖分享 |
+| 對戰型 | TypingRaceGame 🏆 | 打字競速 v1 單機版 |
+| AI ��� | RandomChallengeGame 🎲 | 雪凜 AI 出�� + AI 評分 |
+| 節奏型 | MusicTypingGame 🎵 | 按鍵對應音符，打字=演奏 |
+| 建造型 | YukiHouseGame 🏠 | 雪凜的家，打字累積建材 |
+| 建造型 | TypingFarmGame 🌱 | 打��農場，輸入=澆水 |
+| 解謎型 | CrosswordGame 🔲 | 填字遊戲，注音/英文填答 |
+| 解謎型 | WordleGame 💡 | 台灣版 Wordle（注��猜詞） |
+| 解謎型 | WordChainGame 🎭 | 暗語接龍 |
+| 對戰型 | SpeedTypingBattleGame ⚔️ | 打字對決（分割畫面搶同一段文字） |
+| 對戰型 | TypingBossRaid 🐉 | 打字團戰（多人打字攻擊 Boss）|
+| 社群型 | TypingProfileCard 📊 | 打字履歷（WPM/常用詞/語言分布） |
+
+### 工具面板
+- [ ] 計算機面板（基礎四則 + 科學計算）
+- [ ] 常用語面板（自訂快捷短語���）
+- [ ] 色碼選擇器面板���HEX/RGB 取色）
+- [ ] 單���換算面板（長度/重量/溫度/貨幣）
+
+### ��人化
+- [ ] 打字統計儀表板（速度/常用詞/使用時間）
+- [ ] 自製貼圖上傳（圖片→貼圖包）
+- [ ] 鍵盤音效包（預設 + 自訂）
+- [ ] 自訂震動模��
+
+### 經濟系統
+- [ ] Z ���系統完善（藍新金流儲值流��）
+- [ ] 打字任��賺 Z 幣
+- [ ] 皮膚商城（主題/貼圖/表情包）
+
+### 無障礙
+- [ ] 單手模式（鍵盤縮小靠左/靠右）
+- [ ] 大字模式（放大按鍵 + 高對比度）
+
+### UI / UX
+- [ ] 背景圖片拖曳平移（pan drag）
+- [ ] 設定頁裁切框（crop frame）
+- [ ] ThemePanelView 內直接上傳自訂背景
+- [ ] 面板 UI 重構��向上展開 + 長按懸浮化（PanelCoordinator）
+
+### Lottie 佔位動畫
+- [ ] yuki_freeze.json（情緒冷靜期結冰）
+- [ ] yuki_battle_idle.json（遊戲待機）
+- [ ] yuki_cupid.json（情聖月老）
+- [ ] 所有 Lottie 載入處加 fallback 邏輯
+
+---
+
+## 長期目標（v1.0+）
+
+### 輸入法進階
+- [ ] 手寫辨識（MLKit / Tesseract）
+- [ ] libchewing JNI 整合（替���純 Kotlin 引擎）
+- [ ] AI 語音自動標點（Whisper + Claw 標點模型）
+- [ ] 整句自動完成（ghost text 灰字 + Tab 接受）
+- [ ] 智慧回覆建議（分析上下文 → 3 個回覆）
+- [ ] OCR 貼上（拍照→文��辨識→貼上）
+- [ ] AI 改寫語氣（選中文字→正式/輕鬆/可愛/專業）
+- [ ] 雲端設定同步（換機不怕）
+- [ ] 語氣強度滑桿
+
+### 雪凜深度功能
+- [ ] 雪凜語音朗讀（TTS）
+- [ ] 雪��對話模式（鍵盤內聊天）
+- [ ] 雪凜打���教學（新手引導）
+- [ ] 心情日記 UI
+
+### 3D / AR
+- [ ] AR 雪凜（ARCore + 平面偵測 + 放��互動）
+- [ ] SnowRealmVR 輸入介面（OpenXR 預留）
+
+### 連線 & ��� App
+- [ ] 打字競速 v2.0 連線配對（Supabase Realtime）
+- [ ] CoinBeast 跨 App 聯動（Deep Link + Z 幣同步）
+- [ ] 毛行天下聯動（打字距離同步）
+- [ ] 情緒採礦週報接 Insight 分析
+
+### 上架
+- [ ] 正式雪凜 Lottie 角色動畫（需設計師素材）
+- [ ] 正式 VRM 模型表情完善
+- [ ] 上架 Google Play
+
+---
+
+## 實作順序建議
+
+```
+v0.4.0 重點：滑動輸入 + 智慧候選字 + 開關系統 + AI Skill
+─────────────────────────────────────────────────────
+批次 A（滑動輸入 + RIME 詞庫）         ← 核心差異化功能
+  ↓
+批次 B（全功能開關設定系統）            ← 基礎建設，後續功能都依賴
+  ↓
+批次 C（智慧候選字升級）               ← 輸入法核心���驗
+  ↓
+批次 D（AI Skill × 12）               ← 功能量最大
+  ↓
+批次 E（AI Provider 擴充���             ← 讓 AI 功��有免費���案
+  ↓
+批次 F（雪凜人格系統）                 ← 角色差異化
+  ↓
+批次 G（語境預測 + Whisper）           ← 進階 AI
+  ↓
+批次 H（API 串接 + 環境）              ← GIF / 翻譯實際可用
+  ↓
+批次 I（懸浮面板群完善）               ← UI ��驗打磨
+```
+
+---
+
+## 備註
+
+- 版本號：**v0.3.1**（versionCode 5）
+- deploy 指令：`bash scripts/deploy.sh "更新��明"` 或 `./gradlew appDistributionUploadDebug`
+- Firebase App Distribution 測��群��：`testers`
+- google-services.json 已在 .gitignore
+- YukiBoard Supabase DB：`43.167.237.37:30183`（獨立專案）
+- Insight Engine ��後台管理邀請碼 + 貼圖
+- 注音詞庫現有 23 萬行 dict + 4 萬行 phrases（McBopomofo 來源）
+- RIME 詞庫為額外補充��SQLite 約 8-15MB，打包進 assets
