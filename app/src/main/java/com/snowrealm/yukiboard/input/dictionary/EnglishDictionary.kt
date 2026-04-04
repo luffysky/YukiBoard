@@ -100,9 +100,9 @@ class EnglishDictionary(private val context: Context? = null) {
 
     /**
      * 自動更正 — 找最接近的單字。
-     * 使用簡單的編輯距離 1 匹配。
+     * 編輯距離 1（所有長度）+ 編輯距離 2（≥5 字元）。
      */
-    fun autocorrect(input: String, maxResults: Int = 3): List<String> {
+    fun autocorrect(input: String, maxResults: Int = 5): List<String> {
         if (input.length < 2) return emptyList()
 
         val lower = input.lowercase()
@@ -111,38 +111,94 @@ class EnglishDictionary(private val context: Context? = null) {
         val exact = suggest(lower, maxResults)
         if (exact.isNotEmpty()) return exact
 
-        val candidates = mutableListOf<Pair<String, Int>>()
+        val candidates = mutableMapOf<String, Int>() // word → score
 
-        // 嘗試刪除最後一個字元
-        if (lower.length > 2) {
-            val trimmed = lower.dropLast(1)
-            val trimSuggestions = suggest(trimmed, maxResults)
-            trimSuggestions.forEach { candidates.add(it to 1) }
+        // 編輯距離 1：刪除、替換、插入、交換
+        addEditDistance1Candidates(lower, candidates)
+
+        // 編輯距離 2（≥5 字元才做，避免短詞誤判）
+        if (lower.length >= 5) {
+            addEditDistance2Candidates(lower, candidates)
         }
 
-        // 嘗試替換最後一個字元
-        val withoutLast = lower.dropLast(1)
-        for (c in 'a'..'z') {
-            val attempt = withoutLast + c
-            var node = root
-            var valid = true
-            for (ch in attempt) {
-                val next = node.children[ch]
-                if (next == null) { valid = false; break }
-                node = next
-            }
-            if (valid) {
-                val subCandidates = mutableListOf<Pair<String, Int>>()
-                collectWords(node, subCandidates, 3)
-                subCandidates.forEach { candidates.add(it) }
-            }
-        }
-
-        return candidates
-            .sortedByDescending { it.second }
-            .map { it.first }
-            .distinct()
+        return candidates.entries
+            .sortedByDescending { it.value }
             .take(maxResults)
+            .map { it.key }
+    }
+
+    private fun addEditDistance1Candidates(word: String, out: MutableMap<String, Int>) {
+        // 刪除一字元
+        for (i in word.indices) {
+            val attempt = word.removeRange(i, i + 1)
+            if (attempt.length >= 2 && isWord(attempt)) {
+                out[attempt] = maxOf(out[attempt] ?: 0, frequencyOf(attempt) + 200)
+            }
+        }
+        // 交換相鄰字元
+        for (i in 0 until word.length - 1) {
+            val chars = word.toCharArray()
+            chars[i] = word[i + 1]; chars[i + 1] = word[i]
+            val attempt = String(chars)
+            if (isWord(attempt)) {
+                out[attempt] = maxOf(out[attempt] ?: 0, frequencyOf(attempt) + 250)
+            }
+        }
+        // 替換一字元
+        for (i in word.indices) {
+            for (c in 'a'..'z') {
+                if (c == word[i]) continue
+                val attempt = word.replaceRange(i, i + 1, c.toString())
+                if (isWord(attempt)) {
+                    out[attempt] = maxOf(out[attempt] ?: 0, frequencyOf(attempt) + 150)
+                }
+            }
+        }
+        // 插入一字元
+        for (i in 0..word.length) {
+            for (c in 'a'..'z') {
+                val attempt = word.substring(0, i) + c + word.substring(i)
+                if (isWord(attempt)) {
+                    out[attempt] = maxOf(out[attempt] ?: 0, frequencyOf(attempt) + 100)
+                }
+            }
+        }
+    }
+
+    private fun addEditDistance2Candidates(word: String, out: MutableMap<String, Int>) {
+        // 刪除兩字元
+        for (i in word.indices) {
+            val d1 = word.removeRange(i, i + 1)
+            for (j in d1.indices) {
+                val attempt = d1.removeRange(j, j + 1)
+                if (attempt.length >= 3 && isWord(attempt)) {
+                    out[attempt] = maxOf(out[attempt] ?: 0, frequencyOf(attempt) + 50)
+                }
+            }
+        }
+        // 刪除 1 + 替換 1
+        for (i in word.indices) {
+            val d1 = word.removeRange(i, i + 1)
+            for (j in d1.indices) {
+                for (c in 'a'..'z') {
+                    if (c == d1[j]) continue
+                    val attempt = d1.replaceRange(j, j + 1, c.toString())
+                    if (isWord(attempt)) {
+                        out[attempt] = maxOf(out[attempt] ?: 0, frequencyOf(attempt) + 30)
+                    }
+                }
+            }
+            if (out.size > 30) return // 避免計算量過大
+        }
+    }
+
+    /** 取得單字頻率分數 */
+    fun frequencyOf(word: String): Int {
+        var node = root
+        for (ch in word.lowercase()) {
+            node = node.children[ch] ?: return 0
+        }
+        return if (node.isWord) node.frequency else 0
     }
 
     private fun collectWords(node: TrieNode, results: MutableList<Pair<String, Int>>, limit: Int) {

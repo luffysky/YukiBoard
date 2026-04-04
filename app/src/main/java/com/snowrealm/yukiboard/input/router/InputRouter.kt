@@ -197,34 +197,64 @@ class InputRouter(private val context: Context) {
     }
 
     private fun updateCandidates() {
-        val raw = activeEngine.getCandidates().toMutableList()
+        val raw = activeEngine.getCandidates()
         val composing = activeEngine.composingText
 
-        // 對英文模式追加智慧糾錯候選
-        if (currentMode == InputMode.ENGLISH && composing.isNotEmpty()) {
+        // 非英文模式直接用引擎候選
+        if (currentMode != InputMode.ENGLISH) {
+            candidateManager.update(raw)
+            return
+        }
+
+        // ─── 英文模式：統合多來源候選 + 統一排序 ───
+        val scored = mutableMapOf<String, Float>()
+
+        // 1. 字典前綴匹配（基礎分 = 排名靠前的分高）
+        raw.forEachIndexed { i, word ->
+            scored[word] = (scored[word] ?: 0f) + (10f - i * 0.5f).coerceAtLeast(1f)
+        }
+
+        if (composing.isNotEmpty()) {
+            // 2. 智慧糾錯（拼錯時提供修正，高加分）
             val corrections = smartInput.getCorrectionCandidates(composing, lastCommittedWord)
-            if (corrections.isNotEmpty()) {
-                val merged = (corrections + raw).distinct()
-                candidateManager.update(merged)
-                return
+            corrections.forEachIndexed { i, word ->
+                scored[word] = (scored[word] ?: 0f) + (8f - i).coerceAtLeast(2f)
             }
 
-            val adaptive = smartInput.adaptiveDictionary.suggest(composing, 3)
-            raw.addAll(adaptive.filter { it !in raw })
+            // 3. 自適應字典（使用者學過的詞，中高加分）
+            val adaptive = smartInput.adaptiveDictionary.suggest(composing, 5)
+            adaptive.forEachIndexed { i, word ->
+                scored[word] = (scored[word] ?: 0f) + (6f - i * 0.5f).coerceAtLeast(1f)
+            }
 
+            // 4. 語句預測（bigram/trigram 符合前綴的，高加分）
             val prefixed = smartInput.getPhrasePredictionsWithPrefix(composing, 3)
-            raw.addAll(prefixed.filter { it !in raw })
-        }
+            prefixed.forEachIndexed { i, word ->
+                scored[word] = (scored[word] ?: 0f) + (7f - i).coerceAtLeast(2f)
+            }
 
-        // composing 為空時顯示下一詞預測
-        if (composing.isEmpty() && currentMode == InputMode.ENGLISH) {
+            // 5. 完全匹配 composing 加分（使用者可能就是要打這個詞）
+            if (scored.containsKey(composing.lowercase())) {
+                scored[composing.lowercase()] = scored[composing.lowercase()]!! + 3f
+            }
+        } else {
+            // composing 為空：下一詞預測 + 情境建議
             val predictions = smartInput.getPhrasePredictions(5)
-            if (predictions.isNotEmpty()) {
-                raw.addAll(predictions.filter { it !in raw })
+            predictions.forEachIndexed { i, word ->
+                scored[word] = (scored[word] ?: 0f) + (6f - i).coerceAtLeast(1f)
+            }
+            val context = smartInput.getContextSuggestions(currentAppPackage, 3)
+            context.forEachIndexed { i, word ->
+                scored[word] = (scored[word] ?: 0f) + (5f - i).coerceAtLeast(1f)
             }
         }
 
-        candidateManager.update(raw.distinct())
+        val sorted = scored.entries
+            .sortedByDescending { it.value }
+            .take(12)
+            .map { it.key }
+
+        candidateManager.update(sorted)
     }
 
     /** 記錄提交詞，供智慧輸入各模組學習 */

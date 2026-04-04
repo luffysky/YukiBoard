@@ -88,14 +88,14 @@ class EnglishInputEngine(context: Context? = null) : InputEngine {
 
     private fun updateCandidateCache() {
         val prefix = buffer.toString()
-        if (prefix.length < 2) {
+        if (prefix.isEmpty()) {
             cachedCandidates = emptyList()
             return
         }
-        // 先嘗試前綴匹配
-        var results = dictionary.suggest(prefix, 9)
-        // 如果前綴匹配不到，嘗試自動更正
-        if (results.isEmpty()) {
+        // 1 個字母也給建議（高頻詞 top 5）
+        var results = dictionary.suggest(prefix, if (prefix.length == 1) 5 else 9)
+        // 前綴匹配不到，嘗試自動更正
+        if (results.isEmpty() && prefix.length >= 2) {
             results = dictionary.autocorrect(prefix, 5)
         }
         cachedCandidates = results

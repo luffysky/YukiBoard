@@ -93,10 +93,13 @@ class CharacterView @JvmOverloads constructor(
      * 預設從 assets/vrm/Yukirin.vrm 載入，失敗時 fallback 回 Lottie。
      */
     fun initVrmMode(assetPath: String = VRM_ASSET_PATH) {
-        cleanupCurrentMode()
-        renderMode = RenderMode.VRM
-
         try {
+            // 先測試 Filament native lib 是否可用
+            com.google.android.filament.utils.Utils.init()
+
+            cleanupCurrentMode()
+            renderMode = RenderMode.VRM
+
             val vv = VrmCharacterView(context).apply {
                 isClickable = false
                 isFocusable = false
@@ -113,9 +116,14 @@ class CharacterView @JvmOverloads constructor(
 
             // VRM 載入後自動 playIdle
             vv.postDelayed({ playIdle() }, 2000)
-        } catch (e: Exception) {
-            // VRM 初始化失敗，fallback 回 Lottie
+        } catch (e: Throwable) {
+            // VRM/Filament 初始化失敗（含 native lib 缺失），fallback 回 Lottie
             e.printStackTrace()
+            // 清理可能半建的 VRM view
+            vrmView?.let { removeView(it) }
+            vrmView = null
+            vrmAnimation = null
+            characterAnimation = null
             initLottieMode()
         }
     }
