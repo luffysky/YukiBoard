@@ -308,11 +308,10 @@ class YukiBoardIMEService : InputMethodService() {
         ))
         glSurfaceView = gl
 
-        // 雪凜角色（VRM 3D 或 Lottie）浮動在左上角
+        // 雪凜角色（Lottie）浮動在左上角
         val charSize = (72 * resources.displayMetrics.density).toInt()
         val charView = CharacterView(this)
-        // 使用 VRM 模式：從 Insight Engine 載入 Yukirin.vrm
-        charView.initVrmMode()
+        // Lottie 模式（init 已自動啟用，VRM 模式待穩定後再切換）
         val charParams = FrameLayout.LayoutParams(charSize, charSize).apply {
             gravity = android.view.Gravity.TOP or android.view.Gravity.START
         }
@@ -1398,7 +1397,25 @@ class YukiBoardIMEService : InputMethodService() {
     private fun handleEnter(ic: InputConnection) {
         val result = inputRouter.processEnter()
         applyInputResult(ic, result)
-        if (result is InputResult.Idle) sendDefaultEditorAction(true)
+        if (result is InputResult.Idle) {
+            // 檢查 Editor 是否要求特定 action（搜尋/傳送/完成等）
+            val info = currentInputEditorInfo
+            val action = info?.imeOptions?.and(android.view.inputmethod.EditorInfo.IME_MASK_ACTION) ?: 0
+            val hasActionLabel = info?.actionLabel != null
+            val isMultiLine = (info?.inputType ?: 0) and
+                android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE != 0
+
+            if (!isMultiLine && (action == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
+                    || action == android.view.inputmethod.EditorInfo.IME_ACTION_SEND
+                    || action == android.view.inputmethod.EditorInfo.IME_ACTION_GO
+                    || hasActionLabel)) {
+                // 搜尋/傳送/前往 — 執行 action（可能關閉鍵盤）
+                sendDefaultEditorAction(true)
+            } else {
+                // 一般輸入 — 送換行符
+                ic.commitText("\n", 1)
+            }
+        }
     }
 
     private fun handleSpace(ic: InputConnection) {
