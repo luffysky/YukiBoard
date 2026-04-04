@@ -1166,8 +1166,10 @@ class YukiBoardIMEService : InputMethodService() {
     // =========================================================================
 
     private fun openSettings() {
+        // 先隱藏 IME 視窗，避免系統在 Activity 顯示後重新拉回 IME 焦點導致 Activity 被關閉
+        requestHideSelf(0)
         val intent = Intent(this, SettingsActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
         startActivity(intent)
     }
@@ -1252,6 +1254,12 @@ class YukiBoardIMEService : InputMethodService() {
 
         game.init(gridRows, gridCols)
         gkv.attachGame(game)
+
+        // ⌨返回：退出遊戲模式回到一般鍵盤
+        gkv.onBackToNormal = {
+            exitGameMode()
+            keyboardView.switchMode(KeyboardMode.NORMAL)
+        }
 
         // 遊戲事件回呼（統一透過反射取 onGameEvent 屬性）
         setGameEventCallback(game)

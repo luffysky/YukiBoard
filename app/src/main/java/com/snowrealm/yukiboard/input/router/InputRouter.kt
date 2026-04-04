@@ -149,12 +149,25 @@ class InputRouter(private val context: Context) {
      * 使用者從候選列選擇第 [index] 個候選字。
      */
     fun selectCandidate(index: Int): InputResult {
-        // 各引擎有各自的 selectCandidateAt 實作
+        // 候選列可能被自適應字典重新排序，需把 UI 索引映射回引擎索引
+        val displayedText = candidateManager.candidates.getOrNull(index)
         val result = when (val eng = activeEngine) {
-            is ChewingInputEngine -> eng.selectCandidateAt(index)
-            is PinyinInputEngine -> eng.selectCandidateAt(index)
-            is CangjieInputEngine -> eng.selectCandidateAt(index)
-            is JapaneseInputEngine -> eng.selectCandidateAt(index)
+            is ChewingInputEngine -> {
+                val engineIndex = if (displayedText != null) eng.getCandidates().indexOf(displayedText).takeIf { it >= 0 } ?: index else index
+                eng.selectCandidateAt(engineIndex)
+            }
+            is PinyinInputEngine -> {
+                val engineIndex = if (displayedText != null) eng.getCandidates().indexOf(displayedText).takeIf { it >= 0 } ?: index else index
+                eng.selectCandidateAt(engineIndex)
+            }
+            is CangjieInputEngine -> {
+                val engineIndex = if (displayedText != null) eng.getCandidates().indexOf(displayedText).takeIf { it >= 0 } ?: index else index
+                eng.selectCandidateAt(engineIndex)
+            }
+            is JapaneseInputEngine -> {
+                val engineIndex = if (displayedText != null) eng.getCandidates().indexOf(displayedText).takeIf { it >= 0 } ?: index else index
+                eng.selectCandidateAt(engineIndex)
+            }
             else -> {
                 // 英文/韓文：通用候選選擇
                 val selected = candidateManager.selectAt(index)

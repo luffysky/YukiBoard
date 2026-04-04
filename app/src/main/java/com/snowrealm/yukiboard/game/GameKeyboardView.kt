@@ -51,12 +51,21 @@ class GameKeyboardView(context: Context) : View(context) {
 
     private val hudHeight = 32f * density
     private var rowHeight = 44f * density
-    private val keyPaddingH = 3f * density
-    private val keyPaddingV = 3f * density
+    private val keyPaddingH = 5f * density
+    private val keyPaddingV = 5f * density
     private val cornerRadius = 8f * density
 
     var hudText: String = ""
     var onBackToMenu: (() -> Unit)? = null
+    var onBackToNormal: (() -> Unit)? = null
+
+    // ⌨返回 按鈕區域（在 HUD 左上角）
+    private val backBtnRect = RectF()
+    private val backBtnPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val backBtnTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+        textSize = 12f * density
+    }
 
     // 滑動偵測
     private val gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
@@ -110,12 +119,23 @@ class GameKeyboardView(context: Context) : View(context) {
         keyPaint.color = theme.candidateBarColorInt
         canvas.drawRect(0f, 0f, width.toFloat(), hudHeight, keyPaint)
 
+        // ⌨返回 按鈕（左上角）
+        val btnW = 56f * density
+        val btnH = hudHeight - 6f * density
+        val btnY = 3f * density
+        backBtnRect.set(4f * density, btnY, 4f * density + btnW, btnY + btnH)
+        backBtnPaint.color = theme.specialKeyColorInt
+        canvas.drawRoundRect(backBtnRect, 6f * density, 6f * density, backBtnPaint)
+        backBtnTextPaint.color = theme.keyLabelColorInt
+        val btnTextY = backBtnRect.top + (backBtnRect.height() + backBtnTextPaint.textSize) / 2f - backBtnTextPaint.descent()
+        canvas.drawText("⌨返回", backBtnRect.centerX(), btnTextY, backBtnTextPaint)
+
         val g = game ?: return
         val sm = g.scoreManager
 
-        // 左：分數
+        // 左（按鈕右側）：分數
         hudLeftPaint.color = theme.keyLabelColorInt
-        canvas.drawText("分數: ${sm.currentScore}", 12f * density, hudHeight * 0.65f, hudLeftPaint)
+        canvas.drawText("分數: ${sm.currentScore}", backBtnRect.right + 8f * density, hudHeight * 0.65f, hudLeftPaint)
 
         // 中：連擊 & 狀態
         if (sm.combo > 1) {
@@ -241,6 +261,13 @@ class GameKeyboardView(context: Context) : View(context) {
         gestureDetector.onTouchEvent(event)
 
         if (event.action == MotionEvent.ACTION_UP) {
+            // ⌨返回 按鈕
+            if (backBtnRect.contains(event.x, event.y)) {
+                onBackToNormal?.invoke()
+                performClick()
+                return true
+            }
+
             val hit = keyRectCache.firstOrNull { it.first.contains(event.x, event.y) }
             if (hit != null) {
                 val (_, row, col) = hit

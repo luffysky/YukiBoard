@@ -156,6 +156,7 @@ class KeyboardView(context: Context) : View(context) {
     private var candidateScrollX = 0f
     private var candidateLastTouchX = 0f
     private var candidateIsDragging = false
+    private var candidateTouchActive = false
     private val candidateRects = mutableListOf<Pair<RectF, Int>>() // rect → index in allCandidates
     /** 是否有自訂背景圖（設為 true 時鍵盤背景變半透明） */
     var hasCustomBackground: Boolean = false
@@ -230,8 +231,8 @@ class KeyboardView(context: Context) : View(context) {
 
     // 佈局常數
     private val candidateBarHeight = 40f * density
-    private val keyPaddingH = 3f * density
-    private val keyPaddingV = 4f * density
+    private val keyPaddingH = 5f * density
+    private val keyPaddingV = 6f * density
     private val keyCornerRadius = 8f * density
     private val bottomPadding = 8f * density
 
@@ -1095,8 +1096,10 @@ class KeyboardView(context: Context) : View(context) {
                 if (y < candidateBarHeight && candidates.isNotEmpty()) {
                     candidateLastTouchX = x
                     candidateIsDragging = false
+                    candidateTouchActive = true
                     return true
                 }
+                candidateTouchActive = false
                 // 展開面板：記錄觸控起始位置
                 if (isCandidateExpanded && y > candidateBarHeight) {
                     expandTouchStartY = y
@@ -1118,7 +1121,7 @@ class KeyboardView(context: Context) : View(context) {
 
             MotionEvent.ACTION_MOVE -> {
                 // 候選列橫向捲動
-                if (y < candidateBarHeight && candidates.isNotEmpty()) {
+                if (candidateTouchActive && candidates.isNotEmpty()) {
                     val dx = candidateLastTouchX - x
                     if (!candidateIsDragging && Math.abs(dx) > 8 * density) {
                         candidateIsDragging = true
@@ -1200,13 +1203,17 @@ class KeyboardView(context: Context) : View(context) {
                 }
 
                 // 候選列觸控選字（使用繪製時記錄的 candidateRects）
-                if (y < candidateBarHeight && candidates.isNotEmpty()) {
+                if (candidateTouchActive && candidates.isNotEmpty()) {
+                    candidateTouchActive = false
                     if (candidateIsDragging) {
                         candidateIsDragging = false
                         performClick()
                         return true
                     }
-                    val hit = candidateRects.firstOrNull { it.first.contains(x, y) }
+                    // 用 ACTION_DOWN 的 x 座標做 hit test（避免手指微偏）
+                    val hitX = x
+                    val hitY = candidateBarHeight / 2f  // 固定在候選列中央，避免手指滑出
+                    val hit = candidateRects.firstOrNull { it.first.contains(hitX, hitY) }
                     if (hit != null) {
                         onCandidateSelectListener?.invoke(hit.second)
                         performClick()
