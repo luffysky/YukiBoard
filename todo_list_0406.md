@@ -2,7 +2,7 @@
 
 > 整合 todo-list-0405 + 總任��包 + 滑動輸入任務包 + Games_add + Games_bug
 > ~~刪除線~~ = 已完成 / ✅ = 已完成
-> 版本：**v0.3.6**（versionCode 10）
+> 版本：**v0.4.2**（versionCode 16）
 
 ---
 
@@ -51,15 +51,43 @@
 - ✅ 雪凜預設 Lottie Q 版角色（VRM 可在設定開啟）
 - ✅ 語音輸入加入 RECORD_AUDIO 權限檢查提示
 
----
-
-## 緊急修復（v0.3.6）
+### v0.3.6 — 緊急修復
 
 - ✅ **GIF 搜尋框無法輸入** — CJK 輸入透過 InputRouter 組字→搜尋框；輸入模式面板收縮只留搜尋列
 - ✅ **語音辨識加入更多語言** — 新增泰語/越南語/印尼語/義大利語/俄語/阿拉伯語/土耳其語（共 17 語）
 - ✅ **候選字/預測字依語意前後文排序** — getTextBeforeCursor → extractContextWords → bigram/trigram 加權
 - ✅ **記憶翻牌遊戲初始無牌面** — 開局 2 秒展示所有牌面（藍色光暈），展示期間不可操作
-- ✅ **背景圖片 XY 位置拉桿** — 水平/垂直位置滑桿（0%~100%）+ 設定預覽改 FIT_CENTER 完整呈現
+- ✅ **背景圖片 XY 位置拉桿** — 水平/垂直位置滑桿（0%~100%）+ 設定預覽改 MATRIX 完整呈現
+
+### v0.3.7 — Skills 重寫 + 日韓詞庫 + 影片預覽
+
+- ✅ **WeatherSkill 重寫** — GPS + OpenWeatherMap 自動取得天氣，無 AI 也有本地短句回應
+- ✅ **WhisperSkill 重寫** — AI 語音後處理（加標點、修正同音錯字），無 AI 時本地基礎標點
+- ✅ **TranslateSkill 升級** — 自動偵測目標語言（中→英、其他→中）+ 8 語言支援 + fallback prompt
+- ✅ **日文假名/片假名切換** — KEYCODE_TOGGLE_KANA + JapaneseInputEngine.toggleKatakana()
+- ✅ **日文詞庫擴充** — 新增 ~180 詞（動詞活用、形容詞、接續詞、日常用語、SNS 用語）
+- ✅ **韓文詞庫** — 新增 ~200 常用詞 + getCandidates() 前綴匹配 + selectCandidateAt()
+- ✅ **背景顯示比例選擇** — 保持比例（center-crop）/ 整張塞入（fit-xy stretch）
+- ✅ **影片預覽可播放** — Settings TextureView + MediaPlayer 循環靜音播放
+
+### v0.3.8 — 鍵盤語言切換 Bug 修復
+
+- ✅ **注音/日/韓鍵盤切數字再切回會跳英文** — KeyboardView.rebuildLayoutForOrientation() 新增 rowsForCurrentInputMode()，根據 currentInputMode 回傳對應佈局
+
+### v0.3.9 — 符號鍵盤擴充
+
+- ✅ **符號鍵盤新增底線 _** — 取代 % 位置（% 移至第三行）
+- ✅ **大量符號擴充** — 長按變體：" → ""„、! → ¡、? → ¿、/ → \、° → ℃℉、= → ≠≈≤≥
+- ✅ **更多符號頁新增** — ♥♡♣♠♦、★☆✦✧、→←↑↓↔⇒、§、貨幣列 £¥€¢₩₿
+
+### v0.4.0~v0.4.2 — 按鍵自訂 + 鍵盤完整預覽
+
+- ✅ **鍵盤高度拉桿** — 25%~55% 螢幕高度，設定頁即時調整
+- ✅ **按鍵大小拉桿** — 70%~130%，調整個別按鍵間距（padding 反向縮放），鍵盤高度不變
+- ✅ **按鍵透明度拉桿** — 0~255，按鍵背景 alpha 調整
+- ✅ **鍵盤完整預覽** — 背景圖 + 遮罩 + 按鍵即時渲染，所有拉桿同步更新
+- ✅ **預覽高度同步** — 背景圖預覽 + 完整鍵盤預覽高度跟隨鍵盤高度拉桿變化
+- ✅ **.env 新增 OPEN_WEATHER_MAP_API_KEY**
 
 ---
 
@@ -325,7 +353,7 @@ v0.4.0 重點：滑動輸入 + 智慧候選字 + 開關系統 + AI Skill
 
 ## 備註
 
-- 版本號：**v0.3.6**（versionCode 10）
+- 版本號：**v0.4.2**（versionCode 16）
 - deploy 指令：`bash scripts/deploy.sh "更新��明"` 或 `./gradlew appDistributionUploadDebug`
 - Firebase App Distribution 測��群��：`testers`
 - google-services.json 已在 .gitignore
