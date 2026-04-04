@@ -491,27 +491,31 @@ class YukiBoardIMEService : InputMethodService() {
                 val editorInfo = currentInputEditorInfo
                 val ic = currentInputConnection ?: return@launch
 
-                // 檢查目標 App 是否支援此 MIME type
-                val supported = editorInfo?.contentMimeTypes?.any {
-                    android.content.ClipDescription.compareMimeTypes(it, mimeType)
-                } == true
+                val inputContentInfo = androidx.core.view.inputmethod.InputContentInfoCompat(
+                    contentUri,
+                    android.content.ClipDescription("sticker", arrayOf(mimeType)),
+                    null
+                )
+                val flag = if (android.os.Build.VERSION.SDK_INT >= 25)
+                    androidx.core.view.inputmethod.InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION
+                else 0
 
-                if (supported) {
-                    val inputContentInfo = androidx.core.view.inputmethod.InputContentInfoCompat(
-                        contentUri,
-                        android.content.ClipDescription("sticker", arrayOf(mimeType)),
-                        null
-                    )
-                    val flag = if (android.os.Build.VERSION.SDK_INT >= 25)
-                        androidx.core.view.inputmethod.InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION
-                    else 0
+                // 先嘗試 commitContent（LINE 等 App 雖未宣告 contentMimeTypes 但仍支援）
+                val committed = try {
                     androidx.core.view.inputmethod.InputConnectionCompat.commitContent(
                         ic, editorInfo, inputContentInfo, flag, null
                     )
-                } else {
-                    // 目標 App 不支援圖片插入，fallback 傳 URL
+                } catch (_: Exception) { false }
+
+                if (!committed) {
+                    // commitContent 失敗，改用剪貼簿複製圖片讓使用者貼上
                     launch(Dispatchers.Main) {
-                        ic.commitText(url, 1)
+                        val clip = android.content.ClipData.newUri(
+                            contentResolver, "sticker", contentUri
+                        )
+                        val cm = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        cm.setPrimaryClip(clip)
+                        ic.commitText("[已複製貼圖到剪貼簿]", 1)
                     }
                 }
             } catch (e: Exception) {
