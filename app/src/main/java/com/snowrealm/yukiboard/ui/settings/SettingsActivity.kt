@@ -368,6 +368,8 @@ class SettingsActivity : AppCompatActivity() {
     private var bgPreviewContainer: FrameLayout? = null
     private var bgVideoPlayer: android.media.MediaPlayer? = null
     private var bgVideoTexture: android.view.TextureView? = null
+    private var bgVideoWidth = 0
+    private var bgVideoHeight = 0
     private var fullPreviewView: View? = null
     private var fullPreviewBgBitmap: android.graphics.Bitmap? = null
 
@@ -536,13 +538,13 @@ class SettingsActivity : AppCompatActivity() {
             prefs.bgScaleMode = 0
             btnCrop.setTextColor(0xFF111827.toInt()); btnCrop.setBackgroundColor(0xFF7FD8FF.toInt())
             btnFit.setTextColor(0xFFE8F4FF.toInt()); btnFit.setBackgroundColor(0xFF2A3A5C.toInt())
-            updateBgPreviewMatrix(); fullPreviewView?.invalidate()
+            updateBgPreviewMatrix(); updateVideoPreviewTransform(); fullPreviewView?.invalidate()
         }
         btnFit.setOnClickListener {
             prefs.bgScaleMode = 1
             btnFit.setTextColor(0xFF111827.toInt()); btnFit.setBackgroundColor(0xFF7FD8FF.toInt())
             btnCrop.setTextColor(0xFFE8F4FF.toInt()); btnCrop.setBackgroundColor(0xFF2A3A5C.toInt())
-            updateBgPreviewMatrix(); fullPreviewView?.invalidate()
+            updateBgPreviewMatrix(); updateVideoPreviewTransform(); fullPreviewView?.invalidate()
         }
         scaleModeRow.addView(btnCrop)
         scaleModeRow.addView(btnFit)
@@ -564,7 +566,7 @@ class SettingsActivity : AppCompatActivity() {
                 override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
                     prefs.bgOffsetX = p / 100f
                     xLabel.text = "水平位置 X: %d%%".format(p)
-                    updateBgPreviewMatrix(); fullPreviewView?.invalidate()
+                    updateBgPreviewMatrix(); updateVideoPreviewTransform(); fullPreviewView?.invalidate()
                 }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
                 override fun onStopTrackingTouch(sb: SeekBar?) {}
@@ -587,7 +589,7 @@ class SettingsActivity : AppCompatActivity() {
                 override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
                     prefs.bgOffsetY = p / 100f
                     yLabel.text = "垂直位置 Y: %d%%".format(p)
-                    updateBgPreviewMatrix(); fullPreviewView?.invalidate()
+                    updateBgPreviewMatrix(); updateVideoPreviewTransform(); fullPreviewView?.invalidate()
                 }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
                 override fun onStopTrackingTouch(sb: SeekBar?) {}
@@ -729,7 +731,12 @@ class SettingsActivity : AppCompatActivity() {
                         isLooping = true
                         setVolume(0f, 0f)
                         prepareAsync()
-                        setOnPreparedListener { it.start() }
+                        setOnPreparedListener { player ->
+                            bgVideoWidth = player.videoWidth
+                            bgVideoHeight = player.videoHeight
+                            updateVideoPreviewTransform()
+                            player.start()
+                        }
                     }
                     bgVideoPlayer = mp
                 } catch (e: Exception) {
@@ -737,7 +744,9 @@ class SettingsActivity : AppCompatActivity() {
                     bgPreviewLabel?.visibility = View.VISIBLE
                 }
             }
-            override fun onSurfaceTextureSizeChanged(st: android.graphics.SurfaceTexture, w: Int, h: Int) {}
+            override fun onSurfaceTextureSizeChanged(st: android.graphics.SurfaceTexture, w: Int, h: Int) {
+                updateVideoPreviewTransform()
+            }
             override fun onSurfaceTextureDestroyed(st: android.graphics.SurfaceTexture): Boolean {
                 // 僅釋放 MediaPlayer，不移除 View（避免 stopVideoPreview 重入）
                 val mp = bgVideoPlayer
@@ -799,6 +808,29 @@ class SettingsActivity : AppCompatActivity() {
             }
             iv.imageMatrix = matrix
         }
+    }
+
+    /** 根據 prefs 的 bgScaleMode + bgOffsetX/Y 更新影片預覽 TextureView 的 transform */
+    private fun updateVideoPreviewTransform() {
+        val tv = bgVideoTexture ?: return
+        val vw = tv.width.toFloat()
+        val vh = tv.height.toFloat()
+        if (vw <= 0 || vh <= 0 || bgVideoWidth <= 0 || bgVideoHeight <= 0) return
+
+        val matrix = android.graphics.Matrix()
+        if (prefs.bgScaleMode == 1) {
+            matrix.setScale(vw / bgVideoWidth, vh / bgVideoHeight)
+        } else {
+            val scale = maxOf(vw / bgVideoWidth, vh / bgVideoHeight)
+            val scaledW = bgVideoWidth * scale
+            val scaledH = bgVideoHeight * scale
+            val maxDx = (scaledW - vw).coerceAtLeast(0f)
+            val maxDy = (scaledH - vh).coerceAtLeast(0f)
+            matrix.setScale(scale, scale)
+            matrix.postTranslate(-maxDx * prefs.bgOffsetX, -maxDy * prefs.bgOffsetY)
+        }
+        tv.setTransform(matrix)
+        tv.invalidate()
     }
 
     private fun refreshBgPreview() {

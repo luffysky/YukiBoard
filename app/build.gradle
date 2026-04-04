@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 23
-        versionName "0.4.9"
+        versionCode 24
+        versionName "0.5.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -75,7 +75,7 @@ android {
             debuggable true
             firebaseAppDistribution {
                 groups = "testers"
-                releaseNotes = "v${android.defaultConfig.versionName}\n- 修復影片背景切換/清除時當掉\n- 修復 MediaPlayer 重入釋放導致 crash\n- 主題面板整合完整背景設定"
+                releaseNotes = "v${android.defaultConfig.versionName}\n- 修復影片背景 crash + 比例/XY 即時生效\n- 影片預覽支援 scaleMode + offset transform\n- 主題面板整合完整背景設定與鍵盤預覽"
             }
         }
     }
