@@ -207,13 +207,13 @@ data class KeyboardState(
         // 注音佈局
         // =================================================================
         fun bopomofoRows(): List<List<KeyModel>> = listOf(
-            // 聲母第一行 + 韻母
+            // 大千式標準排列（ㄦ 移至底行）
             listOf(
                 KeyModel.char("ㄅ"), KeyModel.char("ㄉ"),
-                KeyModel.char("ㄓ"), KeyModel.char("ㄚ"),
-                KeyModel.char("ㄞ"), KeyModel.char("ㄢ"),
-                KeyModel.char("ㄦ"),
-                KeyModel.char("ˊ"), KeyModel.char("ˇ"), KeyModel.char("ˋ")
+                KeyModel.char("ˇ"), KeyModel.char("ˋ"),
+                KeyModel.char("ㄓ"), KeyModel.char("ˊ"),
+                KeyModel.char("˙"),
+                KeyModel.char("ㄚ"), KeyModel.char("ㄞ"), KeyModel.char("ㄢ")
             ),
             listOf(
                 KeyModel.char("ㄆ"), KeyModel.char("ㄊ"), KeyModel.char("ㄍ"),
@@ -233,15 +233,16 @@ data class KeyboardState(
                 KeyModel.char("ㄩ"), KeyModel.char("ㄝ"), KeyModel.char("ㄡ"),
                 KeyModel.char("ㄥ")
             ),
-            // 底行（˙ 輕聲放在空白鍵長按 altChars）
+            // 底行（ㄦ 移至此行）
             listOf(
-                KeyModel.special("?123", KeyboardView.KEYCODE_SWITCH_NUMBERS, widthWeight = 1.2f),
-                KeyModel.special("⌫", KeyboardView.KEYCODE_DELETE, widthWeight = 1.3f),
-                KeyModel.special("切換", KeyboardView.KEYCODE_SWITCH_LANG, widthWeight = 1.2f),
-                KeyModel.special(" ", KeyboardView.KEYCODE_SPACE, widthWeight = 3.0f, altChars = listOf("˙")),
+                KeyModel.char("ㄦ"),
+                KeyModel.special("?123", KeyboardView.KEYCODE_SWITCH_NUMBERS, widthWeight = 1.0f),
+                KeyModel.special("⌫", KeyboardView.KEYCODE_DELETE, widthWeight = 1.2f),
+                KeyModel.special("切換", KeyboardView.KEYCODE_SWITCH_LANG, widthWeight = 1.0f),
+                KeyModel.special(" ", KeyboardView.KEYCODE_SPACE, widthWeight = 3.0f),
                 KeyModel.special(",", KeyboardView.KEYCODE_COMMA, altChars = listOf("，", "、", "；")),
                 KeyModel.special(".", KeyboardView.KEYCODE_PERIOD, altChars = listOf("。", "！", "？")),
-                KeyModel.special("↵", KeyboardView.KEYCODE_ENTER, widthWeight = 1.3f)
+                KeyModel.special("↵", KeyboardView.KEYCODE_ENTER, widthWeight = 1.2f)
             )
         )
 
