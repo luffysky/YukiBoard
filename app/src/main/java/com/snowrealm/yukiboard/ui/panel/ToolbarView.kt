@@ -87,6 +87,12 @@ class ToolbarView(context: Context) : View(context) {
 
     var onPanelSelected: ((PanelType) -> Unit)? = null
 
+    private var isTransparent = false
+    fun setTransparent(transparent: Boolean) {
+        isTransparent = transparent
+        invalidate()
+    }
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec).let {
             if (it > 0) it else resources.displayMetrics.widthPixels
@@ -98,7 +104,12 @@ class ToolbarView(context: Context) : View(context) {
         super.onDraw(canvas)
 
         // 背景
-        bgPaint.color = theme.effectiveToolbarColor()
+        if (isTransparent) {
+            canvas.drawColor(android.graphics.Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
+            bgPaint.color = 0x22000000
+        } else {
+            bgPaint.color = theme.effectiveToolbarColor()
+        }
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
 
         // 計算按鈕佈局（含捲動偏移）

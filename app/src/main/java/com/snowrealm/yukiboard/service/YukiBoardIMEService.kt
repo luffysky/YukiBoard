@@ -352,7 +352,7 @@ class YukiBoardIMEService : InputMethodService() {
         // 底部安全間距（避免貼住螢幕底部）
         val bottomPad = (8 * resources.displayMetrics.density).toInt()
         val bottomSpacer = View(this).apply {
-            setBackgroundColor(0xFF111827.toInt())
+            setBackgroundColor(if (prefs.transparentKeyboard) android.graphics.Color.TRANSPARENT else 0xFF111827.toInt())
         }
         rootContainer.addView(bottomSpacer, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, bottomPad
@@ -391,15 +391,24 @@ class YukiBoardIMEService : InputMethodService() {
 
         glSurfaceView?.onResume()
 
+        // 透明鍵盤模式
+        applyTransparentMode()
+
         // 重新檢查自訂背景（設定頁可能已更改）
         val bgHas = backgroundView?.reloadFromStorage() ?: false
         val useCustomBg = prefs.useCustomBackground && bgHas
-        if (keyboardView.hasCustomBackground != useCustomBg) {
-            keyboardView.hasCustomBackground = useCustomBg
+        // 透明模式也啟用玻璃按鍵風格
+        val glassKeys = useCustomBg || prefs.transparentKeyboard
+        if (keyboardView.hasCustomBackground != glassKeys) {
+            keyboardView.hasCustomBackground = glassKeys
             keyboardView.invalidate()
         }
-        backgroundView?.overlayAlpha = prefs.bgOverlayAlpha
-        keyboardView.bgOverlayAlpha = prefs.bgOverlayAlpha
+        if (prefs.transparentKeyboard) {
+            keyboardView.bgOverlayAlpha = prefs.transparentKeyboardAlpha
+        } else {
+            backgroundView?.overlayAlpha = prefs.bgOverlayAlpha
+            keyboardView.bgOverlayAlpha = prefs.bgOverlayAlpha
+        }
         keyboardView.customKeyLabelColor = prefs.customKeyLabelColor
         keyboardView.hapticEnabled = prefs.keyPressVibration
 
@@ -787,11 +796,17 @@ class YukiBoardIMEService : InputMethodService() {
 
         characterView?.playListening()
 
-        val locale = if (inputRouter.inputMode == com.snowrealm.yukiboard.input.router.InputMode.BOPOMOFO) {
-            "zh-TW"
-        } else {
-            "en-US"
+        val locale = when (inputRouter.inputMode) {
+            com.snowrealm.yukiboard.input.router.InputMode.BOPOMOFO -> "zh-TW"
+            com.snowrealm.yukiboard.input.router.InputMode.PINYIN -> "zh-CN"
+            com.snowrealm.yukiboard.input.router.InputMode.CANGJIE,
+            com.snowrealm.yukiboard.input.router.InputMode.SPEED_CANGJIE -> "zh-HK"
+            com.snowrealm.yukiboard.input.router.InputMode.JAPANESE -> "ja-JP"
+            com.snowrealm.yukiboard.input.router.InputMode.KOREAN -> "ko-KR"
+            else -> "en-US"
         }
+
+        keyboardView.voiceListeningLocale = locale
 
         speechEngine?.startListening(
             locale = locale,
@@ -801,6 +816,7 @@ class YukiBoardIMEService : InputMethodService() {
             onFinalResult = { result ->
                 val ic = currentInputConnection ?: return@startListening
                 ic.finishComposingText()
+                keyboardView.voiceListeningLocale = null
                 if (result.isNotEmpty()) {
                     ic.commitText(result, 1)
                     characterView?.playHappy()
@@ -809,6 +825,7 @@ class YukiBoardIMEService : InputMethodService() {
                 }
             },
             onError = { _ ->
+                keyboardView.voiceListeningLocale = null
                 characterView?.playIdle()
                 currentInputConnection?.finishComposingText()
             }
@@ -817,6 +834,7 @@ class YukiBoardIMEService : InputMethodService() {
 
     private fun stopVoiceInput() {
         speechEngine?.stopListening()
+        keyboardView.voiceListeningLocale = null
         characterView?.playIdle()
     }
 
@@ -847,6 +865,27 @@ class YukiBoardIMEService : InputMethodService() {
             container.layoutParams = FrameLayout.LayoutParams(kbWidth, FrameLayout.LayoutParams.WRAP_CONTENT).apply {
                 gravity = Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM
             }
+        }
+    }
+
+    // =========================================================================
+    // 透明鍵盤
+    // =========================================================================
+
+    private fun applyTransparentMode() {
+        val transparent = prefs.transparentKeyboard
+        val w = window?.window ?: return
+
+        if (transparent) {
+            // IME 視窗背景透明 → 可看到底層 App
+            w.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+            w.setDimAmount(0f)
+            // 根容器也透明
+            rootContainer.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            toolbarView.setTransparent(true)
+        } else {
+            w.setBackgroundDrawable(null) // 還原系統預設
+            toolbarView.setTransparent(false)
         }
     }
 

@@ -177,6 +177,10 @@ class KeyboardView(context: Context) : View(context) {
     var currentMode: KeyboardMode = KeyboardMode.NORMAL
         private set
 
+    /** 語音辨識中的語言（null = 未啟動） */
+    var voiceListeningLocale: String? = null
+        set(value) { field = value; invalidate() }
+
     /** 子佈局：NORMAL 模式下可切換數字/符號鍵盤 */
     private enum class SubLayout { ABC, NUMBERS, SYMBOLS }
     private var subLayout: SubLayout = SubLayout.ABC
@@ -654,6 +658,29 @@ class KeyboardView(context: Context) : View(context) {
             candidatePaint.textSize = 16f * density
             canvas.drawText(toast, width / 2f, candidateBarHeight * 0.65f, candidatePaint)
             candidatePaint.textSize = 15f * density
+            return
+        }
+
+        // 語音辨識中指示
+        val vLocale = voiceListeningLocale
+        if (vLocale != null) {
+            val langName = when {
+                vLocale.startsWith("zh-TW") -> "中文(繁體)"
+                vLocale.startsWith("zh-CN") -> "中文(簡體)"
+                vLocale.startsWith("zh-HK") -> "粵語"
+                vLocale.startsWith("ja") -> "日本語"
+                vLocale.startsWith("ko") -> "한국어"
+                vLocale.startsWith("es") -> "Español"
+                vLocale.startsWith("fr") -> "Français"
+                vLocale.startsWith("de") -> "Deutsch"
+                vLocale.startsWith("pt") -> "Português"
+                else -> "English"
+            }
+            val dots = ".".repeat(((System.currentTimeMillis() / 500) % 4).toInt())
+            candidatePaint.color = theme.candidateSelectedColorInt
+            candidatePaint.textSize = 15f * density
+            canvas.drawText("🎤 $langName 辨識中$dots", width / 2f, candidateBarHeight * 0.65f, candidatePaint)
+            postInvalidateDelayed(500)
             return
         }
 

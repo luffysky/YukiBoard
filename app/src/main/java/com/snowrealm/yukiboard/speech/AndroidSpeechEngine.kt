@@ -72,6 +72,9 @@ class AndroidSpeechEngine(context: Context) : SpeechInputEngine {
             putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, false)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+            // 多語言辨識：除主語言外，也接受其他常用語言
+            val extraLangs = SUPPORTED_LOCALES.filter { it != locale }
+            putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", extraLangs.toTypedArray())
         }
 
         recognizer?.startListening(intent)
@@ -91,5 +94,14 @@ class AndroidSpeechEngine(context: Context) : SpeechInputEngine {
         recognizer?.destroy()
         recognizer = null
         isListening = false
+    }
+
+    companion object {
+        /** 支援的語言清單 — 作為額外辨識語言 */
+        val SUPPORTED_LOCALES = listOf(
+            "en-US", "zh-TW", "zh-CN", "zh-HK",
+            "ja-JP", "ko-KR",
+            "es-ES", "fr-FR", "de-DE", "pt-BR"
+        )
     }
 }

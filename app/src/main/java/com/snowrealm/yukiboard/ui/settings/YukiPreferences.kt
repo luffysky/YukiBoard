@@ -116,6 +116,10 @@ class YukiPreferences(context: Context) {
     var useCustomBackground: Boolean by BoolPref("use_custom_bg", false)
     var bgOverlayAlpha: Int by IntPref("bg_overlay_alpha", 100)
 
+    // 透明鍵盤（透視到底層 App）
+    var transparentKeyboard: Boolean by BoolPref("transparent_keyboard", false)
+    var transparentKeyboardAlpha: Int by IntPref("transparent_keyboard_alpha", 40) // 0~255
+
     // 自訂字體顏色（0 = 跟隨主題）
     var customKeyLabelColor: Int by IntPref("custom_key_label_color", 0)
 

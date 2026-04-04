@@ -488,6 +488,33 @@ class SettingsActivity : AppCompatActivity() {
             })
         })
 
+        // ── 透明鍵盤 ──
+        card.addView(switchRow("透明鍵盤", "背景完全透視到底層 App", prefs.transparentKeyboard) {
+            prefs.transparentKeyboard = it
+        })
+
+        // 透明度滑桿
+        val tAlphaLabel = TextView(this).apply {
+            text = "透明度: %d%%".format((prefs.transparentKeyboardAlpha * 100) / 255)
+            textSize = 11f
+            setTextColor(0xFF8899AA.toInt())
+            setPadding(dp(12), dp(4), 0, 0)
+        }
+        card.addView(tAlphaLabel)
+        card.addView(SeekBar(this).apply {
+            max = 255
+            progress = prefs.transparentKeyboardAlpha
+            setPadding(dp(12), dp(4), dp(12), dp(8))
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+                    prefs.transparentKeyboardAlpha = p
+                    tAlphaLabel.text = "透明度: %d%%".format((p * 100) / 255)
+                }
+                override fun onStartTrackingTouch(sb: SeekBar?) {}
+                override fun onStopTrackingTouch(sb: SeekBar?) {}
+            })
+        })
+
         // ── 字體顏色 ──
         card.addView(buildKeyLabelColorPicker())
 
@@ -662,7 +689,164 @@ class SettingsActivity : AppCompatActivity() {
         scrollH.addView(colorRow)
         container.addView(scrollH)
 
+        // 自訂顏色按鈕
+        container.addView(TextView(this).apply {
+            text = "＋ 自訂顏色..."
+            textSize = 12f
+            setTextColor(0xFF7FD8FF.toInt())
+            setPadding(dp(8), dp(8), dp(8), dp(4))
+            setOnClickListener {
+                showCustomColorPicker { pickedColor ->
+                    prefs.customKeyLabelColor = pickedColor
+                    // 更新所有色塊（取消選中）
+                    colorViews.forEachIndexed { i, v ->
+                        val c = colors[i].first
+                        v.background = android.graphics.drawable.GradientDrawable().apply {
+                            shape = android.graphics.drawable.GradientDrawable.OVAL
+                            if (c == 0) {
+                                setColors(intArrayOf(
+                                    0xFFFF6B6B.toInt(), 0xFFFFD700.toInt(), 0xFF4ADE80.toInt(),
+                                    0xFF7FD8FF.toInt(), 0xFFA78BFA.toInt(), 0xFFFF6B9D.toInt()
+                                ))
+                                gradientType = android.graphics.drawable.GradientDrawable.SWEEP_GRADIENT
+                            } else {
+                                setColor(c)
+                            }
+                            if (c == 0xFFFFFFFF.toInt() || c == 0) {
+                                setStroke(dp(1), 0xFF555555.toInt())
+                            }
+                        }
+                    }
+                    Toast.makeText(this@SettingsActivity, "已設定自訂顏色", Toast.LENGTH_SHORT).show()
+                }
+            }
+        })
+
         return container
+    }
+
+    private fun showCustomColorPicker(onColorPicked: (Int) -> Unit) {
+        val currentColor = prefs.customKeyLabelColor.let { if (it == 0) 0xFFFFFFFF.toInt() else it }
+
+        val dialogLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(16), dp(20), dp(8))
+        }
+
+        // 顏色預覽
+        val previewView = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(48)).apply {
+                bottomMargin = dp(12)
+            }
+            background = android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = dp(8).toFloat()
+                setColor(currentColor)
+            }
+        }
+        dialogLayout.addView(previewView)
+
+        var r = android.graphics.Color.red(currentColor)
+        var g = android.graphics.Color.green(currentColor)
+        var b = android.graphics.Color.blue(currentColor)
+
+        fun updatePreview() {
+            val c = android.graphics.Color.rgb(r, g, b)
+            previewView.background = android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = dp(8).toFloat()
+                setColor(c or 0xFF000000.toInt())
+            }
+        }
+
+        // Hex 輸入
+        val hexInput = android.widget.EditText(this).apply {
+            hint = "#RRGGBB"
+            setText(String.format("#%02X%02X%02X", r, g, b))
+            textSize = 14f
+            setTextColor(0xFFFFFFFF.toInt())
+            setHintTextColor(0xFF888888.toInt())
+            inputType = android.text.InputType.TYPE_CLASS_TEXT
+            filters = arrayOf(android.text.InputFilter.LengthFilter(7))
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                bottomMargin = dp(8)
+            }
+        }
+        dialogLayout.addView(hexInput)
+
+        fun makeSlider(label: String, initial: Int, onChanged: (Int) -> Unit): LinearLayout {
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setPadding(0, dp(4), 0, dp(4))
+            }
+            row.addView(TextView(this).apply {
+                text = label
+                textSize = 13f
+                setTextColor(0xFFCCCCCC.toInt())
+                layoutParams = LinearLayout.LayoutParams(dp(24), LinearLayout.LayoutParams.WRAP_CONTENT)
+            })
+            val valueText = TextView(this).apply {
+                text = "$initial"
+                textSize = 12f
+                setTextColor(0xFF7FD8FF.toInt())
+                layoutParams = LinearLayout.LayoutParams(dp(32), LinearLayout.LayoutParams.WRAP_CONTENT)
+                gravity = android.view.Gravity.END
+            }
+            val sb = android.widget.SeekBar(this).apply {
+                max = 255
+                progress = initial
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
+                        valueText.text = "$progress"
+                        onChanged(progress)
+                        updatePreview()
+                        hexInput.setText(String.format("#%02X%02X%02X", r, g, b))
+                    }
+                    override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
+                    override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {}
+                })
+            }
+            row.addView(sb)
+            row.addView(valueText)
+            return row
+        }
+
+        val rSlider = makeSlider("R", r) { r = it }
+        val gSlider = makeSlider("G", g) { g = it }
+        val bSlider = makeSlider("B", b) { b = it }
+        dialogLayout.addView(rSlider)
+        dialogLayout.addView(gSlider)
+        dialogLayout.addView(bSlider)
+
+        // Hex → RGB 同步
+        hexInput.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                val hex = s?.toString()?.removePrefix("#") ?: return
+                if (hex.length == 6) {
+                    try {
+                        val parsed = android.graphics.Color.parseColor("#$hex")
+                        r = android.graphics.Color.red(parsed)
+                        g = android.graphics.Color.green(parsed)
+                        b = android.graphics.Color.blue(parsed)
+                        rSlider.findViewById<android.widget.SeekBar>(0)
+                        // 直接更新 seekbar（避免遞迴死循環，用 tag 標記）
+                        updatePreview()
+                    } catch (_: Exception) {}
+                }
+            }
+        })
+
+        android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            .setTitle("自訂字體顏色")
+            .setView(dialogLayout)
+            .setPositiveButton("確定") { _, _ ->
+                val color = android.graphics.Color.rgb(r, g, b) or 0xFF000000.toInt()
+                onColorPicked(color)
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     // ─────────────────────────────────────────────────────────
