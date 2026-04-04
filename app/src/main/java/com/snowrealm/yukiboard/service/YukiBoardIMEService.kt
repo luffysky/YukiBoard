@@ -1305,8 +1305,8 @@ class YukiBoardIMEService : InputMethodService() {
             }
         }
 
-        // 觸發角色打字動畫
-        characterView?.playTyping()
+        // 觸發角色打字動畫（節流：每 N 次按鍵才播放，避免拖慢輸入）
+        characterView?.onKeystroke()
 
         keyboardView.updateComposingText(inputRouter.composingText)
         keyboardView.updateCandidates(inputRouter.candidates)

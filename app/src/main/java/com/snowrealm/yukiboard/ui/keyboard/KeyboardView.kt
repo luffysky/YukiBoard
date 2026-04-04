@@ -365,11 +365,13 @@ class KeyboardView(context: Context) : View(context) {
     }
 
     fun updateComposingText(text: String) {
+        if (composingText == text) return
         composingText = text
         invalidate()
     }
 
     fun updateCandidates(list: List<String>) {
+        if (allCandidates == list) return
         allCandidates = list
         candidates = if (list.size > CANDIDATE_BAR_MAX) list.take(CANDIDATE_BAR_MAX) else list
         highlightedCandidateIndex = -1
