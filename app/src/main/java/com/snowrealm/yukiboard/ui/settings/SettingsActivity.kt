@@ -360,10 +360,13 @@ class SettingsActivity : AppCompatActivity() {
     // 背景卡片
     // ─────────────────────────────────────────────────────────
 
-    // 預覽用的 ImageView（需在 onActivityResult 更新）
+    // 預覽用的 ImageView / TextureView（需在 onActivityResult 更新）
     private var bgPreviewImage: android.widget.ImageView? = null
     private var bgPreviewOverlay: View? = null
     private var bgPreviewLabel: TextView? = null
+    private var bgPreviewContainer: FrameLayout? = null
+    private var bgVideoPlayer: android.media.MediaPlayer? = null
+    private var bgVideoTexture: android.view.TextureView? = null
 
     private fun buildBackgroundCard(): LinearLayout {
         val card = simpleCard("鍵盤背景 / Background")
@@ -371,7 +374,7 @@ class SettingsActivity : AppCompatActivity() {
         // ── 預覽區 ──
         val previewContainer = FrameLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(140)
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(180)
             ).apply { setMargins(0, 0, 0, dp(8)) }
             background = android.graphics.drawable.GradientDrawable().apply {
                 setColor(0xFF111827.toInt())
@@ -386,13 +389,14 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         val previewImg = android.widget.ImageView(this).apply {
-            scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+            scaleType = android.widget.ImageView.ScaleType.MATRIX
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
         }
         bgPreviewImage = previewImg
+        bgPreviewContainer = previewContainer
         previewContainer.addView(previewImg)
 
         // 遮罩覆蓋（模擬鍵盤上的效果）
@@ -490,6 +494,52 @@ class SettingsActivity : AppCompatActivity() {
             })
         })
 
+        // ── 背景位置 X 拉桿 ──
+        val xLabel = TextView(this).apply {
+            text = "水平位置 X: %d%%".format((prefs.bgOffsetX * 100).toInt())
+            textSize = 12f
+            setTextColor(0xFF7FD8FF.toInt())
+            setPadding(dp(12), dp(8), 0, dp(4))
+        }
+        card.addView(xLabel)
+        card.addView(SeekBar(this).apply {
+            max = 100
+            progress = (prefs.bgOffsetX * 100).toInt()
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+                    prefs.bgOffsetX = p / 100f
+                    xLabel.text = "水平位置 X: %d%%".format(p)
+                    updateBgPreviewMatrix()
+                }
+                override fun onStartTrackingTouch(sb: SeekBar?) {}
+                override fun onStopTrackingTouch(sb: SeekBar?) {}
+            })
+        })
+
+        // ── 背景位置 Y 拉桿 ──
+        val yLabel = TextView(this).apply {
+            text = "垂直位置 Y: %d%%".format((prefs.bgOffsetY * 100).toInt())
+            textSize = 12f
+            setTextColor(0xFF7FD8FF.toInt())
+            setPadding(dp(12), dp(4), 0, dp(4))
+        }
+        card.addView(yLabel)
+        card.addView(SeekBar(this).apply {
+            max = 100
+            progress = (prefs.bgOffsetY * 100).toInt()
+            setPadding(dp(12), dp(4), dp(12), dp(8))
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+                    prefs.bgOffsetY = p / 100f
+                    yLabel.text = "垂直位置 Y: %d%%".format(p)
+                    updateBgPreviewMatrix()
+                }
+                override fun onStartTrackingTouch(sb: SeekBar?) {}
+                override fun onStopTrackingTouch(sb: SeekBar?) {}
+            })
+        })
+
         // ── 透明鍵盤 ──
         card.addView(switchRow("透明鍵盤", "背景完全透視到底層 App", prefs.transparentKeyboard) {
             prefs.transparentKeyboard = it
@@ -523,6 +573,84 @@ class SettingsActivity : AppCompatActivity() {
         return card
     }
 
+    private fun startVideoPreview(filePath: String) {
+        val container = bgPreviewContainer ?: return
+        val tv = android.view.TextureView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        }
+        bgVideoTexture = tv
+
+        tv.surfaceTextureListener = object : android.view.TextureView.SurfaceTextureListener {
+            override fun onSurfaceTextureAvailable(st: android.graphics.SurfaceTexture, w: Int, h: Int) {
+                try {
+                    val mp = android.media.MediaPlayer().apply {
+                        setDataSource(filePath)
+                        setSurface(android.view.Surface(st))
+                        isLooping = true
+                        setVolume(0f, 0f)
+                        prepareAsync()
+                        setOnPreparedListener { it.start() }
+                    }
+                    bgVideoPlayer = mp
+                } catch (e: Exception) {
+                    bgPreviewLabel?.text = "🎬 影片播放失敗"
+                    bgPreviewLabel?.visibility = View.VISIBLE
+                }
+            }
+            override fun onSurfaceTextureSizeChanged(st: android.graphics.SurfaceTexture, w: Int, h: Int) {}
+            override fun onSurfaceTextureDestroyed(st: android.graphics.SurfaceTexture): Boolean {
+                stopVideoPreview()
+                return true
+            }
+            override fun onSurfaceTextureUpdated(st: android.graphics.SurfaceTexture) {}
+        }
+
+        // 插入到 ImageView 後面，overlay 前面（index 1）
+        val overlayIdx = container.indexOfChild(bgPreviewOverlay)
+        container.addView(tv, if (overlayIdx > 0) overlayIdx else 1)
+    }
+
+    private fun stopVideoPreview() {
+        try {
+            bgVideoPlayer?.stop()
+            bgVideoPlayer?.release()
+        } catch (_: Exception) { }
+        bgVideoPlayer = null
+        bgVideoTexture?.let { bgPreviewContainer?.removeView(it) }
+        bgVideoTexture = null
+    }
+
+    /** 根據 prefs 的 bgOffsetX/Y 更新預覽圖的 Matrix */
+    private fun updateBgPreviewMatrix() {
+        val iv = bgPreviewImage ?: return
+        val drawable = iv.drawable ?: return
+        val bmpW = drawable.intrinsicWidth.toFloat()
+        val bmpH = drawable.intrinsicHeight.toFloat()
+        if (bmpW <= 0 || bmpH <= 0) return
+
+        iv.post {
+            val vw = iv.width.toFloat()
+            val vh = iv.height.toFloat()
+            if (vw <= 0 || vh <= 0) return@post
+
+            val scale = maxOf(vw / bmpW, vh / bmpH)
+            val scaledW = bmpW * scale
+            val scaledH = bmpH * scale
+            val maxDx = (scaledW - vw).coerceAtLeast(0f)
+            val maxDy = (scaledH - vh).coerceAtLeast(0f)
+            val dx = -maxDx * prefs.bgOffsetX
+            val dy = -maxDy * prefs.bgOffsetY
+
+            val matrix = android.graphics.Matrix()
+            matrix.setScale(scale, scale)
+            matrix.postTranslate(dx, dy)
+            iv.imageMatrix = matrix
+        }
+    }
+
     private fun refreshBgPreview() {
         val savedBg = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getSavedBackground(this)
         if (savedBg != null && !com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.isVideoFile(savedBg)) {
@@ -533,29 +661,15 @@ class SettingsActivity : AppCompatActivity() {
                 withContext(Dispatchers.Main) {
                     bgPreviewImage?.setImageBitmap(bmp)
                     bgPreviewLabel?.visibility = View.GONE
+                    updateBgPreviewMatrix()
                 }
             }
         } else if (savedBg != null) {
-            // 影片預覽：取第一幀
-            activityScope.launch(Dispatchers.IO) {
-                try {
-                    val retriever = android.media.MediaMetadataRetriever()
-                    retriever.setDataSource(savedBg.absolutePath)
-                    val frame = retriever.getFrameAtTime(0)
-                    retriever.release()
-                    withContext(Dispatchers.Main) {
-                        bgPreviewImage?.setImageBitmap(frame)
-                        bgPreviewLabel?.text = "🎬 影片背景"
-                        bgPreviewLabel?.visibility = View.VISIBLE
-                        bgPreviewLabel?.setBackgroundColor(0x55000000)
-                    }
-                } catch (_: Exception) {
-                    withContext(Dispatchers.Main) {
-                        bgPreviewLabel?.text = "🎬 影片背景（無法預覽）"
-                        bgPreviewLabel?.visibility = View.VISIBLE
-                    }
-                }
-            }
+            // 影片預覽：TextureView 播放
+            stopVideoPreview()
+            bgPreviewImage?.setImageBitmap(null)
+            bgPreviewLabel?.visibility = View.GONE
+            startVideoPreview(savedBg.absolutePath)
         } else {
             bgPreviewImage?.setImageBitmap(null)
             bgPreviewLabel?.text = "尚未設定背景"
@@ -1069,6 +1183,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        stopVideoPreview()
         super.onDestroy()
         activityScope.cancel()
     }

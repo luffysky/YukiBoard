@@ -2,7 +2,7 @@
 
 > 整合 todo-list-0405 + 總任��包 + 滑動輸入任務包 + Games_add + Games_bug
 > ~~刪除線~~ = 已完成 / ✅ = 已完成
-> 版本：**v0.3.1**（versionCode 5）
+> 版本：**v0.3.6**（versionCode 10）
 
 ---
 
@@ -40,6 +40,26 @@
 - ✅ Batch 1 全 19 項 Bug 修復（null safety / scope leaks / encrypted wallet / WiFi PIN）
 - ✅ 注音鍵盤改回大千式標準排列（ㄦ移至底行）
 - ✅ Firebase App Distribution testers 群組通知
+
+### v0.3.2~v0.3.5 — 選字修復 + 遊戲返回 + 設定穩定
+- ✅ 候選字選不中修復（引擎索引映射 + candidateRects → hitTestCandidateIndex 數學計算）
+- ✅ 候選列橫向滑動 + 右側 ▼ 展開箭頭
+- ✅ 設定頁自動關閉修復（recreate → Intent 重啟 + requestHideSelf）
+- ✅ ClawClient skills by lazy → getSkill() 動態工廠（切換 Provider 即時生效）
+- ✅ 遊戲模式：遊戲中 HUD + 遊戲選單均有 ⌨返回 按鈕
+- ✅ 按鍵 padding 加大（H:3→5dp, V:4→6dp）
+- ✅ 雪凜預設 Lottie Q 版角色（VRM 可在設定開啟）
+- ✅ 語音輸入加入 RECORD_AUDIO 權限檢查提示
+
+---
+
+## 緊急修復（v0.3.6）
+
+- ✅ **GIF 搜尋框無法輸入** — CJK 輸入透過 InputRouter 組字→搜尋框；輸入模式面板收縮只留搜尋列
+- ✅ **語音辨識加入更多語言** — 新增泰語/越南語/印尼語/義大利語/俄語/阿拉伯語/土耳其語（共 17 語）
+- ✅ **候選字/預測字依語意前後文排序** — getTextBeforeCursor → extractContextWords → bigram/trigram 加權
+- ✅ **記憶翻牌遊戲初始無牌面** — 開局 2 秒展示所有牌面（藍色光暈），展示期間不可操作
+- ✅ **背景圖片 XY 位置拉桿** — 水平/垂直位置滑桿（0%~100%）+ 設定預覽改 FIT_CENTER 完整呈現
 
 ---
 
@@ -305,7 +325,7 @@ v0.4.0 重點：滑動輸入 + 智慧候選字 + 開關系統 + AI Skill
 
 ## 備註
 
-- 版本號：**v0.3.1**（versionCode 5）
+- 版本號：**v0.3.6**（versionCode 10）
 - deploy 指令：`bash scripts/deploy.sh "更新��明"` 或 `./gradlew appDistributionUploadDebug`
 - Firebase App Distribution 測��群��：`testers`
 - google-services.json 已在 .gitignore

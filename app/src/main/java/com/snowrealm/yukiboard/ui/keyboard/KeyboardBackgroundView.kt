@@ -37,6 +37,15 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
             overlayView?.setBackgroundColor(Color.argb(field, 0, 0, 0))
         }
 
+    // 背景位置偏移（0.0~1.0，0.5=置中）
+    var offsetX: Float = 0.5f
+        set(value) { field = value.coerceIn(0f, 1f); applyOffset() }
+    var offsetY: Float = 0.5f
+        set(value) { field = value.coerceIn(0f, 1f); applyOffset() }
+
+    private var bmpWidth = 0
+    private var bmpHeight = 0
+
     enum class BackgroundType { NONE, IMAGE, VIDEO }
 
     private var currentType = BackgroundType.NONE
@@ -147,25 +156,40 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
     }
 
     /**
-     * 初始化 matrix 實現 center-crop 效果（後續可雙指縮放）。
+     * 初始化 matrix 並根據 offsetX/offsetY 定位。
+     * offsetX/offsetY = 0.5 等同 center-crop。
      */
     private fun initCenterCropMatrix(iv: ImageView, bmpW: Int, bmpH: Int) {
+        bmpWidth = bmpW; bmpHeight = bmpH
         iv.post {
-            val vw = iv.width.toFloat()
-            val vh = iv.height.toFloat()
-            if (vw <= 0 || vh <= 0) return@post
-
-            val scale = maxOf(vw / bmpW, vh / bmpH)
-            val dx = (vw - bmpW * scale) / 2f
-            val dy = (vh - bmpH * scale) / 2f
-
-            imageMatrix.reset()
-            imageMatrix.setScale(scale, scale)
-            imageMatrix.postTranslate(dx, dy)
-            savedMatrix.set(imageMatrix)
-            scaleFactor = 1.0f
-            iv.imageMatrix = imageMatrix
+            applyOffset()
         }
+    }
+
+    /** 根據 offsetX/offsetY 重新計算 matrix */
+    private fun applyOffset() {
+        val iv = imageView ?: return
+        val vw = iv.width.toFloat()
+        val vh = iv.height.toFloat()
+        if (vw <= 0 || vh <= 0 || bmpWidth <= 0 || bmpHeight <= 0) return
+
+        val scale = maxOf(vw / bmpWidth, vh / bmpHeight) * scaleFactor
+        val scaledW = bmpWidth * scale
+        val scaledH = bmpHeight * scale
+
+        // 可平移範圍：圖片超出 View 的部分
+        val maxDx = (scaledW - vw).coerceAtLeast(0f)
+        val maxDy = (scaledH - vh).coerceAtLeast(0f)
+
+        // offsetX 0.0=最左(dx=0)，0.5=置中，1.0=最右(dx=-maxDx)
+        val dx = -maxDx * offsetX
+        val dy = -maxDy * offsetY
+
+        imageMatrix.reset()
+        imageMatrix.setScale(scale, scale)
+        imageMatrix.postTranslate(dx, dy)
+        savedMatrix.set(imageMatrix)
+        iv.imageMatrix = imageMatrix
     }
 
     /**

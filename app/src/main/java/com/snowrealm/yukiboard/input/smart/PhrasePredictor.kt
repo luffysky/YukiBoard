@@ -99,6 +99,42 @@ class PhrasePredictor(context: Context) {
             .take(maxResults)
     }
 
+    /**
+     * 用外部上下文詞預測下一個詞。
+     * @param contextWords 上下文詞序列（最後 1~2 個���即可）
+     */
+    fun predictWithContext(contextWords: List<String>, maxResults: Int = 5): List<PredictionItem> {
+        if (contextWords.isEmpty()) return emptyList()
+        val scores = mutableMapOf<String, Float>()
+
+        // Trigram
+        if (contextWords.size >= 2) {
+            val key = "${contextWords[contextWords.size - 2]} ${contextWords.last()}"
+            val triMap = trigrams[key]
+            if (triMap != null) {
+                val total = triMap.values.sum().toFloat()
+                for ((word, count) in triMap) {
+                    scores[word] = (scores[word] ?: 0f) + (count / total) * TRIGRAM_WEIGHT
+                }
+            }
+        }
+
+        // Bigram
+        val prev = contextWords.last()
+        val biMap = bigrams[prev]
+        if (biMap != null) {
+            val total = biMap.values.sum().toFloat()
+            for ((word, count) in biMap) {
+                scores[word] = (scores[word] ?: 0f) + (count / total) * BIGRAM_WEIGHT
+            }
+        }
+
+        return scores.entries
+            .sortedByDescending { it.value }
+            .take(maxResults)
+            .map { PredictionItem(it.key, it.value) }
+    }
+
     /** 重置最近詞（例如換行 / 切 App） */
     fun resetContext() {
         recentWords.clear()

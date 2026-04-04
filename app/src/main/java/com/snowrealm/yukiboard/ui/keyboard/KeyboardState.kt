@@ -619,12 +619,13 @@ data class KeyboardState(
                 KeyModel.special("⌫", KeyboardView.KEYCODE_DELETE, widthWeight = 1.5f)
             ),
             listOf(
-                KeyModel.special("?123", KeyboardView.KEYCODE_SWITCH_NUMBERS, widthWeight = 1.2f),
+                KeyModel.special("?123", KeyboardView.KEYCODE_SWITCH_NUMBERS, widthWeight = 1.0f),
+                KeyModel.special("あ/ア", KeyboardView.KEYCODE_TOGGLE_KANA, widthWeight = 1.0f),
                 KeyModel.special(",", KeyboardView.KEYCODE_COMMA, altChars = listOf("、", "，")),
-                KeyModel.special("切換", KeyboardView.KEYCODE_SWITCH_LANG, widthWeight = 1.0f),
-                KeyModel.special(" ", KeyboardView.KEYCODE_SPACE, widthWeight = 4f),
+                KeyModel.special("切換", KeyboardView.KEYCODE_SWITCH_LANG, widthWeight = 0.8f),
+                KeyModel.special(" ", KeyboardView.KEYCODE_SPACE, widthWeight = 3.5f),
                 KeyModel.special(".", KeyboardView.KEYCODE_PERIOD, altChars = listOf("。", "！", "？")),
-                KeyModel.special("↵", KeyboardView.KEYCODE_ENTER, widthWeight = 1.5f)
+                KeyModel.special("↵", KeyboardView.KEYCODE_ENTER, widthWeight = 1.2f)
             )
         )
 

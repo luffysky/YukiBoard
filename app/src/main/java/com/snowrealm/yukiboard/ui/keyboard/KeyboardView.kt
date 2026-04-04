@@ -105,6 +105,7 @@ class KeyboardView(context: Context) : View(context) {
         const val KEYCODE_SWITCH_NUMBERS = -500  // 切到數字符號鍵盤
         const val KEYCODE_SWITCH_SYMBOLS = -501  // 切到更多符號鍵盤
         const val KEYCODE_SWITCH_ABC     = -502  // 切回字母鍵盤
+        const val KEYCODE_TOGGLE_KANA    = -503  // 日語 あ⇔ア 切換
 
         private const val LONG_PRESS_DELAY = 400L
         private const val CANDIDATE_BAR_MAX = 6

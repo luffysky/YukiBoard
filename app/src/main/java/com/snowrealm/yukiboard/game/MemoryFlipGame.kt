@@ -26,6 +26,7 @@ class MemoryFlipGame(context: Context) : GameLogic {
     private var secondFlip: Pair<Int, Int>? = null
     private var flipCooldown = 0L
     private var pairsLeft = 0
+    private var revealTimeMs = 0L  // 開局展示所有牌面的時間
 
     var onGameEvent: ((GameEvent) -> Unit)? = null
 
@@ -39,7 +40,9 @@ class MemoryFlipGame(context: Context) : GameLogic {
         firstFlip = null; secondFlip = null; flipCooldown = 0
         isMatched = Array(rows) { BooleanArray(cols) }
         generatePairs()
-        clearGrid(); status = GameStatus.PLAYING
+        revealTimeMs = REVEAL_DURATION_MS
+        status = GameStatus.PLAYING
+        renderRevealGrid()  // 開局展示所有牌面
     }
 
     override fun pause() { if (status == GameStatus.PLAYING) status = GameStatus.PAUSED }
@@ -47,6 +50,17 @@ class MemoryFlipGame(context: Context) : GameLogic {
 
     override fun update(deltaMs: Long) {
         if (status != GameStatus.PLAYING) return
+
+        // 開局展示階段（不扣時間）
+        if (revealTimeMs > 0) {
+            revealTimeMs -= deltaMs
+            if (revealTimeMs <= 0) {
+                revealTimeMs = 0
+                renderGrid()  // 翻回所有牌
+            }
+            return
+        }
+
         timeLeftMs -= deltaMs
         if (timeLeftMs <= 0) { gameOver(); return }
 
@@ -63,6 +77,7 @@ class MemoryFlipGame(context: Context) : GameLogic {
 
     override fun onKeyPress(row: Int, col: Int, label: String) {
         if (status != GameStatus.PLAYING) return
+        if (revealTimeMs > 0) return  // 展示階段不可操作
         if (flipCooldown > 0) return
         if (row !in 0 until rows || col !in 0 until cols) return
         if (isMatched[row][col]) return
@@ -130,6 +145,18 @@ class MemoryFlipGame(context: Context) : GameLogic {
         for (r in 0 until rows) for (c in 0 until cols) grid[r][c].reset()
     }
 
+    /** 開局展示：所有��面朝上 */
+    private fun renderRevealGrid() {
+        for (r in 0 until rows) {
+            for (c in 0 until cols) {
+                val cell = grid[r][c]
+                cell.gameLabel = symbols[r][c]
+                cell.glowColor = 0xFF42A5F5.toInt()  // 藍色光暈
+                cell.isActive = true
+            }
+        }
+    }
+
     private fun renderGrid() {
         for (r in 0 until rows) {
             for (c in 0 until cols) {
@@ -158,6 +185,7 @@ class MemoryFlipGame(context: Context) : GameLogic {
 
     companion object {
         const val GAME_DURATION_MS = 90_000L
+        const val REVEAL_DURATION_MS = 2_000L  // 開局展示 2 秒
         private val SYMBOLS = listOf(
             "🐱", "🐶", "🐰", "🦊", "🐻", "🐼", "🐨", "🦁",
             "🌟", "🌙", "☀️", "❄️", "🔥", "💧", "🌸", "🍀",

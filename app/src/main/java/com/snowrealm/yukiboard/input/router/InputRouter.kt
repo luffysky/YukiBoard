@@ -42,6 +42,8 @@ class InputRouter(private val context: Context) {
     private var lastCommittedWord: String? = null
     // 目前 App 套件名（供習慣追蹤用）
     var currentAppPackage: String? = null
+    // 輸入框上下文（由 Service 從 getTextBeforeCursor 設定）
+    var contextBeforeCursor: String = ""
 
     // 語言循環順序（使用者可自訂，預設全開）
     var enabledModes: List<InputMode> = listOf(
@@ -68,6 +70,7 @@ class InputRouter(private val context: Context) {
     val composingText: String get() = activeEngine.composingText
     val candidates: List<String> get() = candidateManager.candidates
     val inputMode: InputMode get() = currentMode
+    fun getActiveEngine(): InputEngine = activeEngine
 
     // -------------------------------------------------------------------------
     // 語言切換
@@ -168,8 +171,12 @@ class InputRouter(private val context: Context) {
                 val engineIndex = if (displayedText != null) eng.getCandidates().indexOf(displayedText).takeIf { it >= 0 } ?: index else index
                 eng.selectCandidateAt(engineIndex)
             }
+            is KoreanInputEngine -> {
+                val engineIndex = if (displayedText != null) eng.getCandidates().indexOf(displayedText).takeIf { it >= 0 } ?: index else index
+                eng.selectCandidateAt(engineIndex)
+            }
             else -> {
-                // 英文/韓文：通用候選選擇
+                // 英文：通用候選選擇
                 val selected = candidateManager.selectAt(index)
                 if (selected != null) {
                     activeEngine.reset()
@@ -218,13 +225,26 @@ class InputRouter(private val context: Context) {
         val raw = activeEngine.getCandidates()
         val composing = activeEngine.composingText
 
-        // 非英文模式：引擎候選 + 自適應字典排序
+        // 非英文模式：引擎候選 + 自適應字典 + 上下文 bigram/trigram 排序
         if (currentMode != InputMode.ENGLISH) {
             if (raw.size > 1) {
-                // 用自適應字典提升使用者常用字的排名
+                // 從上下文提取最近幾個字/詞（CJK 每個字算一個 token）
+                val contextWords = extractContextWords(contextBeforeCursor)
+                val contextPredictions = if (contextWords.isNotEmpty()) {
+                    smartInput.predictWithContext(contextWords, 10)
+                        .withIndex()
+                        .associate { (i, w) -> w to (10f - i).coerceAtLeast(1f) }
+                } else emptyMap()
+
                 val boosted = raw.sortedWith(compareByDescending<String> { word ->
-                    val entry = smartInput.adaptiveDictionary.getFrequency(word)
-                    if (entry > 0) entry + 100 else 0  // 有使用記錄的優先
+                    var score = 0f
+                    // 自適應字典分數
+                    val freq = smartInput.adaptiveDictionary.getFrequency(word)
+                    if (freq > 0) score += freq + 50
+                    // 上下文 bigram/trigram 加權
+                    val ctxScore = contextPredictions[word]
+                    if (ctxScore != null) score += ctxScore * 5
+                    score
                 }.thenBy { raw.indexOf(it) })  // 其他保持原順序
                 candidateManager.update(boosted)
             } else {
@@ -282,6 +302,35 @@ class InputRouter(private val context: Context) {
             .map { it.key }
 
         candidateManager.update(sorted)
+    }
+
+    /** 從游標前文字提取最近的 context words（CJK 每字一個 token，英文按空格分） */
+    private fun extractContextWords(text: String): List<String> {
+        if (text.isBlank()) return emptyList()
+        val trimmed = text.trimEnd()
+        if (trimmed.isEmpty()) return emptyList()
+
+        val result = mutableListOf<String>()
+        // 從尾端取最近 3 個 token
+        val chars = trimmed.toList().reversed()
+        for (ch in chars) {
+            if (result.size >= 3) break
+            if (ch.isWhitespace()) continue
+            val code = ch.code
+            val isCjk = code in 0x4E00..0x9FFF || code in 0x3400..0x4DBF
+                    || code in 0x3040..0x30FF || code in 0xAC00..0xD7AF
+            if (isCjk) {
+                result.add(ch.toString())
+            } else if (ch.isLetter()) {
+                // 英文：回溯整個單詞
+                val idx = trimmed.lastIndexOf(ch)
+                val wordStart = trimmed.lastIndexOfAny(charArrayOf(' ', '\n', '\t'), idx) + 1
+                val word = trimmed.substring(wordStart, idx + 1)
+                if (word.isNotBlank() && word !in result) result.add(word)
+                break
+            }
+        }
+        return result.reversed()
     }
 
     /** 記錄提交詞，供智慧輸入各模組學習 */

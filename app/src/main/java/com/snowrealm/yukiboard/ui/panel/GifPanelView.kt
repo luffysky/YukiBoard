@@ -82,7 +82,9 @@ class GifPanelView(context: Context) : View(context) {
         val w = MeasureSpec.getSize(widthMeasureSpec).let {
             if (it > 0) it else resources.displayMetrics.widthPixels
         }
-        setMeasuredDimension(w, (200 * density).toInt())
+        // 輸入模式時只顯示搜尋列，讓鍵盤有更多空間
+        val h = if (isInputMode) searchBarH.toInt() else (200 * density).toInt()
+        setMeasuredDimension(w, h)
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -334,6 +336,7 @@ class GifPanelView(context: Context) : View(context) {
                             isInputMode = true
                             inputBuffer.clear()
                             if (searchQuery.isNotEmpty()) inputBuffer.append(searchQuery)
+                            requestLayout()
                             invalidate()
                         }
                         performClick()
@@ -399,12 +402,21 @@ class GifPanelView(context: Context) : View(context) {
         if (!isInputMode) return
         if (inputBuffer.isNotEmpty()) {
             isInputMode = false
+            requestLayout()
             search(inputBuffer.toString())
         }
     }
 
     fun exitInputMode() {
         isInputMode = false
+        requestLayout()
+        invalidate()
+    }
+
+    /** 接收來自 InputRouter 的組字提交文字（中文等 CJK 輸入） */
+    fun onComposedTextInput(text: String) {
+        if (!isInputMode) return
+        inputBuffer.append(text)
         invalidate()
     }
 

@@ -101,7 +101,9 @@ class AndroidSpeechEngine(context: Context) : SpeechInputEngine {
         val SUPPORTED_LOCALES = listOf(
             "en-US", "zh-TW", "zh-CN", "zh-HK",
             "ja-JP", "ko-KR",
-            "es-ES", "fr-FR", "de-DE", "pt-BR"
+            "es-ES", "fr-FR", "de-DE", "pt-BR",
+            "th-TH", "vi-VN", "id-ID",
+            "it-IT", "ru-RU", "ar-SA", "tr-TR"
         )
     }
 }

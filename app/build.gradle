@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 9
-        versionName "0.3.5"
+        versionCode 10
+        versionName "0.3.6"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -75,7 +75,7 @@ android {
             debuggable true
             firebaseAppDistribution {
                 groups = "testers"
-                releaseNotes = "v${android.defaultConfig.versionName}\n- 候選列重寫：橫向滑動 + 右側▼展開，選字穩定\n- 雪凜預設 Lottie Q 版角色（VRM 可在設定開啟）\n- 語音輸入加入麥克風權限檢查提示\n- 遊戲選單 + 遊戲中均有⌨返回按鈕"
+                releaseNotes = "v${android.defaultConfig.versionName}\n- GIF 搜尋框支援 CJK 組字輸入\n- 語音辨識新增 7 語言（共 17 語）\n- 候選字依前後文 bigram/trigram 排序\n- 記憶翻牌開局 2 秒展示牌面\n- 背景圖片 XY 位置拉桿 + 預覽修正"
             }
         }
     }

@@ -11,6 +11,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import com.snowrealm.yukiboard.animation.gles.KeyboardGLSurfaceView
 import com.snowrealm.yukiboard.game.*
+import com.snowrealm.yukiboard.input.router.InputMode
 import com.snowrealm.yukiboard.input.router.InputRouter
 import com.snowrealm.yukiboard.input.router.InputResult
 import com.snowrealm.yukiboard.input.snippet.SnippetManager
@@ -231,9 +232,18 @@ class YukiBoardIMEService : InputMethodService() {
             }
         }
         keyboardView.setOnCandidateSelectListener { index ->
-            val ic = currentInputConnection ?: return@setOnCandidateSelectListener
             val result = inputRouter.selectCandidate(index)
-            applyInputResult(ic, result)
+            // GIF/翻譯面板輸入模式：選字提交到面板而非目標 App
+            val gpRef = gifPanel
+            val tpRef = translatePanel
+            if (gpRef != null && gpRef.isInInputMode && result is InputResult.CommitText) {
+                gpRef.onComposedTextInput(result.text)
+            } else if (tpRef != null && tpRef.isInInputMode && result is InputResult.CommitText) {
+                tpRef.onCharInput(result.text)
+            } else {
+                val ic = currentInputConnection ?: return@setOnCandidateSelectListener
+                applyInputResult(ic, result)
+            }
             keyboardView.updateComposingText(inputRouter.composingText)
             keyboardView.updateCandidates(inputRouter.candidates)
         }
@@ -265,6 +275,8 @@ class YukiBoardIMEService : InputMethodService() {
 
         // 自訂圖片/影片背景（最底層）
         val bgView = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView(this)
+        bgView.offsetX = prefs.bgOffsetX
+        bgView.offsetY = prefs.bgOffsetY
         val savedBg = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getSavedBackground(this)
         val useCustomBg = prefs.useCustomBackground && savedBg != null
         if (useCustomBg && savedBg != null) {
@@ -407,6 +419,8 @@ class YukiBoardIMEService : InputMethodService() {
         applyTransparentMode()
 
         // 重新檢查自訂背景（設定頁可能已更改）
+        backgroundView?.offsetX = prefs.bgOffsetX
+        backgroundView?.offsetY = prefs.bgOffsetY
         val bgHas = backgroundView?.reloadFromStorage() ?: false
         val useCustomBg = prefs.useCustomBackground && bgHas
         // 透明模式也啟用玻璃按鍵風格
@@ -1389,18 +1403,61 @@ class YukiBoardIMEService : InputMethodService() {
         // GIF 面板輸入模式：攔截鍵盤輸入到搜尋框
         val gp = gifPanel
         if (gp != null && gp.isInInputMode) {
+            val isCjk = inputRouter.inputMode != InputMode.ENGLISH
             when (keyCode) {
-                KeyboardView.KEYCODE_DELETE -> gp.onDeleteInput()
-                KeyboardView.KEYCODE_ENTER -> gp.onEnterInput()
-                KeyboardView.KEYCODE_SPACE -> gp.onSpaceInput()
+                KeyboardView.KEYCODE_DELETE -> {
+                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
+                        inputRouter.processDelete()
+                        keyboardView.updateComposingText(inputRouter.composingText)
+                        keyboardView.updateCandidates(inputRouter.candidates)
+                    } else {
+                        gp.onDeleteInput()
+                    }
+                }
+                KeyboardView.KEYCODE_ENTER -> {
+                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
+                        // 先提交組字到搜尋框
+                        gp.onComposedTextInput(inputRouter.composingText)
+                        inputRouter.reset()
+                        keyboardView.updateComposingText("")
+                        keyboardView.updateCandidates(emptyList())
+                    }
+                    gp.onEnterInput()
+                }
+                KeyboardView.KEYCODE_SPACE -> {
+                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
+                        val result = inputRouter.processSpace()
+                        if (result is InputResult.CommitText) {
+                            gp.onComposedTextInput(result.text)
+                        }
+                        keyboardView.updateComposingText(inputRouter.composingText)
+                        keyboardView.updateCandidates(inputRouter.candidates)
+                    } else {
+                        gp.onSpaceInput()
+                    }
+                }
                 KeyboardView.KEYCODE_SWITCH_LANG -> handleSwitchLang()
                 KeyboardView.KEYCODE_SHIFT, KeyboardView.KEYCODE_CTRL -> { }
-                else -> if (label.isNotEmpty() && keyCode >= 0) gp.onCharInput(label)
+                else -> if (label.isNotEmpty() && keyCode >= 0) {
+                    if (isCjk) {
+                        val result = inputRouter.processInput(label)
+                        if (result is InputResult.CommitText) {
+                            gp.onComposedTextInput(result.text)
+                        }
+                        keyboardView.updateComposingText(inputRouter.composingText)
+                        keyboardView.updateCandidates(inputRouter.candidates)
+                    } else {
+                        gp.onCharInput(label)
+                    }
+                }
             }
             return
         }
 
         val ic: InputConnection = currentInputConnection ?: return
+
+        // 更新上下文給候選排序用
+        inputRouter.contextBeforeCursor = ic.getTextBeforeCursor(20, 0)?.toString() ?: ""
 
         ic.beginBatchEdit()
         try {
@@ -1469,6 +1526,18 @@ class YukiBoardIMEService : InputMethodService() {
                 sendKey(ic, KeyEvent.KEYCODE_DPAD_LEFT)
                 sendKey(ic, KeyEvent.KEYCODE_DPAD_LEFT)
                 sendKey(ic, KeyEvent.KEYCODE_DPAD_LEFT)
+            }
+
+            // 日語 あ⇔ア 切換
+            KeyboardView.KEYCODE_TOGGLE_KANA -> {
+                val eng = inputRouter.getActiveEngine()
+                if (eng is com.snowrealm.yukiboard.input.engine.JapaneseInputEngine) {
+                    eng.toggleKatakana()
+                    keyboardView.updateComposingText(inputRouter.composingText)
+                    // 更新按鈕標籤
+                    val newLabel = if (eng.katakanaMode) "カナ→あ" else "あ→カナ"
+                    keyboardView.showToast(if (eng.katakanaMode) "片仮名モード" else "平仮名モード")
+                }
             }
 
             // 子佈局切換鍵（由 KeyboardView 內部處理，不需 IME 動作）

@@ -116,6 +116,8 @@ class YukiPreferences(context: Context) {
     // 自訂背景
     var useCustomBackground: Boolean by BoolPref("use_custom_bg", false)
     var bgOverlayAlpha: Int by IntPref("bg_overlay_alpha", 100)
+    var bgOffsetX: Float by FloatPref("bg_offset_x", 0.5f)   // 0.0=最左 ~ 1.0=最右
+    var bgOffsetY: Float by FloatPref("bg_offset_y", 0.5f)   // 0.0=最上 ~ 1.0=最下
 
     // 透明鍵盤（透視到底層 App）
     var transparentKeyboard: Boolean by BoolPref("transparent_keyboard", false)

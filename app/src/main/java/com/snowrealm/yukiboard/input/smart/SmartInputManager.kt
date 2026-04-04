@@ -106,6 +106,14 @@ class SmartInputManager(context: Context) {
     }
 
     /**
+     * 用外部上下文（getTextBeforeCursor）做 bigram/trigram 預測。
+     */
+    fun predictWithContext(contextWords: List<String>, max: Int = 5): List<String> {
+        if (!phrasePredictEnabled) return emptyList()
+        return phrasePredictor.predictWithContext(contextWords, max).map { it.word }
+    }
+
+    /**
      * 取得情境建議（時段 + App 綜合）。
      */
     fun getContextSuggestions(appPackage: String? = null, max: Int = 3): List<String> {
