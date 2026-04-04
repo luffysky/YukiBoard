@@ -73,6 +73,10 @@ android {
         debug {
             minifyEnabled false
             debuggable true
+            firebaseAppDistribution {
+                groups = "testers"
+                releaseNotes = "v${android.defaultConfig.versionName} debug build"
+            }
         }
     }
 
