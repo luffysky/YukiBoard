@@ -1173,10 +1173,22 @@ class KeyboardView(context: Context) : View(context) {
                         performClick()
                         return true
                     }
-                    // composing 佔用寬度
+                    // 語言標籤 + composing 佔用寬度（與繪製邏輯一致）
+                    val langLabel = when (currentInputMode) {
+                        com.snowrealm.yukiboard.input.router.InputMode.ENGLISH -> "EN"
+                        com.snowrealm.yukiboard.input.router.InputMode.BOPOMOFO -> "中文 [注音]"
+                        com.snowrealm.yukiboard.input.router.InputMode.PINYIN -> "中文 [拼音]"
+                        com.snowrealm.yukiboard.input.router.InputMode.CANGJIE -> "中文 [倉頡]"
+                        com.snowrealm.yukiboard.input.router.InputMode.SPEED_CANGJIE -> "中文 [速成]"
+                        com.snowrealm.yukiboard.input.router.InputMode.JAPANESE -> "日本語 [ローマ字]"
+                        com.snowrealm.yukiboard.input.router.InputMode.KOREAN -> "한국어"
+                        com.snowrealm.yukiboard.input.router.InputMode.AUTO -> "AUTO"
+                    }
+                    altHintPaint.textSize = 10f * density
+                    val langLabelWidth = altHintPaint.measureText(langLabel) + 16f * density
                     val compW = if (composingText.isNotEmpty()) {
-                        composingPaint.measureText("[$composingText]") + 24f * density
-                    } else 0f
+                        langLabelWidth + composingPaint.measureText("[$composingText]") + 12f * density
+                    } else langLabelWidth
                     // 點在 composing 區域內不選字
                     if (x < compW) {
                         performClick()
