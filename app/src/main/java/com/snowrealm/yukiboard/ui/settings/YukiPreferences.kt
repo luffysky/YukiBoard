@@ -119,6 +119,8 @@ class YukiPreferences(context: Context) {
     var bgOffsetX: Float by FloatPref("bg_offset_x", 0.5f)   // 0.0=最左 ~ 1.0=最右
     var bgOffsetY: Float by FloatPref("bg_offset_y", 0.5f)   // 0.0=最上 ~ 1.0=最下
     var bgScaleMode: Int by IntPref("bg_scale_mode", 0)       // 0=保持比例(裁切) 1=整張塞入(拉伸)
+    var keyScalePercent: Int by IntPref("key_scale_percent", 100)  // 按鍵大小 70~130%
+    var keyOpacity: Int by IntPref("key_opacity", 255)             // 按鍵背景不透明度 0~255
 
     // 透明鍵盤（透視到底層 App）
     var transparentKeyboard: Boolean by BoolPref("transparent_keyboard", false)

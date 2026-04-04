@@ -179,6 +179,12 @@ class KeyboardView(context: Context) : View(context) {
     var bgOverlayAlpha: Int = 100
     /** 自訂字體顏色（0 = 跟隨主題） */
     var customKeyLabelColor: Int = 0
+    /** 按鍵大小比例 70~130（百分比），影響行高和字體大小 */
+    var keyScalePercent: Int = 100
+        set(value) { field = value.coerceIn(70, 130); requestLayout(); invalidate() }
+    /** 按鍵背景不透明度 0~255 */
+    var keyOpacity: Int = 255
+        set(value) { field = value.coerceIn(0, 255); invalidate() }
     private var expandScrollOffset: Float = 0f    // 展開面板捲動偏移
     private var expandTouchStartY: Float = 0f     // 觸控起始 Y（用於滑動偵測）
     private var expandLastTouchY: Float = 0f      // 上一次觸控 Y
@@ -582,7 +588,8 @@ class KeyboardView(context: Context) : View(context) {
             mainRowCount
         }
 
-        val preferredRowH = if (isLandscape) rowHeightLandscape else rowHeightPortrait
+        val baseRowH = if (isLandscape) rowHeightLandscape else rowHeightPortrait
+        val preferredRowH = baseRowH * keyScalePercent / 100f
         val preferredHeight = candidateBarHeight + effectiveRowCount * preferredRowH + bottomPadding
 
         val heightMode = MeasureSpec.getMode(heightMeasureSpec)
@@ -930,7 +937,9 @@ class KeyboardView(context: Context) : View(context) {
         val isSide = (left > 0f)
         val useLabelPaint = if (isSide) sideLabelPaint else labelPaint
         if (isSide) {
-            sideLabelPaint.textSize = 12f * density
+            sideLabelPaint.textSize = 12f * density * keyScalePercent / 100f
+        } else {
+            labelPaint.textSize = (if (theme.keyFontSizeSp > 0) theme.keyFontSizeSp else 18f) * density * keyScalePercent / 100f
         }
 
         val totalUnits = rows.maxOfOrNull { row ->
@@ -957,13 +966,18 @@ class KeyboardView(context: Context) : View(context) {
                 val isPressed = pressedKey == key
                 val isShiftKey = key.code == KEYCODE_SHIFT
                 val isCtrlKey = key.code == KEYCODE_CTRL
-                val rawKeyColor = when {
+                val baseKeyColor = when {
                     isPressed -> theme.keyPressedColorInt
                     isShiftKey && (isShifted || isCapsLock) -> theme.keyPressedColorInt
                     isCtrlKey && isCtrlActive -> theme.candidateSelectedColorInt
                     key.isSpecial -> theme.specialKeyColorInt
                     else -> theme.keyColorInt
                 }
+                // 套用按鍵不透明度
+                val rawKeyColor = if (keyOpacity < 255) {
+                    val a = ((baseKeyColor ushr 24) * keyOpacity / 255).coerceIn(0, 255)
+                    (a shl 24) or (baseKeyColor and 0x00FFFFFF)
+                } else baseKeyColor
                 val cr = theme.keyCornerRadiusDp * density
 
                 if (hasCustomBackground) {

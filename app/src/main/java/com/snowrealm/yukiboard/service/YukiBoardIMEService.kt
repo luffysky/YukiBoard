@@ -301,6 +301,8 @@ class YukiBoardIMEService : InputMethodService() {
         // 只有啟用自訂背景時才改為玻璃模式
         keyboardView.hasCustomBackground = useCustomBg
         keyboardView.bgOverlayAlpha = prefs.bgOverlayAlpha
+        keyboardView.keyScalePercent = prefs.keyScalePercent
+        keyboardView.keyOpacity = prefs.keyOpacity
         keyboardView.hapticEnabled = prefs.keyPressVibration
 
         // 套用當前主題
@@ -438,6 +440,8 @@ class YukiBoardIMEService : InputMethodService() {
             keyboardView.bgOverlayAlpha = prefs.bgOverlayAlpha
         }
         keyboardView.customKeyLabelColor = prefs.customKeyLabelColor
+        keyboardView.keyScalePercent = prefs.keyScalePercent
+        keyboardView.keyOpacity = prefs.keyOpacity
         keyboardView.hapticEnabled = prefs.keyPressVibration
 
         // 遊戲模式恢復

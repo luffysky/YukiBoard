@@ -2,6 +2,7 @@ package com.snowrealm.yukiboard.ui.settings
 
 import android.content.Intent
 import android.content.res.Configuration
+import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
@@ -367,6 +368,7 @@ class SettingsActivity : AppCompatActivity() {
     private var bgPreviewContainer: FrameLayout? = null
     private var bgVideoPlayer: android.media.MediaPlayer? = null
     private var bgVideoTexture: android.view.TextureView? = null
+    private var fullPreviewView: View? = null
 
     private fun buildBackgroundCard(): LinearLayout {
         val card = simpleCard("鍵盤背景 / Background")
@@ -488,6 +490,7 @@ class SettingsActivity : AppCompatActivity() {
                     prefs.bgOverlayAlpha = p
                     alphaLabel.text = "遮罩深度: %d%%".format((p * 100) / 255)
                     bgPreviewOverlay?.setBackgroundColor(android.graphics.Color.argb(p, 0, 0, 0))
+                    fullPreviewView?.invalidate()
                 }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
                 override fun onStopTrackingTouch(sb: SeekBar?) {}
@@ -527,13 +530,13 @@ class SettingsActivity : AppCompatActivity() {
             prefs.bgScaleMode = 0
             btnCrop.setTextColor(0xFF111827.toInt()); btnCrop.setBackgroundColor(0xFF7FD8FF.toInt())
             btnFit.setTextColor(0xFFE8F4FF.toInt()); btnFit.setBackgroundColor(0xFF2A3A5C.toInt())
-            updateBgPreviewMatrix()
+            updateBgPreviewMatrix(); fullPreviewView?.invalidate()
         }
         btnFit.setOnClickListener {
             prefs.bgScaleMode = 1
             btnFit.setTextColor(0xFF111827.toInt()); btnFit.setBackgroundColor(0xFF7FD8FF.toInt())
             btnCrop.setTextColor(0xFFE8F4FF.toInt()); btnCrop.setBackgroundColor(0xFF2A3A5C.toInt())
-            updateBgPreviewMatrix()
+            updateBgPreviewMatrix(); fullPreviewView?.invalidate()
         }
         scaleModeRow.addView(btnCrop)
         scaleModeRow.addView(btnFit)
@@ -555,7 +558,7 @@ class SettingsActivity : AppCompatActivity() {
                 override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
                     prefs.bgOffsetX = p / 100f
                     xLabel.text = "水平位置 X: %d%%".format(p)
-                    updateBgPreviewMatrix()
+                    updateBgPreviewMatrix(); fullPreviewView?.invalidate()
                 }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
                 override fun onStopTrackingTouch(sb: SeekBar?) {}
@@ -578,12 +581,71 @@ class SettingsActivity : AppCompatActivity() {
                 override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
                     prefs.bgOffsetY = p / 100f
                     yLabel.text = "垂直位置 Y: %d%%".format(p)
-                    updateBgPreviewMatrix()
+                    updateBgPreviewMatrix(); fullPreviewView?.invalidate()
                 }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
                 override fun onStopTrackingTouch(sb: SeekBar?) {}
             })
         })
+
+        // ── 按鍵大小拉桿 ──
+        val keySizeLabel = TextView(this).apply {
+            text = "按鍵大小: %d%%".format(prefs.keyScalePercent)
+            textSize = 12f
+            setTextColor(0xFF7FD8FF.toInt())
+            setPadding(dp(12), dp(8), 0, dp(4))
+        }
+        card.addView(keySizeLabel)
+        card.addView(SeekBar(this).apply {
+            max = 60   // 70~130 → offset 0~60
+            progress = prefs.keyScalePercent - 70
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+                    prefs.keyScalePercent = p + 70
+                    keySizeLabel.text = "按鍵大小: %d%%".format(p + 70)
+                    fullPreviewView?.invalidate()
+                }
+                override fun onStartTrackingTouch(sb: SeekBar?) {}
+                override fun onStopTrackingTouch(sb: SeekBar?) {}
+            })
+        })
+
+        // ── 按鍵透明度拉桿 ──
+        val keyOpLabel = TextView(this).apply {
+            text = "按鍵不透明度: %d%%".format((prefs.keyOpacity * 100) / 255)
+            textSize = 12f
+            setTextColor(0xFF7FD8FF.toInt())
+            setPadding(dp(12), dp(4), 0, dp(4))
+        }
+        card.addView(keyOpLabel)
+        card.addView(SeekBar(this).apply {
+            max = 255
+            progress = prefs.keyOpacity
+            setPadding(dp(12), dp(4), dp(12), dp(8))
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+                    prefs.keyOpacity = p
+                    keyOpLabel.text = "按鍵不透明度: %d%%".format((p * 100) / 255)
+                    fullPreviewView?.invalidate()
+                }
+                override fun onStartTrackingTouch(sb: SeekBar?) {}
+                override fun onStopTrackingTouch(sb: SeekBar?) {}
+            })
+        })
+
+        // ── 鍵盤完整預覽（背景 + 遮罩 + 按鍵） ──
+        val previewTitle = TextView(this).apply {
+            text = "鍵盤預覽"
+            textSize = 13f
+            setTextColor(0xFF7FD8FF.toInt())
+            setPadding(dp(12), dp(12), 0, dp(4))
+        }
+        card.addView(previewTitle)
+
+        val kbPreview = buildFullKeyboardPreview()
+        fullPreviewView = kbPreview
+        card.addView(kbPreview)
 
         // ── 透明鍵盤 ──
         card.addView(switchRow("透明鍵盤", "背景完全透視到底層 App", prefs.transparentKeyboard) {
@@ -724,6 +786,135 @@ class SettingsActivity : AppCompatActivity() {
             bgPreviewImage?.setImageBitmap(null)
             bgPreviewLabel?.text = "尚未設定背景"
             bgPreviewLabel?.visibility = View.VISIBLE
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 鍵盤完整預覽（背景 + 遮罩 + 按鍵）
+    // ─────────────────────────────────────────────────────────
+
+    private fun buildFullKeyboardPreview(): View {
+        val theme = themeManager.currentTheme
+        val savedBg = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getSavedBackground(this)
+        val bgBitmap: android.graphics.Bitmap? = if (savedBg != null &&
+            !com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.isVideoFile(savedBg)) {
+            try {
+                val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = 4 }
+                android.graphics.BitmapFactory.decodeFile(savedBg.absolutePath, opts)
+            } catch (_: Exception) { null }
+        } else null
+
+        val previewHeight = dp(160)
+        val dens = resources.displayMetrics.density
+
+        return object : View(this@SettingsActivity) {
+            private val keyPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+            private val textPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                textAlign = android.graphics.Paint.Align.CENTER
+                color = if (prefs.customKeyLabelColor != 0) prefs.customKeyLabelColor else theme.keyLabelColorInt
+            }
+            private val bgMatrix = android.graphics.Matrix()
+
+            init {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, previewHeight
+                ).apply { setMargins(dp(12), dp(4), dp(12), dp(12)) }
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    setColor(theme.backgroundColorInt)
+                    cornerRadius = dp(8).toFloat()
+                }
+                clipToOutline = true
+                outlineProvider = object : android.view.ViewOutlineProvider() {
+                    override fun getOutline(view: View, outline: android.graphics.Outline) {
+                        outline.setRoundRect(0, 0, view.width, view.height, dp(8).toFloat())
+                    }
+                }
+            }
+
+            override fun onDraw(canvas: Canvas) {
+                super.onDraw(canvas)
+                val w = width.toFloat()
+                val h = height.toFloat()
+                if (w <= 0 || h <= 0) return
+
+                // 1. 背景圖片
+                val bmp = bgBitmap
+                if (bmp != null && prefs.useCustomBackground) {
+                    bgMatrix.reset()
+                    if (prefs.bgScaleMode == 1) {
+                        bgMatrix.setScale(w / bmp.width, h / bmp.height)
+                    } else {
+                        val scale = maxOf(w / bmp.width, h / bmp.height)
+                        val sw = bmp.width * scale
+                        val sh = bmp.height * scale
+                        val maxDx = (sw - w).coerceAtLeast(0f)
+                        val maxDy = (sh - h).coerceAtLeast(0f)
+                        bgMatrix.setScale(scale, scale)
+                        bgMatrix.postTranslate(-maxDx * prefs.bgOffsetX, -maxDy * prefs.bgOffsetY)
+                    }
+                    canvas.drawBitmap(bmp, bgMatrix, null)
+
+                    // 2. 遮罩
+                    keyPaint.color = android.graphics.Color.argb(prefs.bgOverlayAlpha, 0, 0, 0)
+                    keyPaint.style = android.graphics.Paint.Style.FILL
+                    canvas.drawRect(0f, 0f, w, h, keyPaint)
+                }
+
+                // 3. 繪製迷你鍵盤按鍵
+                val rows = com.snowrealm.yukiboard.ui.keyboard.KeyboardState.defaultQwertyRows()
+                val hasBg = bmp != null && prefs.useCustomBackground
+                val scalePct = prefs.keyScalePercent
+                val keyAlpha = prefs.keyOpacity
+                val baseRowH = h / rows.size
+                val rowH = baseRowH * scalePct / 100f
+                val yOffset = (h - rows.size * rowH) / 2f  // 垂直居中
+                val padH = 2f * dens
+                val padV = 2f * dens
+                val cr = theme.keyCornerRadiusDp * dens * 0.6f
+                val fontSize = 10f * dens * scalePct / 100f
+                textPaint.textSize = fontSize
+                textPaint.color = if (prefs.customKeyLabelColor != 0) prefs.customKeyLabelColor
+                    else theme.keyLabelColorInt
+
+                val totalUnits = rows.maxOf { row -> row.sumOf { it.widthWeight.toDouble() }.toFloat() }
+
+                rows.forEachIndexed { rowIdx, row ->
+                    val top = yOffset + rowIdx * rowH
+                    var x = 0f
+                    val unitW = w / totalUnits
+
+                    row.forEach { key ->
+                        val keyW = unitW * key.widthWeight
+                        val rect = android.graphics.RectF(
+                            x + padH, top + padV,
+                            x + keyW - padH, top + rowH - padV
+                        )
+
+                        if (hasBg) {
+                            // 玻璃模式：透明底 + 細框線
+                            keyPaint.style = android.graphics.Paint.Style.STROKE
+                            keyPaint.strokeWidth = 0.5f * dens
+                            keyPaint.color = android.graphics.Color.argb((keyAlpha * 0.3f).toInt().coerceIn(0, 255), 255, 255, 255)
+                            canvas.drawRoundRect(rect, cr, cr, keyPaint)
+                        } else {
+                            // 標準模式
+                            val baseColor = if (key.isSpecial) theme.specialKeyColorInt else theme.keyColorInt
+                            val a = ((baseColor ushr 24) * keyAlpha / 255).coerceIn(0, 255)
+                            keyPaint.color = (a shl 24) or (baseColor and 0x00FFFFFF)
+                            keyPaint.style = android.graphics.Paint.Style.FILL
+                            canvas.drawRoundRect(rect, cr, cr, keyPaint)
+                        }
+
+                        // 標籤
+                        val label = key.label
+                        if (label.isNotEmpty() && label.length <= 3) {
+                            val textY = rect.top + (rect.height() + fontSize) / 2f - textPaint.descent()
+                            canvas.drawText(label, rect.centerX(), textY, textPaint)
+                        }
+                        x += keyW
+                    }
+                }
+            }
         }
     }
 
