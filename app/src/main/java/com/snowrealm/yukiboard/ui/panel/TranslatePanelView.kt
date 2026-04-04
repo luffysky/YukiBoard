@@ -42,7 +42,7 @@ class TranslatePanelView(context: Context) : View(context) {
     var theme: KeyboardTheme = KeyboardTheme.default()
         set(value) { field = value; invalidate() }
 
-    /** 外部設定要翻譯的來源文字（通常從游標前方取得） */
+    /** 外部設定要翻譯的來源文字（從游標擷取或手動輸入） */
     var sourceText: String = ""
         set(value) { field = value; translate(); invalidate() }
 
@@ -50,8 +50,15 @@ class TranslatePanelView(context: Context) : View(context) {
     var translatedText: String = ""
         private set
 
+    /** 使用者正在手動輸入翻譯來源 */
+    private var isInputMode = false
+    private val inputBuffer = StringBuilder()
+
     /** 點擊翻譯結果時回呼 */
     var onTranslatedSelected: ((String) -> Unit)? = null
+
+    /** 請求焦點到翻譯輸入框（讓鍵盤打的字進到這裡） */
+    var onRequestInputMode: ((Boolean) -> Unit)? = null
 
     /** 翻譯引擎回呼 — 由 IME Service 注入 */
     var translationProvider: ((source: String, fromLang: String, toLang: String, callback: (String) -> Unit) -> Unit)? = null
@@ -73,6 +80,9 @@ class TranslatePanelView(context: Context) : View(context) {
     private var swapRect = RectF()
     private var fromRect = RectF()
     private var toRect = RectF()
+    private var sourceRect = RectF()
+    private var clearRect = RectF()
+    private var translateBtnRect = RectF()
     private val fromLangRects = mutableListOf<Pair<RectF, Int>>()
     private val toLangRects = mutableListOf<Pair<RectF, Int>>()
     private var showFromPicker = false
@@ -99,22 +109,72 @@ class TranslatePanelView(context: Context) : View(context) {
         // 語言選擇列
         drawLangHeader(canvas)
 
+        // 來源文字輸入框
+        val srcY = headerH + 6 * density
+        val srcH = 44 * density
+        sourceRect = RectF(8 * density, srcY, width - 8 * density, srcY + srcH)
+
+        // 輸入框背景
+        btnPaint.color = if (isInputMode)
+            (theme.candidateSelectedColorInt and 0x00FFFFFF) or 0x22000000
+        else
+            (theme.keyColorInt and 0x00FFFFFF) or 0x30000000
+        canvas.drawRoundRect(sourceRect, cornerR, cornerR, btnPaint)
+
+        // 輸入框邊框（聚焦時）
+        if (isInputMode) {
+            val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = 1.5f * density
+                color = theme.candidateSelectedColorInt
+            }
+            canvas.drawRoundRect(sourceRect, cornerR, cornerR, borderPaint)
+        }
+
         // 來源文字
-        val srcY = headerH + 8 * density
+        val displayText = when {
+            isInputMode && inputBuffer.isNotEmpty() -> inputBuffer.toString()
+            sourceText.isNotEmpty() -> sourceText
+            else -> ""
+        }
+        val placeholder = if (isInputMode) "輸入要翻譯的文字..." else "點此輸入，或從輸入框擷取文字"
         textPaint.color = theme.candidateTextColorInt
-        val srcDisplay = if (sourceText.isEmpty()) "(從游標前方擷取文字)" else sourceText
-        textPaint.alpha = if (sourceText.isEmpty()) 100 else 255
-        canvas.drawText(srcDisplay, 12f * density, srcY + textPaint.textSize, textPaint)
+        textPaint.alpha = if (displayText.isEmpty()) 80 else 255
+        val srcTextDisplay = displayText.ifEmpty { placeholder }
+        canvas.drawText(srcTextDisplay, sourceRect.left + 10 * density, sourceRect.centerY() + textPaint.textSize / 3f, textPaint)
         textPaint.alpha = 255
 
-        // 分隔線
-        val divY = srcY + 40 * density
-        bgPaint.color = theme.keyColorInt
-        canvas.drawRect(12 * density, divY, width - 12 * density, divY + density, bgPaint)
+        // 右側清除按鈕（有文字時顯示）
+        if (displayText.isNotEmpty()) {
+            val clearSize = 20 * density
+            clearRect = RectF(
+                sourceRect.right - clearSize - 8 * density,
+                sourceRect.centerY() - clearSize / 2,
+                sourceRect.right - 8 * density,
+                sourceRect.centerY() + clearSize / 2
+            )
+            swapPaint.color = (theme.candidateTextColorInt and 0x00FFFFFF) or 0x88000000.toInt()
+            swapPaint.textSize = 14f * density
+            canvas.drawText("✕", clearRect.centerX(), clearRect.centerY() + 5 * density, swapPaint)
+            swapPaint.textSize = 18f * density
+        } else {
+            clearRect = RectF()
+        }
+
+        // 翻譯按鈕
+        val btnY = srcY + srcH + 6 * density
+        val btnH = 32 * density
+        translateBtnRect = RectF(width - 80 * density, btnY, width - 8 * density, btnY + btnH)
+        btnPaint.color = theme.candidateSelectedColorInt
+        canvas.drawRoundRect(translateBtnRect, cornerR, cornerR, btnPaint)
+        langPaint.color = 0xFFFFFFFF.toInt()
+        langPaint.textSize = 11f * density
+        canvas.drawText("翻譯 →", translateBtnRect.centerX(), translateBtnRect.centerY() + langPaint.textSize / 3f, langPaint)
+        langPaint.textSize = 12f * density
 
         // 翻譯結果（可點擊）
-        val resY = divY + 8 * density
-        resultRect = RectF(8 * density, resY, width - 8 * density, resY + 50 * density)
+        val resY = btnY + btnH + 6 * density
+        resultRect = RectF(8 * density, resY, width - 8 * density, height - 8 * density)
 
         btnPaint.color = (theme.candidateSelectedColorInt and 0x00FFFFFF) or 0x18000000
         canvas.drawRoundRect(resultRect, cornerR, cornerR, btnPaint)
@@ -251,6 +311,42 @@ class TranslatePanelView(context: Context) : View(context) {
                 return true
             }
 
+            // 點擊來源輸入框 → 進入手動輸入模式
+            if (sourceRect.contains(event.x, event.y)) {
+                // 先檢查是否點了清除按鈕
+                if (!clearRect.isEmpty && clearRect.contains(event.x, event.y)) {
+                    inputBuffer.clear()
+                    sourceText = ""
+                    translatedText = ""
+                    invalidate()
+                    performClick()
+                    return true
+                }
+                if (!isInputMode) {
+                    isInputMode = true
+                    inputBuffer.clear()
+                    if (sourceText.isNotEmpty()) {
+                        inputBuffer.append(sourceText)
+                    }
+                    onRequestInputMode?.invoke(true)
+                    invalidate()
+                }
+                performClick()
+                return true
+            }
+
+            // 翻譯按鈕
+            if (translateBtnRect.contains(event.x, event.y)) {
+                if (isInputMode && inputBuffer.isNotEmpty()) {
+                    sourceText = inputBuffer.toString()
+                } else if (sourceText.isNotEmpty()) {
+                    translate()
+                }
+                invalidate()
+                performClick()
+                return true
+            }
+
             // 點擊翻譯結果 → 插入
             if (resultRect.contains(event.x, event.y) && translatedText.isNotEmpty()) {
                 onTranslatedSelected?.invoke(translatedText)
@@ -264,6 +360,48 @@ class TranslatePanelView(context: Context) : View(context) {
     override fun performClick(): Boolean {
         super.performClick()
         return true
+    }
+
+    // ─────────────── 手動輸入 API ���──────────────
+
+    /** 是否處於翻譯輸入模式 */
+    val isInInputMode: Boolean get() = isInputMode
+
+    /** 接收鍵盤字元輸入 */
+    fun onCharInput(text: String) {
+        if (!isInputMode) return
+        inputBuffer.append(text)
+        invalidate()
+    }
+
+    /** 接收退格 */
+    fun onDeleteInput() {
+        if (!isInputMode || inputBuffer.isEmpty()) return
+        inputBuffer.deleteCharAt(inputBuffer.lastIndex)
+        invalidate()
+    }
+
+    /** 接收空白鍵 — 加空格 */
+    fun onSpaceInput() {
+        if (!isInputMode) return
+        inputBuffer.append(' ')
+        invalidate()
+    }
+
+    /** 接收 Enter — 觸發翻譯 */
+    fun onEnterInput() {
+        if (!isInputMode) return
+        if (inputBuffer.isNotEmpty()) {
+            sourceText = inputBuffer.toString()
+        }
+        invalidate()
+    }
+
+    /** 退出輸入模式 */
+    fun exitInputMode() {
+        isInputMode = false
+        onRequestInputMode?.invoke(false)
+        invalidate()
     }
 
     private data class LangOption(val code: String, val display: String)

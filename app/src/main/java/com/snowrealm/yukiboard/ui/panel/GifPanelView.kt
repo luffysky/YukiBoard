@@ -60,6 +60,9 @@ class GifPanelView(context: Context) : View(context) {
     private var searchQuery = ""
     private var gifResults = listOf<GifItem>()
     private var isLoading = false
+    private var isInputMode = false
+    private val inputBuffer = StringBuilder()
+    private var searchBarRect = RectF()
     private val tagRects = mutableListOf<Pair<RectF, String>>()
     private val gifRects = mutableListOf<Pair<RectF, Int>>()
 
@@ -120,17 +123,42 @@ class GifPanelView(context: Context) : View(context) {
         bgPaint.color = theme.candidateBarColorInt
         canvas.drawRect(0f, 0f, width.toFloat(), searchBarH, bgPaint)
 
-        val searchRect = RectF(8 * density, 4 * density, width - 8 * density, searchBarH - 4 * density)
-        cardPaint.color = theme.keyColorInt
-        canvas.drawRoundRect(searchRect, cornerR, cornerR, cardPaint)
+        searchBarRect = RectF(8 * density, 4 * density, width - 8 * density, searchBarH - 4 * density)
+        cardPaint.color = if (isInputMode)
+            (theme.candidateSelectedColorInt and 0x00FFFFFF) or 0x22000000
+        else theme.keyColorInt
+        canvas.drawRoundRect(searchBarRect, cornerR, cornerR, cardPaint)
 
-        searchPaint.color = if (searchQuery.isEmpty()) {
+        // 聚焦邊框
+        if (isInputMode) {
+            val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = 1.5f * density
+                color = theme.candidateSelectedColorInt
+            }
+            canvas.drawRoundRect(searchBarRect, cornerR, cornerR, borderPaint)
+        }
+
+        val currentText = if (isInputMode) inputBuffer.toString() else searchQuery
+        searchPaint.color = if (currentText.isEmpty()) {
             theme.candidateTextColorInt.and(0x00FFFFFF).or(0x80000000.toInt())
         } else {
             theme.keyLabelColorInt
         }
-        val displayText = searchQuery.ifEmpty { "\uD83D\uDD0D 搜尋 GIF..." }
-        canvas.drawText(displayText, searchRect.left + 12 * density, searchRect.centerY() + searchPaint.textSize / 3f, searchPaint)
+        val displayText = if (currentText.isEmpty()) {
+            if (isInputMode) "輸入搜尋關鍵字..." else "\uD83D\uDD0D 點此搜尋 GIF..."
+        } else currentText
+        canvas.drawText(displayText, searchBarRect.left + 12 * density, searchBarRect.centerY() + searchPaint.textSize / 3f, searchPaint)
+
+        // 清除按鈕
+        if (currentText.isNotEmpty()) {
+            val clearPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                textAlign = Paint.Align.CENTER
+                textSize = 14f * density
+                color = (theme.candidateTextColorInt and 0x00FFFFFF) or 0x88000000.toInt()
+            }
+            canvas.drawText("✕", searchBarRect.right - 16 * density, searchBarRect.centerY() + 5 * density, clearPaint)
+        }
     }
 
     private fun drawTrendingTags(canvas: Canvas) {
@@ -289,9 +317,33 @@ class GifPanelView(context: Context) : View(context) {
             }
             MotionEvent.ACTION_UP -> {
                 if (!isDragging) {
+                    // 搜尋框點擊
+                    if (searchBarRect.contains(event.x, event.y)) {
+                        // 清除按鈕
+                        val currentText = if (isInputMode) inputBuffer.toString() else searchQuery
+                        if (currentText.isNotEmpty() && event.x > searchBarRect.right - 30 * density) {
+                            inputBuffer.clear()
+                            searchQuery = ""
+                            gifResults = emptyList()
+                            invalidate()
+                            performClick()
+                            return true
+                        }
+                        // 進入輸入模式
+                        if (!isInputMode) {
+                            isInputMode = true
+                            inputBuffer.clear()
+                            if (searchQuery.isNotEmpty()) inputBuffer.append(searchQuery)
+                            invalidate()
+                        }
+                        performClick()
+                        return true
+                    }
+
                     // 標籤
                     val tagHit = tagRects.firstOrNull { it.first.contains(event.x, event.y) }
                     if (tagHit != null) {
+                        isInputMode = false
                         search(tagHit.second)
                         performClick()
                         return true
@@ -319,6 +371,41 @@ class GifPanelView(context: Context) : View(context) {
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         scope.cancel()
+    }
+
+    // ─────��───────── 鍵盤輸入 API ───────────────
+
+    val isInInputMode: Boolean get() = isInputMode
+
+    fun onCharInput(text: String) {
+        if (!isInputMode) return
+        inputBuffer.append(text)
+        invalidate()
+    }
+
+    fun onDeleteInput() {
+        if (!isInputMode || inputBuffer.isEmpty()) return
+        inputBuffer.deleteCharAt(inputBuffer.lastIndex)
+        invalidate()
+    }
+
+    fun onSpaceInput() {
+        if (!isInputMode) return
+        inputBuffer.append(' ')
+        invalidate()
+    }
+
+    fun onEnterInput() {
+        if (!isInputMode) return
+        if (inputBuffer.isNotEmpty()) {
+            isInputMode = false
+            search(inputBuffer.toString())
+        }
+    }
+
+    fun exitInputMode() {
+        isInputMode = false
+        invalidate()
     }
 
     /** GIF 項目資料 */

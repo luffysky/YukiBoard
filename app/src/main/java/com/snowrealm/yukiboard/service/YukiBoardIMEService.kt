@@ -473,6 +473,9 @@ class YukiBoardIMEService : InputMethodService() {
     }
 
     private fun showPanel(panel: PanelType) {
+        // 離開面板輸入模式
+        translatePanel?.exitInputMode()
+        gifPanel?.exitInputMode()
         panelContainer.removeAllViews()
         panelContainer.visibility = View.VISIBLE
 
@@ -506,17 +509,28 @@ class YukiBoardIMEService : InputMethodService() {
             PanelType.TRANSLATE -> {
                 val p = TranslatePanelView(this).also { translatePanel = it }
                 p.theme = theme
-                // 從游標前方取得文字作為翻譯來源
-                val before = currentInputConnection?.getTextBeforeCursor(200, 0)?.toString() ?: ""
-                p.sourceText = before.trim().takeLast(100)
+                // 嘗試從選取文字 → 游標前方 → 游標後方擷取
+                val ic = currentInputConnection
+                val selected = ic?.getSelectedText(0)?.toString()?.trim() ?: ""
+                val source = if (selected.isNotEmpty()) {
+                    selected.take(200)
+                } else {
+                    val before = ic?.getTextBeforeCursor(200, 0)?.toString()?.trim() ?: ""
+                    if (before.isNotEmpty()) before.takeLast(100)
+                    else {
+                        val after = ic?.getTextAfterCursor(200, 0)?.toString()?.trim() ?: ""
+                        after.take(100)
+                    }
+                }
+                if (source.isNotEmpty()) p.sourceText = source
                 p.onTranslatedSelected = { translated ->
                     currentInputConnection?.commitText(translated, 1)
                 }
                 val engine = translateEngine
                 if (engine != null) {
-                    p.translationProvider = { source, fromLang, toLang, callback ->
+                    p.translationProvider = { src, fromLang, toLang, callback ->
                         serviceScope.launch {
-                            val result = engine.translate(source, fromLang, toLang)
+                            val result = engine.translate(src, fromLang, toLang)
                             callback(result)
                         }
                     }
@@ -1045,6 +1059,34 @@ class YukiBoardIMEService : InputMethodService() {
     // =========================================================================
 
     private fun handleKeyPress(keyCode: Int, label: String) {
+        // 翻譯面板輸入模式：攔截鍵盤輸入到翻譯框
+        val tp = translatePanel
+        if (tp != null && tp.isInInputMode) {
+            when (keyCode) {
+                KeyboardView.KEYCODE_DELETE -> tp.onDeleteInput()
+                KeyboardView.KEYCODE_ENTER -> tp.onEnterInput()
+                KeyboardView.KEYCODE_SPACE -> tp.onSpaceInput()
+                KeyboardView.KEYCODE_SWITCH_LANG -> handleSwitchLang()
+                KeyboardView.KEYCODE_SHIFT, KeyboardView.KEYCODE_CTRL -> { }
+                else -> if (label.isNotEmpty() && keyCode >= 0) tp.onCharInput(label)
+            }
+            return
+        }
+
+        // GIF 面板輸入模式：攔截鍵盤輸入到搜尋框
+        val gp = gifPanel
+        if (gp != null && gp.isInInputMode) {
+            when (keyCode) {
+                KeyboardView.KEYCODE_DELETE -> gp.onDeleteInput()
+                KeyboardView.KEYCODE_ENTER -> gp.onEnterInput()
+                KeyboardView.KEYCODE_SPACE -> gp.onSpaceInput()
+                KeyboardView.KEYCODE_SWITCH_LANG -> handleSwitchLang()
+                KeyboardView.KEYCODE_SHIFT, KeyboardView.KEYCODE_CTRL -> { }
+                else -> if (label.isNotEmpty() && keyCode >= 0) gp.onCharInput(label)
+            }
+            return
+        }
+
         val ic: InputConnection = currentInputConnection ?: return
 
         ic.beginBatchEdit()
