@@ -657,13 +657,31 @@ class KeyboardView(context: Context) : View(context) {
             return
         }
 
-        // composing text 佔用寬度（注音組合顯示在最左邊）
-        var composingWidth = 0f
+        // 語言標籤（常駐顯示在左側）
+        val langLabel = when (currentInputMode) {
+            com.snowrealm.yukiboard.input.router.InputMode.ENGLISH -> "EN"
+            com.snowrealm.yukiboard.input.router.InputMode.BOPOMOFO -> "中文 [注音]"
+            com.snowrealm.yukiboard.input.router.InputMode.PINYIN -> "中文 [拼音]"
+            com.snowrealm.yukiboard.input.router.InputMode.CANGJIE -> "中文 [倉頡]"
+            com.snowrealm.yukiboard.input.router.InputMode.SPEED_CANGJIE -> "中文 [速成]"
+            com.snowrealm.yukiboard.input.router.InputMode.JAPANESE -> "日本語 [ローマ字]"
+            com.snowrealm.yukiboard.input.router.InputMode.KOREAN -> "한국어"
+            com.snowrealm.yukiboard.input.router.InputMode.AUTO -> "AUTO"
+        }
+        altHintPaint.color = (theme.candidateTextColorInt and 0x00FFFFFF) or 0x60000000
+        altHintPaint.textSize = 10f * density
+        altHintPaint.textAlign = Paint.Align.LEFT
+        canvas.drawText(langLabel, 8f * density, candidateBarHeight * 0.65f, altHintPaint)
+        altHintPaint.textAlign = Paint.Align.RIGHT  // 還原
+        val langLabelWidth = altHintPaint.measureText(langLabel) + 16f * density
+
+        // composing text（顯示在語言標籤右側）
+        var composingWidth = langLabelWidth
         if (composingText.isNotEmpty()) {
             composingPaint.color = theme.composingTextColorInt
             val displayText = "[$composingText]"
-            canvas.drawText(displayText, 16f, candidateBarHeight * 0.65f, composingPaint)
-            composingWidth = composingPaint.measureText(displayText) + 24f * density
+            canvas.drawText(displayText, langLabelWidth + 4f * density, candidateBarHeight * 0.65f, composingPaint)
+            composingWidth = langLabelWidth + composingPaint.measureText(displayText) + 12f * density
         }
 
         // 展開按鈕寬度
