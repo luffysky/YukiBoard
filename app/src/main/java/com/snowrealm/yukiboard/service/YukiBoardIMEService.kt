@@ -308,10 +308,10 @@ class YukiBoardIMEService : InputMethodService() {
         ))
         glSurfaceView = gl
 
-        // 雪凜角色（Lottie）浮動在左上角
+        // 雪凜角色（VRM 3D）浮動在左上角，失敗時自動 fallback Lottie
         val charSize = (72 * resources.displayMetrics.density).toInt()
         val charView = CharacterView(this)
-        // Lottie 模式（init 已自動啟用，VRM 模式待穩定後再切換）
+        charView.initVrmMode()
         val charParams = FrameLayout.LayoutParams(charSize, charSize).apply {
             gravity = android.view.Gravity.TOP or android.view.Gravity.START
         }
@@ -1384,6 +1384,12 @@ class YukiBoardIMEService : InputMethodService() {
     // =========================================================================
 
     private fun handleDelete(ic: InputConnection) {
+        // 如果有選取的文字，直接刪除選取範圍
+        val sel = ic.getSelectedText(0)
+        if (!sel.isNullOrEmpty()) {
+            ic.commitText("", 1)
+            return
+        }
         when (val result = inputRouter.processDelete()) {
             is InputResult.ComposingUpdated -> ic.setComposingText(result.composing, 1)
             is InputResult.ComposingCleared -> {

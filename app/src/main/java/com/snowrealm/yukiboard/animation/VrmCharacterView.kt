@@ -147,17 +147,8 @@ class VrmCharacterView @JvmOverloads constructor(
         isClickable = false
         isFocusable = false
         holder.setFormat(PixelFormat.TRANSLUCENT)
-        holder.addCallback(object : SurfaceHolder.Callback {
-            override fun surfaceCreated(holder: SurfaceHolder) {
-                initFilament()
-            }
-            override fun surfaceChanged(holder: SurfaceHolder, format: Int, w: Int, h: Int) {
-                updateViewport(w, h)
-            }
-            override fun surfaceDestroyed(holder: SurfaceHolder) {
-                stopRendering()
-            }
-        })
+
+        initFilament()
     }
 
     private fun initFilament() {
@@ -206,11 +197,30 @@ class VrmCharacterView @JvmOverloads constructor(
             resourceLoader = ResourceLoader(eng)
         }
 
+        displayHelper = DisplayHelper(context)
+
+        // UiHelper 負責管理 Surface → SwapChain 生命週期
         uiHelper = UiHelper(UiHelper.ContextErrorPolicy.DONT_CHECK).apply {
             isOpaque = false
+            setRenderCallback(object : UiHelper.RendererCallback {
+                override fun onNativeWindowChanged(surface: android.view.Surface) {
+                    swapChain?.let { engine?.destroySwapChain(it) }
+                    swapChain = engine?.createSwapChain(surface, SwapChainFlags.CONFIG_TRANSPARENT)
+                    displayHelper?.attach(renderer!!, this@VrmCharacterView.display)
+                }
+                override fun onDetachedFromSurface() {
+                    displayHelper?.detach()
+                    swapChain?.let {
+                        engine?.destroySwapChain(it)
+                        swapChain = null
+                    }
+                }
+                override fun onResized(width: Int, height: Int) {
+                    updateViewport(width, height)
+                }
+            })
             attachTo(this@VrmCharacterView)
         }
-        displayHelper = DisplayHelper(context)
         choreographer = Choreographer.getInstance()
 
         isReady = true

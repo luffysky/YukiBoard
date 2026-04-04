@@ -89,29 +89,35 @@ class CharacterView @JvmOverloads constructor(
     }
 
     /**
-     * 切換到 VRM 渲染模式，從指定 URL 載入模型。
-     * 預設使用 Insight Engine 的 Yukirin.vrm。
+     * 切換到 VRM 渲染模式。
+     * 預設從 assets/vrm/Yukirin.vrm 載入，失敗時 fallback 回 Lottie。
      */
-    fun initVrmMode(modelUrl: String = VRM_MODEL_URL) {
+    fun initVrmMode(assetPath: String = VRM_ASSET_PATH) {
         cleanupCurrentMode()
         renderMode = RenderMode.VRM
 
-        val vv = VrmCharacterView(context).apply {
-            isClickable = false
-            isFocusable = false
+        try {
+            val vv = VrmCharacterView(context).apply {
+                isClickable = false
+                isFocusable = false
+            }
+            addView(vv, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+            vrmView = vv
+
+            val anim = VrmCharacterAnimation(vv)
+            vrmAnimation = anim
+            characterAnimation = anim
+
+            // 從 assets 載入 VRM 模型
+            vv.loadModelFromAsset(assetPath)
+
+            // VRM 載入後自動 playIdle
+            vv.postDelayed({ playIdle() }, 2000)
+        } catch (e: Exception) {
+            // VRM 初始化失敗，fallback 回 Lottie
+            e.printStackTrace()
+            initLottieMode()
         }
-        addView(vv, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
-        vrmView = vv
-
-        val anim = VrmCharacterAnimation(vv)
-        vrmAnimation = anim
-        characterAnimation = anim
-
-        // 載入 VRM 模型
-        vv.loadModelFromUrl(modelUrl)
-
-        // VRM 載入後自動 playIdle
-        vv.postDelayed({ playIdle() }, 2000)
     }
 
     private fun cleanupCurrentMode() {
@@ -267,7 +273,7 @@ class CharacterView @JvmOverloads constructor(
     fun getCurrentRenderMode(): RenderMode = renderMode
 
     companion object {
-        /** Insight Engine 提供的 Yukirin VRM 模型 URL */
-        const val VRM_MODEL_URL = "https://insight.snowrealm.pet/models/Yukirin.vrm"
+        /** assets 內的 VRM 模型路徑 */
+        const val VRM_ASSET_PATH = "vrm/Yukirin.vrm"
     }
 }

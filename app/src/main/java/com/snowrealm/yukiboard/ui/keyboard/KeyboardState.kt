@@ -59,22 +59,16 @@ data class KeyboardState(
                 KeyModel.char("m"),
                 KeyModel.special("⌫", KeyboardView.KEYCODE_DELETE, widthWeight = 1.5f)
             ),
-            // 功能行
+            // 底行（精簡：合併功能行 + 空白鍵，方向鍵移至開發者模式）
             listOf(
-                KeyModel.special("Ctrl", KeyboardView.KEYCODE_CTRL, widthWeight = 1.2f),
+                KeyModel.special("Ctrl", KeyboardView.KEYCODE_CTRL, widthWeight = 1.0f),
                 KeyModel.special("Tab", KeyboardView.KEYCODE_TAB, widthWeight = 1.0f),
-                KeyModel.special("←", KeyboardView.KEYCODE_ARROW_LEFT),
-                KeyModel.special("→", KeyboardView.KEYCODE_ARROW_RIGHT),
-                KeyModel.special("↑", KeyboardView.KEYCODE_ARROW_UP),
-                KeyModel.special("↓", KeyboardView.KEYCODE_ARROW_DOWN),
-                KeyModel.special("切換", KeyboardView.KEYCODE_SWITCH_LANG, widthWeight = 1.3f),
-                KeyModel.special("↵", KeyboardView.KEYCODE_ENTER, widthWeight = 1.5f)
-            ),
-            listOf(
-                KeyModel.special("?123", KeyboardView.KEYCODE_SWITCH_NUMBERS, widthWeight = 1.3f),
+                KeyModel.special("?123", KeyboardView.KEYCODE_SWITCH_NUMBERS, widthWeight = 1.2f),
+                KeyModel.special("切換", KeyboardView.KEYCODE_SWITCH_LANG, widthWeight = 1.2f),
                 KeyModel.special(",", KeyboardView.KEYCODE_COMMA, altChars = listOf("，", "、", "；", "：", "「", "」")),
-                KeyModel.special(" ", KeyboardView.KEYCODE_SPACE, widthWeight = 5.5f),
-                KeyModel.special(".", KeyboardView.KEYCODE_PERIOD, altChars = listOf("。", "！", "？", "…", "～", "·"))
+                KeyModel.special(" ", KeyboardView.KEYCODE_SPACE, widthWeight = 3.0f),
+                KeyModel.special(".", KeyboardView.KEYCODE_PERIOD, altChars = listOf("。", "！", "？", "…", "～", "·")),
+                KeyModel.special("↵", KeyboardView.KEYCODE_ENTER, widthWeight = 1.5f)
             )
         )
 
@@ -213,11 +207,13 @@ data class KeyboardState(
         // 注音佈局
         // =================================================================
         fun bopomofoRows(): List<List<KeyModel>> = listOf(
+            // 聲母第一行 + 韻母
             listOf(
-                KeyModel.char("ㄅ"), KeyModel.char("ㄉ"), KeyModel.char("ˇ"),
-                KeyModel.char("ˋ"), KeyModel.char("ㄓ"), KeyModel.char("ˊ"),
-                KeyModel.char("˙"), KeyModel.char("ㄚ"), KeyModel.char("ㄞ"),
-                KeyModel.char("ㄢ"), KeyModel.char("ㄦ")
+                KeyModel.char("ㄅ"), KeyModel.char("ㄉ"),
+                KeyModel.char("ㄓ"), KeyModel.char("ㄚ"),
+                KeyModel.char("ㄞ"), KeyModel.char("ㄢ"),
+                KeyModel.char("ㄦ"),
+                KeyModel.char("ˊ"), KeyModel.char("ˇ"), KeyModel.char("ˋ")
             ),
             listOf(
                 KeyModel.char("ㄆ"), KeyModel.char("ㄊ"), KeyModel.char("ㄍ"),
@@ -237,13 +233,12 @@ data class KeyboardState(
                 KeyModel.char("ㄩ"), KeyModel.char("ㄝ"), KeyModel.char("ㄡ"),
                 KeyModel.char("ㄥ")
             ),
+            // 底行（˙ 輕聲放在空白鍵長按 altChars）
             listOf(
                 KeyModel.special("?123", KeyboardView.KEYCODE_SWITCH_NUMBERS, widthWeight = 1.2f),
-                KeyModel.special("←", KeyboardView.KEYCODE_ARROW_LEFT),
-                KeyModel.special("→", KeyboardView.KEYCODE_ARROW_RIGHT),
                 KeyModel.special("⌫", KeyboardView.KEYCODE_DELETE, widthWeight = 1.3f),
-                KeyModel.special("切換", KeyboardView.KEYCODE_SWITCH_LANG, widthWeight = 1.3f),
-                KeyModel.special(" ", KeyboardView.KEYCODE_SPACE, widthWeight = 2.5f),
+                KeyModel.special("切換", KeyboardView.KEYCODE_SWITCH_LANG, widthWeight = 1.2f),
+                KeyModel.special(" ", KeyboardView.KEYCODE_SPACE, widthWeight = 3.0f, altChars = listOf("˙")),
                 KeyModel.special(",", KeyboardView.KEYCODE_COMMA, altChars = listOf("，", "、", "；")),
                 KeyModel.special(".", KeyboardView.KEYCODE_PERIOD, altChars = listOf("。", "！", "？")),
                 KeyModel.special("↵", KeyboardView.KEYCODE_ENTER, widthWeight = 1.3f)

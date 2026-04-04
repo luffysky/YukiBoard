@@ -308,10 +308,29 @@ class KeyboardView(context: Context) : View(context) {
     private var pressedKey: KeyModel? = null
     private var popupWindow: PopupWindow? = null
 
+    // 刪除鍵長按重複
+    private var deleteRepeatCount = 0
+    private val deleteRepeatRunnable = object : Runnable {
+        override fun run() {
+            if (pressedKey?.code != KEYCODE_DELETE) return
+            deleteRepeatCount++
+            onKeyPressListener?.invoke(KEYCODE_DELETE, "⌫")
+            if (hapticEnabled && deleteRepeatCount % 3 == 0) vibrateShort()
+            // 越按越快：初始 80ms，最快 20ms
+            val delay = (80L - (deleteRepeatCount * 5).coerceAtMost(60)).coerceAtLeast(20L)
+            handler.postDelayed(this, delay)
+        }
+    }
+
     private val longPressRunnable = Runnable {
         val key = longPressKey ?: return@Runnable
         val rect = longPressRect ?: return@Runnable
         when {
+            key.code == KEYCODE_DELETE -> {
+                isLongPressTriggered = true
+                deleteRepeatCount = 0
+                handler.post(deleteRepeatRunnable)
+            }
             key.code == KEYCODE_TAB -> {
                 isLongPressTriggered = true
                 vibrateShort()
@@ -1042,6 +1061,7 @@ class KeyboardView(context: Context) : View(context) {
                 val currentRect = longPressRect
                 if (currentRect != null && !currentRect.contains(x, y)) {
                     handler.removeCallbacks(longPressRunnable)
+                    handler.removeCallbacks(deleteRepeatRunnable)
                     pressedKey = null
                     invalidate()
                 }
@@ -1049,6 +1069,7 @@ class KeyboardView(context: Context) : View(context) {
 
             MotionEvent.ACTION_UP -> {
                 handler.removeCallbacks(longPressRunnable)
+                handler.removeCallbacks(deleteRepeatRunnable)
                 pressedKey = null
                 if (isSpaceLongPressed) {
                     isSpaceLongPressed = false
@@ -1152,6 +1173,7 @@ class KeyboardView(context: Context) : View(context) {
 
             MotionEvent.ACTION_CANCEL -> {
                 handler.removeCallbacks(longPressRunnable)
+                handler.removeCallbacks(deleteRepeatRunnable)
                 pressedKey = null
                 isLongPressTriggered = false
                 if (isSpaceLongPressed) {
