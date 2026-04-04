@@ -91,7 +91,19 @@
 
 ---
 
-## 當前版本待實作（v0.4.0）
+## 待修復（明日優先）
+
+### Skill 修復
+- [ ] **CupidSkill** — 加 try-catch fallback（R.raw.claw_cupid_male/female_prompt 缺失時會 crash）
+- [ ] **WriterSkill** — 加 try-catch fallback（R.raw.claw_writer_prompt 缺失時會 crash）
+
+### 設定頁 / UI
+- [ ] **鍵盤完整預覽** — 影片背景時預覽只顯示靜態底色，考慮截取影片第一幀
+- [ ] **字體顏色拉桿** — 調整後鍵盤完整預覽的字色要同步更新
+
+---
+
+## 當前版本待實作（v0.4.0+）
 
 ### 批次 A — 滑動輸入 + RIME 詞庫（8 步）
 
