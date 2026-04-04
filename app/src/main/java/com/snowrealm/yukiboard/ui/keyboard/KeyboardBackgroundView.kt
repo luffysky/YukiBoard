@@ -381,11 +381,10 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
     fun hasBackground(): Boolean = currentType != BackgroundType.NONE
 
     private fun releaseMediaPlayer() {
-        try {
-            mediaPlayer?.stop()
-            mediaPlayer?.release()
-        } catch (_: Exception) { }
+        val mp = mediaPlayer ?: return
         mediaPlayer = null
+        try { mp.stop() } catch (_: Exception) { }
+        try { mp.release() } catch (_: Exception) { }
     }
 
     fun destroy() {

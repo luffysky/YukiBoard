@@ -739,7 +739,11 @@ class SettingsActivity : AppCompatActivity() {
             }
             override fun onSurfaceTextureSizeChanged(st: android.graphics.SurfaceTexture, w: Int, h: Int) {}
             override fun onSurfaceTextureDestroyed(st: android.graphics.SurfaceTexture): Boolean {
-                stopVideoPreview()
+                // 僅釋放 MediaPlayer，不移除 View（避免 stopVideoPreview 重入）
+                val mp = bgVideoPlayer
+                bgVideoPlayer = null
+                try { mp?.stop() } catch (_: Exception) { }
+                try { mp?.release() } catch (_: Exception) { }
                 return true
             }
             override fun onSurfaceTextureUpdated(st: android.graphics.SurfaceTexture) {}
@@ -751,11 +755,15 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun stopVideoPreview() {
-        try {
-            bgVideoPlayer?.stop()
-            bgVideoPlayer?.release()
-        } catch (_: Exception) { }
+        val mp = bgVideoPlayer ?: run {
+            // 沒有 player，只清 texture
+            bgVideoTexture?.let { bgPreviewContainer?.removeView(it) }
+            bgVideoTexture = null
+            return
+        }
         bgVideoPlayer = null
+        try { mp.stop() } catch (_: Exception) { }
+        try { mp.release() } catch (_: Exception) { }
         bgVideoTexture?.let { bgPreviewContainer?.removeView(it) }
         bgVideoTexture = null
     }
