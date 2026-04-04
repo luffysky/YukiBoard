@@ -193,7 +193,7 @@ class KeyboardView(context: Context) : View(context) {
     }
     private val altHintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.RIGHT
-        textSize = 9f * density
+        textSize = 10f * density
     }
     private val candidatePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
@@ -642,7 +642,7 @@ class KeyboardView(context: Context) : View(context) {
             altHintPaint.textSize = 10f * density
             altHintPaint.textAlign = Paint.Align.RIGHT
             canvas.drawText(modeTag, width.toFloat() - 8f * density, candidateBarHeight * 0.65f, altHintPaint)
-            altHintPaint.textSize = 9f * density
+            altHintPaint.textSize = 10f * density
         }
 
         // 模式切換提示
@@ -893,10 +893,11 @@ class KeyboardView(context: Context) : View(context) {
                 val textY = rect.top + (rect.height() + useLabelPaint.textSize) / 2f - useLabelPaint.descent()
                 canvas.drawText(displayLabel, rect.centerX(), textY, useLabelPaint)
 
-                // Alt hint
+                // Alt hint：右上角顯示第一個長按字元
                 if (key.altChars.isNotEmpty()) {
-                    altHintPaint.color = (effectiveLabelColor and 0x00FFFFFF) or 0x66000000
-                    canvas.drawText("·", rect.right - 4f * density, rect.top + 10f * density, altHintPaint)
+                    altHintPaint.color = (effectiveLabelColor and 0x00FFFFFF) or 0x80000000.toInt()
+                    val hint = key.altChars.first()
+                    canvas.drawText(hint, rect.right - 3f * density, rect.top + 11f * density, altHintPaint)
                 }
 
                 x += keyWidth
