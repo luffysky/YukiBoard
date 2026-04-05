@@ -610,15 +610,15 @@ class KeyboardView(context: Context) : View(context) {
             KeyboardMode.NORMAL -> when (subLayout) {
                 SubLayout.ABC -> Pair(
                     rowsForCurrentInputMode(),
-                    KeyboardState.landscapeNormalSidePanel()
+                    emptyList()  // 一般模式橫向不加側邊面板，跟直向一樣
                 )
                 SubLayout.NUMBERS -> Pair(
                     KeyboardState.numberSymbolRows(),
-                    KeyboardState.landscapeNormalSidePanel()
+                    emptyList()
                 )
                 SubLayout.SYMBOLS -> Pair(
                     KeyboardState.moreSymbolRows(),
-                    KeyboardState.landscapeNormalSidePanel()
+                    emptyList()
                 )
             }
             KeyboardMode.DESIGNER -> Pair(
