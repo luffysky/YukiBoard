@@ -1,6 +1,7 @@
 package com.snowrealm.yukiboard.speech
 
 import android.content.Context
+import android.media.AudioAttributes
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
@@ -45,6 +46,13 @@ class AndroidTtsEngine(context: Context, private val onInitDone: ((Boolean) -> U
                         utteranceId?.let { pendingCallbacks.remove(it) }
                     }
                 })
+                // 確保使用正確音頻通道（USAGE_MEDIA + CONTENT_TYPE_SPEECH）
+                tts?.setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                )
                 Log.i(tag, "TTS initialized, engine=${tts?.defaultEngine}")
             } else {
                 Log.e(tag, "TTS init failed, status=$status")

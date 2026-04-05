@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 53
-        versionName "0.7.3"
+        versionCode 54
+        versionName "0.7.4"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,12 +82,10 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- 注音鍵盤 Gboard 風格重排（⇧/⌫ 獨立行 + 底行整齊）\n" +
-                    "- 注音長按輸出英文/數字（大千式 QWERTY 對應）\n" +
-                    "- 新增數字鍵盤（計算機 3x4 格子 + 運算符號）\n" +
-                    "- 切面板/語言後打字卡住修復\n" +
-                    "- 語音辨識重複輸出修復 + Whisper 錯誤回饋\n" +
-                    "- Claw AI 依輸入語言自動回應"
+                    "- 主題面板整合所有設定（按鍵大小/透明度/透明鍵盤/鍵盤高度）\n" +
+                    "- 新增個別按鍵寬度/高度自訂（點選按鍵→滑桿調整）\n" +
+                    "- TTS 語音測試修復（AudioAttributes + 自動偵測語言）\n" +
+                    "- 主題面板與設定頁即時雙向同步"
             }
         }
         debug {

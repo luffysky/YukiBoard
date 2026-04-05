@@ -7,12 +7,14 @@ import android.view.View
 import com.snowrealm.yukiboard.theme.KeyboardTheme
 import com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView
 import com.snowrealm.yukiboard.ui.keyboard.KeyboardState
+import com.snowrealm.yukiboard.ui.keyboard.KeyboardView
 import com.snowrealm.yukiboard.ui.settings.YukiPreferences
 
 /**
- * 主題瀏覽面板 — 在鍵盤內直接預覽和切換主題、背景、字體顏色。
+ * 主題瀏覽面板 — 在鍵盤內直接預覽和切換主題、背景、字體顏色、按鍵設定。
  *
- * 五區塊：主題列表 → 背景控制 → 背景調整 → 字體顏色 → 鍵盤預覽
+ * 九區塊：主題列表 → 背景控制 → 背景調整 → 字體顏色 → 按鍵設定 → 透明鍵盤
+ *         → 鍵盤尺寸 → 個別按鍵尺寸 → 鍵盤預覽
  * 可上下捲動。設定與 SettingsActivity 雙向同步（都讀寫同一份 prefs）。
  */
 class ThemePanelView(context: Context) : View(context) {
@@ -47,19 +49,18 @@ class ThemePanelView(context: Context) : View(context) {
         set(value) { field = value; invalidate() }
 
     var onThemeSelected: ((KeyboardTheme) -> Unit)? = null
-
-    /** 選圖片回呼（由 IME Service 處理 Intent） */
     var onPickBackground: (() -> Unit)? = null
-    /** 選影片回呼 */
     var onPickVideo: (() -> Unit)? = null
-    /** 清除背景回呼 */
     var onClearBackground: (() -> Unit)? = null
-    /** 遮罩深度變更回呼 */
     var onOverlayAlphaChanged: ((Int) -> Unit)? = null
-    /** 字體顏色變更回呼 */
     var onLabelColorChanged: ((Int) -> Unit)? = null
-    /** 比例/偏移/鍵盤參數變更回呼（通知 IME 即時套用） */
     var onBackgroundSettingsChanged: (() -> Unit)? = null
+    /** 按鍵大小/透明度/透明鍵盤等變更（通知 IME 即時套用） */
+    var onKeySettingsChanged: (() -> Unit)? = null
+    /** 個別按鍵尺寸變更 */
+    var onPerKeySizeChanged: (() -> Unit)? = null
+    /** 鍵盤高度變更 */
+    var onKeyboardHeightChanged: (() -> Unit)? = null
 
     var currentThemeId: String = "snow_dark"
         set(value) { field = value; invalidate() }
@@ -67,7 +68,6 @@ class ThemePanelView(context: Context) : View(context) {
     var availableThemes: List<KeyboardTheme> = KeyboardTheme.all()
         set(value) { field = value; invalidate() }
 
-    /** 背景預覽 bitmap（由外部載入後設定） */
     var previewBgBitmap: Bitmap? = null
         set(value) { field = value; invalidate() }
 
@@ -85,14 +85,24 @@ class ThemePanelView(context: Context) : View(context) {
     private var scaleCropRect: RectF? = null
     private var scaleFitRect: RectF? = null
 
+    // 透明鍵盤切換按鈕
+    private var transparentToggleRect: RectF? = null
+
+    // 個別按鍵 — 重置全部
+    private var resetAllKeySizeRect: RectF? = null
+    // 個別按鍵 — 重置選中
+    private var resetSelectedKeySizeRect: RectF? = null
+
     // 滑桿定義
-    private enum class SliderId { OVERLAY, OFFSET_X, OFFSET_Y }
+    private enum class SliderId {
+        OVERLAY, OFFSET_X, OFFSET_Y,
+        KEY_SCALE, KEY_OPACITY,
+        TRANSPARENT_ALPHA,
+        KB_HEIGHT,
+        PER_KEY_WIDTH, PER_KEY_HEIGHT
+    }
     private data class SliderDef(val id: SliderId, var trackRect: RectF = RectF())
-    private val sliders = listOf(
-        SliderDef(SliderId.OVERLAY),
-        SliderDef(SliderId.OFFSET_X),
-        SliderDef(SliderId.OFFSET_Y)
-    )
+    private val sliders = SliderId.values().map { SliderDef(it) }
     private var draggingSlider: SliderId? = null
 
     // 字體顏色
@@ -118,7 +128,10 @@ class ThemePanelView(context: Context) : View(context) {
     private var lastTouchY = 0f
     private var isDragging = false
 
-    /** 載入/重新載入背景預覽 bitmap */
+    // 個別按鍵選擇
+    private var selectedKeyId: String? = null
+    private val perKeyRects = mutableListOf<Pair<RectF, String>>() // rect -> keyId
+
     fun reloadPreviewBitmap() {
         val savedBg = KeyboardBackgroundView.getSavedBackground(context)
         previewBgBitmap = if (savedBg != null) {
@@ -150,8 +163,11 @@ class ThemePanelView(context: Context) : View(context) {
         super.onDraw(canvas)
         themeRects.clear()
         colorRects.clear()
+        perKeyRects.clear()
         pickImgRect = null; pickVideoRect = null; clearBgRect = null
         scaleCropRect = null; scaleFitRect = null
+        transparentToggleRect = null
+        resetAllKeySizeRect = null; resetSelectedKeySizeRect = null
         sliders.forEach { it.trackRect.setEmpty() }
 
         bgPaint.color = theme.effectivePanelBackground()
@@ -163,27 +179,47 @@ class ThemePanelView(context: Context) : View(context) {
 
         var curY = pad
 
-        // ═══ 區塊 1: 主題列表 ═══
+        // ═══ 1: 主題列表 ═══
         curY = drawSectionTitle(canvas, "主題", curY)
         curY = drawThemeCards(canvas, curY)
         curY += sectionGap
 
-        // ═══ 區塊 2: 背景控制（選圖/選影片/清除） ═══
+        // ═══ 2: 背景控制 ═══
         curY = drawSectionTitle(canvas, "鍵盤背景", curY)
         curY = drawBackgroundButtons(canvas, curY)
         curY += sectionGap
 
-        // ═══ 區塊 3: 背景調整（遮罩、比例、XY） ═══
+        // ═══ 3: 背景調整 ═══
         curY = drawSectionTitle(canvas, "背景調整", curY)
         curY = drawBackgroundAdjust(canvas, curY)
         curY += sectionGap
 
-        // ═══ 區塊 4: 字體顏色 ═══
+        // ═══ 4: 字體顏色 ═══
         curY = drawSectionTitle(canvas, "按鍵字體顏色", curY)
         curY = drawColorPicker(canvas, curY)
         curY += sectionGap
 
-        // ═══ 區塊 5: 鍵盤完整預覽 ═══
+        // ═══ 5: 按鍵設定 ═══
+        curY = drawSectionTitle(canvas, "按鍵設定", curY)
+        curY = drawKeySettings(canvas, curY)
+        curY += sectionGap
+
+        // ═══ 6: 透明鍵盤 ═══
+        curY = drawSectionTitle(canvas, "透明鍵盤", curY)
+        curY = drawTransparentSettings(canvas, curY)
+        curY += sectionGap
+
+        // ═══ 7: 鍵盤尺寸 ═══
+        curY = drawSectionTitle(canvas, "鍵盤尺寸", curY)
+        curY = drawKeyboardSizeSettings(canvas, curY)
+        curY += sectionGap
+
+        // ═══ 8: 個別按鍵尺寸 ═══
+        curY = drawSectionTitle(canvas, "個別按鍵尺寸", curY)
+        curY = drawPerKeySettings(canvas, curY)
+        curY += sectionGap
+
+        // ═══ 9: 鍵盤預覽 ═══
         curY = drawSectionTitle(canvas, "鍵盤預覽", curY)
         curY = drawKeyboardPreview(canvas, curY)
 
@@ -230,7 +266,6 @@ class ThemePanelView(context: Context) : View(context) {
                 canvas.drawRoundRect(rect, cornerR, cornerR, bp)
             }
 
-            // mini keys
             val keyY = rect.top + 10 * density
             val keyH = 16f * density; val keyW = 24f * density; val kp = 3f * density
             val kx = rect.left + 10 * density
@@ -242,7 +277,6 @@ class ThemePanelView(context: Context) : View(context) {
                 canvas.drawText(listOf("Q", "W", "⏎")[k], kr.centerX(), kr.centerY() + 3f * density, textPaint)
             }
 
-            // candidate bar
             val barY = keyY + keyH + 4 * density
             previewKeyPaint.color = t.candidateBarColorInt
             canvas.drawRoundRect(
@@ -263,7 +297,7 @@ class ThemePanelView(context: Context) : View(context) {
         return y
     }
 
-    // ─── 背景按鈕（選圖片/選影片/清除） ───
+    // ─── 背景按鈕 ───
 
     private fun drawBackgroundButtons(canvas: Canvas, startY: Float): Float {
         val btnH = 30f * density
@@ -285,15 +319,14 @@ class ThemePanelView(context: Context) : View(context) {
         return startY + btnH + 6 * density
     }
 
-    // ─── 背景調整（遮罩、比例、XY） ───
+    // ─── 背景調整 ───
 
     private fun drawBackgroundAdjust(canvas: Canvas, startY: Float): Float {
         var y = startY
-        val trackH = 6f * density
         val trackLeft = pad + 4 * density
         val trackRight = width - pad - 4 * density
+        val trackH = 6f * density
 
-        // 遮罩深度滑桿
         y = drawSliderRow(canvas, y, "遮罩深度", SliderId.OVERLAY,
             prefs.bgOverlayAlpha / 255f, "%d%%".format((prefs.bgOverlayAlpha * 100) / 255),
             trackLeft, trackRight, trackH)
@@ -328,12 +361,10 @@ class ThemePanelView(context: Context) : View(context) {
 
         y += btnH + 8 * density
 
-        // X 偏移滑桿
         y = drawSliderRow(canvas, y, "水平位置 X", SliderId.OFFSET_X,
             prefs.bgOffsetX, "%d%%".format((prefs.bgOffsetX * 100).toInt()),
             trackLeft, trackRight, trackH)
 
-        // Y 偏移滑桿
         y = drawSliderRow(canvas, y, "垂直位置 Y", SliderId.OFFSET_Y,
             prefs.bgOffsetY, "%d%%".format((prefs.bgOffsetY * 100).toInt()),
             trackLeft, trackRight, trackH)
@@ -341,45 +372,208 @@ class ThemePanelView(context: Context) : View(context) {
         return y
     }
 
-    /** 繪製一條滑桿列（標籤 + 軌道 + 手把），回傳底部 Y */
-    private fun drawSliderRow(
-        canvas: Canvas, startY: Float, label: String, id: SliderId,
-        pct: Float, valueText: String,
-        trackLeft: Float, trackRight: Float, trackH: Float
-    ): Float {
+    // ─── 按鍵設定（大小 + 不透明度） ───
+
+    private fun drawKeySettings(canvas: Canvas, startY: Float): Float {
         var y = startY
-        textPaint.textSize = 11f * density
-        textPaint.color = theme.candidateTextColorInt
+        val trackLeft = pad + 4 * density
+        val trackRight = width - pad - 4 * density
+        val trackH = 6f * density
+
+        // 按鍵大小 70~130%
+        val scalePct = (prefs.keyScalePercent - 70f) / 60f  // 0~1
+        y = drawSliderRow(canvas, y, "按鍵大小", SliderId.KEY_SCALE,
+            scalePct, "%d%%".format(prefs.keyScalePercent),
+            trackLeft, trackRight, trackH)
+
+        // 按鍵不透明度 0~255
+        y = drawSliderRow(canvas, y, "按鍵不透明度", SliderId.KEY_OPACITY,
+            prefs.keyOpacity / 255f, "%d%%".format((prefs.keyOpacity * 100) / 255),
+            trackLeft, trackRight, trackH)
+
+        return y
+    }
+
+    // ─── 透明鍵盤 ───
+
+    private fun drawTransparentSettings(canvas: Canvas, startY: Float): Float {
+        var y = startY
+        val trackLeft = pad + 4 * density
+        val trackRight = width - pad - 4 * density
+        val trackH = 6f * density
+
+        // toggle
+        val btnH = 28f * density
+        val btnR = 6f * density
+        val isOn = prefs.transparentKeyboard
+        val toggleRect = RectF(pad, y, width - pad, y + btnH)
+        transparentToggleRect = toggleRect
+        cardPaint.color = if (isOn) theme.effectiveAccentColor() else theme.keyColorInt
+        canvas.drawRoundRect(toggleRect, btnR, btnR, cardPaint)
+        btnTextPaint.color = if (isOn) 0xFF111827.toInt() else theme.candidateTextColorInt
+        val toggleLabel = if (isOn) "透明鍵盤: ON（透視到底層 App）" else "透明鍵盤: OFF"
+        canvas.drawText(toggleLabel, toggleRect.centerX(), toggleRect.centerY() + btnTextPaint.textSize / 3f, btnTextPaint)
+        y += btnH + 8 * density
+
+        // 透明度滑桿
+        if (isOn) {
+            y = drawSliderRow(canvas, y, "透明度", SliderId.TRANSPARENT_ALPHA,
+                prefs.transparentKeyboardAlpha / 255f,
+                "%d%%".format((prefs.transparentKeyboardAlpha * 100) / 255),
+                trackLeft, trackRight, trackH)
+        }
+
+        return y
+    }
+
+    // ─── 鍵盤尺寸 ───
+
+    private fun drawKeyboardSizeSettings(canvas: Canvas, startY: Float): Float {
+        var y = startY
+        val trackLeft = pad + 4 * density
+        val trackRight = width - pad - 4 * density
+        val trackH = 6f * density
+
+        // 鍵盤高度 25~55%
+        val heightPct = (prefs.keyboardHeightRatio - 0.25f) / 0.30f
+        y = drawSliderRow(canvas, y, "鍵盤高度", SliderId.KB_HEIGHT,
+            heightPct, "%d%%".format((heightPct * 100).toInt()),
+            trackLeft, trackRight, trackH)
+
+        return y
+    }
+
+    // ─── 個別按鍵尺寸 ───
+
+    private fun drawPerKeySettings(canvas: Canvas, startY: Float): Float {
+        var y = startY
+
+        // 說明文字
+        textPaint.textSize = 10f * density
+        textPaint.color = theme.candidateTextColorInt; textPaint.alpha = 160
         textPaint.textAlign = Paint.Align.LEFT
-        canvas.drawText("$label: $valueText", pad + 4 * density, y + textPaint.textSize, textPaint)
-        textPaint.textAlign = Paint.Align.CENTER
+        canvas.drawText("點選按鍵後調整寬度和高度", pad + 4 * density, y + textPaint.textSize, textPaint)
+        textPaint.alpha = 255; textPaint.textAlign = Paint.Align.CENTER
         y += textPaint.textSize + 6 * density
 
-        val trackRect = RectF(trackLeft, y, trackRight, y + trackH)
-        sliders.first { it.id == id }.trackRect.set(trackRect)
+        // 繪製迷你鍵盤（可點選）
+        val rows = KeyboardState.defaultQwertyRows()
+        val pvW = width - pad * 2
+        val rowH = 22f * density
+        val totalUnits = rows.maxOf { row -> row.sumOf { it.widthWeight.toDouble() }.toFloat() }
+        val perKeySizes = prefs.getAllPerKeySizes()
 
-        // track bg
-        sliderPaint.color = theme.keyColorInt
-        sliderPaint.style = Paint.Style.FILL
-        canvas.drawRoundRect(trackRect, trackH / 2, trackH / 2, sliderPaint)
+        rows.forEachIndexed { rowIdx, row ->
+            val top = y + rowIdx * rowH
+            var kx = pad
+            val unitW = pvW / totalUnits
 
-        // fill
-        val fillRect = RectF(trackLeft, y, trackLeft + (trackRight - trackLeft) * pct, y + trackH)
-        sliderPaint.color = theme.effectiveAccentColor(); sliderPaint.alpha = 180
-        canvas.drawRoundRect(fillRect, trackH / 2, trackH / 2, sliderPaint)
-        sliderPaint.alpha = 255
+            row.forEach { key ->
+                val keyW = unitW * key.widthWeight
+                val keyId = if (key.code != 0) key.code.toString() else key.label
+                val kr = RectF(kx + 1 * density, top + 1 * density, kx + keyW - 1 * density, top + rowH - 1 * density)
+                perKeyRects.add(kr to keyId)
 
-        // thumb
-        val thumbX = trackLeft + (trackRight - trackLeft) * pct
-        val thumbR = 8f * density
-        sliderPaint.color = 0xFFFFFFFF.toInt()
-        canvas.drawCircle(thumbX, y + trackH / 2, thumbR, sliderPaint)
-        sliderPaint.color = theme.effectiveAccentColor()
-        sliderPaint.style = Paint.Style.STROKE; sliderPaint.strokeWidth = 1.5f * density
-        canvas.drawCircle(thumbX, y + trackH / 2, thumbR, sliderPaint)
-        sliderPaint.style = Paint.Style.FILL
+                // 有自訂尺寸的按鍵用不同顏色
+                val hasCustom = perKeySizes.containsKey(keyId)
+                val isSelected = keyId == selectedKeyId
 
-        return y + trackH + 10 * density
+                cardPaint.color = when {
+                    isSelected -> theme.effectiveAccentColor()
+                    hasCustom -> theme.candidateSelectedColorInt
+                    key.isSpecial -> theme.specialKeyColorInt
+                    else -> theme.keyColorInt
+                }
+                canvas.drawRoundRect(kr, 3f * density, 3f * density, cardPaint)
+
+                val label = key.label
+                if (label.isNotEmpty() && label.length <= 3) {
+                    textPaint.textSize = 7f * density
+                    textPaint.color = when {
+                        isSelected -> 0xFF111827.toInt()
+                        else -> theme.keyLabelColorInt
+                    }
+                    canvas.drawText(label, kr.centerX(), kr.centerY() + 3f * density, textPaint)
+                }
+                kx += keyW
+            }
+        }
+        y += rows.size * rowH + 6 * density
+
+        // 選中按鍵的調整滑桿
+        val sel = selectedKeyId
+        if (sel != null) {
+            val trackLeft = pad + 4 * density
+            val trackRight = width - pad - 4 * density
+            val trackH = 6f * density
+
+            // 顯示選中按鍵名
+            textPaint.textSize = 11f * density
+            textPaint.color = theme.effectiveAccentColor()
+            textPaint.textAlign = Paint.Align.LEFT
+            val selLabel = findKeyLabel(sel)
+            canvas.drawText("選中: $selLabel", pad + 4 * density, y + textPaint.textSize, textPaint)
+            textPaint.textAlign = Paint.Align.CENTER
+            y += textPaint.textSize + 6 * density
+
+            // 寬度倍率 0.5~2.0
+            val curW = prefs.getPerKeyWidth(sel)
+            val wPct = (curW - 0.5f) / 1.5f
+            y = drawSliderRow(canvas, y, "寬度", SliderId.PER_KEY_WIDTH,
+                wPct, "%.0f%%".format(curW * 100),
+                trackLeft, trackRight, trackH)
+
+            // 高度倍率 0.5~2.0
+            val curH = prefs.getPerKeyHeight(sel)
+            val hPct = (curH - 0.5f) / 1.5f
+            y = drawSliderRow(canvas, y, "高度", SliderId.PER_KEY_HEIGHT,
+                hPct, "%.0f%%".format(curH * 100),
+                trackLeft, trackRight, trackH)
+
+            // 重置選中
+            val btnH = 24f * density
+            val btnR = 6f * density
+            val btnW2 = (width - pad * 3) / 2f
+            val rr = RectF(pad, y, pad + btnW2, y + btnH)
+            resetSelectedKeySizeRect = rr
+            drawButton(canvas, rr, "重置此鍵", btnR, 0xFF3A2020.toInt())
+
+            val ra = RectF(pad * 2 + btnW2, y, pad * 2 + btnW2 * 2, y + btnH)
+            resetAllKeySizeRect = ra
+            drawButton(canvas, ra, "重置全部", btnR, 0xFF3A2020.toInt())
+
+            y += btnH + 6 * density
+        } else {
+            // 只顯示重置全部
+            val btnH = 24f * density
+            val btnR = 6f * density
+            val ra = RectF(pad, y, width / 2f, y + btnH)
+            resetAllKeySizeRect = ra
+            drawButton(canvas, ra, "重置全部", btnR, 0xFF3A2020.toInt())
+            y += btnH + 6 * density
+        }
+
+        return y
+    }
+
+    private fun findKeyLabel(keyId: String): String {
+        val code = keyId.toIntOrNull()
+        if (code != null) {
+            return when (code) {
+                KeyboardView.KEYCODE_SHIFT -> "Shift"
+                KeyboardView.KEYCODE_DELETE -> "刪除"
+                KeyboardView.KEYCODE_ENTER -> "Enter"
+                KeyboardView.KEYCODE_SPACE -> "空白"
+                KeyboardView.KEYCODE_SWITCH_LANG -> "切換"
+                KeyboardView.KEYCODE_SWITCH_NUMBERS -> "?123"
+                KeyboardView.KEYCODE_TAB -> "Tab"
+                KeyboardView.KEYCODE_CTRL -> "Ctrl"
+                KeyboardView.KEYCODE_COMMA -> ","
+                KeyboardView.KEYCODE_PERIOD -> "."
+                else -> "key$code"
+            }
+        }
+        return keyId
     }
 
     // ─── 字體顏色 ───
@@ -434,21 +628,19 @@ class ThemePanelView(context: Context) : View(context) {
         return startY + dotR * 2 + 18 * density
     }
 
-    // ─── 鍵盤完整預覽 ───
+    // ─── 鍵盤預覽 ───
 
     private fun drawKeyboardPreview(canvas: Canvas, startY: Float): Float {
         val pvW = width - pad * 2
         val pvH = 100f * density
         val pvRect = RectF(pad, startY, pad + pvW, startY + pvH)
 
-        // 背景
         cardPaint.color = theme.backgroundColorInt
         canvas.drawRoundRect(pvRect, cornerR, cornerR, cardPaint)
 
         canvas.save()
         canvas.clipRect(pvRect)
 
-        // 背景圖片
         val bmp = previewBgBitmap
         if (bmp != null && prefs.useCustomBackground) {
             previewBgMatrix.reset()
@@ -468,13 +660,11 @@ class ThemePanelView(context: Context) : View(context) {
             }
             canvas.drawBitmap(bmp, previewBgMatrix, null)
 
-            // 遮罩
             previewKeyPaint.color = Color.argb(prefs.bgOverlayAlpha, 0, 0, 0)
             previewKeyPaint.style = Paint.Style.FILL
             canvas.drawRect(pvRect, previewKeyPaint)
         }
 
-        // 繪製迷你鍵盤按鍵
         val rows = KeyboardState.defaultQwertyRows()
         val hasBg = bmp != null && prefs.useCustomBackground
         val keyAlpha = prefs.keyOpacity
@@ -482,16 +672,24 @@ class ThemePanelView(context: Context) : View(context) {
         val cr = theme.keyCornerRadiusDp * density * 0.5f
         val fontSize = 8f * density
         val totalUnits = rows.maxOf { row -> row.sumOf { it.widthWeight.toDouble() }.toFloat() }
+        val perKeySizesMap = prefs.getAllPerKeySizes()
+        val globalScaleInv = (200 - prefs.keyScalePercent) / 100f
 
         rows.forEachIndexed { rowIdx, row ->
             val top = pvRect.top + rowIdx * rowH
             var kx = pvRect.left
             val unitW = pvW / totalUnits
-            val padH = 1.5f * density; val padV = 1.5f * density
+            val basePadH = 1.5f * density * globalScaleInv
+            val basePadV = 1.5f * density * globalScaleInv
 
             row.forEach { key ->
                 val keyW = unitW * key.widthWeight
-                val kr = RectF(kx + padH, top + padV, kx + keyW - padH, top + rowH - padV)
+                val keyId = if (key.code != 0) key.code.toString() else key.label
+                val (pkW, pkH) = perKeySizesMap[keyId] ?: (1f to 1f)
+                val adjPadH = basePadH + (keyW * (1f - pkW) / 2f).coerceAtLeast(0f)
+                val adjPadV = basePadV + (rowH * (1f - pkH) / 2f).coerceAtLeast(0f)
+
+                val kr = RectF(kx + adjPadH, top + adjPadV, kx + keyW - adjPadH, top + rowH - adjPadV)
 
                 if (hasBg) {
                     previewKeyPaint.style = Paint.Style.STROKE
@@ -510,7 +708,7 @@ class ThemePanelView(context: Context) : View(context) {
                 if (label.isNotEmpty() && label.length <= 3) {
                     textPaint.textSize = fontSize
                     textPaint.color = if (prefs.customKeyLabelColor != 0) prefs.customKeyLabelColor
-                        else theme.keyLabelColorInt
+                    else theme.keyLabelColorInt
                     val textY = kr.top + (kr.height() + fontSize) / 2f - textPaint.descent()
                     canvas.drawText(label, kr.centerX(), textY, textPaint)
                 }
@@ -521,13 +719,52 @@ class ThemePanelView(context: Context) : View(context) {
 
         canvas.restore()
 
-        // 邊框
         cardPaint.style = Paint.Style.STROKE; cardPaint.strokeWidth = 1f * density
         cardPaint.color = theme.candidateTextColorInt; cardPaint.alpha = 40
         canvas.drawRoundRect(pvRect, cornerR, cornerR, cardPaint)
         cardPaint.style = Paint.Style.FILL; cardPaint.alpha = 255
 
         return startY + pvH + pad
+    }
+
+    // ─── 共用繪製 ───
+
+    private fun drawSliderRow(
+        canvas: Canvas, startY: Float, label: String, id: SliderId,
+        pct: Float, valueText: String,
+        trackLeft: Float, trackRight: Float, trackH: Float
+    ): Float {
+        var y = startY
+        textPaint.textSize = 11f * density
+        textPaint.color = theme.candidateTextColorInt
+        textPaint.textAlign = Paint.Align.LEFT
+        canvas.drawText("$label: $valueText", pad + 4 * density, y + textPaint.textSize, textPaint)
+        textPaint.textAlign = Paint.Align.CENTER
+        y += textPaint.textSize + 6 * density
+
+        val trackRect = RectF(trackLeft, y, trackRight, y + trackH)
+        sliders.first { it.id == id }.trackRect.set(trackRect)
+
+        sliderPaint.color = theme.keyColorInt
+        sliderPaint.style = Paint.Style.FILL
+        canvas.drawRoundRect(trackRect, trackH / 2, trackH / 2, sliderPaint)
+
+        val clampedPct = pct.coerceIn(0f, 1f)
+        val fillRect = RectF(trackLeft, y, trackLeft + (trackRight - trackLeft) * clampedPct, y + trackH)
+        sliderPaint.color = theme.effectiveAccentColor(); sliderPaint.alpha = 180
+        canvas.drawRoundRect(fillRect, trackH / 2, trackH / 2, sliderPaint)
+        sliderPaint.alpha = 255
+
+        val thumbX = trackLeft + (trackRight - trackLeft) * clampedPct
+        val thumbR = 8f * density
+        sliderPaint.color = 0xFFFFFFFF.toInt()
+        canvas.drawCircle(thumbX, y + trackH / 2, thumbR, sliderPaint)
+        sliderPaint.color = theme.effectiveAccentColor()
+        sliderPaint.style = Paint.Style.STROKE; sliderPaint.strokeWidth = 1.5f * density
+        canvas.drawCircle(thumbX, y + trackH / 2, thumbR, sliderPaint)
+        sliderPaint.style = Paint.Style.FILL
+
+        return y + trackH + 10 * density
     }
 
     private fun drawButton(canvas: Canvas, rect: RectF, label: String, cornerR: Float, bgColor: Int) {
@@ -554,7 +791,6 @@ class ThemePanelView(context: Context) : View(context) {
                 lastTouchY = event.y
                 isDragging = false
 
-                // 檢查是否點中任何滑桿
                 for (s in sliders) {
                     if (s.trackRect.isEmpty) continue
                     val ty = s.trackRect.centerY()
@@ -603,7 +839,7 @@ class ThemePanelView(context: Context) : View(context) {
                 pickVideoRect?.let { if (it.contains(cx, cy)) { onPickVideo?.invoke(); performClick(); return true } }
                 clearBgRect?.let { if (it.contains(cx, cy)) { onClearBackground?.invoke(); performClick(); return true } }
 
-                // 比例模式切換
+                // 比例模式
                 scaleCropRect?.let {
                     if (it.contains(cx, cy)) {
                         prefs.bgScaleMode = 0
@@ -619,12 +855,49 @@ class ThemePanelView(context: Context) : View(context) {
                     }
                 }
 
+                // 透明鍵盤 toggle
+                transparentToggleRect?.let {
+                    if (it.contains(cx, cy)) {
+                        prefs.transparentKeyboard = !prefs.transparentKeyboard
+                        onKeySettingsChanged?.invoke()
+                        invalidate(); performClick(); return true
+                    }
+                }
+
                 // 字體顏色
                 val colorHit = colorRects.firstOrNull { it.first.contains(cx, cy) }
                 if (colorHit != null) {
                     prefs.customKeyLabelColor = colorHit.second
                     onLabelColorChanged?.invoke(colorHit.second)
                     invalidate(); performClick(); return true
+                }
+
+                // 個別按鍵選擇
+                val keyHit = perKeyRects.firstOrNull { it.first.contains(cx, cy) }
+                if (keyHit != null) {
+                    selectedKeyId = if (selectedKeyId == keyHit.second) null else keyHit.second
+                    invalidate(); performClick(); return true
+                }
+
+                // 重置選中按鍵
+                resetSelectedKeySizeRect?.let {
+                    if (it.contains(cx, cy)) {
+                        selectedKeyId?.let { keyId ->
+                            prefs.resetPerKeySize(keyId)
+                            onPerKeySizeChanged?.invoke()
+                        }
+                        invalidate(); performClick(); return true
+                    }
+                }
+
+                // 重置全部
+                resetAllKeySizeRect?.let {
+                    if (it.contains(cx, cy)) {
+                        prefs.resetAllPerKeySizes()
+                        selectedKeyId = null
+                        onPerKeySizeChanged?.invoke()
+                        invalidate(); performClick(); return true
+                    }
                 }
 
                 performClick(); return true
@@ -648,6 +921,36 @@ class ThemePanelView(context: Context) : View(context) {
             SliderId.OFFSET_Y -> {
                 prefs.bgOffsetY = pct
                 onBackgroundSettingsChanged?.invoke()
+            }
+            SliderId.KEY_SCALE -> {
+                prefs.keyScalePercent = (pct * 60 + 70).toInt()
+                onKeySettingsChanged?.invoke()
+            }
+            SliderId.KEY_OPACITY -> {
+                prefs.keyOpacity = (pct * 255).toInt()
+                onKeySettingsChanged?.invoke()
+            }
+            SliderId.TRANSPARENT_ALPHA -> {
+                prefs.transparentKeyboardAlpha = (pct * 255).toInt()
+                onKeySettingsChanged?.invoke()
+            }
+            SliderId.KB_HEIGHT -> {
+                prefs.keyboardHeightRatio = 0.25f + pct * 0.30f
+                onKeyboardHeightChanged?.invoke()
+            }
+            SliderId.PER_KEY_WIDTH -> {
+                val sel = selectedKeyId ?: return
+                val w = 0.5f + pct * 1.5f  // 0.5~2.0
+                val h = prefs.getPerKeyHeight(sel)
+                prefs.setPerKeySize(sel, w, h)
+                onPerKeySizeChanged?.invoke()
+            }
+            SliderId.PER_KEY_HEIGHT -> {
+                val sel = selectedKeyId ?: return
+                val w = prefs.getPerKeyWidth(sel)
+                val h = 0.5f + pct * 1.5f  // 0.5~2.0
+                prefs.setPerKeySize(sel, w, h)
+                onPerKeySizeChanged?.invoke()
             }
         }
         invalidate()

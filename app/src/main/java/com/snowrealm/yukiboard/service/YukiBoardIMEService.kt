@@ -375,6 +375,7 @@ class YukiBoardIMEService : InputMethodService() {
         keyboardView.bgOverlayAlpha = prefs.bgOverlayAlpha
         keyboardView.keyScalePercent = prefs.keyScalePercent
         keyboardView.keyOpacity = prefs.keyOpacity
+        keyboardView.perKeySizes = prefs.getAllPerKeySizes()
         keyboardView.hapticEnabled = prefs.keyPressVibration
         keyboardView.swipeTrailEnabled = prefs.swipeTrailEnabled
         keyboardView.swipeInputEnabled = prefs.swipeInput
@@ -547,6 +548,7 @@ class YukiBoardIMEService : InputMethodService() {
         keyboardView.customKeyLabelColor = prefs.customKeyLabelColor
         keyboardView.keyScalePercent = prefs.keyScalePercent
         keyboardView.keyOpacity = prefs.keyOpacity
+        keyboardView.perKeySizes = prefs.getAllPerKeySizes()
         keyboardView.hapticEnabled = prefs.keyPressVibration
         keyboardView.swipeTrailEnabled = prefs.swipeTrailEnabled
         keyboardView.swipeInputEnabled = prefs.swipeInput
@@ -893,6 +895,24 @@ class YukiBoardIMEService : InputMethodService() {
                         bg.reloadFromStorage()
                     }
                     keyboardView.invalidate()
+                }
+                p.onKeySettingsChanged = {
+                    keyboardView.keyScalePercent = prefs.keyScalePercent
+                    keyboardView.keyOpacity = prefs.keyOpacity
+                    // 透明鍵盤即時套用
+                    applyTransparentMode()
+                    val bgHasNow = backgroundView?.reloadFromStorage() ?: false
+                    val glassKeysNow = (prefs.useCustomBackground && bgHasNow) || prefs.transparentKeyboard
+                    keyboardView.hasCustomBackground = glassKeysNow
+                    keyboardView.invalidate()
+                }
+                p.onPerKeySizeChanged = {
+                    keyboardView.perKeySizes = prefs.getAllPerKeySizes()
+                    keyboardView.invalidate()
+                }
+                p.onKeyboardHeightChanged = {
+                    // 重建鍵盤高度需要重新設定 InputView
+                    setInputView(onCreateInputView())
                 }
                 p
             }

@@ -2,6 +2,7 @@ package com.snowrealm.yukiboard.ui.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import org.json.JSONObject
 import kotlin.reflect.KProperty
 
 /**
@@ -151,6 +152,63 @@ class YukiPreferences(context: Context) {
 
     // 自訂字體顏色（0 = 跟隨主題）
     var customKeyLabelColor: Int by IntPref("custom_key_label_color", 0)
+
+    // ═══════════════════════════════════════════════════════════
+    // 個別按鍵尺寸（JSON: {"keyId": {"w": 1.0, "h": 1.0}, ...}）
+    // keyId = keyCode（特殊鍵）或 label（字元鍵）
+    // w/h = 寬度/高度倍率，1.0 = 預設
+    // ═══════════════════════════════════════════════════════════
+    private var perKeySizeJson: String
+        get() = prefs.getString("per_key_size_json", "{}") ?: "{}"
+        set(value) = prefs.edit().putString("per_key_size_json", value).apply()
+
+    fun getPerKeyWidth(keyId: String): Float {
+        return try {
+            val json = JSONObject(perKeySizeJson)
+            json.optJSONObject(keyId)?.optDouble("w", 1.0)?.toFloat() ?: 1.0f
+        } catch (_: Exception) { 1.0f }
+    }
+
+    fun getPerKeyHeight(keyId: String): Float {
+        return try {
+            val json = JSONObject(perKeySizeJson)
+            json.optJSONObject(keyId)?.optDouble("h", 1.0)?.toFloat() ?: 1.0f
+        } catch (_: Exception) { 1.0f }
+    }
+
+    fun setPerKeySize(keyId: String, w: Float, h: Float) {
+        val json = try { JSONObject(perKeySizeJson) } catch (_: Exception) { JSONObject() }
+        val entry = JSONObject().put("w", w.toDouble()).put("h", h.toDouble())
+        json.put(keyId, entry)
+        perKeySizeJson = json.toString()
+    }
+
+    fun resetPerKeySize(keyId: String) {
+        val json = try { JSONObject(perKeySizeJson) } catch (_: Exception) { JSONObject() }
+        json.remove(keyId)
+        perKeySizeJson = json.toString()
+    }
+
+    fun resetAllPerKeySizes() {
+        perKeySizeJson = "{}"
+    }
+
+    fun getAllPerKeySizes(): Map<String, Pair<Float, Float>> {
+        val result = mutableMapOf<String, Pair<Float, Float>>()
+        try {
+            val json = JSONObject(perKeySizeJson)
+            json.keys().forEach { key ->
+                val obj = json.optJSONObject(key)
+                if (obj != null) {
+                    result[key] = Pair(
+                        obj.optDouble("w", 1.0).toFloat(),
+                        obj.optDouble("h", 1.0).toFloat()
+                    )
+                }
+            }
+        } catch (_: Exception) {}
+        return result
+    }
 
     // ════��═════════════════════════════��════════════════════════
     // 委派實作

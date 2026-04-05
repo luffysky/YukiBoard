@@ -203,6 +203,9 @@ class KeyboardView(context: Context) : View(context) {
     /** 按鍵背景不透明度 0~255 */
     var keyOpacity: Int = 255
         set(value) { field = value.coerceIn(0, 255); invalidate() }
+    /** 個別按鍵尺寸倍率 (keyId -> (widthMul, heightMul)) */
+    var perKeySizes: Map<String, Pair<Float, Float>> = emptyMap()
+        set(value) { field = value; invalidate() }
     private var expandScrollOffset: Float = 0f    // 展開面板捲動偏移
     private var expandTouchStartY: Float = 0f     // 觸控起始 Y（用於滑動偵測）
     private var expandLastTouchY: Float = 0f      // 上一次觸控 Y
@@ -1163,11 +1166,18 @@ class KeyboardView(context: Context) : View(context) {
             row.forEach { key ->
                 val keyWidth = unitWidth * key.widthWeight
                 val touchRect = RectF(x, top, x + keyWidth, top + rh)
+
+                // 個別按鍵尺寸倍率
+                val keyId = if (key.code != 0) key.code.toString() else key.label
+                val (pkW, pkH) = perKeySizes[keyId] ?: (1f to 1f)
+                val adjPadH = padH + (keyWidth * (1f - pkW) / 2f).coerceAtLeast(0f)
+                val adjPadV = padV + (rh * (1f - pkH) / 2f).coerceAtLeast(0f)
+
                 val rect = RectF(
-                    x + padH,
-                    top + padV,
-                    x + keyWidth - padH,
-                    top + rh - padV
+                    x + adjPadH,
+                    top + adjPadV,
+                    x + keyWidth - adjPadH,
+                    top + rh - adjPadV
                 )
                 keyEntries.add(KeyEntry(touchRect, rect, key))
 

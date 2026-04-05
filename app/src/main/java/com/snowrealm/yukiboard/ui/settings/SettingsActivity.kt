@@ -2040,7 +2040,7 @@ class SettingsActivity : AppCompatActivity() {
                                     return@post
                                 }
                                 (btn as TextView).text = "🔊 播放中..."
-                                engine?.speak(testText, "zh-TW", prefs.ttsSpeed) {
+                                engine?.speak(testText, null, prefs.ttsSpeed) {
                                     mainHandler.post { engine?.destroy(); resetBtn() }
                                 }
                             }
