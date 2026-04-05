@@ -82,13 +82,12 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
+                    "- 剪貼簿面板全新卡片式 UI（釘選區橫滑 + 歷史區直捲）\n" +
+                    "- TTS 測試按鈕修復（等待引擎初始化 + 狀態顯示）\n" +
                     "- TTS 語音輸出（翻譯朗讀 + Yuki語音 + 候選字朗讀）\n" +
                     "- AI 候選字 debounce 600ms + ✨ 金色標記\n" +
                     "- ClawPanel 串流即時顯示（邊收邊渲染）\n" +
-                    "- 語音辨識多語言支援（不受鍵盤語言限制）\n" +
-                    "- 設定頁 TTS 引擎切換 + 語速調整 + 測試按鈕\n" +
-                    "- Whisper API 連線測試按鈕\n" +
-                    "- Release APK 簽名（可正常安裝）"
+                    "- 設定頁 TTS 引擎切換 + 語速調整 + 測試按鈕"
             }
         }
         debug {
