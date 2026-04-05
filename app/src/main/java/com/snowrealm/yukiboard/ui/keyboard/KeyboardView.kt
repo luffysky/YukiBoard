@@ -393,6 +393,17 @@ class KeyboardView(context: Context) : View(context) {
     /** 外部設定：是否啟用滑動輸入（滑動產生文字） */
     var swipeInputEnabled = true
 
+    // ─── 滑動停頓偵測 ───
+    private var swipeDwellKey: KeyModel? = null
+    private var swipeDwellStartMs = 0L
+    private val swipeDwellThresholdMs = 300L
+    private val swipeDwellHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val swipeDwellRunnable = Runnable {
+        swipeDwellKey?.let { onSwipeDwellConfirmed(it) }
+    }
+    /** 滑動停頓確認回呼（音節確認） */
+    var onSwipeSyllableConfirmed: ((String) -> Unit)? = null
+
     // ─── 滑動輸入解碼 ──────────────────────────────────────
     /** 滑動經過的按鍵序列（去連續重複） */
     private val swipeKeySequence = mutableListOf<KeyModel>()
@@ -1475,6 +1486,13 @@ class KeyboardView(context: Context) : View(context) {
             val currentKey = keyEntries.firstOrNull { it.touchRect.contains(x, y) }?.key
             if (currentKey != null && currentKey != swipeHighlightKey) {
                 flashKey(currentKey)
+                // 停頓偵測：換了按鍵就重新計時
+                swipeDwellHandler.removeCallbacks(swipeDwellRunnable)
+                if (currentKey != swipeDwellKey) {
+                    swipeDwellKey = currentKey
+                    swipeDwellStartMs = System.currentTimeMillis()
+                    swipeDwellHandler.postDelayed(swipeDwellRunnable, swipeDwellThresholdMs)
+                }
             }
             invalidate()
         }
@@ -1483,6 +1501,8 @@ class KeyboardView(context: Context) : View(context) {
     fun onSwipeEnd() {
         if (!isSwipingActive && swipePoints.isEmpty()) return
         isSwipingActive = false
+        swipeDwellHandler.removeCallbacks(swipeDwellRunnable)
+        swipeDwellKey = null
         swipeFadeAnimator?.cancel()
         swipeFadeAnimator = android.animation.ValueAnimator.ofFloat(1f, 0f).apply {
             duration = 400
@@ -1513,6 +1533,27 @@ class KeyboardView(context: Context) : View(context) {
             }
             start()
         }
+    }
+
+    /** 停頓確認：滑動時在某按鍵停留超過閾值，自動確認音節 */
+    private fun onSwipeDwellConfirmed(key: KeyModel) {
+        // 視覺回饋：按鍵強閃爍
+        swipeHighlightKey = key
+        swipeHighlightAlpha = 1.0f
+        highlightFadeAnimator?.cancel()
+        highlightFadeAnimator = android.animation.ValueAnimator.ofFloat(1.0f, 0f).apply {
+            duration = 350
+            addUpdateListener { anim ->
+                swipeHighlightAlpha = anim.animatedValue as Float
+                invalidate()
+            }
+            start()
+        }
+        // 短震動
+        if (hapticEnabled) vibrateShort()
+        // 通知音節確認
+        onSwipeSyllableConfirmed?.invoke(key.label)
+        swipeDwellKey = null
     }
 
     private fun drawSwipeTrail(canvas: Canvas) {
@@ -1959,6 +2000,11 @@ class KeyboardView(context: Context) : View(context) {
             }
         }
         return true
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        swipeDwellHandler.removeCallbacks(swipeDwellRunnable)
     }
 
     override fun performClick(): Boolean {

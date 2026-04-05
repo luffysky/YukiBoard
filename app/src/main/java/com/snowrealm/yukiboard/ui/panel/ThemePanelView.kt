@@ -152,6 +152,11 @@ class ThemePanelView(context: Context) : View(context) {
         } else null
     }
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        reloadPreviewBitmap()
+    }
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec).let {
             if (it > 0) it else resources.displayMetrics.widthPixels

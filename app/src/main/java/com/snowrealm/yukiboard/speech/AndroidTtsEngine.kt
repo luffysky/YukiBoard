@@ -51,8 +51,9 @@ class AndroidTtsEngine(context: Context, private val onInitDone: ((Boolean) -> U
                 // 確保使用正確音頻通道（USAGE_MEDIA + CONTENT_TYPE_SPEECH）
                 tts?.setAudioAttributes(
                     AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .setFlags(AudioAttributes.FLAG_AUDIBILITY_ENFORCED)
                         .build()
                 )
                 Log.i(tag, "TTS initialized, engine=${tts?.defaultEngine}")
@@ -96,9 +97,10 @@ class AndroidTtsEngine(context: Context, private val onInitDone: ((Boolean) -> U
             pendingCallbacks[utteranceId] = onDone
         }
 
-        // 明確指定音頻串流為 STREAM_MUSIC
+        // 使用 STREAM_NOTIFICATION 不受靜音和 AudioFocus 影響
         val params = Bundle().apply {
-            putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC)
+            putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_NOTIFICATION)
+            putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
         }
         val speakResult = engine.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
         if (speakResult != TextToSpeech.SUCCESS) {

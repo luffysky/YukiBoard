@@ -55,6 +55,7 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
     enum class BackgroundType { NONE, IMAGE, VIDEO }
 
     private var currentType = BackgroundType.NONE
+    private var currentLoadedPath: String? = null
 
     // ── 雙指縮放相關 ──
     private var imageMatrix = Matrix()
@@ -108,6 +109,7 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
     fun setImageBackground(file: File) {
         clearBackground()
         currentType = BackgroundType.IMAGE
+        currentLoadedPath = file.absolutePath
 
         val iv = ImageView(context).apply {
             scaleType = ImageView.ScaleType.MATRIX
@@ -238,6 +240,7 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
     fun setVideoBackground(file: File) {
         clearBackground()
         currentType = BackgroundType.VIDEO
+        currentLoadedPath = file.absolutePath
 
         val filePath = file.absolutePath
 
@@ -340,14 +343,14 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
             return false
         }
 
-        // 已經載入同類型就不重複載入（影片重新載入會閃）
-        if (currentType == BackgroundType.VIDEO && isVideoFile(savedBg) && mediaPlayer != null) {
-            // 影片已載入，但 offset/scaleMode 可能已變更，重新套用
+        // 同一檔案才跳過重載（不同檔案要重新載入）
+        if (currentType == BackgroundType.VIDEO && isVideoFile(savedBg) && mediaPlayer != null
+            && currentLoadedPath == savedBg.absolutePath) {
             applyVideoTransform()
             return true
         }
-        if (currentType == BackgroundType.IMAGE && !isVideoFile(savedBg) && imageView != null) {
-            // 圖片已載入，但 offset/scaleMode 可能已變更，重新套用
+        if (currentType == BackgroundType.IMAGE && !isVideoFile(savedBg) && imageView != null
+            && currentLoadedPath == savedBg.absolutePath) {
             applyOffset()
             return true
         }
@@ -371,6 +374,7 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
 
     fun clearBackground() {
         currentType = BackgroundType.NONE
+        currentLoadedPath = null
         releaseMediaPlayer()
         removeAllViews()
         imageView = null

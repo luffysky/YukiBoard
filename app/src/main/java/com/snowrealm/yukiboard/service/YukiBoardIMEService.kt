@@ -345,6 +345,10 @@ class YukiBoardIMEService : InputMethodService() {
             }
         }
 
+        keyboardView.onSwipeSyllableConfirmed = { label ->
+            currentInputConnection?.commitText(label, 1)
+        }
+
         // 自訂圖片/影片背景（最底層）
         val bgView = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView(this)
         bgView.scaleMode = prefs.bgScaleMode
