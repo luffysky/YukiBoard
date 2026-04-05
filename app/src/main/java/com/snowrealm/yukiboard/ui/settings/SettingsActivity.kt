@@ -213,7 +213,8 @@ class SettingsActivity : AppCompatActivity() {
             inputChildren += switchRow("滑動輸入", "滑動手勢輸入", prefs.swipeInput) { prefs.swipeInput = it }
             inputChildren += switchRow("自動更正", "英文自動更正", prefs.autoCorrect) { prefs.autoCorrect = it }
             inputChildren += switchRow("Snippet 展開", "開發者模式：縮寫 + Tab 展開", prefs.snippetEnabled) { prefs.snippetEnabled = it }
-            inputChildren += switchRow("私房話模式", "AES 加密訊息", prefs.secretMessageMode) { prefs.secretMessageMode = it }
+            inputChildren += switchRow("直打注音", "注音符號直接輸出不轉漢字", prefs.rawBopomofoMode) { prefs.rawBopomofoMode = it }
+            inputChildren += switchRow("私房話模式", "AES 加密訊息（Enter 送出時加密）", prefs.secretMessageMode) { prefs.secretMessageMode = it }
             inputChildren += switchRow("語氣偵測", "偵測打字語氣", prefs.toneDetection) { prefs.toneDetection = it }
             inputChildren += switchRow("懸浮面板", "啟用懸浮面板功能", prefs.floatingPanelEnabled) { prefs.floatingPanelEnabled = it }
             inputChildren += switchRow("遠端鍵盤", "藍牙/WiFi 遠端控制", prefs.remoteKeyboardEnabled) { prefs.remoteKeyboardEnabled = it }

@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 26
-        versionName "0.5.2"
+        versionCode 27
+        versionName "0.5.3"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -75,7 +75,7 @@ android {
             debuggable true
             firebaseAppDistribution {
                 groups = "testers"
-                releaseNotes = "v${android.defaultConfig.versionName}\n- fix: 私房話加密改為 Enter 送出時整句加密（不再逐字加密）\n- feat: 候選字修復 + 自訂詞彙 + 整句預測\n- feat: 語氣偵測/懸浮面板/動作預測全接線"
+                releaseNotes = "v${android.defaultConfig.versionName}\n- feat: 直打注音模式（注音符號直接輸出不轉漢字）\n- fix: 私房話模式預設關閉（不再預設加密）\n- 設定頁 輸入行為 新增「直打注音」開關"
             }
         }
     }

@@ -439,6 +439,12 @@ class YukiBoardIMEService : InputMethodService() {
         inputRouter.smartInput.habitTrackEnabled = prefs.habitTracking
         inputRouter.currentAppPackage = info?.packageName
 
+        // 同步直打注音模式
+        val bopoEngine = inputRouter.getActiveEngine()
+        if (bopoEngine is com.snowrealm.yukiboard.input.engine.ChewingInputEngine) {
+            bopoEngine.rawBopomofoMode = prefs.rawBopomofoMode
+        }
+
         // 自動解密：如果輸入框已有加密訊息 [YB🔐]，顯示解密內容
         val ic0 = currentInputConnection
         if (ic0 != null && prefs.secretMessageMode) {

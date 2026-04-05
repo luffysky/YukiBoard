@@ -20,6 +20,9 @@ class ChewingInputEngine(
     private val userDict: com.snowrealm.yukiboard.input.dictionary.UserDictionary? = null
 ) : InputEngine {
 
+    /** 直打注音模式：注音符號直接輸出，不轉漢字 */
+    var rawBopomofoMode = false
+
     // ─── 注音組字緩衝 ───
     private val bopomofoBuffer = StringBuilder()
     // 已選字但尚未 commit 的暫存（連續選字場景）
@@ -122,6 +125,14 @@ class ChewingInputEngine(
         if (char.isEmpty()) return InputResult.Idle
 
         val ch = char[0]
+
+        // 直打注音模式：注音符號和聲調直接輸出
+        if (rawBopomofoMode) {
+            if (ch in '\u3105'..'\u312F' || ch in toneMarks) {
+                return InputResult.CommitText(char)
+            }
+        }
+
         return when {
             // 注音符號
             ch in '\u3105'..'\u312F' -> {
