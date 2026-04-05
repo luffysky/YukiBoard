@@ -875,6 +875,7 @@ class KeyboardView(context: Context) : View(context) {
         val vLocale = voiceListeningLocale
         if (vLocale != null) {
             val langName = when {
+                vLocale == "auto" -> "多語言"
                 vLocale.startsWith("zh-TW") -> "中文(繁體)"
                 vLocale.startsWith("zh-CN") -> "中文(簡體)"
                 vLocale.startsWith("zh-HK") -> "粵語"

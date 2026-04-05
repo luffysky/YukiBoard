@@ -202,18 +202,18 @@ class WhisperSpeechEngine(
         write((value shr 8) and 0xFF)
     }
 
-    /** 呼叫 Whisper API 辨識 */
+    /** 呼叫 Whisper API 辨識（不指定語言，由 Whisper 自動偵測） */
     private fun transcribe(wavData: ByteArray, language: String): String? {
-        val body = MultipartBody.Builder()
+        val bodyBuilder = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
             .addFormDataPart(
                 "file", "audio.wav",
                 wavData.toRequestBody("audio/wav".toMediaType())
             )
             .addFormDataPart("model", model)
-            .addFormDataPart("language", language)
             .addFormDataPart("response_format", "json")
-            .build()
+        // 不傳 language → Whisper 自動偵測，支援所有語言混合辨識
+        val body = bodyBuilder.build()
 
         val request = Request.Builder()
             .url("https://api.openai.com/v1/audio/transcriptions")

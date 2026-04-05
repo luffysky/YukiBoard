@@ -67,9 +67,15 @@ class AndroidSpeechEngine(context: Context) : SpeechInputEngine {
 
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            // 主要語言（hint），但允許辨識其他語言
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, locale)
             putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, false)
+            // 開啟多語言支援：列出所有常用語言，引擎會自動判斷
+            putStringArrayListExtra(RecognizerIntent.EXTRA_SUPPORTED_LANGUAGES, arrayListOf(
+                "zh-TW", "zh-CN", "en-US", "ja-JP", "ko-KR",
+                "es-ES", "fr-FR", "de-DE", "pt-BR"
+            ))
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
             // 降低靜音偵測敏感度，避免過早截斷

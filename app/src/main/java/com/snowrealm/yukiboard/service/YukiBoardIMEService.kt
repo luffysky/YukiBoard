@@ -1107,20 +1107,21 @@ class YukiBoardIMEService : InputMethodService() {
 
         characterView?.playListening()
 
-        val locale = when (inputRouter.inputMode) {
+        // 語言 hint（主要用於 Android SpeechRecognizer 的預設語言，但兩引擎都支援多語言自動偵測）
+        val localeHint = when (inputRouter.inputMode) {
             com.snowrealm.yukiboard.input.router.InputMode.BOPOMOFO -> "zh-TW"
             com.snowrealm.yukiboard.input.router.InputMode.PINYIN -> "zh-CN"
             com.snowrealm.yukiboard.input.router.InputMode.CANGJIE,
-            com.snowrealm.yukiboard.input.router.InputMode.SPEED_CANGJIE -> "zh-HK"
+            com.snowrealm.yukiboard.input.router.InputMode.SPEED_CANGJIE -> "zh-TW"
             com.snowrealm.yukiboard.input.router.InputMode.JAPANESE -> "ja-JP"
             com.snowrealm.yukiboard.input.router.InputMode.KOREAN -> "ko-KR"
-            else -> "en-US"
+            else -> "zh-TW" // 預設中文優先（台灣用戶為主）
         }
 
-        keyboardView.voiceListeningLocale = locale
+        keyboardView.voiceListeningLocale = "auto"
 
         speechEngine?.startListening(
-            locale = locale,
+            locale = localeHint,
             onPartialResult = { partial ->
                 currentInputConnection?.setComposingText(partial, 1)
             },
