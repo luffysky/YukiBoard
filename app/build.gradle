@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 35
-        versionName "0.6.1"
+        versionCode 36
+        versionName "0.6.2"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -75,7 +75,7 @@ android {
             debuggable true
             firebaseAppDistribution {
                 groups = "testers"
-                releaseNotes = "v${android.defaultConfig.versionName}\n- feat: PersonalDictionary三層自動學詞\n- feat: StyleProfiler語氣風格學習+候選加分\n- feat: ComboTracker連擊粒子特效\n- feat: EmotionStickerEngine情緒貼圖推薦"
+                releaseNotes = "v${android.defaultConfig.versionName}\n- feat: Gemini+Groq AI Provider\n- feat: ApiGuideActivity申請教學\n- feat: ClawClient.streamSkill串流\n- feat: AI設定5平台選擇"
             }
         }
     }

@@ -131,9 +131,11 @@ class AISettingsActivity : AppCompatActivity() {
         }
 
         val providers = listOf(
+            Triple(AIProviderType.GEMINI, "Google Gemini（免費推薦）", true),
+            Triple(AIProviderType.GROQ, "Groq（免費超快）", true),
             Triple(AIProviderType.OPENAI, "OpenAI", true),
             Triple(AIProviderType.ANTHROPIC, "Anthropic", true),
-            Triple(AIProviderType.SNOWREALM, "SnowRealm（即將推出）", false)
+            Triple(AIProviderType.SNOWREALM, "SnowRealm（邀請碼）", true)
         )
 
         providers.forEach { (type, label, enabled) ->
@@ -191,6 +193,17 @@ class AISettingsActivity : AppCompatActivity() {
         fun updateModelOptions(type: AIProviderType) {
             modelGroup.removeAllViews()
             val models = when (type) {
+                AIProviderType.GEMINI -> listOf(
+                    "gemini-2.0-flash" to "Gemini 2.0 Flash (推薦/免費)",
+                    "gemini-2.0-flash-lite" to "Gemini 2.0 Flash Lite",
+                    "gemini-1.5-flash" to "Gemini 1.5 Flash"
+                )
+                AIProviderType.GROQ -> listOf(
+                    "llama-3.3-70b-versatile" to "Llama 3.3 70B (推薦)",
+                    "llama-3.1-8b-instant" to "Llama 3.1 8B (超快)",
+                    "gemma2-9b-it" to "Gemma 2 9B",
+                    "mixtral-8x7b-32768" to "Mixtral 8x7B"
+                )
                 AIProviderType.OPENAI -> listOf(
                     "gpt-4o-mini" to "gpt-4o-mini (推薦)",
                     "gpt-4o" to "gpt-4o"
@@ -317,6 +330,25 @@ class AISettingsActivity : AppCompatActivity() {
         }
 
         // ── Security notice ──
+        // API Key 申請教學按鈕
+        root.addView(Button(this).apply {
+            text = "不知道怎麼申請 API Key？看教學"
+            setTextColor(0xFFFFFFFF.toInt())
+            textSize = 13f
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xFF4A5A77.toInt())
+                cornerRadius = dp(8).toFloat()
+            }
+            setPadding(dp(16), dp(10), dp(16), dp(10))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(dp(4), dp(16), dp(4), dp(4)) }
+            setOnClickListener {
+                startActivity(android.content.Intent(this@AISettingsActivity, ApiGuideActivity::class.java))
+            }
+        })
+
         root.addView(TextView(this).apply {
             text = "\uD83D\uDD12 您的 API Key 使用 Android 系統加密儲存於本機"
             textSize = 12f

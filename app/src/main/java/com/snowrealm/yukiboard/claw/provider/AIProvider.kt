@@ -5,6 +5,8 @@ import kotlinx.coroutines.flow.Flow
 enum class AIProviderType {
     OPENAI,
     ANTHROPIC,
+    GEMINI,
+    GROQ,
     SNOWREALM
 }
 

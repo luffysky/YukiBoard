@@ -5,6 +5,8 @@ import com.snowrealm.yukiboard.auth.InviteCodeManager
 import com.snowrealm.yukiboard.auth.SnowRealmAuthClient
 import com.snowrealm.yukiboard.claw.provider.AIProviderManager
 import com.snowrealm.yukiboard.claw.skills.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 class ClawClient(context: Context) {
     private val providerManager = AIProviderManager.getInstance(context)
@@ -98,6 +100,17 @@ class ClawClient(context: Context) {
     private fun hasOwnApiKey(): Boolean {
         val key = providerManager.getApiKey(providerManager.getSelectedProviderType())
         return !key.isNullOrBlank()
+    }
+
+    /**
+     * 串流執行 Skill — 回傳 Flow<String>，UI 可邊收邊顯示。
+     * 目前直接委派給 Provider 的 complete()。
+     */
+    suspend fun streamSkill(prompt: String, systemPrompt: String = ""): Flow<String> {
+        if (!isAvailable()) return emptyFlow()
+        val provider = providerManager.getCurrentProvider()
+        val model = providerManager.getSelectedModel(providerManager.getSelectedProviderType())
+        return provider.complete(prompt, systemPrompt, model)
     }
 
     fun getAvailableSkills(): List<ClawSkill> = allSkillIds.mapNotNull { getSkill(it) }

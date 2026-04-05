@@ -259,13 +259,15 @@
 - [ ] GeminiProvider.kt（免費 1500 次/天）
 - [ ] GroqProvider.kt（免費限額，速度最快）
 - [ ] GeminiNanoProvider.kt（Android 14+ 本地離線）
-- [ ] AIProviderType enum 更新（+GEMINI/GROQ/GEMINI_NANO）
-- [ ] 首次使用預設邏輯（Nano ��先 → Gemini → 用戶選擇）
+- ✅ AIProviderType enum 更新（+GEMINI/GROQ）
+- ✅ GeminiProvider（SSE streaming + gemini-2.0-flash）
+- ✅ GroqProvider（OpenAI相容格式 + llama-3.3-70b）
+- ✅ AIProviderManager + AISettingsActivity 5平台選擇
+- ✅ ClawClient.streamSkill() — Flow<String> 串流結果直通 UI
+- ✅ ApiGuideActivity.kt（5 平台申請教學 + 一鍵跳轉）
 - [ ] AI 候選字 debounce（600ms）+ ✨ 標記顯示
 - [ ] markAICandidates() — 候選列 AI 建議淡紫標示
-- [ ] ClawClient.streamSkill() — Flow<String> 串流結果直通 UI
 - [ ] ClawPanelView 串流即時顯示（partial result 邊收邊顯示）
-- [ ] ApiGuideActivity.kt（5 平台申��教學 + 雪凜推薦語���
 
 ---
 

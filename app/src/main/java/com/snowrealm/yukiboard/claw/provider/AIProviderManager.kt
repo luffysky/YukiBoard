@@ -81,6 +81,8 @@ class AIProviderManager private constructor(context: Context) {
             when (type) {
                 AIProviderType.OPENAI -> OpenAIProvider(apiKey)
                 AIProviderType.ANTHROPIC -> AnthropicProvider(apiKey)
+                AIProviderType.GEMINI -> GeminiProvider(apiKey)
+                AIProviderType.GROQ -> GroqProvider(apiKey)
                 AIProviderType.SNOWREALM -> SnowRealmProvider(appContext)
             }
         }
