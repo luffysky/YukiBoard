@@ -114,12 +114,13 @@ class ClawPanelView(context: Context) : LinearLayout(context) {
         currentJob = scope.launch {
             try {
                 // 嘗試串流模式（邊收邊顯示）
+                val systemPrompt = "你是 YukiBoard 鍵盤助手雪凜。一律使���繁體中文回答，簡潔有力。"
                 val prompt = "${input.text}\n\nContext: ${input.context}"
                 val accumulated = StringBuilder()
                 var hasStream = false
 
                 withContext(Dispatchers.IO) {
-                    client.streamSkill(prompt)
+                    client.streamSkill(prompt, systemPrompt)
                 }.collect { chunk ->
                     hasStream = true
                     accumulated.append(chunk)
