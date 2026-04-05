@@ -2060,13 +2060,13 @@ class SettingsActivity : AppCompatActivity() {
                                     resetBtn()
                                     return@post
                                 }
-                                // 檢查通知音量（TTS 使用 STREAM_NOTIFICATION）
+                                // 檢查媒體音量（TTS 使用 STREAM_MUSIC）
                                 val audioMgr = getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
-                                val vol = audioMgr.getStreamVolume(android.media.AudioManager.STREAM_NOTIFICATION)
-                                val maxVol = audioMgr.getStreamMaxVolume(android.media.AudioManager.STREAM_NOTIFICATION)
-                                android.util.Log.i("TTS_TEST", "engine=${engine?.javaClass?.simpleName}, isReady=${engine?.isReady}, notifVol=$vol/$maxVol")
+                                val vol = audioMgr.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
+                                val maxVol = audioMgr.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
+                                android.util.Log.i("TTS_TEST", "engine=${engine?.javaClass?.simpleName}, isReady=${engine?.isReady}, mediaVol=$vol/$maxVol")
                                 if (vol == 0) {
-                                    android.widget.Toast.makeText(this@SettingsActivity, "通知音量為 0，請至系統設定調高音量後再測試", android.widget.Toast.LENGTH_LONG).show()
+                                    android.widget.Toast.makeText(this@SettingsActivity, "媒體音量為 0，請調高音量後再測試", android.widget.Toast.LENGTH_LONG).show()
                                 }
                                 (btn as TextView).text = "🔊 播放中..."
                                 engine?.speak(testText, null, prefs.ttsSpeed) {

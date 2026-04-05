@@ -48,12 +48,11 @@ class AndroidTtsEngine(context: Context, private val onInitDone: ((Boolean) -> U
                         utteranceId?.let { pendingCallbacks.remove(it) }
                     }
                 })
-                // 確保使用正確音頻通道（USAGE_MEDIA + CONTENT_TYPE_SPEECH）
+                // 使用媒體音訊通道（跟隨媒體音量）
                 tts?.setAudioAttributes(
                     AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .setFlags(AudioAttributes.FLAG_AUDIBILITY_ENFORCED)
                         .build()
                 )
                 Log.i(tag, "TTS initialized, engine=${tts?.defaultEngine}")
@@ -97,9 +96,9 @@ class AndroidTtsEngine(context: Context, private val onInitDone: ((Boolean) -> U
             pendingCallbacks[utteranceId] = onDone
         }
 
-        // 使用 STREAM_NOTIFICATION 不受靜音和 AudioFocus 影響
+        // 使用 STREAM_MUSIC（媒體音量）
         val params = Bundle().apply {
-            putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_NOTIFICATION)
+            putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC)
             putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
         }
         val speakResult = engine.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
