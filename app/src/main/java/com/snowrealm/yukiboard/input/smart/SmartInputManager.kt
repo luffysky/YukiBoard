@@ -180,6 +180,11 @@ class SmartInputManager(context: Context) {
         sentencePredictor.resetContext()
     }
 
+    /** 滑動輸入英文候選（委派給 EnglishDictionary） */
+    fun swipeSuggestEnglish(chars: List<Char>): List<String> {
+        return dictionary?.swipeSuggest(chars) ?: emptyList()
+    }
+
     /** 定期儲存（onFinishInputView 呼叫） */
     fun persist() {
         phrasePredictor.save()

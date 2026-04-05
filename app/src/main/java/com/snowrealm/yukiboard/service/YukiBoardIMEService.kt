@@ -256,6 +256,10 @@ class YukiBoardIMEService : InputMethodService() {
             }
             ic.commitText(text, 1)
         }
+        // 滑動輸入：收到按鍵序列 → 解碼成候選字
+        keyboardView.setOnSwipeInputListener { keys ->
+            handleSwipeInput(keys)
+        }
         keyboardView.setOnModeChangedListener { mode ->
             manualModeOverride = true
             characterView?.playSwitchLang()
@@ -267,6 +271,20 @@ class YukiBoardIMEService : InputMethodService() {
             }
         }
         keyboardView.setOnCandidateSelectListener { index ->
+            // 滑動輸入候選：直接 commit，不走 InputRouter
+            if (swipeInputPending && index in swipeInputCandidates.indices) {
+                val text = swipeInputCandidates[index]
+                val ic = currentInputConnection
+                if (ic != null) {
+                    ic.commitText(text, 1)
+                }
+                swipeInputPending = false
+                swipeInputCandidates = emptyList()
+                keyboardView.updateComposingText("")
+                keyboardView.updateCandidates(emptyList())
+                return@setOnCandidateSelectListener
+            }
+
             val result = inputRouter.selectCandidate(index)
             // GIF/翻譯面板輸入模式：選字提交到面板而非目標 App
             val gpRef = gifPanel
@@ -340,6 +358,7 @@ class YukiBoardIMEService : InputMethodService() {
         keyboardView.keyOpacity = prefs.keyOpacity
         keyboardView.hapticEnabled = prefs.keyPressVibration
         keyboardView.swipeTrailEnabled = prefs.swipeTrailEnabled
+        keyboardView.swipeInputEnabled = prefs.swipeInput
 
         // 套用當前主題
         val currentTheme = ThemeManager.getInstance(this).currentTheme
@@ -510,6 +529,7 @@ class YukiBoardIMEService : InputMethodService() {
         keyboardView.keyOpacity = prefs.keyOpacity
         keyboardView.hapticEnabled = prefs.keyPressVibration
         keyboardView.swipeTrailEnabled = prefs.swipeTrailEnabled
+        keyboardView.swipeInputEnabled = prefs.swipeInput
 
         // 遊戲模式恢復
         if (isInGameMode) {
@@ -1507,7 +1527,37 @@ class YukiBoardIMEService : InputMethodService() {
     // 按鍵處理核心
     // =========================================================================
 
+    /**
+     * 滑動輸入處理：收到滑過的按鍵序列，解碼成候選字顯示。
+     * 選字後自動提交到輸入框。
+     */
+    private fun handleSwipeInput(keys: List<com.snowrealm.yukiboard.ui.keyboard.KeyModel>) {
+        if (keys.size < 2) return
+
+        val labels = keys.map { it.label }
+        val candidates = inputRouter.swipeSuggest(labels)
+
+        if (candidates.isNotEmpty()) {
+            // 顯示滑動軌跡對應的注音/字母作為 composing text
+            val composing = labels.joinToString("")
+            keyboardView.updateComposingText(composing)
+            keyboardView.updateCandidates(candidates)
+
+            // 標記正在滑動輸入模式，選字時直接 commit（不走 InputRouter）
+            swipeInputPending = true
+            swipeInputCandidates = candidates
+        }
+    }
+
+    private var swipeInputPending = false
+    private var swipeInputCandidates: List<String> = emptyList()
+
     private fun handleKeyPress(keyCode: Int, label: String) {
+        // 清除滑動輸入待選狀態（開始打字表示放棄滑動候選）
+        if (swipeInputPending) {
+            swipeInputPending = false
+            swipeInputCandidates = emptyList()
+        }
         // 翻譯面板輸入模式：攔截鍵盤輸入到翻譯框
         val tp = translatePanel
         if (tp != null && tp.isInInputMode) {

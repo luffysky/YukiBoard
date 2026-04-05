@@ -377,6 +377,24 @@ class KeyboardView(context: Context) : View(context) {
     private var swipeColor = 0xFFB39DDB.toInt()
     /** 外部設定：是否啟用滑動路徑視覺 */
     var swipeTrailEnabled = true
+    /** 外部設定：是否啟用滑動輸入（滑動產生文字） */
+    var swipeInputEnabled = true
+
+    // ─── 滑動輸入解碼 ──────────────────────────────────────
+    /** 滑動經過的按鍵序列（去連續重複） */
+    private val swipeKeySequence = mutableListOf<KeyModel>()
+    /** 滑動起始位置 */
+    private var swipeDownX = 0f
+    private var swipeDownY = 0f
+    /** 是否已被判定為滑動（跨越 ≥2 個不同按鍵 且移動距離 > 閾值） */
+    private var isSwipeGesture = false
+    private val SWIPE_DISTANCE_THRESHOLD = 20f * density  // 20dp
+
+    private var onSwipeInputListener: ((keys: List<KeyModel>) -> Unit)? = null
+    /** 設定滑動輸入回呼：收到經過的按鍵序列（去重），由外部解碼成文字 */
+    fun setOnSwipeInputListener(listener: (keys: List<KeyModel>) -> Unit) {
+        onSwipeInputListener = listener
+    }
 
     // 外層發光 Paint（粗線 + 半透明，不用 BlurMaskFilter 以保效能）
     private val swipeGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1533,6 +1551,10 @@ class KeyboardView(context: Context) : View(context) {
                     return true
                 }
                 isLongPressTriggered = false
+                isSwipeGesture = false
+                swipeKeySequence.clear()
+                swipeDownX = x
+                swipeDownY = y
                 val hit = keyEntries.firstOrNull { it.touchRect.contains(x, y) }
                 if (hit != null) {
                     pressedKey = hit.key
@@ -1541,6 +1563,10 @@ class KeyboardView(context: Context) : View(context) {
                     handler.postDelayed(longPressRunnable, LONG_PRESS_DELAY)
                     if (hapticEnabled) vibrateShort()
                     invalidate()
+                    // 記錄滑動起始按鍵
+                    if (swipeInputEnabled && !hit.key.isSpecial) {
+                        swipeKeySequence.add(hit.key)
+                    }
                 }
                 // 滑動路徑起點
                 if (y >= candidateBarHeight) {
@@ -1600,6 +1626,23 @@ class KeyboardView(context: Context) : View(context) {
                     pressedKey = null
                     invalidate()
                 }
+                // 滑動輸入：追蹤經過的按鍵
+                if (swipeInputEnabled && !isLongPressTriggered && y >= candidateBarHeight) {
+                    val moveHit = keyEntries.firstOrNull { it.touchRect.contains(x, y) }
+                    if (moveHit != null && !moveHit.key.isSpecial) {
+                        val lastKey = swipeKeySequence.lastOrNull()
+                        if (lastKey == null || lastKey.label != moveHit.key.label) {
+                            swipeKeySequence.add(moveHit.key)
+                        }
+                    }
+                    // 判定為滑動：距離超過閾值 且 經過 ≥2 個不同按鍵
+                    val dist = Math.hypot((x - swipeDownX).toDouble(), (y - swipeDownY).toDouble())
+                    if (!isSwipeGesture && dist > SWIPE_DISTANCE_THRESHOLD && swipeKeySequence.size >= 2) {
+                        isSwipeGesture = true
+                        // 取消長按（滑動中不觸發長按）
+                        handler.removeCallbacks(longPressRunnable)
+                    }
+                }
                 // 更新滑動路徑
                 if (y >= candidateBarHeight) {
                     onSwipeMove(x, y)
@@ -1643,8 +1686,23 @@ class KeyboardView(context: Context) : View(context) {
 
                 if (isLongPressTriggered) {
                     isLongPressTriggered = false
+                    // 滑動路徑結束
+                    onSwipeEnd()
                     return true
                 }
+
+                // 滑動輸入：滑動結束，送出按鍵序列
+                if (isSwipeGesture && swipeKeySequence.size >= 2) {
+                    onSwipeInputListener?.invoke(swipeKeySequence.toList())
+                    swipeKeySequence.clear()
+                    isSwipeGesture = false
+                    // 滑動路徑結束
+                    onSwipeEnd()
+                    performClick()
+                    return true
+                }
+                swipeKeySequence.clear()
+                isSwipeGesture = false
 
                 // 展開面板觸控選字（滑動中不選字）
                 if (isCandidateExpanded && y > candidateBarHeight && allCandidates.isNotEmpty()) {

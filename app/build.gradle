@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 29
-        versionName "0.5.5"
+        versionCode 30
+        versionName "0.5.6"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -75,7 +75,7 @@ android {
             debuggable true
             firebaseAppDistribution {
                 groups = "testers"
-                releaseNotes = "v${android.defaultConfig.versionName}\n- feat: 注音鍵盤長按直接輸出注音符號/聲調（不用開直打模式）\n- fix: 橫向鍵盤太扁 — 自動提高高度比例 + 行高加大\n- 更新 todo_list_0406.md 新增個人風格智慧系統 + SwipeTrail 任務規劃"
+                releaseNotes = "v${android.defaultConfig.versionName}\n- feat: 滑動輸入完整實作（英文子序列匹配 + 注音多音節查詞）\n- feat: 注音鍵盤長按直接輸出注音符號/聲調\n- fix: 橫向鍵盤太扁 — 自動提高高度比例 + 行高加大"
             }
         }
     }

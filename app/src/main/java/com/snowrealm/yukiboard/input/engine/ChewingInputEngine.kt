@@ -571,6 +571,20 @@ class ChewingInputEngine(
         return results.toList()
     }
 
+    /**
+     * 滑動輸入用：接收連續注音符號字串，分段成音節後查候選字。
+     * 例如 "ㄅㄨㄧㄠ" → [ㄅㄨ, ㄧㄠ] → 查「不要」等詞組。
+     */
+    fun lookupByBopomofoString(bopomofoStr: String): List<String> {
+        if (bopomofoStr.isEmpty()) return emptyList()
+        val syllables = segmentSyllables(bopomofoStr)
+        return if (syllables.size == 1) {
+            lookupCandidates(syllables[0])
+        } else {
+            lookupMultiSyllable(syllables)
+        }
+    }
+
     /** 查單音節的所有可能單字（用於多音節過濾） */
     private fun lookupSingleSyllableChars(syllable: String): Set<String> {
         val chars = mutableSetOf<String>()

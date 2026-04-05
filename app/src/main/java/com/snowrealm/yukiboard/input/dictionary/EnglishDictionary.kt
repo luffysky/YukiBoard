@@ -192,6 +192,49 @@ class EnglishDictionary(private val context: Context? = null) {
         }
     }
 
+    /**
+     * 滑動輸入建議 — 根據滑過的按鍵字母序列，找出匹配的單字。
+     * 匹配規則：
+     * 1. 單字首字母 == 序列首字母
+     * 2. 單字尾字母 == 序列尾字母
+     * 3. 序列中的所有字母在單字中以子序列出現（允許跳過）
+     * 4. 按頻率排序
+     */
+    fun swipeSuggest(keySequence: List<Char>, maxResults: Int = 8): List<String> {
+        if (keySequence.size < 2) return emptyList()
+        val seq = keySequence.map { it.lowercaseChar() }
+        val firstChar = seq.first()
+        val lastChar = seq.last()
+
+        // 從 Trie 的首字母節點開始收集所有單字
+        val startNode = root.children[firstChar] ?: return emptyList()
+        val allWords = mutableListOf<Pair<String, Int>>()
+        collectWords(startNode, allWords, 500)
+
+        // 過濾：尾字母匹配 + 子序列匹配
+        val matched = allWords.filter { (word, _) ->
+            word.length >= 2 &&
+            word.last() == lastChar &&
+            isSubsequence(seq, word)
+        }
+
+        return matched
+            .sortedByDescending { it.second }
+            .take(maxResults)
+            .map { it.first }
+    }
+
+    /** 檢查 pattern 是否為 text 的子序列 */
+    private fun isSubsequence(pattern: List<Char>, text: String): Boolean {
+        var pi = 0
+        for (ch in text) {
+            if (pi < pattern.size && ch == pattern[pi]) {
+                pi++
+            }
+        }
+        return pi >= pattern.size
+    }
+
     /** 取得單字頻率分數 */
     fun frequencyOf(word: String): Int {
         var node = root

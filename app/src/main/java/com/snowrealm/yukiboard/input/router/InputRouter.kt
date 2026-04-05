@@ -80,6 +80,26 @@ class InputRouter(private val context: Context) {
     val inputMode: InputMode get() = currentMode
     fun getActiveEngine(): InputEngine = activeEngine
 
+    /** 滑動輸入：根據當前模式解碼按鍵序列為候選字 */
+    fun swipeSuggest(keyLabels: List<String>): List<String> {
+        if (keyLabels.size < 2) return emptyList()
+
+        val isBopomofo = keyLabels.any { it.length == 1 && it[0] in '\u3105'..'\u312F' }
+
+        return if (isBopomofo) {
+            // 注音模式：合併注音符號，查詞
+            val bopomofoStr = keyLabels.joinToString("")
+            val engine = bopomofoEngine
+            if (engine is ChewingInputEngine) {
+                engine.lookupByBopomofoString(bopomofoStr)
+            } else emptyList()
+        } else {
+            // 英文模式：字母子序列匹配
+            val chars = keyLabels.mapNotNull { it.firstOrNull()?.lowercaseChar() }
+            smartInput.swipeSuggestEnglish(chars)
+        }
+    }
+
     // -------------------------------------------------------------------------
     // 語言切換
     // -------------------------------------------------------------------------
