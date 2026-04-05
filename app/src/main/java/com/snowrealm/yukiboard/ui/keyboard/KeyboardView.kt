@@ -6,6 +6,8 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.PointF
 import android.graphics.RectF
 import android.graphics.Shader
 import android.os.Build
@@ -344,6 +346,55 @@ class KeyboardView(context: Context) : View(context) {
     private var pressedKey: KeyModel? = null
     private var popupWindow: PopupWindow? = null
 
+    // 長按滑動選字 — alt-char inline overlay
+    private var altPopupActive = false
+    private var altPopupChars: List<String> = emptyList()
+    private var altPopupRects: List<RectF> = emptyList()
+    private var altPopupHoveredIndex = -1
+    private var altPopupBgRect = RectF()
+    private var altPopupOriginKey: KeyModel? = null
+
+    // 長按滑動選取 — radial menu touch forwarding
+    private var activeRadialView: View? = null
+    private var radialPopupOffsetX = 0f
+    private var radialPopupOffsetY = 0f
+
+    // ─── 滑動路徑視覺 (SwipeTrail) ─────────────────────────────
+    private val swipePoints = mutableListOf<PointF>()
+    private var isSwipingActive = false
+    private var swipeAlpha = 0f
+    private var swipeFadeAnimator: android.animation.ValueAnimator? = null
+    private var swipeHighlightKey: KeyModel? = null
+    private var swipeHighlightAlpha = 0f
+    private var highlightFadeAnimator: android.animation.ValueAnimator? = null
+    private val swipePath = Path()
+    private var swipeColor = 0xFFB39DDB.toInt()
+    /** 外部設定：是否啟用滑動路徑視覺 */
+    var swipeTrailEnabled = true
+
+    // 外層發光 Paint（粗線 + 半透明，不用 BlurMaskFilter 以保效能）
+    private val swipeGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+        strokeWidth = 22f * density
+    }
+    // 內層清晰路徑 Paint
+    private val swipeLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+        strokeWidth = 5f * density
+    }
+    // 起點圓點 Paint
+    private val swipeDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+    // 按鍵高亮 Paint
+    private val swipeKeyHighlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+
     // 刪除鍵長按重複
     private var deleteRepeatCount = 0
     private val deleteRepeatRunnable = object : Runnable {
@@ -439,6 +490,12 @@ class KeyboardView(context: Context) : View(context) {
         if (newTheme.keyFontSizeSp > 0) {
             labelPaint.textSize = newTheme.keyFontSizeSp * density
         }
+        // 更新滑動路徑顏色（跟主題強調色同步）
+        val base = newTheme.candidateSelectedColorInt
+        val r = (Color.red(base) * 1.2f).toInt().coerceAtMost(255)
+        val g = (Color.green(base) * 1.2f).toInt().coerceAtMost(255)
+        val b = (Color.blue(base) * 1.2f).toInt().coerceAtMost(255)
+        swipeColor = if (r + g + b >= 200) Color.argb(255, r, g, b) else 0xFFB39DDB.toInt()
         invalidate()
     }
 
@@ -639,6 +696,14 @@ class KeyboardView(context: Context) : View(context) {
         if (isCandidateExpanded && allCandidates.isNotEmpty()) {
             drawExpandedCandidatePanel(canvas)
         }
+
+        // 滑動路徑
+        if (swipePoints.size >= 2 || (swipePoints.size == 1 && isSwipingActive)) {
+            drawSwipeTrail(canvas)
+        }
+
+        // 長按 alt-char overlay（最頂層）
+        drawAltPopupOverlay(canvas)
     }
 
     private var bgGradient: LinearGradient? = null
@@ -1066,51 +1131,263 @@ class KeyboardView(context: Context) : View(context) {
     private fun showAltPopup(key: KeyModel, anchorRect: RectF) {
         dismissPopup()
 
-        val container = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(theme.candidateBarColorInt)
-            setPadding((6 * density).toInt(), (4 * density).toInt(), (6 * density).toInt(), (4 * density).toInt())
-            elevation = 8f * density
-        }
-
         val allChars = listOf(key.label) + key.altChars
-        allChars.forEach { ch ->
-            container.addView(TextView(context).apply {
-                text = ch
-                textSize = 18f
-                setTextColor(theme.keyLabelColorInt)
-                setPadding((12 * density).toInt(), (8 * density).toInt(), (12 * density).toInt(), (8 * density).toInt())
-                setBackgroundColor(theme.keyColorInt)
-                setOnClickListener {
-                    val output = if ((isShifted || isCapsLock) && ch.length == 1) ch.uppercase() else ch
-                    onKeyPressListener?.invoke(ch[0].code, output)
-                    autoUnshift()
-                    dismissPopup()
-                }
-            })
-            container.addView(View(context).apply {
-                layoutParams = LinearLayout.LayoutParams((2 * density).toInt(), LinearLayout.LayoutParams.MATCH_PARENT)
-            })
+        altPopupChars = allChars
+        altPopupOriginKey = key
+        altPopupActive = true
+
+        // 計算每個字元的格子位置（水平排列，居中於按鍵上方）
+        val cellW = 42f * density
+        val cellH = 50f * density
+        val padding = 6f * density
+        val gap = 2f * density
+        val totalW = allChars.size * cellW + (allChars.size - 1) * gap + padding * 2
+
+        val startX = (anchorRect.centerX() - totalW / 2f).coerceIn(0f, width - totalW)
+        val startY = (anchorRect.top - cellH - padding * 2 - 4f * density).coerceAtLeast(0f)
+
+        altPopupBgRect = RectF(startX, startY, startX + totalW, startY + cellH + padding * 2)
+
+        altPopupRects = allChars.mapIndexed { i, _ ->
+            RectF(
+                startX + padding + i * (cellW + gap),
+                startY + padding,
+                startX + padding + i * (cellW + gap) + cellW,
+                startY + padding + cellH
+            )
         }
 
-        val popup = PopupWindow(container,
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            true
-        ).apply {
-            isOutsideTouchable = true
-            setOnDismissListener { popupWindow = null }
+        // 預設 hover 在原始字元（index 0）
+        altPopupHoveredIndex = 0
+        invalidate()
+    }
+
+    private fun dismissAltPopup() {
+        altPopupActive = false
+        altPopupHoveredIndex = -1
+        altPopupChars = emptyList()
+        altPopupRects = emptyList()
+        altPopupOriginKey = null
+        invalidate()
+    }
+
+    private fun commitAltPopupSelection() {
+        val idx = altPopupHoveredIndex
+        if (idx in altPopupChars.indices) {
+            val ch = altPopupChars[idx]
+            val output = if ((isShifted || isCapsLock) && ch.length == 1) ch.uppercase() else ch
+            onKeyPressListener?.invoke(ch[0].code, output)
+            autoUnshift()
+        }
+        dismissAltPopup()
+    }
+
+    /** 根據手指位置更新 alt popup 的 hover 狀態 */
+    private fun updateAltPopupHover(x: Float, y: Float) {
+        // 檢查是否在 popup 區域或其下方（原始按鍵區域）的延伸範圍內
+        val extendedRect = RectF(
+            altPopupBgRect.left - 20f * density,
+            altPopupBgRect.top - 10f * density,
+            altPopupBgRect.right + 20f * density,
+            altPopupBgRect.bottom + 80f * density  // 向下延伸到按鍵區域
+        )
+        if (!extendedRect.contains(x, y)) {
+            altPopupHoveredIndex = -1
+            invalidate()
+            return
         }
 
-        val xOff = anchorRect.left.toInt()
-        val yOff = -(height - anchorRect.top.toInt() + (48 * density).toInt())
-        popup.showAtLocation(this, Gravity.BOTTOM or Gravity.START, xOff, -yOff)
-        popupWindow = popup
+        // 找最近的格子（主要依 X 軸，只要 Y 在擴展範圍就行）
+        var bestIdx = -1
+        var bestDist = Float.MAX_VALUE
+        altPopupRects.forEachIndexed { i, rect ->
+            val cx = rect.centerX()
+            val dist = Math.abs(x - cx)
+            if (dist < bestDist) {
+                bestDist = dist
+                bestIdx = i
+            }
+        }
+        // 如果 X 軸距離太遠（超出最外側格子太多），不選
+        if (bestIdx >= 0 && bestDist > 40f * density) {
+            bestIdx = -1
+        }
+        if (altPopupHoveredIndex != bestIdx) {
+            altPopupHoveredIndex = bestIdx
+            if (bestIdx >= 0 && hapticEnabled) vibrateShort()
+            invalidate()
+        }
+    }
+
+    private val altBgPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val altCellPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val altTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+    }
+
+    private fun drawAltPopupOverlay(canvas: Canvas) {
+        if (!altPopupActive) return
+
+        // 陰影背景
+        altBgPaint.color = theme.candidateBarColorInt
+        altBgPaint.setShadowLayer(12f * density, 0f, 3f * density, 0x66000000)
+        setLayerType(LAYER_TYPE_SOFTWARE, altBgPaint)
+        canvas.drawRoundRect(altPopupBgRect, 10f * density, 10f * density, altBgPaint)
+        altBgPaint.clearShadowLayer()
+
+        altPopupChars.forEachIndexed { i, ch ->
+            val rect = altPopupRects[i]
+            val isHovered = i == altPopupHoveredIndex
+
+            // 格子背景
+            altCellPaint.color = if (isHovered) theme.candidateSelectedColorInt else theme.keyColorInt
+            canvas.drawRoundRect(rect, 8f * density, 8f * density, altCellPaint)
+
+            // 文字
+            altTextPaint.textSize = 20f * density
+            altTextPaint.color = if (isHovered) theme.keyLabelColorInt else theme.candidateTextColorInt
+            altTextPaint.isFakeBoldText = isHovered
+            val textY = rect.centerY() + 7f * density
+            canvas.drawText(ch, rect.centerX(), textY, altTextPaint)
+        }
+
+        // 三角指示器（指向原始按鍵）
+        if (altPopupHoveredIndex >= 0) {
+            val hRect = altPopupRects[altPopupHoveredIndex]
+            val triSize = 6f * density
+            val path = android.graphics.Path().apply {
+                moveTo(hRect.centerX() - triSize, altPopupBgRect.bottom)
+                lineTo(hRect.centerX() + triSize, altPopupBgRect.bottom)
+                lineTo(hRect.centerX(), altPopupBgRect.bottom + triSize)
+                close()
+            }
+            altCellPaint.color = theme.candidateSelectedColorInt
+            canvas.drawPath(path, altCellPaint)
+        }
     }
 
     private fun dismissPopup() {
         popupWindow?.dismiss()
         popupWindow = null
+    }
+
+    // -------------------------------------------------------------------------
+    // 滑動路徑視覺 (SwipeTrail)
+    // -------------------------------------------------------------------------
+
+    fun onSwipeStart(x: Float, y: Float) {
+        if (!swipeTrailEnabled) return
+        swipeFadeAnimator?.cancel()
+        swipePoints.clear()
+        swipePoints.add(PointF(x, y))
+        isSwipingActive = true
+        swipeAlpha = 1f
+        val startKey = keyEntries.firstOrNull { it.touchRect.contains(x, y) }?.key
+        if (startKey != null) flashKey(startKey)
+        invalidate()
+    }
+
+    fun onSwipeMove(x: Float, y: Float) {
+        if (!isSwipingActive) return
+        val last = swipePoints.lastOrNull()
+        if (last == null || Math.hypot((x - last.x).toDouble(), (y - last.y).toDouble()) > 4.0 * density) {
+            swipePoints.add(PointF(x, y))
+            val currentKey = keyEntries.firstOrNull { it.touchRect.contains(x, y) }?.key
+            if (currentKey != null && currentKey != swipeHighlightKey) {
+                flashKey(currentKey)
+            }
+            invalidate()
+        }
+    }
+
+    fun onSwipeEnd() {
+        if (!isSwipingActive && swipePoints.isEmpty()) return
+        isSwipingActive = false
+        swipeFadeAnimator?.cancel()
+        swipeFadeAnimator = android.animation.ValueAnimator.ofFloat(1f, 0f).apply {
+            duration = 400
+            interpolator = android.view.animation.DecelerateInterpolator()
+            addUpdateListener { anim ->
+                swipeAlpha = anim.animatedValue as Float
+                invalidate()
+            }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    swipePoints.clear()
+                    invalidate()
+                }
+            })
+            start()
+        }
+    }
+
+    private fun flashKey(key: KeyModel) {
+        swipeHighlightKey = key
+        swipeHighlightAlpha = 0.6f
+        highlightFadeAnimator?.cancel()
+        highlightFadeAnimator = android.animation.ValueAnimator.ofFloat(0.6f, 0f).apply {
+            duration = 200
+            addUpdateListener { anim ->
+                swipeHighlightAlpha = anim.animatedValue as Float
+                invalidate()
+            }
+            start()
+        }
+    }
+
+    private fun drawSwipeTrail(canvas: Canvas) {
+        if (swipePoints.isEmpty()) return
+        val alpha = (swipeAlpha * 255).toInt().coerceIn(0, 255)
+        if (alpha == 0) return
+
+        // 構建平滑貝茲路徑
+        swipePath.reset()
+        if (swipePoints.size == 1) {
+            val p = swipePoints[0]
+            swipeDotPaint.color = swipeColor
+            swipeDotPaint.alpha = alpha
+            canvas.drawCircle(p.x, p.y, 10f * density, swipeDotPaint)
+            return
+        }
+
+        swipePath.moveTo(swipePoints[0].x, swipePoints[0].y)
+        for (i in 1 until swipePoints.size - 1) {
+            val curr = swipePoints[i]
+            val next = swipePoints[i + 1]
+            val midX = (curr.x + next.x) / 2f
+            val midY = (curr.y + next.y) / 2f
+            swipePath.quadTo(curr.x, curr.y, midX, midY)
+        }
+        swipePath.lineTo(swipePoints.last().x, swipePoints.last().y)
+
+        // 外層發光（粗線 + 半透明）
+        swipeGlowPaint.color = swipeColor
+        swipeGlowPaint.alpha = (alpha * 0.25f).toInt()
+        canvas.drawPath(swipePath, swipeGlowPaint)
+
+        // 內層清晰路徑
+        swipeLinePaint.color = swipeColor
+        swipeLinePaint.alpha = alpha
+        canvas.drawPath(swipePath, swipeLinePaint)
+
+        // 起點光圈
+        val start = swipePoints[0]
+        swipeDotPaint.color = swipeColor
+        swipeDotPaint.alpha = (alpha * 0.4f).toInt()
+        canvas.drawCircle(start.x, start.y, 14f * density, swipeDotPaint)
+        swipeDotPaint.alpha = (alpha * 0.9f).toInt()
+        canvas.drawCircle(start.x, start.y, 6f * density, swipeDotPaint)
+
+        // 按鍵高亮
+        val highlightKey = swipeHighlightKey
+        if (highlightKey != null && swipeHighlightAlpha > 0f) {
+            val keyEntry = keyEntries.firstOrNull { it.key == highlightKey }
+            if (keyEntry != null) {
+                swipeKeyHighlightPaint.color = swipeColor
+                swipeKeyHighlightPaint.alpha = (swipeHighlightAlpha * 255).toInt()
+                canvas.drawRoundRect(keyEntry.visualRect, 8f * density, 8f * density, swipeKeyHighlightPaint)
+            }
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -1122,26 +1399,46 @@ class KeyboardView(context: Context) : View(context) {
 
         val menu = RadialModeMenu(context, theme, currentMode) { selectedMode ->
             dismissPopup()
+            activeRadialView = null
             if (selectedMode != currentMode) {
                 switchMode(selectedMode)
             }
         }
 
+        val menuSize = (180 * density + 40 * density).toInt()
         val popup = PopupWindow(
             menu,
-            (180 * density + 40 * density).toInt(),
-            (180 * density + 40 * density).toInt(),
-            true
+            menuSize,
+            menuSize,
+            false  // 非 focusable，觸控由 KeyboardView 轉發
         ).apply {
-            isOutsideTouchable = true
+            isOutsideTouchable = false
+            isTouchable = false
             setBackgroundDrawable(null)
-            setOnDismissListener { popupWindow = null }
+            setOnDismissListener {
+                popupWindow = null
+                activeRadialView = null
+            }
         }
 
         val xOff = (anchorRect.centerX() - (110 * density)).toInt().coerceAtLeast(0)
         val yOff = -(height - anchorRect.top.toInt() + (200 * density).toInt())
         popup.showAtLocation(this, Gravity.BOTTOM or Gravity.START, xOff, -yOff)
         popupWindow = popup
+
+        // 記錄 radial view 和座標偏移，讓 onTouchEvent 可以轉發
+        activeRadialView = menu
+        // popup 顯示位置相對於本 View 的偏移
+        // showAtLocation 用 Gravity.BOTTOM|START：xOff 從左邊起算，yOff 從底部起算
+        // 取得實際螢幕座標來計算偏移
+        val viewLoc = IntArray(2)
+        getLocationOnScreen(viewLoc)
+        menu.post {
+            val menuLoc = IntArray(2)
+            menu.getLocationOnScreen(menuLoc)
+            radialPopupOffsetX = (menuLoc[0] - viewLoc[0]).toFloat()
+            radialPopupOffsetY = (menuLoc[1] - viewLoc[1]).toFloat()
+        }
     }
 
     private fun showRadialLanguageMenu(anchorRect: RectF) {
@@ -1149,6 +1446,7 @@ class KeyboardView(context: Context) : View(context) {
 
         val menu = RadialLanguageMenu(context, theme, currentInputMode) { selectedOption ->
             dismissPopup()
+            activeRadialView = null
             onLanguageSelectedListener?.invoke(selectedOption)
         }
 
@@ -1157,17 +1455,32 @@ class KeyboardView(context: Context) : View(context) {
             menu,
             menuSize,
             menuSize,
-            true
+            false  // 非 focusable，觸控由 KeyboardView 轉發
         ).apply {
-            isOutsideTouchable = true
+            isOutsideTouchable = false
+            isTouchable = false
             setBackgroundDrawable(null)
-            setOnDismissListener { popupWindow = null }
+            setOnDismissListener {
+                popupWindow = null
+                activeRadialView = null
+            }
         }
 
         val xOff = (anchorRect.centerX() - menuSize / 2f).toInt().coerceAtLeast(0)
         val yOff = -(height - anchorRect.top.toInt() + (menuSize / 2f + 20 * density).toInt())
         popup.showAtLocation(this, Gravity.BOTTOM or Gravity.START, xOff, -yOff)
         popupWindow = popup
+
+        // 記錄 radial view 和座標偏移
+        activeRadialView = menu
+        val viewLoc = IntArray(2)
+        getLocationOnScreen(viewLoc)
+        menu.post {
+            val menuLoc = IntArray(2)
+            menu.getLocationOnScreen(menuLoc)
+            radialPopupOffsetX = (menuLoc[0] - viewLoc[0]).toFloat()
+            radialPopupOffsetY = (menuLoc[1] - viewLoc[1]).toFloat()
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -1206,9 +1519,31 @@ class KeyboardView(context: Context) : View(context) {
                     if (hapticEnabled) vibrateShort()
                     invalidate()
                 }
+                // 滑動路徑起點
+                if (y >= candidateBarHeight) {
+                    onSwipeStart(x, y)
+                }
             }
 
             MotionEvent.ACTION_MOVE -> {
+                // Alt popup 滑動選字
+                if (altPopupActive) {
+                    updateAltPopupHover(x, y)
+                    return true
+                }
+                // Radial menu 觸控轉發
+                val radial = activeRadialView
+                if (radial != null) {
+                    val localX = x - radialPopupOffsetX
+                    val localY = y - radialPopupOffsetY
+                    val translated = MotionEvent.obtain(
+                        event.downTime, event.eventTime, MotionEvent.ACTION_MOVE,
+                        localX, localY, event.metaState
+                    )
+                    radial.dispatchTouchEvent(translated)
+                    translated.recycle()
+                    return true
+                }
                 // 候選列橫向捲動
                 if (candidateTouchActive && candidates.isNotEmpty()) {
                     val dx = candidateLastTouchX - x
@@ -1242,6 +1577,10 @@ class KeyboardView(context: Context) : View(context) {
                     pressedKey = null
                     invalidate()
                 }
+                // 更新滑動路徑
+                if (y >= candidateBarHeight) {
+                    onSwipeMove(x, y)
+                }
             }
 
             MotionEvent.ACTION_UP -> {
@@ -1253,6 +1592,31 @@ class KeyboardView(context: Context) : View(context) {
                     onSpaceLongPressListener?.invoke(false)
                 }
                 invalidate()
+
+                // Alt popup 放開 → 選字
+                if (altPopupActive) {
+                    commitAltPopupSelection()
+                    isLongPressTriggered = false
+                    performClick()
+                    return true
+                }
+                // Radial menu 放開 → 轉發 UP 給 menu，然後關閉
+                val radial = activeRadialView
+                if (radial != null) {
+                    val localX = x - radialPopupOffsetX
+                    val localY = y - radialPopupOffsetY
+                    val translated = MotionEvent.obtain(
+                        event.downTime, event.eventTime, MotionEvent.ACTION_UP,
+                        localX, localY, event.metaState
+                    )
+                    radial.dispatchTouchEvent(translated)
+                    translated.recycle()
+                    activeRadialView = null
+                    dismissPopup()
+                    isLongPressTriggered = false
+                    performClick()
+                    return true
+                }
 
                 if (isLongPressTriggered) {
                     isLongPressTriggered = false
@@ -1345,6 +1709,8 @@ class KeyboardView(context: Context) : View(context) {
                     }
                     performClick()
                 }
+                // 滑動路徑結束
+                onSwipeEnd()
             }
 
             MotionEvent.ACTION_CANCEL -> {
@@ -1352,10 +1718,14 @@ class KeyboardView(context: Context) : View(context) {
                 handler.removeCallbacks(deleteRepeatRunnable)
                 pressedKey = null
                 isLongPressTriggered = false
+                if (altPopupActive) dismissAltPopup()
+                activeRadialView = null
                 if (isSpaceLongPressed) {
                     isSpaceLongPressed = false
                     onSpaceLongPressListener?.invoke(false)
                 }
+                // 滑動路徑取消
+                onSwipeEnd()
                 invalidate()
             }
         }

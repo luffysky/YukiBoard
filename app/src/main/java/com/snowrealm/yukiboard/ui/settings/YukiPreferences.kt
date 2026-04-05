@@ -85,6 +85,7 @@ class YukiPreferences(context: Context) {
     var secretMessageMode: Boolean by BoolPref("secret_message", false)
     var toneDetection: Boolean by BoolPref("tone_detection", true)
     var rawBopomofoMode: Boolean by BoolPref("raw_bopomofo", false)
+    var swipeTrailEnabled: Boolean by BoolPref("swipe_trail", true)
     var smartCorrection: Boolean by BoolPref("smart_correction", true)
     var adaptiveDict: Boolean by BoolPref("adaptive_dict", true)
     var phrasePredict: Boolean by BoolPref("phrase_predict", true)

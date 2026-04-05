@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 27
-        versionName "0.5.3"
+        versionCode 28
+        versionName "0.5.4"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -75,7 +75,7 @@ android {
             debuggable true
             firebaseAppDistribution {
                 groups = "testers"
-                releaseNotes = "v${android.defaultConfig.versionName}\n- feat: 直打注音模式（注音符號直接輸出不轉漢字）\n- fix: 私房話模式預設關閉（不再預設加密）\n- 設定頁 輸入行為 新增「直打注音」開關"
+                releaseNotes = "v${android.defaultConfig.versionName}\n- feat: 長按滑動選字（alt-char / 環形選單直接滑動選取，不用抬手再點）\n- feat: SwipeTrail 滑動軌跡特效（紫色光暈路徑 + 按鍵高亮 + 淡出動畫）\n- 設定頁新增「滑動軌跡特效」開關"
             }
         }
     }

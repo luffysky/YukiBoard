@@ -326,6 +326,7 @@ class YukiBoardIMEService : InputMethodService() {
         keyboardView.keyScalePercent = prefs.keyScalePercent
         keyboardView.keyOpacity = prefs.keyOpacity
         keyboardView.hapticEnabled = prefs.keyPressVibration
+        keyboardView.swipeTrailEnabled = prefs.swipeTrailEnabled
 
         // 套用當前主題
         val currentTheme = ThemeManager.getInstance(this).currentTheme
@@ -497,6 +498,7 @@ class YukiBoardIMEService : InputMethodService() {
         keyboardView.keyScalePercent = prefs.keyScalePercent
         keyboardView.keyOpacity = prefs.keyOpacity
         keyboardView.hapticEnabled = prefs.keyPressVibration
+        keyboardView.swipeTrailEnabled = prefs.swipeTrailEnabled
 
         // 遊戲模式恢復
         if (isInGameMode) {
