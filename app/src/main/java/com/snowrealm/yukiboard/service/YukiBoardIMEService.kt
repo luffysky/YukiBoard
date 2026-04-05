@@ -1202,14 +1202,15 @@ class YukiBoardIMEService : InputMethodService() {
             },
             onFinalResult = { result ->
                 val ic = currentInputConnection ?: return@startListening
-                // 先清掉 composing（partial），再用最終結果取代，避免重複輸出
-                ic.setComposingText("", 0)
-                ic.finishComposingText()
                 keyboardView.voiceListeningLocale = null
                 if (result.isNotEmpty()) {
-                    ic.commitText(result, 1)
+                    // 用最終結果直接取代 composing 文字，再 finish → 避免重複
+                    ic.setComposingText(result, 1)
+                    ic.finishComposingText()
                     characterView?.playHappy()
                 } else {
+                    ic.setComposingText("", 0)
+                    ic.finishComposingText()
                     characterView?.playIdle()
                 }
             },

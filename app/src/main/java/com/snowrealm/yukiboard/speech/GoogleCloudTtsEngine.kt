@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit
  */
 class GoogleCloudTtsEngine(
     private val apiKey: String,
-    private val voiceName: String = "zh-TW-Standard-A",
+    private val voiceName: String = "zh-TW-Wavenet-A",
     private val audioEncoding: String = "LINEAR16"
 ) : SpeechOutputEngine {
 
@@ -152,23 +152,23 @@ class GoogleCloudTtsEngine(
     private fun pickVoice(langCode: String): Pair<String, String> {
         val lang = langCode.lowercase()
         return when {
-            lang.startsWith("zh-tw") || lang.startsWith("zh-hk") ->
-                "zh-TW" to "zh-TW-Standard-A"
-            lang.startsWith("zh") ->
-                "cmn-CN" to "cmn-CN-Standard-A"
+            lang.startsWith("cmn-tw") || lang.startsWith("zh-tw") || lang.startsWith("zh-hk") ->
+                "cmn-TW" to "cmn-TW-Wavenet-A"
+            lang.startsWith("cmn") || lang.startsWith("zh") ->
+                "cmn-CN" to "cmn-CN-Wavenet-A"
             lang.startsWith("en") ->
-                "en-US" to "en-US-Standard-D"
+                "en-US" to "en-US-Wavenet-D"
             lang.startsWith("ja") ->
-                "ja-JP" to "ja-JP-Standard-A"
+                "ja-JP" to "ja-JP-Wavenet-A"
             lang.startsWith("ko") ->
-                "ko-KR" to "ko-KR-Standard-A"
+                "ko-KR" to "ko-KR-Wavenet-A"
             lang.startsWith("es") ->
-                "es-ES" to "es-ES-Standard-B"
+                "es-ES" to "es-ES-Wavenet-B"
             lang.startsWith("fr") ->
-                "fr-FR" to "fr-FR-Standard-A"
+                "fr-FR" to "fr-FR-Wavenet-A"
             lang.startsWith("de") ->
-                "de-DE" to "de-DE-Standard-A"
-            else -> "zh-TW" to "zh-TW-Standard-A"
+                "de-DE" to "de-DE-Wavenet-A"
+            else -> "cmn-TW" to "cmn-TW-Wavenet-A"
         }
     }
 
@@ -178,9 +178,9 @@ class GoogleCloudTtsEngine(
         return when {
             sample.any { it in '\u3040'..'\u309F' || it in '\u30A0'..'\u30FF' } -> "ja-JP"
             sample.any { it in '\uAC00'..'\uD7AF' } -> "ko-KR"
-            sample.any { it in '\u4E00'..'\u9FFF' } -> "zh-TW"
+            sample.any { it in '\u4E00'..'\u9FFF' } -> "cmn-TW"
             sample.all { it.code < 128 } -> "en-US"
-            else -> "zh-TW"
+            else -> "cmn-TW"
         }
     }
 
