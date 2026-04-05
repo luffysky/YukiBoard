@@ -1973,6 +1973,8 @@ class SettingsActivity : AppCompatActivity() {
             setTextColor(0xFF66AAFF.toInt())
             setPadding(dp(4), dp(8), dp(4), dp(4))
             setOnClickListener {
+                // 先存 EditText 當前值（避免焦點未離開時 prefs 還沒更新）
+                prefs.googleCloudTtsApiKey = keyInput.text.toString().trim()
                 val engine: com.snowrealm.yukiboard.speech.SpeechOutputEngine = when (prefs.ttsEngineType) {
                     1 -> {
                         val key = prefs.googleCloudTtsApiKey
