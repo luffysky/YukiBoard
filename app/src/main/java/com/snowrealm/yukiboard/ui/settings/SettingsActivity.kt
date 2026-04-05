@@ -41,6 +41,23 @@ class SettingsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // 全域 crash 捕捉：顯示錯誤訊息方便回報
+        Thread.setDefaultUncaughtExceptionHandler { _, throwable ->
+            val msg = throwable.stackTraceToString().take(2000)
+            android.util.Log.e("SettingsActivity", "CRASH", throwable)
+            try {
+                val errView = TextView(this).apply {
+                    text = "YukiBoard Crash:\n\n$msg"
+                    textSize = 11f
+                    setTextColor(0xFFFF5555.toInt())
+                    setBackgroundColor(0xFF111111.toInt())
+                    setPadding(24, 48, 24, 24)
+                    setTextIsSelectable(true)
+                }
+                setContentView(ScrollView(this).apply { addView(errView) })
+            } catch (_: Exception) {}
+        }
+
         themeManager = ThemeManager.getInstance(this)
         prefs = YukiPreferences(this)
 
