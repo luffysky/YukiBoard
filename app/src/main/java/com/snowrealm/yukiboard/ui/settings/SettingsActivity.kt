@@ -1730,7 +1730,7 @@ class SettingsActivity : AppCompatActivity() {
         }
         val urlInput = android.widget.EditText(this)
         urlInput.setText(prefs.fasterWhisperServerUrl)
-        urlInput.hint = "https://whisper.snowrealm.com"
+        urlInput.hint = "https://stt.snowrealm.pet"
         urlInput.textSize = 13f
         urlInput.setTextColor(0xFFE8F4FF.toInt())
         urlInput.setHintTextColor(0xFF3A5580.toInt())

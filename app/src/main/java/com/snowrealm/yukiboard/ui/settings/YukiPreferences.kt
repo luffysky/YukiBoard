@@ -92,7 +92,7 @@ class YukiPreferences(context: Context) {
     var speechEngineType: Int by IntPref("speech_engine_type", 0)
     /** Faster-Whisper Server URL */
     var fasterWhisperServerUrl: String
-        get() = prefs.getString("faster_whisper_server_url", "") ?: ""
+        get() = prefs.getString("faster_whisper_server_url", "https://stt.snowrealm.pet") ?: "https://stt.snowrealm.pet"
         set(value) = prefs.edit().putString("faster_whisper_server_url", value).apply()
 
     // ═══════════════════════════════════════════════════════════
