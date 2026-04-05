@@ -1,6 +1,8 @@
 package com.snowrealm.yukiboard.ui.settings
 
 import android.content.Intent
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import android.content.res.Configuration
 import android.graphics.Canvas
 import android.graphics.Color
@@ -1632,54 +1634,193 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
-    /** 語音引擎選擇器：Android 內建 / OpenAI Whisper */
+    /** 語音引擎選擇器：Android 內建 / OpenAI Whisper + 連線測試 */
     private fun speechEngineSelector(): LinearLayout {
         val options = arrayOf("Android 內建", "OpenAI Whisper")
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
+        val outer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             setPadding(dp(8), dp(6), dp(8), dp(6))
-            gravity = android.view.Gravity.CENTER_VERTICAL
-
-            val textContainer = LinearLayout(this@SettingsActivity).apply {
-                orientation = LinearLayout.VERTICAL
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            }
-            textContainer.addView(TextView(this@SettingsActivity).apply {
-                text = "語音辨識引擎"
-                textSize = 14f
-                setTextColor(0xFFE8F4FF.toInt())
-            })
-            textContainer.addView(TextView(this@SettingsActivity).apply {
-                text = "Whisper 需要 OpenAI API Key"
-                textSize = 11f
-                setTextColor(0xFF6688AA.toInt())
-            })
-            addView(textContainer)
-
-            val btnLabel = TextView(this@SettingsActivity).apply {
-                text = options[prefs.speechEngineType.coerceIn(0, options.lastIndex)]
-                textSize = 13f
-                setTextColor(0xFF9ECFFF.toInt())
-                setPadding(dp(10), dp(6), dp(10), dp(6))
-                background = android.graphics.drawable.GradientDrawable().apply {
-                    setColor(0xFF1A2744.toInt())
-                    cornerRadius = dp(6).toFloat()
-                    setStroke(1, 0xFF3A5580.toInt())
-                }
-                setOnClickListener {
-                    android.app.AlertDialog.Builder(this@SettingsActivity, android.R.style.Theme_Material_Dialog_Alert)
-                        .setTitle("選擇語音辨識引擎")
-                        .setSingleChoiceItems(options, prefs.speechEngineType) { dialog, which ->
-                            prefs.speechEngineType = which
-                            text = options[which]
-                            dialog.dismiss()
-                        }
-                        .show()
-                }
-            }
-            addView(btnLabel)
         }
+
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+
+        val textContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        textContainer.addView(TextView(this).apply {
+            text = "語音辨識引擎"
+            textSize = 14f
+            setTextColor(0xFFE8F4FF.toInt())
+        })
+        textContainer.addView(TextView(this).apply {
+            text = "Whisper 需要 OpenAI API Key"
+            textSize = 11f
+            setTextColor(0xFF6688AA.toInt())
+        })
+        row.addView(textContainer)
+
+        val btnLabel = TextView(this).apply {
+            text = options[prefs.speechEngineType.coerceIn(0, options.lastIndex)]
+            textSize = 13f
+            setTextColor(0xFF9ECFFF.toInt())
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xFF1A2744.toInt())
+                cornerRadius = dp(6).toFloat()
+                setStroke(1, 0xFF3A5580.toInt())
+            }
+            setOnClickListener {
+                android.app.AlertDialog.Builder(this@SettingsActivity, android.R.style.Theme_Material_Dialog_Alert)
+                    .setTitle("選擇語音辨識引擎")
+                    .setSingleChoiceItems(options, prefs.speechEngineType) { dialog, which ->
+                        prefs.speechEngineType = which
+                        text = options[which]
+                        dialog.dismiss()
+                    }
+                    .show()
+            }
+        }
+        row.addView(btnLabel)
+        outer.addView(row)
+
+        // Whisper 連線測試按鈕
+        val testStatus = TextView(this).apply {
+            textSize = 12f
+            setTextColor(0xFF6688AA.toInt())
+            setPadding(dp(4), dp(4), dp(4), 0)
+        }
+        val testBtn = TextView(this).apply {
+            text = "測試 Whisper 連線"
+            textSize = 12f
+            setTextColor(0xFF66AAFF.toInt())
+            setPadding(dp(4), dp(8), dp(4), dp(4))
+            setOnClickListener {
+                testStatus.text = "測試中..."
+                testStatus.setTextColor(0xFFFFCC00.toInt())
+                testWhisperConnection(testStatus)
+            }
+        }
+        outer.addView(testBtn)
+        outer.addView(testStatus)
+
+        return outer
     }
+
+    private fun testWhisperConnection(statusView: TextView) {
+        val providerManager = com.snowrealm.yukiboard.claw.provider.AIProviderManager.getInstance(applicationContext)
+        val buildKey = com.snowrealm.yukiboard.BuildConfig.OPENAI_API_KEY
+        val apiKey = buildKey.takeIf { it.isNotBlank() }
+            ?: providerManager.getApiKey(com.snowrealm.yukiboard.claw.provider.AIProviderType.OPENAI)
+
+        if (apiKey.isNullOrBlank()) {
+            statusView.text = "✗ 沒有 OpenAI API Key — 請先到 AI 設定填入"
+            statusView.setTextColor(0xFFFF6666.toInt())
+            return
+        }
+
+        // 送一段極短的靜音 WAV 測試 Whisper API 是否可達
+        Thread {
+            try {
+                val silenceWav = generateSilenceWav(0.5) // 0.5 秒靜音
+                val body = okhttp3.MultipartBody.Builder()
+                    .setType(okhttp3.MultipartBody.FORM)
+                    .addFormDataPart(
+                        "file", "test.wav",
+                        silenceWav.toRequestBody("audio/wav".toMediaType())
+                    )
+                    .addFormDataPart("model", "whisper-1")
+                    .addFormDataPart("language", "en")
+                    .addFormDataPart("response_format", "json")
+                    .build()
+
+                val request = okhttp3.Request.Builder()
+                    .url("https://api.openai.com/v1/audio/transcriptions")
+                    .addHeader("Authorization", "Bearer $apiKey")
+                    .post(body)
+                    .build()
+
+                val client = okhttp3.OkHttpClient.Builder()
+                    .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
+
+                val response = client.newCall(request).execute()
+                val code = response.code
+                val responseBody = response.body?.string() ?: ""
+                response.close()
+
+                runOnUiThread {
+                    when (code) {
+                        200 -> {
+                            statusView.text = "✓ Whisper API 連線成功！可正常使用"
+                            statusView.setTextColor(0xFF66CC88.toInt())
+                        }
+                        401 -> {
+                            statusView.text = "✗ API Key 無效（401 Unauthorized）"
+                            statusView.setTextColor(0xFFFF6666.toInt())
+                        }
+                        429 -> {
+                            statusView.text = "✗ 額度用完或速率限制（429 Rate Limit）"
+                            statusView.setTextColor(0xFFFF9933.toInt())
+                        }
+                        else -> {
+                            val msg = try {
+                                org.json.JSONObject(responseBody).optString("error", responseBody.take(100))
+                            } catch (_: Exception) { responseBody.take(100) }
+                            statusView.text = "✗ 錯誤 $code: $msg"
+                            statusView.setTextColor(0xFFFF6666.toInt())
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    statusView.text = "✗ 連線失敗: ${e.message?.take(80)}"
+                    statusView.setTextColor(0xFFFF6666.toInt())
+                }
+            }
+        }.start()
+    }
+
+    /** 產生極短靜音 WAV 用於測試 API 連線 */
+    private fun generateSilenceWav(durationSec: Double): ByteArray {
+        val sampleRate = 16000
+        val numSamples = (sampleRate * durationSec).toInt()
+        val pcmData = ByteArray(numSamples * 2) // 16-bit = 2 bytes per sample, 全 0 = 靜音
+
+        val out = java.io.ByteArrayOutputStream()
+        java.io.DataOutputStream(out).apply {
+            // RIFF header
+            writeBytes("RIFF")
+            writeLE32(pcmData.size + 36)
+            writeBytes("WAVE")
+            writeBytes("fmt ")
+            writeLE32(16)
+            writeLE16(1)  // PCM
+            writeLE16(1)  // mono
+            writeLE32(sampleRate)
+            writeLE32(sampleRate * 2) // byte rate
+            writeLE16(2)  // block align
+            writeLE16(16) // bits per sample
+            writeBytes("data")
+            writeLE32(pcmData.size)
+            write(pcmData)
+            flush()
+        }
+        return out.toByteArray()
+    }
+
+    private fun java.io.DataOutputStream.writeLE32(v: Int) {
+        write(v and 0xFF); write((v shr 8) and 0xFF)
+        write((v shr 16) and 0xFF); write((v shr 24) and 0xFF)
+    }
+    private fun java.io.DataOutputStream.writeLE16(v: Int) {
+        write(v and 0xFF); write((v shr 8) and 0xFF)
+    }
+
 
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
