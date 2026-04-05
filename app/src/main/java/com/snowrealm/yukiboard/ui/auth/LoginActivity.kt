@@ -53,11 +53,42 @@ class LoginActivity : AppCompatActivity() {
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
         )
 
+        // 恢復被系統回收前的狀態
+        if (savedInstanceState != null) {
+            isRegisterMode = savedInstanceState.getBoolean("isRegisterMode", false)
+            pendingCodeId = savedInstanceState.getString("pendingCodeId")
+        }
+
         setContentView(buildUI())
+
+        // 恢復輸入內容
+        if (savedInstanceState != null) {
+            emailInput.setText(savedInstanceState.getString("email", ""))
+            passwordInput.setText(savedInstanceState.getString("password", ""))
+            nameInput.setText(savedInstanceState.getString("name", ""))
+            codeInput.setText(savedInstanceState.getString("code", ""))
+            if (isRegisterMode) {
+                toggleRegisterMode() // 切回註冊模式 UI
+                if (pendingCodeId != null) {
+                    statusText.setTextColor(0xFF40E0D0.toInt())
+                    statusText.text = "請填入驗證碼"
+                }
+            }
+        }
 
         if (authClient.isLoggedIn) {
             statusText.text = "已登入：${authClient.currentDisplayName ?: authClient.currentEmail}"
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean("isRegisterMode", isRegisterMode)
+        outState.putString("pendingCodeId", pendingCodeId)
+        if (::emailInput.isInitialized) outState.putString("email", emailInput.text.toString())
+        if (::passwordInput.isInitialized) outState.putString("password", passwordInput.text.toString())
+        if (::nameInput.isInitialized) outState.putString("name", nameInput.text.toString())
+        if (::codeInput.isInitialized) outState.putString("code", codeInput.text.toString())
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -210,7 +241,7 @@ class LoginActivity : AppCompatActivity() {
             setPadding((20 * d).toInt(), (16 * d).toInt(), (20 * d).toInt(), (16 * d).toInt())
         }
         oauthContent.addView(createGlassButton("LINE 登入", 0xFF06C755.toInt(), d) {
-            openOAuthCustomTab("$baseUrl/api/auth/line?mobile_callback=yukiboard://auth/callback")
+            startLineLogin()
         })
         oauthContent.addView(createGlassButton("Google 登入", 0xFF4285F4.toInt(), d) {
             openOAuthCustomTab("$baseUrl/api/auth/google?mobile_callback=yukiboard://auth/callback")
@@ -439,6 +470,46 @@ class LoginActivity : AppCompatActivity() {
     // =========================================================================
     // Chrome Custom Tab OAuth（LINE / Google）
     // =========================================================================
+
+    /**
+     * LINE 登入：用 Intent.ACTION_VIEW 打開 LINE OAuth URL。
+     * 這樣 Android 可以偵測 LINE App 並直接跳轉一鍵授權，
+     * 不像 Custom Tab 的 302 redirect 不會觸發 App Link。
+     */
+    private fun startLineLogin() {
+        statusText.setTextColor(0x99FFFFFF.toInt())
+        statusText.text = "正在連接 LINE..."
+
+        activityScope.launch {
+            try {
+                val apiUrl = "$baseUrl/api/auth/line?mobile_callback=yukiboard://auth/callback"
+                val lineUrl = withContext(Dispatchers.IO) {
+                    val client = okhttp3.OkHttpClient.Builder()
+                        .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                        .build()
+                    val request = okhttp3.Request.Builder().url(apiUrl).get().build()
+                    val response = client.newCall(request).execute()
+                    val body = response.body?.string() ?: return@withContext null
+                    // Insight 回傳 JSON { url, state }
+                    val json = org.json.JSONObject(body)
+                    json.optString("url").ifBlank { null }
+                }
+
+                if (lineUrl != null) {
+                    // 用 ACTION_VIEW 打開，讓系統決定用 LINE App 或瀏覽器
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(lineUrl))
+                    startActivity(intent)
+                    statusText.text = ""
+                } else {
+                    statusText.setTextColor(0xFFFF6B6B.toInt())
+                    statusText.text = "LINE 登入設定未完成"
+                }
+            } catch (e: Exception) {
+                statusText.setTextColor(0xFFFF6B6B.toInt())
+                statusText.text = "連線失敗: ${e.message?.take(50)}"
+            }
+        }
+    }
 
     private fun openOAuthCustomTab(url: String) {
         val customTabIntent = CustomTabsIntent.Builder()

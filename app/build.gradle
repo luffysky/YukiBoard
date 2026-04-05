@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 64
-        versionName "0.8.22"
+        versionCode 65
+        versionName "0.8.23"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,11 +82,10 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: LINE/Google 登入改用 Chrome Custom Tab（不再卡帳密）\n" +
-                    "- feat: 設定頁新增 Z幣錢包/輸入法選擇/Snippet 管理/VRM toggle\n" +
-                    "- feat: 環形選單新增懸浮鍵盤快捷切換\n" +
-                    "- fix: 註冊流程對齊 Insight API（自動帶 orgName）\n" +
-                    "- fix: Snippet 卡片 addView crash"
+                    "- fix: LINE 登入改 state 編碼（跨 App cookie 不通修正）\n" +
+                    "- fix: Google 登入同步修正 mobile state 傳遞\n" +
+                    "- fix: 註冊頁切換 App 回來狀態保留（驗證碼不再遺失）\n" +
+                    "- fix: 登出按鈕 + Snippet addView crash"
             }
         }
         debug {
@@ -95,11 +94,10 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: LINE/Google 登入改用 Chrome Custom Tab（不再卡帳密）\n" +
-                    "- feat: 設定頁新增 Z幣錢包/輸入法選擇/Snippet 管理/VRM toggle\n" +
-                    "- feat: 環形選單新增懸浮鍵盤快捷切換\n" +
-                    "- fix: 註冊流程對齊 Insight API（自動帶 orgName）\n" +
-                    "- fix: Snippet 卡片 addView crash"
+                    "- fix: LINE 登入改 state 編碼（跨 App cookie 不通修正）\n" +
+                    "- fix: Google 登入同步修正 mobile state 傳遞\n" +
+                    "- fix: 註冊頁切換 App 回來狀態保留（驗證碼不再遺失）\n" +
+                    "- fix: 登出按鈕 + Snippet addView crash"
             }
         }
     }
