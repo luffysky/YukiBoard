@@ -1271,13 +1271,7 @@ class KeyboardView(context: Context) : View(context) {
     private fun showAltPopup(key: KeyModel, anchorRect: RectF) {
         dismissPopup()
 
-        // 注音/聲調鍵：長按只顯示 altChars（英文/數字），不重複顯示注音本身
-        val isBopomofoKey = key.label.length == 1 && isBopomofoOrTone(key.label[0])
-        val allChars = if (isBopomofoKey && key.altChars.isNotEmpty()) {
-            key.altChars
-        } else {
-            listOf(key.label) + key.altChars
-        }
+        val allChars = listOf(key.label) + key.altChars
         altPopupChars = allChars
         altPopupOriginKey = key
         altPopupActive = true
