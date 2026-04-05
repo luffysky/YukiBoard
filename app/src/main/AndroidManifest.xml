@@ -96,6 +96,12 @@
             android:label="登入 SnowRealm"
             android:exported="false" />
 
+        <!-- Z幣錢包 -->
+        <activity
+            android:name=".ui.currency.ZCoinWalletActivity"
+            android:label="Z幣錢包"
+            android:exported="false" />
+
         <!-- 背景選擇器（IME 代理用透明 Activity） -->
         <activity
             android:name=".ui.settings.BackgroundPickerActivity"
