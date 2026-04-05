@@ -227,6 +227,9 @@
 - ~~[x] 注音自適應學習（AdaptiveDictionary — 用戶選字頻率排序）~~
 - [ ] 中文上下文串聯預測（chineseNgramIndex — 上一字→下一字）
 - ~~[x] 讀取輸入框上下文（getTextBeforeCursor → contextBeforeCursor → extractContextWords）~~
+- [ ] lookupMultiSyllable() fallback 修復 — 無片語時顯示每個音節的單字候選
+- [ ] UserDictionary 加注音欄位 — 手動加詞支援注音→詞對應
+- [ ] 設定頁自訂詞庫管理 UI（新增/釘選/刪除/匯出）
 - [ ] 候選字視覺分類標示（DICTIONARY/ADAPTIVE/PREDICTION/CORRECTION/AI 五種顏色）
 
 ---
@@ -258,6 +261,10 @@
 - [ ] GeminiNanoProvider.kt（Android 14+ 本地離線）
 - [ ] AIProviderType enum 更新（+GEMINI/GROQ/GEMINI_NANO）
 - [ ] 首次使用預設邏輯（Nano ��先 → Gemini → 用戶選擇）
+- [ ] AI 候選字 debounce（600ms）+ ✨ 標記顯示
+- [ ] markAICandidates() — 候選列 AI 建議淡紫標示
+- [ ] ClawClient.streamSkill() — Flow<String> 串流結果直通 UI
+- [ ] ClawPanelView 串流即時顯示（partial result 邊收邊顯示）
 - [ ] ApiGuideActivity.kt（5 平台申��教學 + 雪凜推薦語���
 
 ---
@@ -283,6 +290,7 @@
 ### 批次 H — API 串接 + 環境（總任務包 第十一批）
 
 - ~~[x] GiphyApiClient.kt（trending + search）→ GifPanelView 串接~~
+- [ ] scripts/generate_invite_codes.py — HMAC-SHA256 邀請碼批量生成腳本
 - [ ] 翻譯引擎接 MLKit Translation 離線模型 → TranslatePanelView
 - ✅ `.env.example` 範本檔案
 - [ ] CLAUDE.md 補充各 Key 用途與申請網址
@@ -409,6 +417,13 @@
 | 對戰型 | SpeedTypingBattleGame ⚔️ | 打字對決（分割畫面搶同一段文字） |
 | 對戰型 | TypingBossRaid 🐉 | 打字團戰（多人打字攻擊 Boss）|
 | 社群型 | TypingProfileCard 📊 | 打字履歷（WPM/常用詞/語言分布） |
+| 劇情型 | YukiSecretDiary 📔 | 雪凜秘密日記，解密日記解鎖角色故事 |
+| 情緒型 | EmotionThermometer 🌡️ | 情緒溫度計，正負文字比例視覺化 |
+
+### 遊戲 Bug 修復（Games_bug.md）
+- [ ] GameFloatingPanel scrollY 下限修復（計算 totalContentHeight + coerceIn）
+- [ ] GameLoopRunner 生命週期驗證（onDetachedFromWindow 確認 stop()）
+- [ ] SpellingDuelGame 詞庫搬到 res/raw/spelling_words.txt
 
 ### 工具面板
 - [ ] 計算機面板（基礎四則 + 科學計算）
