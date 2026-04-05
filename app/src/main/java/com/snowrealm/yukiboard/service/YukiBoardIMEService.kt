@@ -1789,6 +1789,18 @@ class YukiBoardIMEService : InputMethodService() {
             val isMultiLine = (info?.inputType ?: 0) and
                 android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE != 0
 
+            // 私房話模式：送出前把輸入框整句加密
+            if (prefs.secretMessageMode) {
+                val plaintext = ic.getTextBeforeCursor(2000, 0)?.toString() ?: ""
+                if (plaintext.isNotBlank() && secretMessageManager?.isEncryptedMessage(plaintext) != true) {
+                    val encrypted = secretMessageManager?.encrypt(plaintext)
+                    if (encrypted != null) {
+                        ic.performContextMenuAction(android.R.id.selectAll)
+                        ic.commitText(encrypted, 1)
+                    }
+                }
+            }
+
             if (!isMultiLine && (action == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
                     || action == android.view.inputmethod.EditorInfo.IME_ACTION_SEND
                     || action == android.view.inputmethod.EditorInfo.IME_ACTION_GO
@@ -1851,16 +1863,11 @@ class YukiBoardIMEService : InputMethodService() {
                     }
                 }
 
-                // 私房話模式：攔截並加密
-                val finalText = if (prefs.secretMessageMode && result.text.isNotBlank()) {
-                    secretMessageManager?.encrypt(result.text) ?: result.text
-                } else result.text
-
                 ic.setComposingText("", 0)
                 ic.finishComposingText()
-                ic.commitText(finalText, 1)
+                ic.commitText(result.text, 1)
                 characterView?.playHappy()
-                forwardTextToRemote(finalText)
+                forwardTextToRemote(result.text)
 
                 // 累積句子，用於整句學習
                 sentenceBuffer.append(result.text)
