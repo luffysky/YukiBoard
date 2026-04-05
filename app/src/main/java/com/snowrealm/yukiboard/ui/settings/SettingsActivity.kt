@@ -2051,27 +2051,43 @@ class SettingsActivity : AppCompatActivity() {
                         }
                     }
                     else -> {
-                        var engine: com.snowrealm.yukiboard.speech.AndroidTtsEngine? = null
-                        engine = com.snowrealm.yukiboard.speech.AndroidTtsEngine(applicationContext) { success ->
+                        // 直接用 Android TextToSpeech API（最簡單，排除包裝問題）
+                        var rawTts: android.speech.tts.TextToSpeech? = null
+                        rawTts = android.speech.tts.TextToSpeech(applicationContext) { status ->
                             mainHandler.post {
-                                if (!success) {
-                                    android.widget.Toast.makeText(this@SettingsActivity, "TTS 引擎初始化失敗，請確認裝置已安裝語音引擎", android.widget.Toast.LENGTH_LONG).show()
-                                    engine?.destroy()
-                                    resetBtn()
-                                    return@post
-                                }
-                                // 檢查媒體音量（TTS 使用 STREAM_MUSIC）
                                 val audioMgr = getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
                                 val vol = audioMgr.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
                                 val maxVol = audioMgr.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
-                                android.util.Log.i("TTS_TEST", "engine=${engine?.javaClass?.simpleName}, isReady=${engine?.isReady}, mediaVol=$vol/$maxVol")
+                                val defaultEngine = rawTts?.defaultEngine ?: "unknown"
+
+                                if (status != android.speech.tts.TextToSpeech.SUCCESS) {
+                                    android.widget.Toast.makeText(this@SettingsActivity,
+                                        "TTS 初始化失敗 status=$status engine=$defaultEngine", android.widget.Toast.LENGTH_LONG).show()
+                                    rawTts?.shutdown()
+                                    resetBtn()
+                                    return@post
+                                }
+
+                                // 設定語言
+                                val langResult = rawTts?.setLanguage(java.util.Locale.TAIWAN)
+                                val info = "engine=$defaultEngine lang=$langResult vol=$vol/$maxVol"
+                                android.widget.Toast.makeText(this@SettingsActivity, "TTS: $info", android.widget.Toast.LENGTH_LONG).show()
+
                                 if (vol == 0) {
-                                    android.widget.Toast.makeText(this@SettingsActivity, "媒體音量為 0，請調高音量後再測試", android.widget.Toast.LENGTH_LONG).show()
+                                    // 自動把媒體音量調到一半
+                                    audioMgr.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, maxVol / 2, android.media.AudioManager.FLAG_SHOW_UI)
                                 }
-                                (btn as TextView).text = "🔊 播放中..."
-                                engine?.speak(testText, null, prefs.ttsSpeed) {
-                                    mainHandler.post { engine?.destroy(); resetBtn() }
-                                }
+
+                                (btn as TextView).text = "🔊 播放中... ($info)"
+                                rawTts?.setSpeechRate(prefs.ttsSpeed)
+                                val speakResult = rawTts?.speak(testText, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "test_utterance")
+                                android.util.Log.i("TTS_TEST", "speakResult=$speakResult $info")
+
+                                // 3秒後自動重置按鈕
+                                mainHandler.postDelayed({
+                                    rawTts?.shutdown()
+                                    resetBtn()
+                                }, 5000)
                             }
                         }
                     }
