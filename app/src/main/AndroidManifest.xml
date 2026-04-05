@@ -74,6 +74,11 @@
             android:label="AI 設定"
             android:exported="false" />
 
+        <activity
+            android:name=".ui.settings.InputTestActivity"
+            android:label="輸入法測試"
+            android:exported="false" />
+
         <!-- 邀請碼頁面 -->
         <activity
             android:name=".ui.auth.InviteCodeActivity"

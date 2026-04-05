@@ -244,6 +244,27 @@ class SettingsActivity : AppCompatActivity() {
         root.addView(buildLanguageCard())
         root.addView(buildUserDictCard())
 
+        // ═══════════════════════════════════════════════════════
+        // 輸入法測試
+        // ═══════════════════════════════════════════════════════
+        root.addView(Button(this).apply {
+            text = "輸入法完整測試"
+            setTextColor(0xFFFFFFFF.toInt())
+            textSize = 15f
+            background = GradientDrawable().apply {
+                setColor(0xFF2E7D32.toInt())
+                cornerRadius = dp(10).toFloat()
+            }
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(dp(4), dp(16), dp(4), dp(8)) }
+            setOnClickListener {
+                startActivity(Intent(this@SettingsActivity, InputTestActivity::class.java))
+            }
+        })
+
         scrollView.addView(root)
         setContentView(scrollView)
     }

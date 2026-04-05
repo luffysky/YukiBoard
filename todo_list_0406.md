@@ -319,6 +319,39 @@
 - [ ] 滑動候選標記淡紫色 #B39DDB + 左側 ≈ 符號
 - [ ] `markSwipeCandidates()` 方法
 
+
+### 批次 L — 防詐 AI 對話模型（FraudAI 任務包 5 批）
+
+> 路線：規則引擎 → AI 分析 → 本地 TFLite 模型（離線零費用）
+> 參考：YukiBoard_FraudAI_Model_Tasks.md
+
+#### L-1 FraudAIAnalyzer（規則 + Gemini Flash，現在可上線）
+- [ ] security/FraudAIAnalyzer.kt — A+B 混合架構（規則引擎 < 1ms + AI 深度分析）
+- [ ] security/ConversationFormatter.kt — LINE 對話格式化（說話者辨識 + 截斷）
+- [ ] 整合 ClawPanelView 防詐分析流程
+
+#### L-2 回報系統（資料收集，訓練模型用）
+- [ ] security/FraudReportManager.kt — 匿名化 + Supabase 上傳
+- [ ] Supabase 建 fraud_reports 表（RLS insert only）
+- [ ] ClawPanelView 加「回報詐騙 / 不是詐騙」按鈕
+- [ ] 同意聲明對話框（隱私保護）
+
+#### L-3 合成訓練資料生成
+- [ ] scripts/generate_fraud_training_data.py — Claude API 批次生成
+- [ ] 5 種詐騙類型 × 200 筆 + 1000 筆正常對話
+- [ ] 輸出 JSONL（fraud_conversations + safe_conversations）
+
+#### L-4 DistilBERT 訓練（Google Colab��
+- [ ] scripts/train_fraud_detector.ipynb — bert-base-chinese fine-tune
+- [ ] 訓練/驗證分割 + accuracy metrics
+- [ ] PyTorch → ONNX → TFLite 轉換
+
+#### L-5 Android TFLite ��地模型整合
+- [ ] security/FraudLocalModel.kt — 離線推論（50-80ms）
+- [ ] assets/fraud_detector.tflite 打包
+- [ ] FraudAIAnalyzer 優先用本地模型，fallback Gemini Flash
+- [ ] build.gradle 加 TFLite 依賴
+
 ---
 
 ## 下個版本（v0.6.0）
@@ -440,6 +473,10 @@ v0.5.5+ 接下來的優先順序
   ↓
 批次 K（滑動輸入邏輯 + 視覺標示）       ← 接上 SwipeTrail 做完整滑動輸入
   ↓
+批次 L-1（FraudAIAnalyzer）            ← 防詐 AI 規則+Gemini 上線
+  ↓
+批次 L-2（回報系統）                    ← 收集資料，為訓練模型做準備
+  ↓
 批次 A 剩餘（RIME 詞庫 + 滑動解碼）    ← 大詞庫支援
   ↓
 批次 E（AI Provider 擴充）             ← 讓 AI 功能有免費方案
@@ -455,7 +492,7 @@ v0.5.5+ 接下來的優先順序
 
 ## 備註
 
-- 版本號：**v0.5.4**（versionCode 28）
+- 版本號：**v0.5.9**（versionCode 33）
 - deploy 指令：`bash scripts/deploy.sh "更新��明"` 或 `./gradlew appDistributionUploadDebug`
 - Firebase App Distribution 測��群��：`testers`
 - google-services.json 已在 .gitignore
