@@ -5,18 +5,16 @@ import android.content.Intent
 import android.graphics.*
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
+import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
-import android.webkit.CookieManager
-import android.webkit.WebResourceRequest
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import androidx.browser.customtabs.CustomTabsIntent
 import com.snowrealm.yukiboard.BuildConfig
 import com.snowrealm.yukiboard.auth.SnowRealmAuthClient
 import kotlinx.coroutines.*
@@ -37,8 +35,6 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var sendCodeBtn: View
     private lateinit var loginBtn: View
     private lateinit var registerToggle: TextView
-    private lateinit var webViewContainer: FrameLayout
-    private var webView: WebView? = null
     private var isRegisterMode = false
     private var pendingCodeId: String? = null
     private val activityScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -64,11 +60,22 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 
-    override fun onBackPressed() {
-        if (webView != null && webViewContainer.visibility == View.VISIBLE) {
-            dismissWebView()
-            return
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        // OAuth callback 成功回來
+        if (intent?.getBooleanExtra("oauth_success", false) == true) {
+            val auth = SnowRealmAuthClient(this)
+            if (auth.isLoggedIn) {
+                statusText.setTextColor(0xFF40E0D0.toInt())
+                statusText.text = "歡迎 ${auth.currentDisplayName ?: auth.currentEmail}！"
+                setResult(RESULT_OK)
+                finish()
+            }
         }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
         super.onBackPressed()
     }
 
@@ -203,10 +210,10 @@ class LoginActivity : AppCompatActivity() {
             setPadding((20 * d).toInt(), (16 * d).toInt(), (20 * d).toInt(), (16 * d).toInt())
         }
         oauthContent.addView(createGlassButton("LINE 登入", 0xFF06C755.toInt(), d) {
-            openOAuthWebView("$baseUrl/api/auth/line")
+            openOAuthCustomTab("$baseUrl/api/auth/line?mobile_callback=yukiboard://auth/callback")
         })
         oauthContent.addView(createGlassButton("Google 登入", 0xFF4285F4.toInt(), d) {
-            openOAuthWebView("$baseUrl/api/auth/google")
+            openOAuthCustomTab("$baseUrl/api/auth/google?mobile_callback=yukiboard://auth/callback")
         })
         oauthCard.addView(oauthContent)
         root.addView(oauthCard)
@@ -220,25 +227,6 @@ class LoginActivity : AppCompatActivity() {
 
         scroll.addView(root)
         frame.addView(scroll)
-
-        // WebView 層
-        webViewContainer = FrameLayout(this).apply {
-            visibility = View.GONE
-            setBackgroundColor(0xF0000000.toInt())
-        }
-        val closeBtn = TextView(this).apply {
-            text = "✕"; textSize = 20f; setTextColor(Color.WHITE)
-            gravity = Gravity.CENTER
-            val s = (44 * d).toInt()
-            layoutParams = FrameLayout.LayoutParams(s, s).apply {
-                gravity = Gravity.TOP or Gravity.END
-                topMargin = (40 * d).toInt(); rightMargin = (12 * d).toInt()
-            }
-            elevation = 10f
-            setOnClickListener { dismissWebView() }
-        }
-        webViewContainer.addView(closeBtn)
-        frame.addView(webViewContainer)
 
         return frame
     }
@@ -439,92 +427,14 @@ class LoginActivity : AppCompatActivity() {
     }
 
     // =========================================================================
-    // WebView OAuth（LINE / Google）
+    // Chrome Custom Tab OAuth（LINE / Google）
     // =========================================================================
 
-    private fun openOAuthWebView(url: String) {
-        CookieManager.getInstance().apply {
-            setAcceptCookie(true)
-            removeAllCookies(null)
-        }
-
-        val wv = WebView(this).apply {
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            ).apply {
-                topMargin = (36 * resources.displayMetrics.density).toInt()
-            }
-            settings.javaScriptEnabled = true
-            settings.domStorageEnabled = true
-            settings.userAgentString = settings.userAgentString + " YukiBoard/1.0"
-
-            webViewClient = object : WebViewClient() {
-                override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                    // 讓所有 URL 正常載入（不攔截），確保 cookie 能正常寫入
-                    return false
-                }
-
-                override fun onPageFinished(view: WebView, url: String) {
-                    super.onPageFinished(view, url)
-                    // 每次頁面載完都檢查是否拿到 admin_session cookie
-                    if (url.contains("/insight-admin") || url.contains("/dashboard")) {
-                        tryExtractSession()
-                    }
-                    // 也在任何頁面結束時檢查 cookie（以防 redirect 路徑不同）
-                    val cookies = CookieManager.getInstance().getCookie(baseUrl)
-                    if (cookies != null && cookies.contains("admin_session=")) {
-                        tryExtractSession()
-                    }
-                }
-            }
-        }
-
-        webView = wv
-        webViewContainer.addView(wv, 0)
-        webViewContainer.visibility = View.VISIBLE
-        wv.loadUrl(url)
-    }
-
-    private var isExtractingSession = false
-
-    private fun tryExtractSession() {
-        if (isExtractingSession) return
-        isExtractingSession = true
-
-        val cookies = CookieManager.getInstance().getCookie(baseUrl) ?: ""
-        val token = cookies.split(";")
-            .map { it.trim() }
-            .firstOrNull { it.startsWith("admin_session=") }
-            ?.substringAfter("admin_session=")
-
-        if (!token.isNullOrBlank()) {
-            activityScope.launch {
-                authClient.saveTokenDirectly(token)
-                val user = authClient.fetchMe()
-                withContext(Dispatchers.Main) {
-                    isExtractingSession = false
-                    dismissWebView()
-                    if (user != null) {
-                        statusText.setTextColor(0xFF40E0D0.toInt())
-                        statusText.text = "歡迎 ${user.displayName}！"
-                    }
-                    setResult(RESULT_OK)
-                    finish()
-                }
-            }
-        } else {
-            isExtractingSession = false
-        }
-    }
-
-    private fun dismissWebView() {
-        webView?.let {
-            webViewContainer.removeView(it)
-            it.destroy()
-        }
-        webView = null
-        webViewContainer.visibility = View.GONE
+    private fun openOAuthCustomTab(url: String) {
+        val customTabIntent = CustomTabsIntent.Builder()
+            .setShowTitle(true)
+            .build()
+        customTabIntent.launchUrl(this, Uri.parse(url))
     }
 
     override fun onDestroy() {

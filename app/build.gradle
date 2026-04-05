@@ -147,6 +147,9 @@ dependencies {
     // Lottie 角色動畫
     implementation 'com.airbnb.android:lottie:6.3.0'
 
+    // Chrome Custom Tab（OAuth 登入用）
+    implementation 'androidx.browser:browser:1.7.0'
+
     // Claw AI — 安全儲存
     implementation 'androidx.security:security-crypto:1.1.0-alpha06'
 

@@ -96,6 +96,23 @@
             android:label="登入 SnowRealm"
             android:exported="false" />
 
+        <!-- OAuth callback（LINE / Google 登入回調） -->
+        <activity
+            android:name=".ui.auth.OAuthCallbackActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:launchMode="singleTask"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="yukiboard"
+                    android:host="auth"
+                    android:pathPrefix="/callback" />
+            </intent-filter>
+        </activity>
+
         <!-- Z幣錢包 -->
         <activity
             android:name=".ui.currency.ZCoinWalletActivity"

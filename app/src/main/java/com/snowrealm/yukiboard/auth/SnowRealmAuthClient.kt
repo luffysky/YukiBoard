@@ -114,7 +114,8 @@ class SnowRealmAuthClient(context: Context) {
     /** 註冊新帳號（需先 sendVerificationCode） */
     suspend fun register(email: String, password: String, name: String, codeId: String, code: String): AuthResult =
         withContext(Dispatchers.IO) {
-            val body = """{"email":"$email","password":"$password","displayName":"$name","codeId":"$codeId","code":"$code"}"""
+            val orgName = name.ifBlank { email.substringBefore("@") }
+            val body = """{"email":"$email","password":"$password","displayName":"$name","orgName":"$orgName","codeId":"$codeId","code":"$code"}"""
             postAuth("/api/auth/register", body)
         }
 
