@@ -218,6 +218,16 @@ class LoginActivity : AppCompatActivity() {
         oauthCard.addView(oauthContent)
         root.addView(oauthCard)
 
+        // ── 登出按鈕（已登入時顯示）──
+        val logoutBtn = createGlassButton("登出", 0xFFE53935.toInt(), d) {
+            authClient.logout()
+            statusText.setTextColor(0xFF40E0D0.toInt())
+            statusText.text = "已登出"
+            recreate()
+        }
+        logoutBtn.visibility = if (authClient.isLoggedIn) View.VISIBLE else View.GONE
+        root.addView(logoutBtn)
+
         // 跳過
         root.addView(TextView(this).apply {
             text = "先跳過"; textSize = 14f; setTextColor(0x66FFFFFF.toInt())
