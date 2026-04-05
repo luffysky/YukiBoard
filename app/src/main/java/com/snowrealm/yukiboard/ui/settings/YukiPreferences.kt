@@ -88,6 +88,11 @@ class YukiPreferences(context: Context) {
     var rawBopomofoMode: Boolean by BoolPref("raw_bopomofo", false)
     var swipeTrailEnabled: Boolean by BoolPref("swipe_trail", true)
 
+    /** 啟用的輸入法（逗號分隔的 InputMode name，空=全開） */
+    var enabledInputModes: String
+        get() = prefs.getString("enabled_input_modes", "") ?: ""
+        set(value) = prefs.edit().putString("enabled_input_modes", value).apply()
+
     /** 語音引擎：0=Android 內建, 1=OpenAI Whisper, 2=Faster-Whisper（自架） */
     var speechEngineType: Int by IntPref("speech_engine_type", 0)
     /** Faster-Whisper Server URL */
@@ -121,13 +126,10 @@ class YukiPreferences(context: Context) {
     // 連線功能
     // ══════��══════════���══════════════════════════════��══════════
     var remoteKeyboardEnabled: Boolean by BoolPref("remote_keyboard", true)
-    var multiplayerEnabled: Boolean by BoolPref("multiplayer", true)
 
     // ══��═════════════════════════��═════════════════════���════════
     // 鍵盤尺寸 / 懸浮模式（保留原有欄位）
     // ════════════════════════════════════��══════════════════════
-    var hapticFeedbackEnabled: Boolean by BoolPref("haptic_feedback", true)
-
     var keyboardHeightRatio: Float
         get() = prefs.getFloat(KEY_KB_HEIGHT, 0.35f)
         set(value) = prefs.edit().putFloat(KEY_KB_HEIGHT, value.coerceIn(MIN_HEIGHT_RATIO, MAX_HEIGHT_RATIO)).apply()

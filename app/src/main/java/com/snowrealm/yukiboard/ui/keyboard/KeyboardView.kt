@@ -157,6 +157,11 @@ class KeyboardView(context: Context) : View(context) {
         onLanguageSelectedListener = listener
     }
 
+    private var onFloatingToggleListener: (() -> Unit)? = null
+    fun setOnFloatingToggleListener(listener: () -> Unit) {
+        onFloatingToggleListener = listener
+    }
+
     /** 當前輸入法模式（供環形語言選單顯示用） */
     var currentInputMode: com.snowrealm.yukiboard.input.router.InputMode =
         com.snowrealm.yukiboard.input.router.InputMode.ENGLISH
@@ -1618,13 +1623,17 @@ class KeyboardView(context: Context) : View(context) {
     private fun showRadialModeMenu(anchorRect: RectF) {
         dismissPopup()
 
-        val menu = RadialModeMenu(context, theme, currentMode) { selectedMode ->
+        val menu = RadialModeMenu(context, theme, currentMode, onModeSelected = { selectedMode ->
             dismissPopup()
             activeRadialView = null
             if (selectedMode != currentMode) {
                 switchMode(selectedMode)
             }
-        }
+        }, onFloatingToggle = {
+            dismissPopup()
+            activeRadialView = null
+            onFloatingToggleListener?.invoke()
+        })
 
         val menuSize = (180 * density + 40 * density).toInt()
         val popup = PopupWindow(

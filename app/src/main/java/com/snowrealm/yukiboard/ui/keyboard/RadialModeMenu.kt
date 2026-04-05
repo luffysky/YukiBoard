@@ -22,7 +22,8 @@ class RadialModeMenu(
     context: Context,
     private val theme: KeyboardTheme,
     private val currentMode: KeyboardMode,
-    private val onModeSelected: (KeyboardMode) -> Unit
+    private val onModeSelected: (KeyboardMode) -> Unit,
+    private val onFloatingToggle: (() -> Unit)? = null
 ) : View(context) {
 
     private val density = context.resources.displayMetrics.density
@@ -57,10 +58,16 @@ class RadialModeMenu(
         style = Paint.Style.STROKE
     }
 
-    private val modes = KeyboardMode.entries.toTypedArray()
-    private val sectorCount = modes.size
+    // Menu items: 4 keyboard modes + optional floating keyboard toggle
+    private data class MenuItem(val label: String, val icon: String, val mode: KeyboardMode?)
+    private val menuItems: Array<MenuItem> = run {
+        val items = mutableListOf<MenuItem>()
+        for (m in KeyboardMode.entries) items.add(MenuItem(m.displayName, m.icon, m))
+        if (onFloatingToggle != null) items.add(MenuItem("懸浮", "🪟", null))
+        items.toTypedArray()
+    }
+    private val sectorCount = menuItems.size
     private val sweepAngle = 360f / sectorCount
-    // 4 sectors: top-right, bottom-right, bottom-left, top-left
     private val startAngles = FloatArray(sectorCount) { i -> -180f + i * sweepAngle }
 
     private var hoveredIndex = -1
@@ -96,9 +103,9 @@ class RadialModeMenu(
 
         val oval = RectF(cx - menuRadius, cy - menuRadius, cx + menuRadius, cy + menuRadius)
 
-        modes.forEachIndexed { i, mode ->
+        menuItems.forEachIndexed { i, item ->
             val isHovered = hoveredIndex == i
-            val isCurrent = mode == currentMode
+            val isCurrent = item.mode == currentMode
 
             sectorPaint.color = when {
                 isHovered -> theme.candidateSelectedColorInt
@@ -125,14 +132,14 @@ class RadialModeMenu(
             val ly = cy + labelR * sin(midAngle).toFloat()
 
             iconPaint.color = if (isHovered) theme.keyLabelColorInt else theme.composingTextColorInt
-            canvas.drawText(mode.icon, lx, ly - 4f * density, iconPaint)
+            canvas.drawText(item.icon, lx, ly - 4f * density, iconPaint)
 
             textPaint.color = when {
                 isHovered -> theme.keyLabelColorInt
                 isCurrent -> theme.candidateSelectedColorInt
                 else -> theme.candidateTextColorInt
             }
-            canvas.drawText(mode.displayName, lx, ly + 14f * density, textPaint)
+            canvas.drawText(item.label, lx, ly + 14f * density, textPaint)
         }
 
         // 中心圓
@@ -159,8 +166,13 @@ class RadialModeMenu(
                 invalidate()
             }
             MotionEvent.ACTION_UP -> {
-                if (hoveredIndex in modes.indices) {
-                    onModeSelected(modes[hoveredIndex])
+                if (hoveredIndex in menuItems.indices) {
+                    val item = menuItems[hoveredIndex]
+                    if (item.mode != null) {
+                        onModeSelected(item.mode)
+                    } else {
+                        onFloatingToggle?.invoke()
+                    }
                 }
                 hoveredIndex = -1
             }
@@ -174,7 +186,7 @@ class RadialModeMenu(
         while (angle < -180) angle += 360f
         while (angle > 180) angle -= 360f
 
-        for (i in modes.indices) {
+        for (i in menuItems.indices) {
             val start = startAngles[i]
             val end = start + sweepAngle
             if (angle >= start && angle < end) return i

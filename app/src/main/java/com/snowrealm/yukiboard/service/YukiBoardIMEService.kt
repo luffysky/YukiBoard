@@ -161,7 +161,17 @@ class YukiBoardIMEService : InputMethodService() {
         appModeDetector = AppModeDetector()
         prefs = YukiPreferences(applicationContext)
 
-        // 預熱注音索引（IO 執行緒，避免首次按鍵凍結 UI）
+        // 套用使用者選擇的輸入法
+        val savedModes = prefs.enabledInputModes
+        if (savedModes.isNotBlank()) {
+            val modeNames = savedModes.split(",").filter { it.isNotBlank() }
+            val modes = modeNames.mapNotNull { name ->
+                try { com.snowrealm.yukiboard.input.router.InputMode.valueOf(name) } catch (_: Exception) { null }
+            }
+            if (modes.isNotEmpty()) inputRouter.enabledModes = modes
+        }
+
+        // 預���注音索引（IO 執行緒，避免首次按鍵凍結 UI）
         serviceScope.launch(Dispatchers.IO) {
             inputRouter.warmUpChewing()
         }
@@ -375,6 +385,12 @@ class YukiBoardIMEService : InputMethodService() {
                     toolbarView.onPanelSelected?.invoke(com.snowrealm.yukiboard.ui.panel.PanelType.EMOJI)
                 }
             }
+        }
+
+        keyboardView.setOnFloatingToggleListener {
+            prefs.floatingModeEnabled = !prefs.floatingModeEnabled
+            // 重新載入鍵盤以套用懸浮模式
+            setInputView(onCreateInputView())
         }
 
         keyboardView.onSwipeSyllableConfirmed = { label ->

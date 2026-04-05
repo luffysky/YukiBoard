@@ -741,30 +741,31 @@ Phase 3：上架準備
 
 ### 批次 N — UI 缺口修復
 
-#### N-1 Z幣錢包入口
-- [ ] 設定頁加「Z幣錢包」按鈕 → 跳轉 `ZCoinWalletActivity`
+#### N-1 Z幣錢包入口 ✅
+- [x] 設定頁加「Z幣錢包」按鈕 → 跳轉 `ZCoinWalletActivity`
 - [ ] 顯示目前餘額預覽
 
-#### N-2 懸浮鍵盤快捷入口
-- [ ] 長按 Tab 環形選單加「懸浮」選項（FloatingKeyboardWrapper toggle）
+#### N-2 懸浮鍵盤快捷入口 ✅
+- [x] 長按 Tab 環形選單加「懸浮」選項（FloatingKeyboardWrapper toggle）
 
-#### N-3 Snippet 管理 UI
-- [ ] 設定頁加「Snippet 管理」入口
-- [ ] 列表顯示所有 snippet（內建 + 自訂）
-- [ ] 新增 / 編輯 / 刪除自訂 snippet 對話框
+#### N-3 Snippet 管理 UI ✅
+- [x] 設定頁加「Snippet 管理」入口
+- [x] 列表顯示所有 snippet（內建 + 自訂）
+- [x] 新增 / 刪除自訂 snippet 對話框
 
-#### N-4 輸入法選擇
-- [ ] 設定頁加「啟用的輸入法」多選
-- [ ] 勾選：注音 / 拼音 / 倉頡 / 速成 / 日文 / 韓文 / 英文
-- [ ] InputRouter.enabledModes 讀取設定
+#### N-4 輸入法選擇 ✅
+- [x] 設定頁加「啟用的輸入法」多選
+- [x] 勾選：注音 / 拼音 / 倉頡 / 速成 / 日文 / 韓文 / 英文
+- [x] InputRouter.enabledModes 讀取設定
 
-#### N-5 VRM 角色開關
-- [ ] 設定頁動畫群組加 `vrmCharacterEnabled` toggle
+#### N-5 VRM 角色開關 ✅
+- [x] 設定頁動畫群組加 `vrmCharacterEnabled` toggle
 
-#### N-6 Dead Preferences 清理
-- [ ] 接上或移除 `hapticFeedbackEnabled`（接到 KeyboardView 按鍵震動）
-- [ ] 移除 `weatherPanelEnabled`、`stickerPanelEnabled`、`multiplayerEnabled`
-- [ ] 移除或實作 `keyboardWidthRatio`
+#### N-6 Dead Preferences 清理 ✅
+- [x] 移除 `hapticFeedbackEnabled`（已有 `keyPressVibration` 取代）
+- [x] 移除 `multiplayerEnabled`（未使用）
+- [x] 保留 `weatherPanelEnabled`、`stickerPanelEnabled`（FloatingPanelManager 使用中）
+- [x] 保留 `keyboardWidthRatio`（IMEService 使用中）
 
 ---
 

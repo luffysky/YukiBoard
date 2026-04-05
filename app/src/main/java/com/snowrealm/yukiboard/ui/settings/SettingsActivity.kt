@@ -100,6 +100,23 @@ class SettingsActivity : AppCompatActivity() {
             }
         })
         titleRow.addView(Button(this).apply {
+            text = "Z幣錢包"
+            setTextColor(0xFFFFFFFF.toInt())
+            textSize = 13f
+            background = GradientDrawable().apply {
+                setColor(0xFFD4A017.toInt())
+                cornerRadius = dp(8).toFloat()
+            }
+            setPadding(dp(14), dp(6), dp(14), dp(6))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { marginEnd = dp(8) }
+            setOnClickListener {
+                startActivity(Intent(this@SettingsActivity, com.snowrealm.yukiboard.ui.currency.ZCoinWalletActivity::class.java))
+            }
+        })
+        titleRow.addView(Button(this).apply {
             val auth = com.snowrealm.yukiboard.auth.SnowRealmAuthClient(this@SettingsActivity)
             text = if (auth.isLoggedIn) auth.currentDisplayName ?: "帳號" else "登入"
             setTextColor(0xFFFFFFFF.toInt())
@@ -211,6 +228,7 @@ class SettingsActivity : AppCompatActivity() {
         root.addView(cardGroup("動畫特效", null, null, animChildren) {
             animChildren += switchRow("流光動畫", "OpenGL ES 流光覆蓋效果", prefs.flowLightEnabled) { prefs.flowLightEnabled = it }
             animChildren += switchRow("角色動畫", "雪凜 Lottie 浮動角色", prefs.characterAnimEnabled) { prefs.characterAnimEnabled = it }
+            animChildren += switchRow("VRM 3D 角色", "3D VRM 模型取代 Lottie 角色", prefs.vrmCharacterEnabled) { prefs.vrmCharacterEnabled = it }
             animChildren += switchRow("按鍵粒子效果", "打字時的粒子動畫", prefs.keyParticleEffect) { prefs.keyParticleEffect = it }
             animChildren += switchRow("按鍵震動", "按鍵時的觸覺回饋", prefs.keyPressVibration) { prefs.keyPressVibration = it }
             animChildren += switchRow("按鍵音效", "按鍵時的聲音回饋", prefs.keySoundEnabled) { prefs.keySoundEnabled = it }
@@ -251,6 +269,16 @@ class SettingsActivity : AppCompatActivity() {
         root.addView(cardGroup("語音輸出 (TTS)", null, null, ttsChildren) {
             ttsChildren += ttsSettingsSection()
         })
+
+        // ═══════════════════════════════════════════════════════
+        // 6.6 輸入法選擇
+        // ═══════════════════════════════════════════════════════
+        root.addView(buildInputMethodCard())
+
+        // ═══════════════════════════════════════════════════════
+        // 6.7 Snippet 管理
+        // ═══════════════════════════════════════════════════════
+        root.addView(buildSnippetCard())
 
         // ═══════════════════════════════════════════════════════
         // 7. 智慧輸入
@@ -2235,6 +2263,203 @@ class SettingsActivity : AppCompatActivity() {
             outer.addView(row)
         }
         return outer
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 輸入法選擇卡片
+    // ─────────────────────────────────────────────────────────
+
+    private fun buildInputMethodCard(): LinearLayout {
+        val card = simpleCard("輸入法選擇")
+
+        val allModes = listOf(
+            com.snowrealm.yukiboard.input.router.InputMode.ENGLISH,
+            com.snowrealm.yukiboard.input.router.InputMode.BOPOMOFO,
+            com.snowrealm.yukiboard.input.router.InputMode.PINYIN,
+            com.snowrealm.yukiboard.input.router.InputMode.CANGJIE,
+            com.snowrealm.yukiboard.input.router.InputMode.SPEED_CANGJIE,
+            com.snowrealm.yukiboard.input.router.InputMode.JAPANESE,
+            com.snowrealm.yukiboard.input.router.InputMode.KOREAN,
+        )
+
+        val saved = prefs.enabledInputModes
+        val enabledSet = if (saved.isBlank()) {
+            allModes.map { it.name }.toMutableSet()
+        } else {
+            saved.split(",").filter { it.isNotBlank() }.toMutableSet()
+        }
+
+        card.addView(TextView(this).apply {
+            text = "勾選要啟用的輸入法（切換語言時循環）"
+            textSize = 12f
+            setTextColor(0xFF6688AA.toInt())
+            setPadding(dp(8), dp(4), dp(8), dp(8))
+        })
+
+        for (mode in allModes) {
+            val cb = android.widget.CheckBox(this).apply {
+                text = "${mode.shortLabel}  ${mode.displayName}"
+                setTextColor(0xFFE8F4FF.toInt())
+                textSize = 14f
+                isChecked = mode.name in enabledSet
+                setPadding(dp(8), dp(4), dp(8), dp(4))
+                setOnCheckedChangeListener { _, checked ->
+                    if (checked) enabledSet.add(mode.name) else enabledSet.remove(mode.name)
+                    if (enabledSet.isEmpty()) {
+                        enabledSet.add(com.snowrealm.yukiboard.input.router.InputMode.ENGLISH.name)
+                        isChecked = true
+                        Toast.makeText(this@SettingsActivity, "至少須啟用一個輸入法", Toast.LENGTH_SHORT).show()
+                    }
+                    prefs.enabledInputModes = enabledSet.joinToString(",")
+                }
+            }
+            card.addView(cb)
+        }
+
+        return card
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Snippet 管理卡片
+    // ─────────────────────────────────────────────────────────
+
+    private fun buildSnippetCard(): LinearLayout {
+        val card = simpleCard("Snippet 管理（開發者模式）")
+        val snippetMgr = com.snowrealm.yukiboard.input.snippet.SnippetManager(this)
+
+        val listContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        fun refreshSnippetList() {
+            listContainer.removeAllViews()
+
+            // 自訂 snippet
+            val custom = snippetMgr.getCustomSnippets()
+            if (custom.isNotEmpty()) {
+                listContainer.addView(TextView(this).apply {
+                    text = "自訂 Snippet"
+                    textSize = 13f
+                    setTextColor(0xFF7FD8FF.toInt())
+                    setPadding(dp(4), dp(8), dp(4), dp(4))
+                })
+                for ((abbr, expansion) in custom) {
+                    val row = LinearLayout(this).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        setPadding(dp(4), dp(4), dp(4), dp(4))
+                        gravity = android.view.Gravity.CENTER_VERTICAL
+                    }
+                    row.addView(TextView(this).apply {
+                        text = "$abbr → ${expansion.take(40)}"
+                        setTextColor(0xFFE8F4FF.toInt())
+                        textSize = 13f
+                        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                    })
+                    row.addView(TextView(this).apply {
+                        text = "✕"
+                        setTextColor(0xFFFF6B6B.toInt())
+                        textSize = 16f
+                        setPadding(dp(8), 0, dp(4), 0)
+                        setOnClickListener {
+                            snippetMgr.removeCustomSnippet(abbr)
+                            refreshSnippetList()
+                        }
+                    })
+                    listContainer.addView(row)
+                }
+            }
+
+            // 內建 snippet 列表（摺疊顯示）
+            val builtIn = snippetMgr.getBuiltInAbbreviations()
+            listContainer.addView(TextView(this).apply {
+                text = "▸ 內建 Snippet (${builtIn.size} 個) — 點擊展開"
+                textSize = 13f
+                setTextColor(0xFF6688AA.toInt())
+                setPadding(dp(4), dp(8), dp(4), dp(4))
+                val builtInContainer = LinearLayout(this@SettingsActivity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    visibility = View.GONE
+                }
+                setOnClickListener {
+                    if (builtInContainer.visibility == View.GONE) {
+                        builtInContainer.visibility = View.VISIBLE
+                        text = "▾ 內建 Snippet (${builtIn.size} 個) — 點擊收合"
+                    } else {
+                        builtInContainer.visibility = View.GONE
+                        text = "▸ 內建 Snippet (${builtIn.size} 個) — 點擊展開"
+                    }
+                }
+                listContainer.addView(this)
+
+                for (abbr in builtIn) {
+                    val result = snippetMgr.expand(abbr)
+                    builtInContainer.addView(TextView(this@SettingsActivity).apply {
+                        text = "$abbr → ${result?.expansion?.replace("\n", "↵")?.take(50) ?: ""}"
+                        setTextColor(0xFF8899AA.toInt())
+                        textSize = 12f
+                        setPadding(dp(12), dp(2), dp(4), dp(2))
+                    })
+                }
+                listContainer.addView(builtInContainer)
+            })
+        }
+
+        refreshSnippetList()
+
+        // 新增按鈕
+        card.addView(Button(this).apply {
+            text = "+ 新增 Snippet"
+            setTextColor(0xFF7FD8FF.toInt())
+            setBackgroundColor(0xFF1A3A5C.toInt())
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(0, dp(8), 0, dp(4)) }
+            setOnClickListener {
+                val dialogView = LinearLayout(this@SettingsActivity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(dp(20), dp(16), dp(20), dp(8))
+                }
+                val abbrInput = android.widget.EditText(this@SettingsActivity).apply {
+                    hint = "縮寫（例如：log）"
+                    setHintTextColor(0x88FFFFFF.toInt())
+                    setTextColor(0xFFFFFFFF.toInt())
+                    setBackgroundColor(0xFF1A3A5C.toInt())
+                    setPadding(dp(8), dp(8), dp(8), dp(8))
+                }
+                val expansionInput = android.widget.EditText(this@SettingsActivity).apply {
+                    hint = "展開文字（例如：console.log()）"
+                    setHintTextColor(0x88FFFFFF.toInt())
+                    setTextColor(0xFFFFFFFF.toInt())
+                    setBackgroundColor(0xFF1A3A5C.toInt())
+                    setPadding(dp(8), dp(8), dp(8), dp(8))
+                    minLines = 2
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { topMargin = dp(8) }
+                }
+                dialogView.addView(abbrInput)
+                dialogView.addView(expansionInput)
+
+                android.app.AlertDialog.Builder(this@SettingsActivity)
+                    .setTitle("新增 Snippet")
+                    .setView(dialogView)
+                    .setPositiveButton("新增") { _, _ ->
+                        val abbr = abbrInput.text.toString().trim()
+                        val expansion = expansionInput.text.toString()
+                        if (abbr.isNotBlank() && expansion.isNotBlank()) {
+                            snippetMgr.addCustomSnippet(abbr, expansion)
+                            refreshSnippetList()
+                        }
+                    }
+                    .setNegativeButton("取消", null)
+                    .show()
+            }
+        })
+
+        card.addView(listContainer)
+        return card
     }
 
     private fun dp(value: Int): Int =
