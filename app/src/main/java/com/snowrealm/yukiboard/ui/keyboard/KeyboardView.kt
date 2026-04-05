@@ -23,6 +23,7 @@ import android.view.inputmethod.EditorInfo
 import android.widget.PopupWindow
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.snowrealm.yukiboard.input.router.CandidateSource
 import com.snowrealm.yukiboard.theme.KeyboardTheme
 
 /**
@@ -160,6 +161,8 @@ class KeyboardView(context: Context) : View(context) {
     private var sideRows: List<List<KeyModel>> = emptyList()
     private var candidates: List<String> = emptyList()
     private var allCandidates: List<String> = emptyList()
+    private var candidateSourceMap: Map<String, CandidateSource> = emptyMap()
+    private var isSwipeCandidateMode: Boolean = false
     private var isCandidateExpanded: Boolean = false
     // 候選列橫向捲動
     private var candidateScrollX = 0f
@@ -481,14 +484,22 @@ class KeyboardView(context: Context) : View(context) {
         invalidate()
     }
 
-    fun updateCandidates(list: List<String>) {
-        if (allCandidates == list) return
+    fun updateCandidates(list: List<String>, sourceMap: Map<String, CandidateSource> = emptyMap()) {
+        if (allCandidates == list && candidateSourceMap == sourceMap) return
         allCandidates = list
         candidates = list  // 不再截斷，全部由橫向捲動顯示
+        candidateSourceMap = sourceMap
+        isSwipeCandidateMode = false
         candidateScrollX = 0f
         highlightedCandidateIndex = -1
         isCandidateExpanded = false
         expandScrollOffset = 0f
+        invalidate()
+    }
+
+    /** 標記當前候選字為滑動輸入結果（淡紫色 + ≈ 前綴） */
+    fun markSwipeCandidates(isSwipe: Boolean) {
+        isSwipeCandidateMode = isSwipe
         invalidate()
     }
 
@@ -837,8 +848,11 @@ class KeyboardView(context: Context) : View(context) {
         candidatePaint.textAlign = Paint.Align.CENTER
         candidatePaint.textSize = 15f * density
 
-        // 計算每個候選字寬度並快取（供 touch 用）
-        val candWidths = candidates.map { candidatePaint.measureText(it) + candPadH * 2 }
+        // 計算每個��選字寬度���快取（供 touch 用）
+        val candWidths = candidates.mapIndexed { i, it ->
+            val display = if (isSwipeCandidateMode && i == 0) "≈$it" else it
+            candidatePaint.measureText(display) + candPadH * 2
+        }
         candWidthsCache = candWidths
         candFixedLeftCache = fixedLeft
         candGapCache = candGap
@@ -865,17 +879,29 @@ class KeyboardView(context: Context) : View(context) {
             val cx = left + cw / 2f
 
             if (right > fixedLeft && left < width.toFloat() - arrowSpace) {
+                // 候選字來源色彩（滑動模式統一淡紫色）
+                val sourceColor = if (isSwipeCandidateMode) 0xFFB39DDB.toInt()
+                else when (candidateSourceMap[text]) {
+                    CandidateSource.CORRECTION -> 0xFFFF9933.toInt()  // 橙色：糾錯
+                    CandidateSource.ADAPTIVE   -> 0xFF66CC88.toInt()  // 綠色：自適應
+                    CandidateSource.PREDICTION -> 0xFF66AAFF.toInt()  // 藍色：預測
+                    CandidateSource.USER_DICT  -> 0xFFFFD700.toInt()  // 金色：使用者詞庫
+                    CandidateSource.SENTENCE   -> 0xFFBB88FF.toInt()  // 紫色：整句
+                    else -> 0 // DICTIONARY 或無來源 → 用主題預設色
+                }
+
                 if (i == 0 && candidates.size > 1) {
-                    keyPaint.color = theme.candidateSelectedColorInt
+                    keyPaint.color = if (sourceColor != 0) sourceColor else theme.candidateSelectedColorInt
                     keyPaint.alpha = 40
                     val pill = RectF(left + 2 * density, 4 * density, right - 2 * density, candidateBarHeight - 4 * density)
                     canvas.drawRoundRect(pill, 6 * density, 6 * density, keyPaint)
                     keyPaint.alpha = 255
-                    candidatePaint.color = theme.candidateSelectedColorInt
+                    candidatePaint.color = if (sourceColor != 0) sourceColor else theme.candidateSelectedColorInt
                 } else {
-                    candidatePaint.color = theme.candidateTextColorInt
+                    candidatePaint.color = if (sourceColor != 0) sourceColor else theme.candidateTextColorInt
                 }
-                canvas.drawText(text, cx, candidateBarHeight * 0.65f, candidatePaint)
+                val displayText = if (isSwipeCandidateMode && i == 0) "≈$text" else text
+                canvas.drawText(displayText, cx, candidateBarHeight * 0.65f, candidatePaint)
 
                 if (i > 0) {
                     dividerPaint.color = (theme.candidateTextColorInt and 0x00FFFFFF) or 0x20000000
@@ -980,8 +1006,16 @@ class KeyboardView(context: Context) : View(context) {
             val rect = RectF(left, top, right, bottom)
             canvas.drawRoundRect(rect, 6 * density, 6 * density, keyPaint)
 
-            // 候選字文字
-            candidatePaint.color = theme.candidateTextColorInt
+            // 候選字文字（來源色彩）
+            val srcColor = when (candidateSourceMap[text]) {
+                CandidateSource.CORRECTION -> 0xFFFF9933.toInt()
+                CandidateSource.ADAPTIVE   -> 0xFF66CC88.toInt()
+                CandidateSource.PREDICTION -> 0xFF66AAFF.toInt()
+                CandidateSource.USER_DICT  -> 0xFFFFD700.toInt()
+                CandidateSource.SENTENCE   -> 0xFFBB88FF.toInt()
+                else -> theme.candidateTextColorInt
+            }
+            candidatePaint.color = srcColor
             canvas.drawText(text, left + (right - left) / 2f, top + (bottom - top) * 0.65f, candidatePaint)
         }
 

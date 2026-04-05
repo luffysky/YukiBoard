@@ -299,7 +299,7 @@ class YukiBoardIMEService : InputMethodService() {
                 applyInputResult(ic, result)
             }
             keyboardView.updateComposingText(inputRouter.composingText)
-            keyboardView.updateCandidates(inputRouter.candidates)
+            keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
         }
         keyboardView.setOnSpaceLongPressListener { pressed ->
             if (prefs.gyroscopeCursorEnabled) {
@@ -1471,6 +1471,10 @@ class YukiBoardIMEService : InputMethodService() {
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT
         ))
+        gkv.onDetached = {
+            gameLoop?.stop()
+            gameLoop = null
+        }
         gameKeyboardView = gkv
         currentGame = game
 
@@ -1567,6 +1571,7 @@ class YukiBoardIMEService : InputMethodService() {
             val composing = labels.joinToString("")
             keyboardView.updateComposingText(composing)
             keyboardView.updateCandidates(candidates)
+            keyboardView.markSwipeCandidates(true)
 
             // 標記正在滑動輸入模式，選字時直接 commit（不走 InputRouter）
             swipeInputPending = true
@@ -1606,7 +1611,7 @@ class YukiBoardIMEService : InputMethodService() {
                     if (isCjk && inputRouter.composingText.isNotEmpty()) {
                         inputRouter.processDelete()
                         keyboardView.updateComposingText(inputRouter.composingText)
-                        keyboardView.updateCandidates(inputRouter.candidates)
+                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
                     } else {
                         gp.onDeleteInput()
                     }
@@ -1628,7 +1633,7 @@ class YukiBoardIMEService : InputMethodService() {
                             gp.onComposedTextInput(result.text)
                         }
                         keyboardView.updateComposingText(inputRouter.composingText)
-                        keyboardView.updateCandidates(inputRouter.candidates)
+                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
                     } else {
                         gp.onSpaceInput()
                     }
@@ -1642,7 +1647,7 @@ class YukiBoardIMEService : InputMethodService() {
                             gp.onComposedTextInput(result.text)
                         }
                         keyboardView.updateComposingText(inputRouter.composingText)
-                        keyboardView.updateCandidates(inputRouter.candidates)
+                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
                         gp.updateComposingHint(inputRouter.composingText)
                     } else {
                         gp.onCharInput(label)
@@ -1846,7 +1851,7 @@ class YukiBoardIMEService : InputMethodService() {
         if (inputRouter.candidates.isNotEmpty()) {
             val focused = inputRouter.candidateManager.focusNext()
             if (focused != null) {
-                keyboardView.updateCandidates(inputRouter.candidates)
+                keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
                 keyboardView.highlightCandidate(inputRouter.candidateManager.focusedIndex)
                 return
             }
@@ -1931,7 +1936,7 @@ class YukiBoardIMEService : InputMethodService() {
                 // 記錄提交並觸發下一詞預測
                 inputRouter.selectCandidate(inputRouter.candidateManager.focusedIndex)
                 keyboardView.updateComposingText("")
-                keyboardView.updateCandidates(inputRouter.candidates)
+                keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
                 return
             }
         }

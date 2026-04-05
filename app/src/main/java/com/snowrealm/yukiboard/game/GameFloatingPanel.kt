@@ -142,9 +142,9 @@ class GameFloatingPanel(
                     val games = GameMode.entries.filter { it.category == selectedCategory }
                     val cardsPerRow = ((width - cardPadding) / (cardSize + cardPadding)).toInt().coerceAtLeast(1)
                     val totalRows = (games.size + cardsPerRow - 1) / cardsPerRow
-                    val totalContentHeight = totalRows * (cardSize + cardPadding)
-                    val visibleHeight = height - titleHeight - tabHeight - cardPadding
-                    val maxScrollUp = -(totalContentHeight - visibleHeight).coerceAtLeast(0f)
+                    val totalContentHeight = totalRows * (cardSize + cardPadding) + cardPadding
+                    val visibleHeight = height - (titleHeight + tabHeight + cardPadding)
+                    val maxScrollUp = if (totalContentHeight > visibleHeight) -(totalContentHeight - visibleHeight) else 0f
                     scrollY = (scrollY + dy).coerceIn(maxScrollUp, 0f)
                     lastTouchY = event.y
                     invalidate()

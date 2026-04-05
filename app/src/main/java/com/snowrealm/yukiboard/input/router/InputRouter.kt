@@ -39,6 +39,10 @@ class InputRouter(private val context: Context) {
     val candidateManager = CandidateManager()
     val smartInput = SmartInputManager(context)
 
+    /** 候選字來源映射（每次 updateCandidates 時更新） */
+    var candidateSourceMap: Map<String, CandidateSource> = emptyMap()
+        private set
+
     private var currentMode: InputMode = InputMode.ENGLISH
     private var activeEngine: InputEngine = englishEngine
 
@@ -81,23 +85,36 @@ class InputRouter(private val context: Context) {
     val inputMode: InputMode get() = currentMode
     fun getActiveEngine(): InputEngine = activeEngine
 
-    /** 滑動輸入：根據當前模式解碼按鍵序列為候選字 */
+    private val bopomofoDecoder = com.snowrealm.yukiboard.input.swipe.BopomofoSwipeDecoder()
+    private val swipeRanker by lazy {
+        com.snowrealm.yukiboard.input.swipe.SwipeCandidateRanker(
+            smartInput,
+            bopomofoEngine as? ChewingInputEngine,
+            bopomofoDecoder
+        )
+    }
+
+    /** 滑動輸入：根據當前模式解碼按鍵序列為候選字（含鄰近鍵容錯排序） */
     fun swipeSuggest(keyLabels: List<String>): List<String> {
         if (keyLabels.size < 2) return emptyList()
 
         val isBopomofo = keyLabels.any { it.length == 1 && it[0] in '\u3105'..'\u312F' }
 
         return if (isBopomofo) {
-            // 注音模式：合併注音符號，查詞
-            val bopomofoStr = keyLabels.joinToString("")
-            val engine = bopomofoEngine
-            if (engine is ChewingInputEngine) {
-                engine.lookupByBopomofoString(bopomofoStr)
-            } else emptyList()
+            // 注音模式：解碼注音符號 + 鄰近替代方案排序
+            val symbols = keyLabels.filter { l ->
+                l.length == 1 && (l[0] in '\u3105'..'\u312F' || l[0] in setOf('ˊ', 'ˇ', 'ˋ', '˙'))
+            }
+            // 去連續重複
+            val deduped = mutableListOf<String>()
+            for (s in symbols) {
+                if (deduped.lastOrNull() != s) deduped.add(s)
+            }
+            swipeRanker.rankBopomofo(deduped)
         } else {
-            // 英文模式：字母子序列匹配
+            // 英文模式：字母序列 + 自適應排序
             val chars = keyLabels.mapNotNull { it.firstOrNull()?.lowercaseChar() }
-            smartInput.swipeSuggestEnglish(chars)
+            swipeRanker.rankEnglish(chars)
         }
     }
 
@@ -258,6 +275,7 @@ class InputRouter(private val context: Context) {
 
         // 非英文模式：引擎候選 + 自適應字典 + 上下文 bigram/trigram + 整句預測
         if (currentMode != InputMode.ENGLISH) {
+            candidateSourceMap = emptyMap() // 非英文暫不追蹤來源
             // ── 整句預測（放在候選列末端，用於直接選句）──
             val sentenceSuggestions = smartInput.getSentencePredictions(
                 contextBeforeCursor, composing, 3
@@ -301,10 +319,12 @@ class InputRouter(private val context: Context) {
 
         // ─── 英文模式：統合多來源候選 + 統一排序 ───
         val scored = mutableMapOf<String, Float>()
+        val sourceMap = mutableMapOf<String, CandidateSource>()
 
         // 1. 字典前綴匹配（基礎分 = 排名靠前的分高）
         raw.forEachIndexed { i, word ->
             scored[word] = (scored[word] ?: 0f) + (10f - i * 0.5f).coerceAtLeast(1f)
+            sourceMap.putIfAbsent(word, CandidateSource.DICTIONARY)
         }
 
         if (composing.isNotEmpty()) {
@@ -312,24 +332,28 @@ class InputRouter(private val context: Context) {
             val corrections = smartInput.getCorrectionCandidates(composing, lastCommittedWord)
             corrections.forEachIndexed { i, word ->
                 scored[word] = (scored[word] ?: 0f) + (8f - i).coerceAtLeast(2f)
+                if (word !in raw) sourceMap[word] = CandidateSource.CORRECTION
             }
 
             // 3. 自適應字典（使用者學過的詞，中高加分）
             val adaptive = smartInput.adaptiveDictionary.suggest(composing, 5)
             adaptive.forEachIndexed { i, word ->
                 scored[word] = (scored[word] ?: 0f) + (6f - i * 0.5f).coerceAtLeast(1f)
+                if (word !in raw) sourceMap[word] = CandidateSource.ADAPTIVE
             }
 
             // 4. 語句預測（bigram/trigram 符合前綴的，高加分）
             val prefixed = smartInput.getPhrasePredictionsWithPrefix(composing, 3)
             prefixed.forEachIndexed { i, word ->
                 scored[word] = (scored[word] ?: 0f) + (7f - i).coerceAtLeast(2f)
+                if (word !in raw) sourceMap[word] = CandidateSource.PREDICTION
             }
 
             // 5. 使用者自訂詞庫（手動加的詞 + 自動學習的詞，高加分）
             val userSuggestions = userDict.suggest(composing, 5)
             userSuggestions.forEachIndexed { i, word ->
                 scored[word] = (scored[word] ?: 0f) + (9f - i).coerceAtLeast(3f)
+                sourceMap[word] = CandidateSource.USER_DICT  // 最高優先來源
             }
 
             // 6. 完全匹配 composing 加分（使用者可能就是要打這個詞）
@@ -362,6 +386,12 @@ class InputRouter(private val context: Context) {
             if (s !in sorted) sorted.add(s)
         }
 
+        // 整句預測標記來源
+        for (s in enSentences) {
+            sourceMap.putIfAbsent(s, CandidateSource.SENTENCE)
+        }
+
+        candidateSourceMap = sourceMap
         candidateManager.update(sorted)
     }
 
@@ -429,6 +459,16 @@ class InputRouter(private val context: Context) {
 // ─────────────────────────────────────────────────────────────────────────────
 // 輔助資料類型
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** 候選字來源分類（用於視覺標示） */
+enum class CandidateSource {
+    DICTIONARY,   // 字典前綴匹配
+    CORRECTION,   // 智慧糾錯
+    ADAPTIVE,     // 自適應字典（頻率學習）
+    PREDICTION,   // 語句預測（bigram/trigram）
+    USER_DICT,    // 使用者自訂詞庫
+    SENTENCE,     // 整句預測
+}
 
 enum class InputMode(val displayName: String, val shortLabel: String) {
     ENGLISH("English", "EN"),

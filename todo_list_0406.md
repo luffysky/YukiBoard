@@ -184,9 +184,9 @@
   - `query()` / `queryPrefix()` / `isAvailable()` / `close()`
 
 #### A-3 滑動手勢偵測
-- [ ] 新增 `input/swipe/SwipeGestureDetector.kt`（點擊 vs 滑動區分，12dp 閾值）
-- [ ] 新增 `input/swipe/BopomofoSwipeDecoder.kt`（座標序��� → 注音符號序列，去連續重複��
-- [ ] 新增 `input/swipe/SwipeCandidateRanker.kt`（合併 ChewingEngine + RimeDict 結果排序）
+- ✅ 新增 `input/swipe/SwipeGestureDetector.kt`（點擊 vs 滑動區分，12dp 閾值）
+- ✅ 新增 `input/swipe/BopomofoSwipeDecoder.kt`（注音符���序列解碼 + 鄰近鍵容錯）
+- ✅ 新增 `input/swipe/SwipeCandidateRanker.kt`（合併 ChewingEngine + 自適應排序）
 
 #### A-4 ChewingInputEngine 擴充
 - ✅ 新增 `lookupByBopomofoString()` — 連續注��查詞（供滑動輸入用）
@@ -343,14 +343,14 @@
 ### 批次 K — SwipeTrail 進階 + 滑動輸入邏輯
 
 #### K-1 滑動輸入邏輯（接 A-3~A-6）
-- [ ] SwipeGestureDetector.kt — 點擊 vs 滑動區分（12dp 閾值）
-- [ ] BopomofoSwipeDecoder.kt — 座標序列→注音符號序列
-- [ ] SwipeCandidateRanker.kt — 合併 ChewingEngine + RimeDict 排序
+- ✅ SwipeGestureDetector.kt — 點擊 vs 滑動區分（12dp 閾值）
+- ✅ BopomofoSwipeDecoder.kt — 注音符號序列解碼 + 鄰近鍵容錯
+- ✅ SwipeCandidateRanker.kt — 合併 ChewingEngine + 自適應排序
 - ✅ YukiBoardIMEService 整合 handleSwipeInput()
 
 #### K-2 滑動候選字視覺標示
-- [ ] 滑動候選標記淡紫色 #B39DDB + 左側 ≈ 符號
-- [ ] `markSwipeCandidates()` 方法
+- ✅ 滑動候選標記淡紫色 #B39DDB + 左側 ≈ 符號
+- ✅ `markSwipeCandidates()` 方法
 
 
 ### 批次 L — 防詐 AI 對話模型（FraudAI 任務包 5 批）
@@ -421,9 +421,9 @@
 | 情緒型 | EmotionThermometer 🌡️ | 情緒溫度計，正負文字比例視覺化 |
 
 ### 遊戲 Bug 修復（Games_bug.md）
-- [ ] GameFloatingPanel scrollY 下限修復（計算 totalContentHeight + coerceIn）
-- [ ] GameLoopRunner 生命週期驗證（onDetachedFromWindow 確認 stop()）
-- [ ] SpellingDuelGame 詞庫搬到 res/raw/spelling_words.txt
+- ✅ GameFloatingPanel scrollY 下限修復（totalContentHeight + cardPadding）
+- ✅ GameLoopRunner 生命週期修復（onDetached → gameLoop.stop()）
+- ✅ SpellingDuelGame 詞庫已在 res/raw/spelling_words.txt（225 詞）
 
 ### 工具面板
 - [ ] 計算機面板（基礎四則 + 科學計算）
