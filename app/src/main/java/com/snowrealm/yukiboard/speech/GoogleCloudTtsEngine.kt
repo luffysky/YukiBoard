@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit
  */
 class GoogleCloudTtsEngine(
     private val apiKey: String,
-    private val voiceName: String = "zh-TW-Wavenet-A",
+    private val voiceName: String = "zh-TW-Standard-A",
     private val audioEncoding: String = "LINEAR16"
 ) : SpeechOutputEngine {
 
@@ -153,22 +153,22 @@ class GoogleCloudTtsEngine(
         val lang = langCode.lowercase()
         return when {
             lang.startsWith("zh-tw") || lang.startsWith("zh-hk") ->
-                "zh-TW" to "zh-TW-Wavenet-A"
+                "zh-TW" to "zh-TW-Standard-A"
             lang.startsWith("zh") ->
-                "zh-CN" to "cmn-CN-Wavenet-A"
+                "cmn-CN" to "cmn-CN-Standard-A"
             lang.startsWith("en") ->
-                "en-US" to "en-US-Wavenet-D"
+                "en-US" to "en-US-Standard-D"
             lang.startsWith("ja") ->
-                "ja-JP" to "ja-JP-Wavenet-A"
+                "ja-JP" to "ja-JP-Standard-A"
             lang.startsWith("ko") ->
-                "ko-KR" to "ko-KR-Wavenet-A"
+                "ko-KR" to "ko-KR-Standard-A"
             lang.startsWith("es") ->
-                "es-ES" to "es-ES-Wavenet-B"
+                "es-ES" to "es-ES-Standard-B"
             lang.startsWith("fr") ->
-                "fr-FR" to "fr-FR-Wavenet-A"
+                "fr-FR" to "fr-FR-Standard-A"
             lang.startsWith("de") ->
-                "de-DE" to "de-DE-Wavenet-A"
-            else -> "zh-TW" to "zh-TW-Wavenet-A"
+                "de-DE" to "de-DE-Standard-A"
+            else -> "zh-TW" to "zh-TW-Standard-A"
         }
     }
 
