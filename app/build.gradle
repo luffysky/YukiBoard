@@ -82,10 +82,12 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: EncryptedSharedPreferences Keystore 損壞 fallback（閃退修復）\n" +
-                    "- fix: 14項功能衝突修復（TTS/語音互搶、AI補字stale、遊戲Undo等）\n" +
-                    "- fix: TTS 語音輸出改用 STREAM_MUSIC\n" +
-                    "- fix: 快取大小限制、Handler leak 修復"
+                    "- feat: 設定頁新增 Z幣錢包入口\n" +
+                    "- feat: 設定頁新增輸入法選擇（7 語言多選）\n" +
+                    "- feat: 設定頁新增 Snippet 管理（內建/自訂列表）\n" +
+                    "- feat: 設定頁動畫群組新增 VRM 3D 角色 toggle\n" +
+                    "- feat: 環形模式選單新增懸浮鍵盤快捷切換\n" +
+                    "- chore: 移除未使用偏好設定"
             }
         }
         debug {
@@ -94,10 +96,12 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: EncryptedSharedPreferences Keystore 損壞 fallback（閃退修復）\n" +
-                    "- fix: 14項功能衝突修復（TTS/語音互搶、AI補字stale、遊戲Undo等）\n" +
-                    "- fix: TTS 語音輸出改用 STREAM_MUSIC\n" +
-                    "- fix: 快取大小限制、Handler leak 修復"
+                    "- feat: 設定頁新增 Z幣錢包入口\n" +
+                    "- feat: 設定頁新增輸入法選擇（7 語言多選）\n" +
+                    "- feat: 設定頁新增 Snippet 管理（內建/自訂列表）\n" +
+                    "- feat: 設定頁動畫群組新增 VRM 3D 角色 toggle\n" +
+                    "- feat: 環形模式選單新增懸浮鍵盤快捷切換\n" +
+                    "- chore: 移除未使用偏好設定"
             }
         }
     }
