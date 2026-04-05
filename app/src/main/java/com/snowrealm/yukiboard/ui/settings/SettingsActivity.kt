@@ -1966,6 +1966,24 @@ class SettingsActivity : AppCompatActivity() {
         speedRow.addView(speedLabel)
         outer.addView(speedRow)
 
+        // TTS 測試文字輸入
+        val testInput = android.widget.EditText(this).apply {
+            setText("你好，我是雪凜。YukiBoard 語音輸出測試成功！")
+            textSize = 13f
+            setTextColor(0xFFE0E0E0.toInt())
+            setHintTextColor(0xFF888888.toInt())
+            hint = "輸入要測試的文字..."
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            minLines = 1
+            maxLines = 3
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xFF0D1B2A.toInt())
+                cornerRadius = dp(6).toFloat()
+                setStroke(1, 0xFF3A5580.toInt())
+            }
+        }
+        outer.addView(testInput)
+
         // TTS 測試按鈕
         val testBtn = TextView(this).apply {
             text = "▶ 測試語音輸出"
@@ -1980,6 +1998,12 @@ class SettingsActivity : AppCompatActivity() {
                 setStroke(1, 0xFF3A5580.toInt())
             }
             setOnClickListener { btn ->
+                val testText = testInput.text.toString().trim()
+                if (testText.isBlank()) {
+                    android.widget.Toast.makeText(this@SettingsActivity, "請輸入要測試的文字", android.widget.Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
                 // 先存 EditText 當前值（避免焦點未離開時 prefs 還沒更新）
                 prefs.googleCloudTtsApiKey = keyInput.text.toString().trim()
                 btn.isEnabled = false
@@ -2001,12 +2025,11 @@ class SettingsActivity : AppCompatActivity() {
                         }
                         val engine = com.snowrealm.yukiboard.speech.GoogleCloudTtsEngine(key)
                         (btn as TextView).text = "🔊 播放中..."
-                        engine.speak("你好，我是雪凜。YukiBoard 語音輸出測試成功！", "zh-TW", prefs.ttsSpeed) {
+                        engine.speak(testText, "zh-TW", prefs.ttsSpeed) {
                             mainHandler.post { engine.destroy(); resetBtn() }
                         }
                     }
                     else -> {
-                        // Android TTS 需要等 onInit callback 才能 speak
                         var engine: com.snowrealm.yukiboard.speech.AndroidTtsEngine? = null
                         engine = com.snowrealm.yukiboard.speech.AndroidTtsEngine(applicationContext) { success ->
                             mainHandler.post {
@@ -2017,7 +2040,7 @@ class SettingsActivity : AppCompatActivity() {
                                     return@post
                                 }
                                 (btn as TextView).text = "🔊 播放中..."
-                                engine?.speak("你好，我是雪凜。YukiBoard 語音輸出測試成功！", "zh-TW", prefs.ttsSpeed) {
+                                engine?.speak(testText, "zh-TW", prefs.ttsSpeed) {
                                     mainHandler.post { engine?.destroy(); resetBtn() }
                                 }
                             }
