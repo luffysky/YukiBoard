@@ -13,7 +13,7 @@ import java.util.UUID
  * 免費、離線可用、支援大部分語言。
  * 品質取決於裝置安裝的 TTS 引擎（Google TTS / Samsung TTS 等）。
  */
-class AndroidTtsEngine(context: Context) : SpeechOutputEngine {
+class AndroidTtsEngine(context: Context, private val onInitDone: ((Boolean) -> Unit)? = null) : SpeechOutputEngine {
 
     private val tag = "AndroidTtsEngine"
     private var tts: TextToSpeech? = null
@@ -49,6 +49,7 @@ class AndroidTtsEngine(context: Context) : SpeechOutputEngine {
             } else {
                 Log.e(tag, "TTS init failed, status=$status")
             }
+            onInitDone?.invoke(isReady)
         }
     }
 
