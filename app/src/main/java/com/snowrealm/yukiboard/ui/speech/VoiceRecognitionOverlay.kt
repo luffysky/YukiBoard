@@ -40,6 +40,7 @@ class VoiceRecognitionOverlay(context: Context) : View(context) {
     // ── 回呼 ──
     var onConfirm: ((String) -> Unit)? = null
     var onCancel: (() -> Unit)? = null
+    var onStop: (() -> Unit)? = null
 
     // ── 尺寸 ──
     private val overlayMarginH = 12 * dp
@@ -150,6 +151,7 @@ class VoiceRecognitionOverlay(context: Context) : View(context) {
 
     // ── 按鈕區域 ──
     private val cancelBtnRect = RectF()
+    private val stopBtnRect = RectF()
     private val confirmBtnRect = RectF()
 
     init {
@@ -420,26 +422,47 @@ class VoiceRecognitionOverlay(context: Context) : View(context) {
     private fun drawButtons(
         canvas: Canvas, left: Float, top: Float, right: Float, bottom: Float
     ) {
-        val btnH = bottom - top
         val totalW = right - left
-        val btnW = (totalW - buttonSpacing) / 2
+        val btnTextY = { rect: RectF -> rect.centerY() + btnTextPaint.textSize * 0.35f }
 
-        // 取消按鈕
-        cancelBtnRect.set(left, top, left + btnW, bottom)
-        btnBgPaint.color = 0x33FF6B6B.toInt()
-        canvas.drawRoundRect(cancelBtnRect, 10 * dp, 10 * dp, btnBgPaint)
-        btnTextPaint.color = 0xFFFF8A8A.toInt()
-        canvas.drawText("✕ 取消", cancelBtnRect.centerX(),
-            cancelBtnRect.centerY() + btnTextPaint.textSize * 0.35f, btnTextPaint)
+        if (state == State.LISTENING) {
+            // 三按鈕：取消 | 停止 | 送出
+            val btnW = (totalW - buttonSpacing * 2) / 3
 
-        // 確認按鈕
-        confirmBtnRect.set(left + btnW + buttonSpacing, top, right, bottom)
-        btnBgPaint.color = if (state == State.FINAL) 0x447EB8FF.toInt() else 0x227EB8FF.toInt()
-        canvas.drawRoundRect(confirmBtnRect, 10 * dp, 10 * dp, btnBgPaint)
-        btnTextPaint.color = if (state == State.FINAL) 0xFFB0D4FF.toInt() else 0x88B0D4FF.toInt()
-        val confirmLabel = if (state == State.FINAL) "✓ 送出" else "✓ 送出"
-        canvas.drawText(confirmLabel, confirmBtnRect.centerX(),
-            confirmBtnRect.centerY() + btnTextPaint.textSize * 0.35f, btnTextPaint)
+            cancelBtnRect.set(left, top, left + btnW, bottom)
+            btnBgPaint.color = 0x33FF6B6B.toInt()
+            canvas.drawRoundRect(cancelBtnRect, 10 * dp, 10 * dp, btnBgPaint)
+            btnTextPaint.color = 0xFFFF8A8A.toInt()
+            canvas.drawText("✕ 取消", cancelBtnRect.centerX(), btnTextY(cancelBtnRect), btnTextPaint)
+
+            stopBtnRect.set(left + btnW + buttonSpacing, top, left + btnW * 2 + buttonSpacing, bottom)
+            btnBgPaint.color = 0x33FFAA00.toInt()
+            canvas.drawRoundRect(stopBtnRect, 10 * dp, 10 * dp, btnBgPaint)
+            btnTextPaint.color = 0xFFFFCC66.toInt()
+            canvas.drawText("■ 停止", stopBtnRect.centerX(), btnTextY(stopBtnRect), btnTextPaint)
+
+            confirmBtnRect.set(left + btnW * 2 + buttonSpacing * 2, top, right, bottom)
+            btnBgPaint.color = 0x227EB8FF.toInt()
+            canvas.drawRoundRect(confirmBtnRect, 10 * dp, 10 * dp, btnBgPaint)
+            btnTextPaint.color = 0x88B0D4FF.toInt()
+            canvas.drawText("✓ 送出", confirmBtnRect.centerX(), btnTextY(confirmBtnRect), btnTextPaint)
+        } else {
+            // 兩按鈕：取消 | 送出
+            stopBtnRect.setEmpty()
+            val btnW = (totalW - buttonSpacing) / 2
+
+            cancelBtnRect.set(left, top, left + btnW, bottom)
+            btnBgPaint.color = 0x33FF6B6B.toInt()
+            canvas.drawRoundRect(cancelBtnRect, 10 * dp, 10 * dp, btnBgPaint)
+            btnTextPaint.color = 0xFFFF8A8A.toInt()
+            canvas.drawText("✕ 取消", cancelBtnRect.centerX(), btnTextY(cancelBtnRect), btnTextPaint)
+
+            confirmBtnRect.set(left + btnW + buttonSpacing, top, right, bottom)
+            btnBgPaint.color = 0x447EB8FF.toInt()
+            canvas.drawRoundRect(confirmBtnRect, 10 * dp, 10 * dp, btnBgPaint)
+            btnTextPaint.color = 0xFFB0D4FF.toInt()
+            canvas.drawText("✓ 送出", confirmBtnRect.centerX(), btnTextY(confirmBtnRect), btnTextPaint)
+        }
     }
 
     // ════════════════════════════════════════
@@ -476,6 +499,10 @@ class VoiceRecognitionOverlay(context: Context) : View(context) {
                 if (cancelBtnRect.contains(event.x, event.y)) {
                     onCancel?.invoke()
                     dismiss()
+                    return true
+                }
+                if (!stopBtnRect.isEmpty && stopBtnRect.contains(event.x, event.y)) {
+                    onStop?.invoke()
                     return true
                 }
                 if (confirmBtnRect.contains(event.x, event.y) && recognizedText.isNotEmpty()) {

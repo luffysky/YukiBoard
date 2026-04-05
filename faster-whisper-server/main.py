@@ -82,6 +82,7 @@ async def transcribe(
     language: Optional[str] = Form(None),
     model_size: Optional[str] = Form(None),
     api_key: Optional[str] = Form(None),
+    initial_prompt: Optional[str] = Form(None),
 ):
     """Transcribe audio file to text."""
     check_auth(api_key)
@@ -97,6 +98,7 @@ async def transcribe(
         segments, info = model.transcribe(
             audio_io,
             language=language,
+            initial_prompt=initial_prompt,
             beam_size=5,
             vad_filter=True,
             vad_parameters=dict(

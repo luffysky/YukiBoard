@@ -213,7 +213,11 @@ class WhisperSpeechEngine(
             )
             .addFormDataPart("model", model)
             .addFormDataPart("response_format", "json")
-        // 不傳 language → Whisper 自動偵測，支援所有語言混合辨識
+        // 中文時加 prompt 引導輸出繁體
+        if (language == "zh") {
+            bodyBuilder.addFormDataPart("language", "zh")
+            bodyBuilder.addFormDataPart("prompt", "以下是繁體中文語音內容。")
+        }
         val body = bodyBuilder.build()
 
         val request = Request.Builder()

@@ -1138,11 +1138,17 @@ class YukiBoardIMEService : InputMethodService() {
     // 語音輸入
     // =========================================================================
 
+    /** 防止 onFinalResult 重複觸發 */
+    private var voiceFinalHandled = false
+
     private fun toggleVoiceInput() {
+        // 如果正在辨識 → 停止
         if (speechEngine?.isListening == true) {
             stopVoiceInput()
             return
         }
+        // 如果 overlay 正在顯示（等待確認/倒數中）→ 不重複啟動
+        if (voiceOverlay?.isShowing == true) return
 
         // 檢查麥克風權限
         if (android.content.pm.PackageManager.PERMISSION_GRANTED !=
@@ -1206,14 +1212,15 @@ class YukiBoardIMEService : InputMethodService() {
 
         characterView?.playListening()
 
-        // 顯示語音辨識 Overlay
+        // 顯示語音辨識 Overlay + 停止按鈕
+        voiceFinalHandled = false
+        voiceOverlay?.onStop = {
+            stopVoiceInput()
+        }
         voiceOverlay?.show(engineName)
 
+        // 中文一律用 zh-TW（繁體優先）
         val localeHint = when (inputRouter.inputMode) {
-            com.snowrealm.yukiboard.input.router.InputMode.BOPOMOFO -> "zh-TW"
-            com.snowrealm.yukiboard.input.router.InputMode.PINYIN -> "zh-CN"
-            com.snowrealm.yukiboard.input.router.InputMode.CANGJIE,
-            com.snowrealm.yukiboard.input.router.InputMode.SPEED_CANGJIE -> "zh-TW"
             com.snowrealm.yukiboard.input.router.InputMode.JAPANESE -> "ja-JP"
             com.snowrealm.yukiboard.input.router.InputMode.KOREAN -> "ko-KR"
             else -> "zh-TW"
@@ -1224,13 +1231,15 @@ class YukiBoardIMEService : InputMethodService() {
         speechEngine?.startListening(
             locale = localeHint,
             onPartialResult = { partial ->
-                // 顯示在 Overlay，不寫入輸入框
-                voiceOverlay?.updatePartial(partial)
+                if (!voiceFinalHandled) {
+                    voiceOverlay?.updatePartial(partial)
+                }
             },
             onFinalResult = { result ->
+                if (voiceFinalHandled) return@startListening
+                voiceFinalHandled = true
                 keyboardView.voiceListeningLocale = null
                 if (result.isNotEmpty()) {
-                    // 顯示最終結果在 Overlay，倒數後自動 commitText
                     voiceOverlay?.showFinal(result)
                 } else {
                     voiceOverlay?.dismiss()

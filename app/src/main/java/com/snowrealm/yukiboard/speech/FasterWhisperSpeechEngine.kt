@@ -212,6 +212,10 @@ class FasterWhisperSpeechEngine(
 
         if (!language.isNullOrBlank()) {
             bodyBuilder.addFormDataPart("language", language)
+            // 中文時加 prompt 引導輸出繁體
+            if (language == "zh") {
+                bodyBuilder.addFormDataPart("initial_prompt", "以下是繁體中文語音內容。")
+            }
         }
         if (apiKey.isNotBlank()) {
             bodyBuilder.addFormDataPart("api_key", apiKey)
