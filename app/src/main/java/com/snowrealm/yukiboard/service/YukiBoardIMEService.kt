@@ -1101,6 +1101,10 @@ class YukiBoardIMEService : InputMethodService() {
             }
         }
 
+        // 顯示當前引擎（方便除錯）
+        val engineName = if (speechEngine is WhisperSpeechEngine) "Whisper API" else "Android 內建"
+        keyboardView.showToast("語音引擎：$engineName")
+
         characterView?.playListening()
 
         val locale = when (inputRouter.inputMode) {

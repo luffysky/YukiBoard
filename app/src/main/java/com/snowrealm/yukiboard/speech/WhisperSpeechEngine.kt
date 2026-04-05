@@ -223,11 +223,15 @@ class WhisperSpeechEngine(
 
         return try {
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return null
+                if (!response.isSuccessful) {
+                    android.util.Log.w("WhisperEngine", "API error ${response.code}: ${response.body?.string()?.take(200)}")
+                    return null
+                }
                 val json = JSONObject(response.body?.string() ?: return null)
                 json.optString("text", "").takeIf { it.isNotBlank() }
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            android.util.Log.w("WhisperEngine", "transcribe failed", e)
             null
         }
     }
