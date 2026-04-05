@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 38
-        versionName "0.6.4"
+        versionCode 39
+        versionName "0.6.5"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -69,6 +69,10 @@ android {
         release {
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            firebaseAppDistribution {
+                groups = "testers"
+                releaseNotes = "v${android.defaultConfig.versionName}"
+            }
         }
         debug {
             minifyEnabled false

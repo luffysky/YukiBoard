@@ -485,6 +485,7 @@ enum class CandidateSource {
     PREDICTION,   // 語句預測（bigram/trigram）
     USER_DICT,    // 使用者自訂詞庫
     SENTENCE,     // 整句預測
+    AI,           // AI 建議（Claw）
 }
 
 enum class InputMode(val displayName: String, val shortLabel: String) {

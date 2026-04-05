@@ -18,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -112,10 +113,36 @@ class ClawPanelView(context: Context) : LinearLayout(context) {
 
         currentJob = scope.launch {
             try {
-                val output = withContext(Dispatchers.IO) {
-                    client.executeSkill(skillId, input)
+                // 嘗試串流模式（邊收邊顯示）
+                val prompt = "${input.text}\n\nContext: ${input.context}"
+                val accumulated = StringBuilder()
+                var hasStream = false
+
+                withContext(Dispatchers.IO) {
+                    client.streamSkill(prompt)
+                }.collect { chunk ->
+                    hasStream = true
+                    accumulated.append(chunk)
+                    withContext(Dispatchers.Main) {
+                        resultView.showStreamingText(accumulated.toString())
+                    }
                 }
-                resultView.showResults(output.suggestions)
+
+                if (hasStream && accumulated.isNotEmpty()) {
+                    // 串流完成 → 解析成建議列表
+                    val suggestions = accumulated.toString()
+                        .split("\n")
+                        .map { it.trim() }
+                        .filter { it.isNotEmpty() }
+                        .ifEmpty { listOf(accumulated.toString()) }
+                    resultView.showResults(suggestions)
+                } else {
+                    // 串流不可用 → fallback 到一次性執行
+                    val output = withContext(Dispatchers.IO) {
+                        client.executeSkill(skillId, input)
+                    }
+                    resultView.showResults(output.suggestions)
+                }
                 // 更新 token 額度
                 toolbarView.remainingTokens = client.getRemainingTokens()
             } catch (e: Exception) {
@@ -149,6 +176,7 @@ class ClawResultCardView(context: Context) : View(context) {
     private var suggestions: List<String> = emptyList()
     private var loadingSkillId: String? = null
     private var errorMessage: String? = null
+    private var streamingText: String? = null
     private var scrollOffset = 0f
     private var lastTouchX = 0f
     private var isDragging = false
@@ -190,7 +218,17 @@ class ClawResultCardView(context: Context) : View(context) {
         suggestions = results
         loadingSkillId = null
         errorMessage = null
+        streamingText = null
         scrollOffset = 0f
+        invalidate()
+    }
+
+    /** 串流模式：顯示正在接收中的文字 */
+    fun showStreamingText(text: String) {
+        streamingText = text
+        loadingSkillId = null
+        errorMessage = null
+        suggestions = emptyList()
         invalidate()
     }
 
@@ -242,6 +280,23 @@ class ClawResultCardView(context: Context) : View(context) {
         if (errorMessage != null) {
             statusPaint.color = 0xFFFF6B6B.toInt()
             canvas.drawText("⚠ $errorMessage", width / 2f, height / 2f, statusPaint)
+            return
+        }
+
+        // 串流模式：邊收邊顯示
+        val streaming = streamingText
+        if (streaming != null) {
+            textPaint.color = theme.keyLabelColorInt
+            textPaint.textAlign = Paint.Align.LEFT
+            val textPadding = 14f * density
+            val maxWidth = width - textPadding * 2
+            val lines = wrapText(streaming + " ▍", textPaint, maxWidth)
+            var ty = 36f * density + textPaint.textSize
+            for (line in lines) {
+                if (ty > height - textPadding) break
+                canvas.drawText(line, textPadding, ty, textPaint)
+                ty += textPaint.textSize * 1.4f
+            }
             return
         }
 

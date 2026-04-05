@@ -45,6 +45,8 @@ import com.snowrealm.yukiboard.ui.settings.YukiPreferences
 import com.snowrealm.yukiboard.gif.GiphyApiClient
 import com.snowrealm.yukiboard.translate.TranslateEngine
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -102,6 +104,10 @@ class YukiBoardIMEService : InputMethodService() {
 
     // TTS 語音輸出
     private var ttsEngine: com.snowrealm.yukiboard.speech.SpeechOutputEngine? = null
+
+    // AI 候選字 debounce
+    private var aiCandidateJob: Job? = null
+    private val AI_CANDIDATE_DEBOUNCE_MS = 600L
 
     // 雪凜系統
     private var yukiCommentEngine: com.snowrealm.yukiboard.yuki.YukiCommentEngine? = null
@@ -1205,6 +1211,57 @@ class YukiBoardIMEService : InputMethodService() {
     }
 
     // =========================================================================
+    // AI 候選字 debounce
+    // =========================================================================
+
+    /**
+     * 輸入時觸發 AI 候選字請求（600ms debounce）。
+     * 使用 Claw AI 的 ai_prediction skill，結果附加到候選列末尾並標記 AI 來源。
+     */
+    private fun requestAICandidates() {
+        aiCandidateJob?.cancel()
+        val client = clawClient ?: return
+        if (!client.isAvailable() || !prefs.aiPrediction) return
+
+        val composing = inputRouter.composingText
+        val context = currentInputConnection?.getTextBeforeCursor(100, 0)?.toString() ?: ""
+        if (composing.isEmpty() && context.isBlank()) return
+
+        aiCandidateJob = serviceScope.launch {
+            delay(AI_CANDIDATE_DEBOUNCE_MS)
+            try {
+                val input = com.snowrealm.yukiboard.claw.ClawInput(
+                    text = composing.ifEmpty { context.takeLast(30) },
+                    context = context,
+                    appPackage = currentInputEditorInfo?.packageName ?: "",
+                    language = if (inputRouter.inputMode == com.snowrealm.yukiboard.input.router.InputMode.ENGLISH) "en" else "zh-TW",
+                    mode = keyboardView.currentMode
+                )
+                val output = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                    client.executeSkill("ai_prediction", input)
+                }
+                if (output.suggestions.isNotEmpty()) {
+                    // 把 AI 候選附加到現有列表末尾
+                    val currentCandidates = inputRouter.candidates.toMutableList()
+                    val currentSourceMap = inputRouter.candidateSourceMap.toMutableMap()
+                    for (suggestion in output.suggestions.take(3)) {
+                        val s = suggestion.trim()
+                        if (s.isNotEmpty() && s !in currentCandidates) {
+                            currentCandidates.add(s)
+                            currentSourceMap[s] = com.snowrealm.yukiboard.input.router.CandidateSource.AI
+                        }
+                    }
+                    keyboardView.updateCandidates(currentCandidates, currentSourceMap)
+                }
+            } catch (_: kotlinx.coroutines.CancellationException) {
+                // debounce cancelled — 正常行為
+            } catch (e: Exception) {
+                android.util.Log.w("YukiBoardIME", "AI candidate failed: ${e.message}")
+            }
+        }
+    }
+
+    // =========================================================================
     // 鍵盤尺寸調整
     // =========================================================================
 
@@ -1856,6 +1913,9 @@ class YukiBoardIMEService : InputMethodService() {
             }
         }
         keyboardView.updateCandidates(candidates)
+
+        // AI 候選字 debounce：有組字或上下文時觸發
+        requestAICandidates()
 
         } finally {
             ic.endBatchEdit()

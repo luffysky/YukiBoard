@@ -958,6 +958,7 @@ class KeyboardView(context: Context) : View(context) {
                     CandidateSource.PREDICTION -> 0xFF66AAFF.toInt()  // 藍色：預測
                     CandidateSource.USER_DICT  -> 0xFFFFD700.toInt()  // 金色：使用者詞庫
                     CandidateSource.SENTENCE   -> 0xFFBB88FF.toInt()  // 紫色：整句
+                    CandidateSource.AI         -> 0xFFE8B84D.toInt()  // 金色：AI ✨
                     else -> 0 // DICTIONARY 或無來源 → 用主題預設色
                 }
 
@@ -971,7 +972,11 @@ class KeyboardView(context: Context) : View(context) {
                 } else {
                     candidatePaint.color = if (sourceColor != 0) sourceColor else theme.candidateTextColorInt
                 }
-                val displayText = if (isSwipeCandidateMode && i == 0) "≈$text" else text
+                val displayText = when {
+                    isSwipeCandidateMode && i == 0 -> "≈$text"
+                    candidateSourceMap[text] == CandidateSource.AI -> "✨$text"
+                    else -> text
+                }
                 canvas.drawText(displayText, cx, candidateBarHeight * 0.65f, candidatePaint)
 
                 if (i > 0) {
