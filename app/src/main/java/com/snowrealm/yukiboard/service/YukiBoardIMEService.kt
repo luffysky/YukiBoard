@@ -958,6 +958,8 @@ class YukiBoardIMEService : InputMethodService() {
         panelContainer.removeAllViews()
         panelContainer.visibility = View.GONE
         hidePanelControlBar()
+        // 回到鍵盤時確保 InputConnection composing 狀態乾淨
+        currentInputConnection?.finishComposingText()
         // 確保圖層正常
         if (isPanelBehindKeyboard) {
             isPanelBehindKeyboard = false
@@ -1780,6 +1782,11 @@ class YukiBoardIMEService : InputMethodService() {
             return
         }
 
+        // 面板開啟中但使用者按了鍵盤按鍵 → 先關閉面板回到正常輸入
+        if (activePanel != null) {
+            closePanel()
+        }
+
         val ic: InputConnection = currentInputConnection ?: return
 
         // 更新上下文給候選排序用
@@ -2070,10 +2077,19 @@ class YukiBoardIMEService : InputMethodService() {
     }
 
     private fun handleSwitchLang() {
+        // 切換語言前：先把 composing 提交到 InputConnection，避免殘留
+        val ic = currentInputConnection
+        val commitResult = inputRouter.getActiveEngine().forceCommit()
+        if (commitResult is com.snowrealm.yukiboard.input.router.InputResult.CommitText) {
+            ic?.commitText(commitResult.text, 1)
+        }
+        ic?.finishComposingText()
+
         inputRouter.toggleLanguage()
         characterView?.playSwitchLang()
         keyboardView.currentInputMode = inputRouter.inputMode
         keyboardView.updateKeyRows(rowsForInputMode(inputRouter.inputMode))
+        keyboardView.updateCandidates(emptyList(), emptyMap())
     }
 
     /** 根據輸入模式取得對應鍵盤佈局 */
