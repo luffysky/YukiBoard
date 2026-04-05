@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 24
-        versionName "0.5.0"
+        versionCode 25
+        versionName "0.5.1"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -75,7 +75,7 @@ android {
             debuggable true
             firebaseAppDistribution {
                 groups = "testers"
-                releaseNotes = "v${android.defaultConfig.versionName}\n- 修復影片背景 crash + 比例/XY 即時生效\n- 影片預覽支援 scaleMode + offset transform\n- 主題面板整合完整背景設定與鍵盤預覽"
+                releaseNotes = "v${android.defaultConfig.versionName}\n- 修復多音節候選字只顯示最後音節\n- 自訂詞彙系統（注音→詞彙手動新增）\n- 整句上下文預測（中/英/日/韓 100+ 常用回覆模板）\n- 語氣偵測接入雪凜回應\n- 私房話加密模式接入\n- 懸浮面板管理器接入（天氣/AI結果）\n- 下一步動作預測提示"
             }
         }
     }

@@ -237,6 +237,7 @@ class SettingsActivity : AppCompatActivity() {
         root.addView(buildBackgroundCard())
         root.addView(buildAppearanceCard())
         root.addView(buildLanguageCard())
+        root.addView(buildUserDictCard())
 
         scrollView.addView(root)
         setContentView(scrollView)
@@ -1395,6 +1396,128 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         card.addView(group)
+        return card
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 自訂詞彙卡片
+    // ─────────────────────────────────────────────────────────
+
+    private fun buildUserDictCard(): LinearLayout {
+        val card = simpleCard("自訂詞彙")
+        val userDict = com.snowrealm.yukiboard.input.dictionary.UserDictionary(this)
+
+        // 新增按鈕
+        val addBtn = android.widget.Button(this).apply {
+            text = "+ 新增詞彙"
+            setTextColor(0xFF7FD8FF.toInt())
+            setBackgroundColor(0xFF1A3A5C.toInt())
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(0, 0, 0, dp(8)) }
+        }
+
+        // 詞彙列表容器
+        val listContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        fun refreshList() {
+            listContainer.removeAllViews()
+            val manualWords = userDict.getAllManual()
+            if (manualWords.isEmpty()) {
+                listContainer.addView(android.widget.TextView(this).apply {
+                    text = "尚無自訂詞彙"
+                    setTextColor(0x88FFFFFF.toInt())
+                    textSize = 13f
+                    setPadding(dp(4), dp(4), dp(4), dp(4))
+                })
+            } else {
+                for ((word, bopo) in manualWords) {
+                    val row = LinearLayout(this).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        setPadding(dp(4), dp(6), dp(4), dp(6))
+                    }
+                    row.addView(android.widget.TextView(this).apply {
+                        text = "$word  $bopo"
+                        setTextColor(0xFFFFFFFF.toInt())
+                        textSize = 14f
+                        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                    })
+                    val delBtn = android.widget.TextView(this).apply {
+                        text = "\u2715"
+                        setTextColor(0xFFFF6B6B.toInt())
+                        textSize = 16f
+                        setPadding(dp(8), 0, dp(4), 0)
+                    }
+                    delBtn.setOnClickListener {
+                        userDict.removeManual(word)
+                        refreshList()
+                    }
+                    row.addView(delBtn)
+                    listContainer.addView(row)
+                }
+            }
+        }
+
+        addBtn.setOnClickListener {
+            val dialogView = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(20), dp(16), dp(20), dp(8))
+            }
+            val wordInput = android.widget.EditText(this).apply {
+                hint = "詞彙（例如：迷客夏）"
+                setHintTextColor(0x88FFFFFF.toInt())
+                setTextColor(0xFFFFFFFF.toInt())
+                setBackgroundColor(0xFF1A3A5C.toInt())
+                setPadding(dp(8), dp(8), dp(8), dp(8))
+            }
+            val bopoInput = android.widget.EditText(this).apply {
+                hint = "注音（例如：ㄇㄧˊ ㄎㄜˋ ㄒㄧㄚˋ）"
+                setHintTextColor(0x88FFFFFF.toInt())
+                setTextColor(0xFFFFFFFF.toInt())
+                setBackgroundColor(0xFF1A3A5C.toInt())
+                setPadding(dp(8), dp(8), dp(8), dp(8))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = dp(8) }
+            }
+            val hint = android.widget.TextView(this).apply {
+                text = "注音各音節間用空格分隔"
+                setTextColor(0x88FFFFFF.toInt())
+                textSize = 12f
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = dp(4) }
+            }
+            dialogView.addView(wordInput)
+            dialogView.addView(bopoInput)
+            dialogView.addView(hint)
+
+            android.app.AlertDialog.Builder(this)
+                .setTitle("新增自訂詞彙")
+                .setView(dialogView)
+                .setPositiveButton("新增") { _, _ ->
+                    val word = wordInput.text.toString().trim()
+                    val bopo = bopoInput.text.toString().trim()
+                    if (word.isNotEmpty() && bopo.isNotEmpty()) {
+                        userDict.addManual(word, bopo)
+                        refreshList()
+                        android.widget.Toast.makeText(this, "已新增「$word」", android.widget.Toast.LENGTH_SHORT).show()
+                    } else {
+                        android.widget.Toast.makeText(this, "詞彙和注音不能空白", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+                .setNegativeButton("取消", null)
+                .show()
+        }
+
+        card.addView(addBtn)
+        card.addView(listContainer)
+        refreshList()
         return card
     }
 

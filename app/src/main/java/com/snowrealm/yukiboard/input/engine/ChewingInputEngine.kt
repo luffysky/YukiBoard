@@ -15,7 +15,10 @@ import java.io.InputStreamReader
  * 字典格式（每行）：`ㄅㄚ\t八 吧 巴 爸 …`
  * 含聲調版與無聲調版：無聲調版回傳所有聲調的聯集。
  */
-class ChewingInputEngine(private val context: Context) : InputEngine {
+class ChewingInputEngine(
+    private val context: Context,
+    private val userDict: com.snowrealm.yukiboard.input.dictionary.UserDictionary? = null
+) : InputEngine {
 
     // ─── 注音組字緩衝 ───
     private val bopomofoBuffer = StringBuilder()
@@ -479,6 +482,17 @@ class ChewingInputEngine(private val context: Context) : InputEngine {
     private fun lookupMultiSyllable(syllables: List<String>): List<String> {
         val results = linkedSetOf<String>()
 
+        // ── 0. 先查 UserDictionary 手動詞彙（最優先）──
+        val fullBopomofo = syllables.joinToString(" ")
+        userDict?.queryByBopomofo(fullBopomofo)?.let {
+            results.addAll(it)
+        }
+        // 無聲調版也查一次
+        val strippedBopo = syllables.joinToString(" ") { it.trimEnd { c -> c in toneMarks } }
+        if (strippedBopo != fullBopomofo) {
+            userDict?.queryByBopomofo(strippedBopo)?.let { results.addAll(it) }
+        }
+
         // ── 1. 聲母簡拼查詢 ──
         val abbreviation = syllables.joinToString("") { syl ->
             val stripped = syl.trimEnd { it in toneMarks }
@@ -527,10 +541,21 @@ class ChewingInputEngine(private val context: Context) : InputEngine {
             }
         }
 
-        // ── 4. 最後一個音節的單字候選（backup） ──
-        val lastSyllable = syllables.last()
-        val lastChars = lookupCandidates(lastSyllable)
-        results.addAll(lastChars.take(20))
+        // ── 4. 每個音節都加單字候選（backup） ──
+        // 查不到詞組時，至少讓每個音節的字都顯示出來
+        // 讓用戶可以逐字選，而不是只看到最後一個音節
+        if (results.isEmpty()) {
+            // 完全查不到詞組：每個音節都加，第一個音節排最前
+            syllables.forEachIndexed { i, syllable ->
+                val chars = lookupCandidates(syllable)
+                results.addAll(chars.take(if (i == 0) 10 else 6))
+            }
+        } else {
+            // 有部分結果：只補最後音節防止候選太少
+            val lastSyllable = syllables.last()
+            val lastChars = lookupCandidates(lastSyllable)
+            results.addAll(lastChars.take(10))
+        }
 
         return results.toList()
     }

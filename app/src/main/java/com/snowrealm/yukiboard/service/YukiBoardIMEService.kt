@@ -108,6 +108,14 @@ class YukiBoardIMEService : InputMethodService() {
 
     // 懸浮面板
     private var floatingPanelManager: com.snowrealm.yukiboard.ui.floating.FloatingPanelManager? = null
+    private var weatherFloatingPanel: com.snowrealm.yukiboard.weather.WeatherFloatingPanel? = null
+    private var clawResultFloatingPanel: com.snowrealm.yukiboard.ui.floating.ClawResultFloatingPanel? = null
+
+    // 下一步動作預測
+    private var nextActionPredictor: com.snowrealm.yukiboard.input.predict.NextActionPredictor? = null
+
+    // 私房話累積緩衝
+    private val sentenceBuffer = StringBuilder()
 
     // 打字事件追蹤（微吐槽用）
     private var consecutiveDeleteCount = 0
@@ -185,8 +193,22 @@ class YukiBoardIMEService : InputMethodService() {
         toneDetector = com.snowrealm.yukiboard.yuki.ToneDetector()
         secretMessageManager = com.snowrealm.yukiboard.yuki.SecretMessageManager()
 
-        // 懸浮面板管理
+        // 懸浮面板管理 + 註冊懸浮面板
         floatingPanelManager = com.snowrealm.yukiboard.ui.floating.FloatingPanelManager(applicationContext)
+        val weatherMgr = com.snowrealm.yukiboard.weather.WeatherManager(applicationContext)
+        weatherFloatingPanel = com.snowrealm.yukiboard.weather.WeatherFloatingPanel(applicationContext, weatherMgr)
+        clawResultFloatingPanel = com.snowrealm.yukiboard.ui.floating.ClawResultFloatingPanel(applicationContext)
+        floatingPanelManager?.registerPanel(weatherFloatingPanel!!)
+        floatingPanelManager?.registerPanel(clawResultFloatingPanel!!)
+
+        // 下一步動作預測
+        nextActionPredictor = com.snowrealm.yukiboard.input.predict.RuleBasedPredictor()
+
+        // 懸浮面板回調：AI 結果插入輸入框
+        clawResultFloatingPanel?.onInsertToInput = { text ->
+            val ic = currentInputConnection
+            ic?.commitText(text, 1)
+        }
     }
 
     override fun onEvaluateInputViewShown(): Boolean = true
@@ -417,6 +439,21 @@ class YukiBoardIMEService : InputMethodService() {
         inputRouter.smartInput.habitTrackEnabled = prefs.habitTracking
         inputRouter.currentAppPackage = info?.packageName
 
+        // 自動解密：如果輸入框已有加密訊息 [YB🔐]，顯示解密內容
+        val ic0 = currentInputConnection
+        if (ic0 != null && prefs.secretMessageMode) {
+            val existing = ic0.getTextBeforeCursor(500, 0)?.toString() ?: ""
+            if (secretMessageManager?.isEncryptedMessage(existing) == true) {
+                val decrypted = secretMessageManager?.decrypt(existing)
+                if (decrypted != null) {
+                    val charAnchor = characterView as? View
+                    if (charAnchor != null) {
+                        yukiSpeechBubble?.show("🔓 $decrypted", charAnchor)
+                    }
+                }
+            }
+        }
+
         if (prefs.appAutoDetectEnabled && !manualModeOverride) {
             val detectedMode = appModeDetector.detectMode(info?.packageName)
             if (detectedMode != keyboardView.currentMode) {
@@ -471,6 +508,13 @@ class YukiBoardIMEService : InputMethodService() {
         manualModeOverride = false
 
         glSurfaceView?.onPause()
+
+        // ��習累積句子
+        val sentence = sentenceBuffer.toString().trim()
+        if (sentence.length >= 2) {
+            inputRouter.smartInput.onSentenceCommitted(sentence)
+        }
+        sentenceBuffer.clear()
 
         // 遊戲暫停
         gameLoop?.pause()
@@ -818,6 +862,8 @@ class YukiBoardIMEService : InputMethodService() {
                         ic.performContextMenuAction(android.R.id.selectAll)
                         ic.commitText(text, 1)
                     }
+                    // 同步結果到懸浮面板（供長按懸浮化使用）
+                    clawResultFloatingPanel?.showResult("AI", listOf(text))
                 }
                 p.onClose = { closePanel() }
                 p.onLockTapped = {
@@ -1501,7 +1547,8 @@ class YukiBoardIMEService : InputMethodService() {
         val ic: InputConnection = currentInputConnection ?: return
 
         // 更新上下文給候選排序用
-        inputRouter.contextBeforeCursor = ic.getTextBeforeCursor(20, 0)?.toString() ?: ""
+        // 200 字元以支援整句上下文預測（不只字詞，還有句子級別）
+        inputRouter.contextBeforeCursor = ic.getTextBeforeCursor(200, 0)?.toString() ?: ""
 
         ic.beginBatchEdit()
         try {
@@ -1613,7 +1660,26 @@ class YukiBoardIMEService : InputMethodService() {
         characterView?.onKeystroke()
 
         keyboardView.updateComposingText(inputRouter.composingText)
-        keyboardView.updateCandidates(inputRouter.candidates)
+
+        // 候選列為空時，顯示下一步動作預測提示
+        val candidates = inputRouter.candidates.toMutableList()
+        if (candidates.isEmpty() && inputRouter.composingText.isEmpty()) {
+            val predictor = nextActionPredictor
+            if (predictor != null) {
+                val predCtx = com.snowrealm.yukiboard.input.predict.PredictionContext(
+                    composingText = inputRouter.composingText,
+                    textBeforeCursor = inputRouter.contextBeforeCursor,
+                    keyboardMode = keyboardView.currentMode,
+                    appPackage = inputRouter.currentAppPackage ?: ""
+                )
+                val actions = predictor.predict(predCtx)
+                for (action in actions.take(3)) {
+                    candidates.add(action.displayText)
+                }
+            }
+        }
+        keyboardView.updateCandidates(candidates)
+
         } finally {
             ic.endBatchEdit()
         }
@@ -1707,6 +1773,14 @@ class YukiBoardIMEService : InputMethodService() {
     private fun handleEnter(ic: InputConnection) {
         val result = inputRouter.processEnter()
         applyInputResult(ic, result)
+
+        // Enter = 句子結束 → 學習整句模式
+        val sentence = sentenceBuffer.toString().trim()
+        if (sentence.length >= 2) {
+            inputRouter.smartInput.onSentenceCommitted(sentence)
+        }
+        sentenceBuffer.clear()
+
         if (result is InputResult.Idle) {
             // 檢查 Editor 是否要求特定 action（搜尋/傳送/完成等）
             val info = currentInputEditorInfo
@@ -1777,11 +1851,33 @@ class YukiBoardIMEService : InputMethodService() {
                     }
                 }
 
+                // 私房話模式：攔截並加密
+                val finalText = if (prefs.secretMessageMode && result.text.isNotBlank()) {
+                    secretMessageManager?.encrypt(result.text) ?: result.text
+                } else result.text
+
                 ic.setComposingText("", 0)
                 ic.finishComposingText()
-                ic.commitText(result.text, 1)
+                ic.commitText(finalText, 1)
                 characterView?.playHappy()
-                forwardTextToRemote(result.text)
+                forwardTextToRemote(finalText)
+
+                // 累積句子，用於整句學習
+                sentenceBuffer.append(result.text)
+
+                // 語氣偵測 + 雪凜回應（負面/悲傷/生氣時）
+                if (prefs.toneDetection && result.text.length >= 2) {
+                    val detection = toneDetector?.analyze(result.text)
+                    if (detection != null && detection.confidence >= 0.3f) {
+                        val response = toneDetector?.getYukiResponse(detection.tone)
+                        if (response != null) {
+                            val charAnchor = characterView as? View
+                            if (charAnchor != null) {
+                                yukiSpeechBubble?.show(response, charAnchor)
+                            }
+                        }
+                    }
+                }
 
                 // 微吐槽檢查
                 if (prefs.yukiSarcasticComments && result.text.length == 1) {

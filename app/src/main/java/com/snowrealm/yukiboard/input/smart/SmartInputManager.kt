@@ -18,6 +18,7 @@ class SmartInputManager(context: Context) {
 
     val adaptiveDictionary = AdaptiveDictionary(context)
     val phrasePredictor = PhrasePredictor(context)
+    val sentencePredictor = SentencePredictor(context)
     val habitTracker = TypingHabitTracker(context)
 
     private var dictionary: EnglishDictionary? = null
@@ -58,6 +59,51 @@ class SmartInputManager(context: Context) {
         if (habitTrackEnabled) {
             habitTracker.recordCommit(word, appPackage)
         }
+    }
+
+    // ─────────────── 整句預測 ───────────────
+
+    /**
+     * 更新輸入框上下文（由 Service 在 handleKey 時呼叫）。
+     * 用於整句預測的前文分析。
+     */
+    fun updateSentenceContext(contextText: String) {
+        if (phrasePredictEnabled) {
+            sentencePredictor.updateContextSentence(contextText)
+        }
+    }
+
+    /**
+     * 提交一段完整句子時呼叫（Enter/換行/切 App 觸發）。
+     * 用於學習句子級別的回覆模式。
+     */
+    fun onSentenceCommitted(sentence: String) {
+        if (phrasePredictEnabled) {
+            sentencePredictor.onSentenceCommitted(sentence)
+        }
+    }
+
+    /**
+     * 取得整句預測候選列表。
+     * @param contextText 輸入框游標前文字
+     * @param currentInput 目前正在輸入的文字
+     * @param maxResults 最多回傳幾句
+     */
+    fun getSentencePredictions(
+        contextText: String,
+        currentInput: String = "",
+        maxResults: Int = 5
+    ): List<String> {
+        if (!phrasePredictEnabled) return emptyList()
+        return sentencePredictor.predictSentences(contextText, currentInput, maxResults)
+            .map { it.sentence }
+    }
+
+    /**
+     * 從上下文提取最近的句子（用於整句級別上下文分析）。
+     */
+    fun extractRecentSentences(contextText: String): List<String> {
+        return sentencePredictor.extractRecentSentences(contextText)
     }
 
     // ─────────────── 糾錯 ───────────────
@@ -131,11 +177,13 @@ class SmartInputManager(context: Context) {
     /** 換行 / 切 App 時重置上下文 */
     fun resetContext() {
         phrasePredictor.resetContext()
+        sentencePredictor.resetContext()
     }
 
     /** 定期儲存（onFinishInputView 呼叫） */
     fun persist() {
         phrasePredictor.save()
+        sentencePredictor.save()
         habitTracker.save()
     }
 

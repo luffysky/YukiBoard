@@ -25,7 +25,10 @@ class InputRouter(private val context: Context) {
     // 引擎（lazy 初始化，避免啟動時全載入）
     // -------------------------------------------------------------------------
     private val englishEngine: InputEngine = EnglishInputEngine(context)
-    private val bopomofoEngine: InputEngine = ChewingInputEngine(context)
+    private val bopomofoEngine: InputEngine = ChewingInputEngine(
+        context,
+        userDict = com.snowrealm.yukiboard.input.dictionary.UserDictionary(context)
+    )
     private val pinyinEngine: InputEngine by lazy { PinyinInputEngine() }
     private val cangjieEngine: InputEngine by lazy { CangjieInputEngine(speedMode = false) }
     private val speedCangjieEngine: InputEngine by lazy { CangjieInputEngine(speedMode = true) }
@@ -42,8 +45,13 @@ class InputRouter(private val context: Context) {
     private var lastCommittedWord: String? = null
     // 目前 App 套件名（供習慣追蹤用）
     var currentAppPackage: String? = null
-    // 輸入框上下文（由 Service 從 getTextBeforeCursor 設定）
+    // 輸入框上下文（由 Service 從 getTextBeforeCursor 設定，200 字元）
     var contextBeforeCursor: String = ""
+        set(value) {
+            field = value
+            // 同步更新整句上下文
+            smartInput.updateSentenceContext(value)
+        }
 
     // 語言循環順序（使用者可自訂，預設全開）
     var enabledModes: List<InputMode> = listOf(
@@ -142,6 +150,8 @@ class InputRouter(private val context: Context) {
         val result = activeEngine.processEnter()
         if (result is InputResult.CommitText) {
             onTextCommitted(result.text)
+            // Enter = 句子結束，學習整句模式
+            smartInput.onSentenceCommitted(result.text)
         }
         candidateManager.clear()
         smartInput.resetContext()
@@ -225,8 +235,13 @@ class InputRouter(private val context: Context) {
         val raw = activeEngine.getCandidates()
         val composing = activeEngine.composingText
 
-        // 非英文模式：引擎候選 + 自適應字典 + 上下文 bigram/trigram 排序
+        // 非英文模式：引擎候選 + 自適應字典 + 上下文 bigram/trigram + 整句預測
         if (currentMode != InputMode.ENGLISH) {
+            // ── 整句預測（放在候選列末端，用於直接選句）──
+            val sentenceSuggestions = smartInput.getSentencePredictions(
+                contextBeforeCursor, composing, 3
+            )
+
             if (raw.size > 1) {
                 // 從上下文提取最近幾個字/詞（CJK 每個字算一個 token）
                 val contextWords = extractContextWords(contextBeforeCursor)
@@ -246,9 +261,19 @@ class InputRouter(private val context: Context) {
                     if (ctxScore != null) score += ctxScore * 5
                     score
                 }.thenBy { raw.indexOf(it) })  // 其他保持原順序
-                candidateManager.update(boosted)
+
+                // 合併：單字候選在前，整句建議在後
+                val combined = boosted.toMutableList()
+                for (s in sentenceSuggestions) {
+                    if (s !in combined) combined.add(s)
+                }
+                candidateManager.update(combined)
             } else {
-                candidateManager.update(raw)
+                val combined = raw.toMutableList()
+                for (s in sentenceSuggestions) {
+                    if (s !in combined) combined.add(s)
+                }
+                candidateManager.update(combined)
             }
             return
         }
@@ -300,6 +325,15 @@ class InputRouter(private val context: Context) {
             .sortedByDescending { it.value }
             .take(12)
             .map { it.key }
+            .toMutableList()
+
+        // 英文也加整句預測
+        val enSentences = smartInput.getSentencePredictions(
+            contextBeforeCursor, composing, 3
+        )
+        for (s in enSentences) {
+            if (s !in sorted) sorted.add(s)
+        }
 
         candidateManager.update(sorted)
     }

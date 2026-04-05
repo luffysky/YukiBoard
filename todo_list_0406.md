@@ -152,9 +152,9 @@
 - [ ] `handleSwipeInput()` → SwipeCandidateRanker → 更新候選列
 
 #### A-7 YukiPreferences 開關
-- [ ] `swipeInputEnabled: Boolean`（預設 true）
+- ~~[x] `swipeInputEnabled: Boolean`（預設 true）~~ — 已在 YukiPreferences.swipeInput
 - [ ] `rimeDictEnabled: Boolean`（預設 true）
-- [ ] SettingsActivity 輸入行為群組加入對應開關
+- ~~[x] SettingsActivity 輸入行為群組加入對應開關~~ — 已有「滑動輸入」switchRow
 
 #### A-8 候選字視覺標示
 - [ ] 滑動候選���記淡紫色 #B39DDB + 左側 ≈ 符號
@@ -162,40 +162,40 @@
 
 ---
 
-### 批次 B — 全功���開關設定系統（總任務包 第二批）
+### ~~批次 B — 全功能開關設定系統（總任務包 第二批）~~ ✅
 
-- [ ] YukiPreferences 補齊所有開關（AI 18 項 + 雪凜 5 項 + 感測器 3 項 + 動畫 5 項 + 遊戲 3 項 + 懸浮面板 3 項 + 輸入行為 7 項）
-- [ ] SettingsActivity 重構 6 群組 CardView（AI/雪凜/感測器/動畫/遊戲/輸入）
-- [ ] 主開關關閉時子項目灰化（alpha 0.4 + disabled）
+- ~~[x] YukiPreferences 補齊所有開關（AI 18 項 + 雪凜 5 項 + 感測器 3 項 + 動畫 5 項 + 遊戲 3 項 + 懸浮面板 3 項 + 輸入行為 7 項）~~
+- ~~[x] SettingsActivity 重構 7 群組 CardView（AI/雪凜/感測器/動畫/遊戲/輸入行為/智慧輸入）~~
+- ~~[x] 主開關關閉時子項目灰化（alpha 0.4 + disabled）~~
 
 ---
 
 ### 批次 C — 智慧候選字升級（總任務包 第九批）
 
-- [ ] 注音自適應學習（ChewingAdaptiveDict — 用戶選字頻率排序）
-- [ ] 中文���下文串聯預測（chineseNgramIndex — 上一字→下一字）
-- [ ] 讀取輸入框上下文（getTextBeforeCursor → currentContextText）
+- ~~[x] 注音自適應學習（AdaptiveDictionary — 用戶選字頻率排序）~~
+- [ ] 中文上下文串聯預測（chineseNgramIndex — 上一字→下一字）
+- ~~[x] 讀取輸入框上下文（getTextBeforeCursor → contextBeforeCursor → extractContextWords）~~
 - [ ] 候選字視覺分類標示（DICTIONARY/ADAPTIVE/PREDICTION/CORRECTION/AI 五種顏色）
 
 ---
 
-### 批次 D — AI Skill 全面升級（總任務包 第六批）
+### ~~批次 D — AI Skill 全面升級（總任務包 第六批）~~ ✅
 
-- [ ] GrammarCheckSkill — ���法糾錯（200 token）
-- [ ] ToneAdjustSkill — 語氣調整 正式/輕鬆/可愛/專業（300 token）
-- [ ] SummarizeSkill — 摘要精簡（300 token）
-- [ ] MemeTextSkill — 迷因/流��語（200 token）
-- [ ] EmojiTranslateSkill — 文字↔Emoji���100 token）
-- [ ] QuickReplySkill — 整句回覆建議（400 token）
-- [ ] CodeCompleteSkill — 程式碼補全（500 token，開發者模式）
-- [ ] RegexGenSkill — 正則產生��（300 token，開發者模式）
-- [ ] CommitMessageSkill — Commit 訊息（400 token，開發者模式）
-- [ ] YukiChatSkill — 雪凜聊天（600 token）
-- [ ] MoodDiarySkill — 心情日記（0-200 token）
-- [ ] WeatherSkill — 天氣助理（0-300 token）
-- [ ] Prompt 模板 6 ���（res/raw/claw_*_prompt.txt）
-- [ ] ClawToolbar 更新（天氣/遊戲按鈕 + Token 顏��指示 + 動態 Skill 過濾）
-- [ ] RadialModeMenu 加入 GAME ��式（四選項 90°）
+- ~~[x] GrammarCheckSkill — 語法糾錯（200 token）~~
+- ~~[x] ToneAdjustSkill — 語氣調整 正式/輕鬆/可愛/專業（300 token）~~
+- ~~[x] SummarizeSkill — 摘要精簡（300 token）~~
+- ~~[x] MemeTextSkill — 迷因/流行語（200 token）~~
+- ~~[x] EmojiTranslateSkill — 文字↔Emoji（100 token）~~
+- ~~[x] QuickReplySkill — 整句回覆建議（400 token）~~
+- ~~[x] CodeCompleteSkill — 程式碼補全（500 token，開發者模式）~~
+- ~~[x] RegexGenSkill — 正則產生器（300 token，開發者模式）~~
+- ~~[x] CommitMessageSkill — Commit 訊息（400 token，開發者模式）~~
+- ~~[x] YukiChatSkill — 雪凜聊天（600 token）~~
+- ~~[x] MoodDiarySkill — 心情日記（0-200 token）~~
+- ~~[x] WeatherSkill — 天氣助理（0-300 token）~~
+- [x] Prompt 模板 10 個（res/raw/claw_*_prompt.txt）— 缺 tone_adjust/summarize/emoji_translate 3 個
+- ~~[x] ClawToolbar 更新（天氣/遊戲按鈕 + Token 顏色指示 + 動態 Skill 過濾）~~
+- ~~[x] RadialModeMenu 加入 GAME 模式（四選項 90°）~~
 
 ---
 
@@ -210,40 +210,40 @@
 
 ---
 
-### 批次 F — 雪凜人格系統（總任務包 第五批）
+### ~~批次 F — 雪凜人格系統（總任務包 第五批）~~ ✅
 
-- [ ] YukiCommentEngine.kt — 微吐槽（打錯字/刪全文/打字變慢/深夜/遊戲�� → 隨機短句 + 10 分鐘冷卻）
-- [ ] EmotionalCooldownManager.kt — 情緒冷靜期（觸發詞庫 + 結冰動畫 + 鍵盤鎖 1 秒 + 確認對話框）
-- [ ] SecretMessageManager.kt — 私房話 AES-256-GCM（格式 `[YB🔐] {base64}`）
-- [ ] ToneDetector.kt — 語氣偵測（本地關鍵字 0 token���NEGATIVE/SAD 時雪凜回應）
+- ~~[x] YukiCommentEngine.kt — 微吐槽（打錯字/刪全文/打字變慢/深夜/遊戲 → 隨機短句 + 10 分鐘冷卻）~~
+- ~~[x] EmotionalCooldownManager.kt — 情緒冷靜期（觸發詞庫 + 結冰動畫 + 鍵盤鎖 1 秒 + 確認對話框）~~
+- ~~[x] SecretMessageManager.kt — 私房話 AES-256-GCM（格式 `[YB🔐] {base64}`）~~
+- ~~[x] ToneDetector.kt — 語氣偵測（本地關鍵字 0 token，NEGATIVE/SAD 時雪凜回應）~~
 
 ---
 
 ### 批次 G — 語境預測 + WhisperSkill（總任務包 第十批）
 
-- [ ] NextActionPredictor 本地 intentPatterns（0 token）+ AI 意圖預測（邀請碼解鎖）
-- [ ] WhisperSkill 實作（MediaRecorder + OpenAI Whisper API multipart ���傳）
-- [ ] InviteCodeActivity UI 美化 + 驗證流���完整化
-- [ ] TokenBudgetManager 每日重置邏輯
+- ~~[x] NextActionPredictor 本地 intentPatterns（0 token）+ AI 意圖預測（邀請碼解鎖）~~
+- [ ] WhisperSkill 實作（MediaRecorder + OpenAI Whisper API multipart 上傳）
+- [ ] InviteCodeActivity UI 美化 + 驗證流程完整化
+- ~~[x] TokenBudgetManager 每日重置邏輯~~
 
 ---
 
 ### 批次 H — API 串接 + 環境（總任務包 第十一批）
 
-- [ ] GiphyApiClient.kt（trending + search）→ GifPanelView 串接
-- [ ] 翻譯引擎接 MLKit Translation 離��模型 → TranslatePanelView
+- ~~[x] GiphyApiClient.kt（trending + search）→ GifPanelView 串接~~
+- [ ] 翻譯引擎接 MLKit Translation 離線模型 → TranslatePanelView
 - [ ] `.env.example` 範本檔案
 - [ ] CLAUDE.md 補充各 Key 用途與申請網址
 
 ---
 
-### 批次 I — 懸浮面板群完善（總任務包 第三、四批）
+### ~~批次 I — 懸浮面板群完善（總任務包 第三、四批）~~ ✅
 
-- [ ] FloatingPanelManager（showPanel/hidePanel/togglePanel/dismissAll + prefs 檢查）
-- [ ] gesture/ 子目錄（DragGestureHandler / PinchGestureHandler / ResizeHandle）
-- [ ] 靠邊吸附（40dp 閾值 + 200ms 動畫）
-- [ ] WeatherFloatingPanel（OpenWeatherMap + 30 分快取 + 雪凜天氣短句 + 6 小時預報）
-- [ ] ClawResultFloatingPanel 完善（streaming typewriter + 版本切換 + 複製/插��）
+- ~~[x] FloatingPanelManager（showPanel/hidePanel/togglePanel/dismissAll + prefs 檢查）~~
+- ~~[x] gesture/ 子目錄（DragGestureHandler / PinchGestureHandler / ResizeHandle）~~
+- ~~[x] 靠邊吸附（40dp 閾值 + 200ms 動畫）~~
+- ~~[x] WeatherFloatingPanel（OpenWeatherMap + 30 分快取 + 雪凜天氣短句 + 6 小時預報）~~
+- ~~[x] ClawResultFloatingPanel 完善（streaming typewriter + 版本切換 + 複製/插入）~~
 
 ---
 
@@ -255,19 +255,19 @@
 - ✅ SnakeGame / WhackAMoleGame / RhythmGame / TypingChallengeGame
 - ✅ WordGuardianGame / SpellingDuelGame / MemoryFlipGame / KeyboardMinesweeperGame
 
-**待實�� 13 款：**
+**待實作 13 款（已完成 9 款 + 額外 VoiceGame）：**
 
-| ���型 | 遊戲 | 核心機制 |
-|------|------|---------|
-| 放置型 | KeyboardTravelerGame 🏃 | 招財跑酷，打字=移動，停頓=坐下吃便當 |
-| 放置型 | WarshipCruiseGame 🚢 | 戰艦巡航，打字=動力 |
-| 收集型 | MoodMinerGame 💎 | 情緒採礦，打字情緒生原石 + 每週週報 |
-| 收集型 | IceCrystalGame ❄️ | 冰晶收集，完整長句掉落冰晶 |
-| 動作型 | BulletHellMiniGame ✈️ | 極簡彈幕，Swipe 閃避 15-30 秒局 |
-| 角色型 | YukiQuizGame 🌸 | 雪凜問答，按鍵作答 |
-| 角色型 | CoupleQuizGame 💘 | 情��測驗，結果截圖分享 |
-| 對戰型 | TypingRaceGame 🏆 | 打字競速 v1 單機版 |
-| AI ��� | RandomChallengeGame 🎲 | 雪凜 AI 出�� + AI 評分 |
+| 類型 | 遊戲 | 核心機制 | 狀態 |
+|------|------|---------|------|
+| 放置型 | ~~KeyboardTravelerGame 🏃~~ | 招財跑酷，打字=移動，停頓=坐下吃便當 | ✅ |
+| 放置型 | ~~WarshipCruiseGame 🚢~~ | 戰艦巡航，打字=動力 | ✅ |
+| 收集型 | ~~MoodMinerGame 💎~~ | 情緒採礦，打字情緒生原石 + 每週週報 | ✅ |
+| 收集型 | ~~IceCrystalGame ❄️~~ | 冰晶收集，完整長句掉落冰晶 | ✅ |
+| 動作型 | ~~BulletHellMiniGame ✈️~~ | 極簡彈幕，Swipe 閃避 15-30 秒局 | ✅ |
+| 角色型 | ~~YukiQuizGame 🌸~~ | 雪凜問答，按鍵作答 | ✅ |
+| 角色型 | ~~CoupleQuizGame 💘~~ | 情侶測驗，結果截圖分享 | ✅ |
+| 對戰型 | ~~TypingRaceGame 🏆~~ | 打字競速 v1 單機版 | ✅ |
+| AI 型 | ~~RandomChallengeGame 🎲~~ | 雪凜 AI 出題 + AI 評分 | ✅ |
 | 節奏型 | MusicTypingGame 🎵 | 按鍵對應音符，打字=演奏 |
 | 建造型 | YukiHouseGame 🏠 | 雪凜的家，打字累積建材 |
 | 建造型 | TypingFarmGame 🌱 | 打��農場，輸入=澆水 |
