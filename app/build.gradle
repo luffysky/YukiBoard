@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 63
-        versionName "0.8.21"
+        versionCode 64
+        versionName "0.8.22"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,12 +82,11 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 設定頁新增 Z幣錢包入口\n" +
-                    "- feat: 設定頁新增輸入法選擇（7 語言多選）\n" +
-                    "- feat: 設定頁新增 Snippet 管理（內建/自訂列表）\n" +
-                    "- feat: 設定頁動畫群組新增 VRM 3D 角色 toggle\n" +
-                    "- feat: 環形模式選單新增懸浮鍵盤快捷切換\n" +
-                    "- chore: 移除未使用偏好設定"
+                    "- feat: LINE/Google 登入改用 Chrome Custom Tab（不再卡帳密）\n" +
+                    "- feat: 設定頁新增 Z幣錢包/輸入法選擇/Snippet 管理/VRM toggle\n" +
+                    "- feat: 環形選單新增懸浮鍵盤快捷切換\n" +
+                    "- fix: 註冊流程對齊 Insight API（自動帶 orgName）\n" +
+                    "- fix: Snippet 卡片 addView crash"
             }
         }
         debug {
@@ -96,12 +95,11 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 設定頁新增 Z幣錢包入口\n" +
-                    "- feat: 設定頁新增輸入法選擇（7 語言多選）\n" +
-                    "- feat: 設定頁新增 Snippet 管理（內建/自訂列表）\n" +
-                    "- feat: 設定頁動畫群組新增 VRM 3D 角色 toggle\n" +
-                    "- feat: 環形模式選單新增懸浮鍵盤快捷切換\n" +
-                    "- chore: 移除未使用偏好設定"
+                    "- feat: LINE/Google 登入改用 Chrome Custom Tab（不再卡帳密）\n" +
+                    "- feat: 設定頁新增 Z幣錢包/輸入法選擇/Snippet 管理/VRM toggle\n" +
+                    "- feat: 環形選單新增懸浮鍵盤快捷切換\n" +
+                    "- fix: 註冊流程對齊 Insight API（自動帶 orgName）\n" +
+                    "- fix: Snippet 卡片 addView crash"
             }
         }
     }
