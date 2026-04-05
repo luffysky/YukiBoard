@@ -2371,15 +2371,15 @@ class SettingsActivity : AppCompatActivity() {
 
             // 內建 snippet 列表（摺疊顯示）
             val builtIn = snippetMgr.getBuiltInAbbreviations()
-            listContainer.addView(TextView(this).apply {
+            val builtInContainer = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                visibility = View.GONE
+            }
+            val toggleLabel = TextView(this).apply {
                 text = "▸ 內建 Snippet (${builtIn.size} 個) — 點擊展開"
                 textSize = 13f
                 setTextColor(0xFF6688AA.toInt())
                 setPadding(dp(4), dp(8), dp(4), dp(4))
-                val builtInContainer = LinearLayout(this@SettingsActivity).apply {
-                    orientation = LinearLayout.VERTICAL
-                    visibility = View.GONE
-                }
                 setOnClickListener {
                     if (builtInContainer.visibility == View.GONE) {
                         builtInContainer.visibility = View.VISIBLE
@@ -2389,19 +2389,18 @@ class SettingsActivity : AppCompatActivity() {
                         text = "▸ 內建 Snippet (${builtIn.size} 個) — 點擊展開"
                     }
                 }
-                listContainer.addView(this)
-
-                for (abbr in builtIn) {
-                    val result = snippetMgr.expand(abbr)
-                    builtInContainer.addView(TextView(this@SettingsActivity).apply {
-                        text = "$abbr → ${result?.expansion?.replace("\n", "↵")?.take(50) ?: ""}"
-                        setTextColor(0xFF8899AA.toInt())
-                        textSize = 12f
-                        setPadding(dp(12), dp(2), dp(4), dp(2))
-                    })
-                }
-                listContainer.addView(builtInContainer)
-            })
+            }
+            for (abbr in builtIn) {
+                val result = snippetMgr.expand(abbr)
+                builtInContainer.addView(TextView(this).apply {
+                    text = "$abbr → ${result?.expansion?.replace("\n", "↵")?.take(50) ?: ""}"
+                    setTextColor(0xFF8899AA.toInt())
+                    textSize = 12f
+                    setPadding(dp(12), dp(2), dp(4), dp(2))
+                })
+            }
+            listContainer.addView(toggleLabel)
+            listContainer.addView(builtInContainer)
         }
 
         refreshSnippetList()
