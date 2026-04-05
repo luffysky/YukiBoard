@@ -114,7 +114,8 @@ class ClawPanelView(context: Context) : LinearLayout(context) {
         currentJob = scope.launch {
             try {
                 // 嘗試串流模式（邊收邊顯示）
-                val systemPrompt = "你是 YukiBoard 鍵盤助手雪凜。一律使���繁體中文回答，簡潔有力。"
+                val lang = detectInputLanguage(input.text)
+                val systemPrompt = "You are YukiBoard keyboard assistant. Reply in $lang. Be concise."
                 val prompt = "${input.text}\n\nContext: ${input.context}"
                 val accumulated = StringBuilder()
                 var hasStream = false
@@ -149,6 +150,18 @@ class ClawPanelView(context: Context) : LinearLayout(context) {
             } catch (e: Exception) {
                 resultView.showError(e.message ?: "執行失敗")
             }
+        }
+    }
+
+    /** 偵測輸入文字的語言，回傳語言名稱供 system prompt 使用 */
+    private fun detectInputLanguage(text: String): String {
+        val sample = text.take(100)
+        return when {
+            sample.any { it in '\u3040'..'\u309F' || it in '\u30A0'..'\u30FF' } -> "Japanese"
+            sample.any { it in '\uAC00'..'\uD7AF' } -> "Korean"
+            sample.any { it in '\u4E00'..'\u9FFF' } -> "Traditional Chinese (繁體中文)"
+            sample.all { it.code < 128 } -> "English"
+            else -> "Traditional Chinese (繁體中文)"
         }
     }
 
