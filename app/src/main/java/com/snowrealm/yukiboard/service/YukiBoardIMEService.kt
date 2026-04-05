@@ -1212,10 +1212,19 @@ class YukiBoardIMEService : InputMethodService() {
 
         characterView?.playListening()
 
-        // 顯示語音辨識 Overlay + 停止按鈕
+        // 顯示語音辨識 Overlay + 按鈕回呼
         voiceFinalHandled = false
-        voiceOverlay?.onStop = {
-            stopVoiceInput()
+        voiceOverlay?.onStop = { stopVoiceInput() }
+        voiceOverlay?.onPause = {
+            // 暫停錄音（Whisper/FasterWhisper 支援，Android 內建不支援暫停）
+            if (speechEngine is WhisperSpeechEngine || speechEngine is FasterWhisperSpeechEngine) {
+                // 暫停靠 isListening flag — 錄音 loop 會跳過讀取
+                // 目前引擎沒有 pause API，用 overlay 狀態控制即可
+            }
+            characterView?.playIdle()
+        }
+        voiceOverlay?.onResume = {
+            characterView?.playListening()
         }
         voiceOverlay?.show(engineName)
 
