@@ -24,10 +24,11 @@ class InputRouter(private val context: Context) {
     // -------------------------------------------------------------------------
     // 引擎（lazy 初始化，避免啟動時全載入）
     // -------------------------------------------------------------------------
+    private val userDict = com.snowrealm.yukiboard.input.dictionary.UserDictionary(context)
     private val englishEngine: InputEngine = EnglishInputEngine(context)
     private val bopomofoEngine: InputEngine = ChewingInputEngine(
         context,
-        userDict = com.snowrealm.yukiboard.input.dictionary.UserDictionary(context)
+        userDict = userDict
     )
     private val pinyinEngine: InputEngine by lazy { PinyinInputEngine() }
     private val cangjieEngine: InputEngine by lazy { CangjieInputEngine(speedMode = false) }
@@ -325,7 +326,13 @@ class InputRouter(private val context: Context) {
                 scored[word] = (scored[word] ?: 0f) + (7f - i).coerceAtLeast(2f)
             }
 
-            // 5. 完全匹配 composing 加分（使用者可能就是要打這個詞）
+            // 5. 使用者自訂詞庫（手動加的詞 + 自動學習的詞，高加分）
+            val userSuggestions = userDict.suggest(composing, 5)
+            userSuggestions.forEachIndexed { i, word ->
+                scored[word] = (scored[word] ?: 0f) + (9f - i).coerceAtLeast(3f)
+            }
+
+            // 6. 完全匹配 composing 加分（使用者可能就是要打這個詞）
             scored[composing.lowercase()]?.let { prev ->
                 scored[composing.lowercase()] = prev + 3f
             }
@@ -411,6 +418,7 @@ class InputRouter(private val context: Context) {
             for (word in words) {
                 if (word.isNotBlank()) {
                     smartInput.onWordCommitted(word, currentAppPackage)
+                    userDict.learn(word)
                     lastCommittedWord = word
                 }
             }

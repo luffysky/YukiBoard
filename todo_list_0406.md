@@ -227,9 +227,9 @@
 - ~~[x] 注音自適應學習（AdaptiveDictionary — 用戶選字頻率排序）~~
 - [ ] 中文上下文串聯預測（chineseNgramIndex — 上一字→下一字）
 - ~~[x] 讀取輸入框上下文（getTextBeforeCursor → contextBeforeCursor → extractContextWords）~~
-- [ ] lookupMultiSyllable() fallback 修復 — 無片語時顯示每個音節的單字候選
-- [ ] UserDictionary 加注音欄位 — 手動加詞支援注音→詞對應
-- [ ] 設定頁自訂詞庫管理 UI（新增/釘選/刪除/匯出）
+- ✅ lookupMultiSyllable() fallback — 無片語時顯示每個音節的單字候選（已實作）
+- ✅ UserDictionary 注音欄位 — addManual/queryByBopomofo + 反向索引（已實作）
+- ✅ 設定頁自訂詞庫管理 UI（新增/刪除/列表）— 釘選/匯出待補
 - [ ] 候選字視覺分類標示（DICTIONARY/ADAPTIVE/PREDICTION/CORRECTION/AI 五種顏色）
 
 ---
