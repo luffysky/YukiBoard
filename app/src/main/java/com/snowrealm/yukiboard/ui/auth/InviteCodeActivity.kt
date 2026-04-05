@@ -191,7 +191,7 @@ class InviteCodeActivity : AppCompatActivity() {
 
         // Auto-close after 2 seconds
         codeInput.isEnabled = false
-        lottieView.postDelayed({ finish() }, 2000)
+        lottieView.postDelayed(finishRunnable, 2000)
     }
 
     private fun showError(message: String) {
@@ -211,6 +211,13 @@ class InviteCodeActivity : AppCompatActivity() {
     private fun onSkipClicked() {
         startActivity(Intent(this, AISettingsActivity::class.java))
         finish()
+    }
+
+    private val finishRunnable = Runnable { finish() }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        lottieView.removeCallbacks(finishRunnable)
     }
 
     private fun dp(value: Int): Int =

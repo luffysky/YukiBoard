@@ -64,6 +64,7 @@ class StickerImageCache(context: Context, private val targetSize: Int = 192) {
 
                 // 寫入磁碟
                 FileOutputStream(diskFile).use { it.write(bytes) }
+                trimDiskCacheIfNeeded()
 
                 // 解碼縮放
                 val bmp = decodeSized(bytes)
@@ -78,6 +79,19 @@ class StickerImageCache(context: Context, private val targetSize: Int = 192) {
     /** 預載一組 URL（背景批次下載） */
     suspend fun preload(urls: List<String>) {
         urls.forEach { getBitmap(it) }
+    }
+
+    private val maxDiskBytes = 50L * 1024 * 1024 // 50MB
+
+    private fun trimDiskCacheIfNeeded() {
+        val files = diskCacheDir.listFiles() ?: return
+        var total = files.sumOf { it.length() }
+        if (total <= maxDiskBytes) return
+        files.sortedBy { it.lastModified() }.forEach { file ->
+            if (total <= maxDiskBytes * 8 / 10) return
+            total -= file.length()
+            file.delete()
+        }
     }
 
     /** 清除所有快取 */

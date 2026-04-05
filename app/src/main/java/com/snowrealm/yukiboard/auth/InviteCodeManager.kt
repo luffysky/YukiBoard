@@ -95,6 +95,7 @@ class InviteCodeManager(context: Context) {
         return (limit - getDailyTokenUsed()).coerceAtLeast(0)
     }
 
+    @Synchronized
     fun consumeTokens(count: Int) {
         resetDailyUsageIfNeeded()
         val current = prefs.getInt("daily_token_used", 0)

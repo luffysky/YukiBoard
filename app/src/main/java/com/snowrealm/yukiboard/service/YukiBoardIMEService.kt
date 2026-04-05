@@ -166,7 +166,7 @@ class YukiBoardIMEService : InputMethodService() {
 
         shakeDetector = ShakeDetector(applicationContext)
         shakeDetector.setOnShakeListener {
-            if (prefs.shakeToUndoEnabled) {
+            if (prefs.shakeToUndoEnabled && !isInGameMode) {
                 val ic = currentInputConnection ?: return@setOnShakeListener
                 sendCtrlKey(ic, KeyEvent.KEYCODE_Z)
                 keyboardView.vibrateShort()
@@ -177,6 +177,15 @@ class YukiBoardIMEService : InputMethodService() {
         gyroController.setOnCursorMoveListener { direction ->
             if (prefs.gyroscopeCursorEnabled) {
                 val ic = currentInputConnection ?: return@setOnCursorMoveListener
+                // F-8: composing 非空時先 forceCommit，避免游標移入 composing 文字中
+                if (inputRouter.composingText.isNotEmpty()) {
+                    val result = inputRouter.getActiveEngine().forceCommit()
+                    if (result is InputResult.CommitText) ic.commitText(result.text, 1)
+                    ic.finishComposingText()
+                    inputRouter.reset()
+                    keyboardView.updateComposingText("")
+                    keyboardView.updateCandidates(emptyList())
+                }
                 val keyCode = when (direction) {
                     CursorDirection.LEFT -> KeyEvent.KEYCODE_DPAD_LEFT
                     CursorDirection.RIGHT -> KeyEvent.KEYCODE_DPAD_RIGHT
@@ -290,6 +299,9 @@ class YukiBoardIMEService : InputMethodService() {
                 val text = swipeInputCandidates[index]
                 val ic = currentInputConnection
                 if (ic != null) {
+                    // F-6: 先清掉殘留的 composing 狀態
+                    ic.finishComposingText()
+                    inputRouter.reset()
                     ic.commitText(text, 1)
                 }
                 swipeInputPending = false
@@ -727,6 +739,16 @@ class YukiBoardIMEService : InputMethodService() {
     }
 
     private fun showPanel(panel: PanelType) {
+        // F-5: 切換面板時先提交殘留的 composing
+        if (inputRouter.composingText.isNotEmpty()) {
+            val ic = currentInputConnection
+            val composing = inputRouter.composingText
+            ic?.commitText(composing, 1)
+            ic?.finishComposingText()
+            inputRouter.reset()
+            keyboardView.updateComposingText("")
+            keyboardView.updateCandidates(emptyList())
+        }
         // 離開面板輸入模式
         translatePanel?.exitInputMode()
         gifPanel?.exitInputMode()
@@ -1155,6 +1177,9 @@ class YukiBoardIMEService : InputMethodService() {
         } else ""
         keyboardView.showToast("語音引擎：$engineName$debugInfo")
 
+        // F-1: 語音輸入開始前，先停止 TTS 避免搶麥克風
+        ttsEngine?.stop()
+
         characterView?.playListening()
 
         // 語言 hint（主要用於 Android SpeechRecognizer 的預設語言，但兩引擎都支援多語言自動偵測）
@@ -1231,6 +1256,8 @@ class YukiBoardIMEService : InputMethodService() {
 
     /** TTS 朗讀（帶語言與語速設定） */
     private fun ttsSpeak(text: String, locale: String? = null, onDone: (() -> Unit)? = null) {
+        // F-1: TTS 開始前，先停止語音輸入避免搶麥克風
+        if (speechEngine?.isListening == true) stopVoiceInput()
         ttsEngine?.speak(text, locale, prefs.ttsSpeed, onDone)
     }
 
@@ -1270,10 +1297,13 @@ class YukiBoardIMEService : InputMethodService() {
         if (composing.isEmpty() && context.isBlank()) return
 
         aiCandidateJob = serviceScope.launch {
+            val capturedComposing = composing
             delay(AI_CANDIDATE_DEBOUNCE_MS)
+            // F-2: 確認上下文沒變，避免把舊的 AI 補字貼到新的候選列
+            if (inputRouter.composingText != capturedComposing) return@launch
             try {
                 val input = com.snowrealm.yukiboard.claw.ClawInput(
-                    text = composing.ifEmpty { context.takeLast(30) },
+                    text = capturedComposing.ifEmpty { context.takeLast(30) },
                     context = context,
                     appPackage = currentInputEditorInfo?.packageName ?: "",
                     language = if (inputRouter.inputMode == com.snowrealm.yukiboard.input.router.InputMode.ENGLISH) "en" else "zh-TW",
@@ -1746,6 +1776,10 @@ class YukiBoardIMEService : InputMethodService() {
     private var swipeInputCandidates: List<String> = emptyList()
 
     private fun handleKeyPress(keyCode: Int, label: String) {
+        // F-12: 語音輸入中按鍵先停止語音，避免 partial result 互蓋
+        if (speechEngine?.isListening == true) {
+            stopVoiceInput()
+        }
         // 清除滑動輸入待選狀態（開始打字表示放棄滑動候選）
         if (swipeInputPending) {
             swipeInputPending = false

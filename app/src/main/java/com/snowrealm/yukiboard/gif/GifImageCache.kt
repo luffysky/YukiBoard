@@ -49,10 +49,24 @@ class GifImageCache(context: Context) {
                 val bytes = client.newCall(Request.Builder().url(url).build())
                     .execute().body?.bytes() ?: return@withContext null
                 FileOutputStream(diskFile).use { it.write(bytes) }
+                trimDiskCacheIfNeeded()
                 val bmp = decodeSized(bytes)
                 if (bmp != null) memCache.put(key, bmp)
                 bmp
             } catch (_: Exception) { null }
+        }
+    }
+
+    private val maxDiskBytes = 30L * 1024 * 1024 // 30MB
+
+    private fun trimDiskCacheIfNeeded() {
+        val files = diskDir.listFiles() ?: return
+        var total = files.sumOf { it.length() }
+        if (total <= maxDiskBytes) return
+        files.sortedBy { it.lastModified() }.forEach { file ->
+            if (total <= maxDiskBytes * 8 / 10) return
+            total -= file.length()
+            file.delete()
         }
     }
 

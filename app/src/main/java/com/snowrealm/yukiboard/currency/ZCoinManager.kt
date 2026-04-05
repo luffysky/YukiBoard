@@ -44,8 +44,9 @@ class ZCoinManager(context: Context) {
      * 消費 Z幣（本地扣除，需同步到 Supabase）。
      * @return true = 扣款成功
      */
+    @Synchronized
     fun spend(amount: Int, description: String): Boolean {
-        if (amount <= 0 || !canAfford(amount)) return false
+        if (amount <= 0 || balance < amount) return false
         balance -= amount
         addTransaction(Transaction(
             type = TransactionType.SPEND,

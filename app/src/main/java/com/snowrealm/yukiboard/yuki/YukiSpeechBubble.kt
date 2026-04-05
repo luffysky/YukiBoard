@@ -132,13 +132,22 @@ class YukiSpeechBubble(context: Context) : View(context) {
         translationY = y.toFloat().coerceAtLeast(0f)
     }
 
+    private val hideRunnable = Runnable {
+        animate()
+            .alpha(0f)
+            .setDuration(FADE_DURATION_MS)
+            .withEndAction { hideNow() }
+            .start()
+    }
+
     private fun scheduleHide() {
-        postDelayed({
-            animate()
-                .alpha(0f)
-                .setDuration(FADE_DURATION_MS)
-                .withEndAction { hideNow() }
-                .start()
-        }, DISPLAY_DURATION_MS)
+        removeCallbacks(hideRunnable)
+        postDelayed(hideRunnable, DISPLAY_DURATION_MS)
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        removeCallbacks(hideRunnable)
+        animate().cancel()
     }
 }

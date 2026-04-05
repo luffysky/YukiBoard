@@ -283,6 +283,7 @@ class BluetoothHidKeyboard(context: Context) : RemoteKeyboardService {
     }
 
     override fun destroy() {
+        handler.removeCallbacksAndMessages(null)
         stop()
         stateListener = null
         remoteKeyListener = null

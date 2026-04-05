@@ -62,7 +62,7 @@ class KeyboardParticleView(context: Context) : View(context) {
 
     fun setTheme(theme: KeyboardTheme) {
         themeId = theme.id
-        particles.clear()
+        post { particles.clear() }
     }
 
     fun start() {
