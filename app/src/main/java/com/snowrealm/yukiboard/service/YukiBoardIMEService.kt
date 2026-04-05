@@ -1883,9 +1883,10 @@ class YukiBoardIMEService : InputMethodService() {
                 val eng = inputRouter.getActiveEngine()
                 if (eng is com.snowrealm.yukiboard.input.engine.JapaneseInputEngine) {
                     eng.toggleKatakana()
+                    // 切換 50 音佈局（平假名 ⇔ 片假名）
+                    KeyboardState.isKatakanaMode = eng.katakanaMode
+                    keyboardView.updateKeyRows(KeyboardState.japaneseRows())
                     keyboardView.updateComposingText(inputRouter.composingText)
-                    // 更新按鈕標籤
-                    val newLabel = if (eng.katakanaMode) "カナ→あ" else "あ→カナ"
                     keyboardView.showToast(if (eng.katakanaMode) "片仮名モード" else "平仮名モード")
                 }
             }
