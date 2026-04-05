@@ -27,6 +27,7 @@ import com.snowrealm.yukiboard.remote.RemoteKeyboardService
 import com.snowrealm.yukiboard.remote.WifiKeyboardServer
 import com.snowrealm.yukiboard.speech.AndroidSpeechEngine
 import com.snowrealm.yukiboard.speech.SpeechInputEngine
+import com.snowrealm.yukiboard.speech.FasterWhisperSpeechEngine
 import com.snowrealm.yukiboard.speech.WhisperSpeechEngine
 import com.snowrealm.yukiboard.theme.KeyboardTheme
 import com.snowrealm.yukiboard.theme.ThemeManager
@@ -101,6 +102,7 @@ class YukiBoardIMEService : InputMethodService() {
 
     // 語音輸入
     private var speechEngine: SpeechInputEngine? = null
+    private var voiceOverlay: com.snowrealm.yukiboard.ui.speech.VoiceRecognitionOverlay? = null
 
     // TTS 語音輸出
     private var ttsEngine: com.snowrealm.yukiboard.speech.SpeechOutputEngine? = null
@@ -254,6 +256,24 @@ class YukiBoardIMEService : InputMethodService() {
         toolbarView = ToolbarView(this)
         toolbarView.onPanelSelected = { panel -> handlePanelToggle(panel) }
         rootContainer.addView(toolbarView, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ))
+
+        // 語音辨識 Overlay（液態玻璃氣泡框）
+        voiceOverlay = com.snowrealm.yukiboard.ui.speech.VoiceRecognitionOverlay(this).also {
+            it.onConfirm = { text ->
+                currentInputConnection?.commitText(text, 1)
+                characterView?.playHappy()
+                keyboardView.voiceListeningLocale = null
+            }
+            it.onCancel = {
+                speechEngine?.cancel()
+                characterView?.playIdle()
+                keyboardView.voiceListeningLocale = null
+            }
+        }
+        rootContainer.addView(voiceOverlay, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         ))
@@ -1127,7 +1147,6 @@ class YukiBoardIMEService : InputMethodService() {
         // 檢查麥克風權限
         if (android.content.pm.PackageManager.PERMISSION_GRANTED !=
             checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)) {
-            // IME 無法直接彈出權限對話框，開啟設定頁讓使用者手動授權
             val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                 data = android.net.Uri.fromParts("package", packageName, null)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -1137,52 +1156,59 @@ class YukiBoardIMEService : InputMethodService() {
             return
         }
 
-        // 根據設定選擇語音引擎（每次重新建立，確保設定變更即時生效）
+        // 根據設定選擇語音引擎（0=Android, 1=Whisper, 2=Faster-Whisper）
         val desiredType = prefs.speechEngineType
         val needRecreate = when {
             speechEngine == null -> true
+            desiredType == 2 && speechEngine !is FasterWhisperSpeechEngine -> true
             desiredType == 1 && speechEngine !is WhisperSpeechEngine -> true
             desiredType == 0 && speechEngine !is AndroidSpeechEngine -> true
             else -> false
         }
         if (needRecreate) {
             speechEngine?.destroy()
-            speechEngine = if (desiredType == 1) {
-                val buildKey = com.snowrealm.yukiboard.BuildConfig.OPENAI_API_KEY
-                val apiKey = buildKey.takeIf { it.isNotBlank() }
-                    ?: com.snowrealm.yukiboard.claw.provider.AIProviderManager
-                        .getInstance(applicationContext)
-                        .getApiKey(com.snowrealm.yukiboard.claw.provider.AIProviderType.OPENAI)
-                if (apiKey.isNullOrBlank()) {
-                    keyboardView.showToast("請先設定 OpenAI API Key")
-                    // fallback 到內建引擎
-                    AndroidSpeechEngine(applicationContext)
-                } else {
-                    WhisperSpeechEngine(apiKey)
+            speechEngine = when (desiredType) {
+                2 -> {
+                    val serverUrl = prefs.fasterWhisperServerUrl
+                    if (serverUrl.isBlank()) {
+                        keyboardView.showToast("請先設定 Faster-Whisper Server URL")
+                        AndroidSpeechEngine(applicationContext)
+                    } else {
+                        FasterWhisperSpeechEngine(serverUrl)
+                    }
                 }
-            } else {
-                AndroidSpeechEngine(applicationContext)
+                1 -> {
+                    val buildKey = com.snowrealm.yukiboard.BuildConfig.OPENAI_API_KEY
+                    val apiKey = buildKey.takeIf { it.isNotBlank() }
+                        ?: com.snowrealm.yukiboard.claw.provider.AIProviderManager
+                            .getInstance(applicationContext)
+                            .getApiKey(com.snowrealm.yukiboard.claw.provider.AIProviderType.OPENAI)
+                    if (apiKey.isNullOrBlank()) {
+                        keyboardView.showToast("請先設定 OpenAI API Key")
+                        AndroidSpeechEngine(applicationContext)
+                    } else {
+                        WhisperSpeechEngine(apiKey)
+                    }
+                }
+                else -> AndroidSpeechEngine(applicationContext)
             }
         }
 
-        // 顯示當前引擎（方便除錯）
-        val isWhisper = speechEngine is WhisperSpeechEngine
-        val engineName = if (isWhisper) "Whisper API" else "Android 內建"
-        val debugInfo = if (isWhisper) {
-            val key = com.snowrealm.yukiboard.BuildConfig.OPENAI_API_KEY.takeIf { it.isNotBlank() }
-                ?: com.snowrealm.yukiboard.claw.provider.AIProviderManager
-                    .getInstance(applicationContext)
-                    .getApiKey(com.snowrealm.yukiboard.claw.provider.AIProviderType.OPENAI)
-            " (Key: ${key?.take(8) ?: "無"}...)"
-        } else ""
-        keyboardView.showToast("語音引擎：$engineName$debugInfo")
+        // 引擎名稱
+        val engineName = when (speechEngine) {
+            is FasterWhisperSpeechEngine -> "Faster-Whisper"
+            is WhisperSpeechEngine -> "Whisper API"
+            else -> "Android 內建"
+        }
 
         // F-1: 語音輸入開始前，先停止 TTS 避免搶麥克風
         ttsEngine?.stop()
 
         characterView?.playListening()
 
-        // 語言 hint（主要用於 Android SpeechRecognizer 的預設語言，但兩引擎都支援多語言自動偵測）
+        // 顯示語音辨識 Overlay
+        voiceOverlay?.show(engineName)
+
         val localeHint = when (inputRouter.inputMode) {
             com.snowrealm.yukiboard.input.router.InputMode.BOPOMOFO -> "zh-TW"
             com.snowrealm.yukiboard.input.router.InputMode.PINYIN -> "zh-CN"
@@ -1190,7 +1216,7 @@ class YukiBoardIMEService : InputMethodService() {
             com.snowrealm.yukiboard.input.router.InputMode.SPEED_CANGJIE -> "zh-TW"
             com.snowrealm.yukiboard.input.router.InputMode.JAPANESE -> "ja-JP"
             com.snowrealm.yukiboard.input.router.InputMode.KOREAN -> "ko-KR"
-            else -> "zh-TW" // 預設中文優先（台灣用戶為主）
+            else -> "zh-TW"
         }
 
         keyboardView.voiceListeningLocale = "auto"
@@ -1198,34 +1224,34 @@ class YukiBoardIMEService : InputMethodService() {
         speechEngine?.startListening(
             locale = localeHint,
             onPartialResult = { partial ->
-                currentInputConnection?.setComposingText(partial, 1)
+                // 顯示在 Overlay，不寫入輸入框
+                voiceOverlay?.updatePartial(partial)
             },
             onFinalResult = { result ->
-                val ic = currentInputConnection ?: return@startListening
                 keyboardView.voiceListeningLocale = null
                 if (result.isNotEmpty()) {
-                    // 用最終結果直接取代 composing 文字，再 finish → 避免重複
-                    ic.setComposingText(result, 1)
-                    ic.finishComposingText()
-                    characterView?.playHappy()
+                    // 顯示最終結果在 Overlay，倒數後自動 commitText
+                    voiceOverlay?.showFinal(result)
                 } else {
-                    ic.setComposingText("", 0)
-                    ic.finishComposingText()
+                    voiceOverlay?.dismiss()
                     characterView?.playIdle()
                 }
             },
             onError = { errorCode ->
                 keyboardView.voiceListeningLocale = null
                 characterView?.playIdle()
-                currentInputConnection?.finishComposingText()
                 val errorMsg = when (errorCode) {
+                    FasterWhisperSpeechEngine.ERROR_NO_SERVER -> "語音辨識失敗：未設定 Server URL"
                     WhisperSpeechEngine.ERROR_NO_API_KEY -> "語音辨識失敗：未設定 API Key"
-                    WhisperSpeechEngine.ERROR_NO_PERMISSION -> "語音辨識失敗：無麥克風權限"
-                    WhisperSpeechEngine.ERROR_AUDIO_INIT -> "語音辨識失敗：錄音初始化失敗"
-                    WhisperSpeechEngine.ERROR_NETWORK -> "語音辨識失敗：網路錯誤"
+                    WhisperSpeechEngine.ERROR_NO_PERMISSION,
+                    FasterWhisperSpeechEngine.ERROR_NO_PERMISSION -> "語音辨識失敗：無麥克風權限"
+                    WhisperSpeechEngine.ERROR_AUDIO_INIT,
+                    FasterWhisperSpeechEngine.ERROR_AUDIO_INIT -> "語音辨識失敗：錄音初始化失敗"
+                    WhisperSpeechEngine.ERROR_NETWORK,
+                    FasterWhisperSpeechEngine.ERROR_NETWORK -> "語音辨識失敗：網路錯誤"
                     else -> "語音辨識錯誤 ($errorCode)"
                 }
-                keyboardView.showToast(errorMsg)
+                voiceOverlay?.showError(errorMsg)
             }
         )
     }
@@ -1234,6 +1260,7 @@ class YukiBoardIMEService : InputMethodService() {
         speechEngine?.stopListening()
         keyboardView.voiceListeningLocale = null
         characterView?.playIdle()
+        // stopListening 會觸發 onFinalResult → overlay 顯示最終結果
     }
 
     // =========================================================================

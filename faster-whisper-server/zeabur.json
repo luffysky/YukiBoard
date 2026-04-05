@@ -1,0 +1,18 @@
+{
+  "$schema": "https://schema.zeabur.app/template.json",
+  "name": "faster-whisper-server",
+  "description": "YukiBoard Faster-Whisper speech-to-text API",
+  "port": 8000,
+  "build": {
+    "type": "dockerfile",
+    "dockerfile": "Dockerfile"
+  },
+  "env": {
+    "WHISPER_MODEL": "base",
+    "WHISPER_DEVICE": "auto",
+    "WHISPER_COMPUTE_TYPE": "auto",
+    "MAX_FILE_SIZE_MB": "25",
+    "WHISPER_API_KEY": "",
+    "PORT": "8000"
+  }
+}

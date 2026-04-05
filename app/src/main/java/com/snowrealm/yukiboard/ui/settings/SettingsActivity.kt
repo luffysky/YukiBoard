@@ -1663,9 +1663,9 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
-    /** 語音引擎選擇器：Android 內建 / OpenAI Whisper + 連線測試 */
+    /** 語音引擎選擇器：Android 內建 / OpenAI Whisper / Faster-Whisper + 連線測試 */
     private fun speechEngineSelector(): LinearLayout {
-        val options = arrayOf("Android 內建", "OpenAI Whisper")
+        val options = arrayOf("Android 內建", "OpenAI Whisper", "Faster-Whisper（自架・免費）")
         val outer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(8), dp(6), dp(8), dp(6))
@@ -1686,7 +1686,7 @@ class SettingsActivity : AppCompatActivity() {
             setTextColor(0xFFE8F4FF.toInt())
         })
         textContainer.addView(TextView(this).apply {
-            text = "Whisper 需要 OpenAI API Key"
+            text = "Whisper 需 API Key / Faster-Whisper 自架免費"
             textSize = 11f
             setTextColor(0xFF6688AA.toInt())
         })
@@ -1705,7 +1705,7 @@ class SettingsActivity : AppCompatActivity() {
             setOnClickListener {
                 android.app.AlertDialog.Builder(this@SettingsActivity, android.R.style.Theme_Material_Dialog_Alert)
                     .setTitle("選擇語音辨識引擎")
-                    .setSingleChoiceItems(options, prefs.speechEngineType) { dialog, which ->
+                    .setSingleChoiceItems(options, prefs.speechEngineType.coerceIn(0, options.lastIndex)) { dialog, which ->
                         prefs.speechEngineType = which
                         text = options[which]
                         dialog.dismiss()
@@ -1716,27 +1716,106 @@ class SettingsActivity : AppCompatActivity() {
         row.addView(btnLabel)
         outer.addView(row)
 
-        // Whisper 連線測試按鈕
+        // Faster-Whisper Server URL 輸入欄
+        outer.addView(TextView(this).apply {
+            text = "Faster-Whisper Server URL"
+            textSize = 12f
+            setTextColor(0xFF6688AA.toInt())
+            setPadding(dp(4), dp(10), dp(4), dp(2))
+        })
+        val urlBg = android.graphics.drawable.GradientDrawable().apply {
+            setColor(0xFF0D1628.toInt())
+            cornerRadius = dp(6).toFloat()
+            setStroke(1, 0xFF3A5580.toInt())
+        }
+        val urlInput = android.widget.EditText(this)
+        urlInput.setText(prefs.fasterWhisperServerUrl)
+        urlInput.hint = "https://whisper.snowrealm.com"
+        urlInput.textSize = 13f
+        urlInput.setTextColor(0xFFE8F4FF.toInt())
+        urlInput.setHintTextColor(0xFF3A5580.toInt())
+        urlInput.setPadding(dp(10), dp(8), dp(10), dp(8))
+        urlInput.background = urlBg
+        urlInput.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
+        urlInput.setSingleLine()
+        urlInput.setOnFocusChangeListener { _: android.view.View, hasFocus: Boolean ->
+            if (!hasFocus) prefs.fasterWhisperServerUrl = urlInput.text.toString().trim()
+        }
+        outer.addView(urlInput)
+
+        // 測試連線按鈕（兩個：Whisper + Faster-Whisper）
         val testStatus = TextView(this).apply {
             textSize = 12f
             setTextColor(0xFF6688AA.toInt())
             setPadding(dp(4), dp(4), dp(4), 0)
         }
-        val testBtn = TextView(this).apply {
+
+        val btnRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, dp(6), 0, 0)
+        }
+        btnRow.addView(TextView(this).apply {
             text = "測試 Whisper 連線"
             textSize = 12f
             setTextColor(0xFF66AAFF.toInt())
-            setPadding(dp(4), dp(8), dp(4), dp(4))
+            setPadding(dp(4), dp(6), dp(12), dp(4))
             setOnClickListener {
                 testStatus.text = "測試中..."
                 testStatus.setTextColor(0xFFFFCC00.toInt())
                 testWhisperConnection(testStatus)
             }
-        }
-        outer.addView(testBtn)
+        })
+        btnRow.addView(TextView(this).apply {
+            text = "測試 Faster-Whisper"
+            textSize = 12f
+            setTextColor(0xFF66AAFF.toInt())
+            setPadding(dp(4), dp(6), dp(4), dp(4))
+            setOnClickListener { _ ->
+                val url = urlInput.text.toString().trim()
+                if (url.isBlank()) {
+                    testStatus.text = "✕ 請先輸入 Server URL"
+                    testStatus.setTextColor(0xFFFF6B6B.toInt())
+                    return@setOnClickListener
+                }
+                prefs.fasterWhisperServerUrl = url
+                testStatus.text = "測試中..."
+                testStatus.setTextColor(0xFFFFCC00.toInt())
+                testFasterWhisperConnection(url, testStatus)
+            }
+        })
+        outer.addView(btnRow)
         outer.addView(testStatus)
 
         return outer
+    }
+
+    private fun testFasterWhisperConnection(serverUrl: String, statusView: TextView) {
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            try {
+                val client = okhttp3.OkHttpClient.Builder()
+                    .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
+                val url = serverUrl.trimEnd('/') + "/health"
+                val request = okhttp3.Request.Builder().url(url).get().build()
+                val response = client.newCall(request).execute()
+                val body = response.body?.string() ?: ""
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    if (response.isSuccessful) {
+                        statusView.text = "✓ Faster-Whisper 連線成功！$body"
+                        statusView.setTextColor(0xFF66FF66.toInt())
+                    } else {
+                        statusView.text = "✕ HTTP ${response.code}: ${body.take(100)}"
+                        statusView.setTextColor(0xFFFF6B6B.toInt())
+                    }
+                }
+            } catch (e: Exception) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    statusView.text = "✕ 連線失敗: ${e.message}"
+                    statusView.setTextColor(0xFFFF6B6B.toInt())
+                }
+            }
+        }
     }
 
     private fun testWhisperConnection(statusView: TextView) {

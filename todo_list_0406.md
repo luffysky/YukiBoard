@@ -684,10 +684,94 @@ Phase 3：上架準備
   Google Play 上架                           ← 商店頁面素材 + 審核 + 分階段發布
 ```
 
+---
+
+### 批次 M — 語音辨識 UX 重構 + Faster-Whisper
+
+> 目標：辨識中文字不直接寫入輸入框，改用液態玻璃氣泡框 Overlay 顯示，辨識完才一次送入
+
+#### M-1 VoiceRecognitionOverlay（液態玻璃氣泡框）
+- [ ] 新增 `ui/speech/VoiceRecognitionOverlay.kt` — 鍵盤上方浮動氣泡框
+  - 頂部標題「語音辨識中...」+ 引擎名稱小字
+  - 液態玻璃效果（模糊背景 + 半透明漸層 + 圓角 + 光澤邊框 + 內陰影）
+  - RenderEffect.createBlurEffect() 毛玻璃 + 漸層邊框呼吸動畫
+  - 辨識中文字區域：兩行高度 + 可垂直 scroll（長文不截斷）
+  - 文字即時更新（typewriter 逐字浮現動畫）
+  - 聲波動畫條（3~5 條高低跳動，表示正在收音）
+  - 雪凜小頭像在氣泡左側（listening 表情）
+- [ ] 底部按鈕列：「取消 ✕」「確認送出 ✓」
+- [ ] 辨識完成自動送出（3 秒倒數，可手動提前送出或取消）
+- [ ] 顯示當前引擎名稱（Android / Whisper / Faster-Whisper）
+
+#### M-2 語音辨識流程重構
+- [ ] `YukiBoardIMEService.toggleVoiceInput()` 改用 Overlay
+  - partial result → `overlay.updateText(partial)`（不再 setComposingText）
+  - final result → `overlay.showFinal(result)` + 倒數自動 commitText
+  - 取消 → `overlay.dismiss()` 不送任何文字
+- [ ] Overlay 確認送出 → `commitText(result, 1)` 一次性寫入
+- [ ] 錯誤訊息也顯示在 Overlay 內（不用 Toast）
+
+#### M-3 Faster-Whisper Server（Zeabur 部署）
+- [ ] 新建 `faster-whisper-server/` 專案目錄
+  - `main.py` — FastAPI server
+  - `Dockerfile` — Python 3.11 + faster-whisper + CUDA（Zeabur GPU）
+  - `zeabur.json` — 部署設定
+  - `requirements.txt` — faster-whisper, fastapi, uvicorn, python-multipart
+- [ ] `POST /v1/transcribe` — 接收 WAV/WebM，回傳 JSON `{ "text": "..." }`
+  - 參數：`language`（可選，自動偵測）、`model`（tiny/base/small/medium）
+  - 回傳：`{ "text", "language", "duration", "segments" }`
+- [ ] `POST /v1/transcribe/stream` — SSE 串流 partial results
+- [ ] 健康檢查 `GET /health`
+- [ ] Zeabur 部署 + 綁定 subdomain（如 `whisper.snowrealm.com`）
+
+#### M-4 FasterWhisperSpeechEngine.kt
+- [ ] 新增 `speech/FasterWhisperSpeechEngine.kt`
+  - AudioRecord 錄音 → WAV → POST 到自架 server
+  - 支援 SSE partial results
+  - server URL 從 YukiPreferences 讀取
+- [ ] `SpeechInputEngine` 介面不變，直接替換
+
+#### M-5 設定頁整合
+- [ ] 語音引擎選單新增第三選項「Faster-Whisper（自架・免費）」
+- [ ] 新增 Faster-Whisper Server URL 輸入欄（預設 `https://whisper.snowrealm.com`）
+- [ ] 新增「測試連線」按鈕（呼叫 `/health`）
+- [ ] YukiPreferences 新增 `fasterWhisperServerUrl` 屬性
+
+---
+
+### 批次 N — UI 缺口修復
+
+#### N-1 Z幣錢包入口
+- [ ] 設定頁加「Z幣錢包」按鈕 → 跳轉 `ZCoinWalletActivity`
+- [ ] 顯示目前餘額預覽
+
+#### N-2 懸浮鍵盤快捷入口
+- [ ] 長按 Tab 環形選單加「懸浮」選項（FloatingKeyboardWrapper toggle）
+
+#### N-3 Snippet 管理 UI
+- [ ] 設定頁加「Snippet 管理」入口
+- [ ] 列表顯示所有 snippet（內建 + 自訂）
+- [ ] 新增 / 編輯 / 刪除自訂 snippet 對話框
+
+#### N-4 輸入法選擇
+- [ ] 設定頁加「啟用的輸入法」多選
+- [ ] 勾選：注音 / 拼音 / 倉頡 / 速成 / 日文 / 韓文 / 英文
+- [ ] InputRouter.enabledModes 讀取設定
+
+#### N-5 VRM 角色開關
+- [ ] 設定頁動畫群組加 `vrmCharacterEnabled` toggle
+
+#### N-6 Dead Preferences 清理
+- [ ] 接上或移除 `hapticFeedbackEnabled`（接到 KeyboardView 按鍵震動）
+- [ ] 移除 `weatherPanelEnabled`、`stickerPanelEnabled`、`multiplayerEnabled`
+- [ ] 移除或實作 `keyboardWidthRatio`
+
+---
+
 ## 備註
 
-- 版本號：**v0.5.9**（versionCode 33）
-- deploy 指令：`bash scripts/deploy.sh "更新��明"` 或 `./gradlew appDistributionUploadDebug`
+- 版本號：**v0.8.0**（versionCode 60）
+- deploy 指令：`bash scripts/deploy.sh "更新說明"` 或 `./gradlew appDistributionUploadDebug`
 - Firebase App Distribution 測��群��：`testers`
 - google-services.json 已在 .gitignore
 - YukiBoard Supabase DB：`43.167.237.37:30183`（獨立專案）
