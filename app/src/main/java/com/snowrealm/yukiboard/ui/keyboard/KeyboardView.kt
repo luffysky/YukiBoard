@@ -109,6 +109,7 @@ class KeyboardView(context: Context) : View(context) {
         const val KEYCODE_SWITCH_SYMBOLS = -501  // 切到更多符號鍵盤
         const val KEYCODE_SWITCH_ABC     = -502  // 切回字母鍵盤
         const val KEYCODE_TOGGLE_KANA    = -503  // 日語 あ⇔ア 切換
+        const val KEYCODE_SWITCH_NUMPAD  = -504  // 切到數字鍵盤（計算機）
 
         private const val LONG_PRESS_DELAY = 400L
         private const val CANDIDATE_BAR_MAX = 6
@@ -219,7 +220,7 @@ class KeyboardView(context: Context) : View(context) {
         set(value) { field = value; invalidate() }
 
     /** 子佈局：NORMAL 模式下可切換數字/符號鍵盤 */
-    private enum class SubLayout { ABC, NUMBERS, SYMBOLS }
+    private enum class SubLayout { ABC, NUMBERS, SYMBOLS, NUMPAD }
     private var subLayout: SubLayout = SubLayout.ABC
 
     // -------------------------------------------------------------------------
@@ -666,6 +667,7 @@ class KeyboardView(context: Context) : View(context) {
             SubLayout.ABC -> rowsForCurrentInputMode()
             SubLayout.NUMBERS -> KeyboardState.numberSymbolRows()
             SubLayout.SYMBOLS -> KeyboardState.moreSymbolRows()
+            SubLayout.NUMPAD -> KeyboardState.numpadRows()
         }
         KeyboardMode.DESIGNER -> KeyboardState.designerRows()
         KeyboardMode.DEVELOPER -> KeyboardState.developerRows()
@@ -696,6 +698,10 @@ class KeyboardView(context: Context) : View(context) {
                 )
                 SubLayout.SYMBOLS -> Pair(
                     KeyboardState.moreSymbolRows(),
+                    emptyList()
+                )
+                SubLayout.NUMPAD -> Pair(
+                    KeyboardState.numpadRows(),
                     emptyList()
                 )
             }
@@ -1883,6 +1889,7 @@ class KeyboardView(context: Context) : View(context) {
                         key.code == KEYCODE_SWITCH_NUMBERS -> switchSubLayout(SubLayout.NUMBERS)
                         key.code == KEYCODE_SWITCH_SYMBOLS -> switchSubLayout(SubLayout.SYMBOLS)
                         key.code == KEYCODE_SWITCH_ABC -> switchSubLayout(SubLayout.ABC)
+                        key.code == KEYCODE_SWITCH_NUMPAD -> switchSubLayout(SubLayout.NUMPAD)
                         key.code == KEYCODE_SHIFT -> toggleShift()
                         key.code == KEYCODE_CTRL -> toggleCtrl()
                         isCtrlActive && !key.isSpecial -> {

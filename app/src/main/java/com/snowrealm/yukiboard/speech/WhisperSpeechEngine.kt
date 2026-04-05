@@ -77,6 +77,7 @@ class WhisperSpeechEngine(
         audioRecord?.startRecording()
 
         val whisperLocale = locale.substringBefore("-") // "zh-TW" → "zh"
+        android.util.Log.i("WhisperEngine", "▶ startListening: apiKey=${apiKey.take(8)}..., locale=$whisperLocale")
 
         recordingJob = scope.launch {
             val pcmStream = ByteArrayOutputStream()

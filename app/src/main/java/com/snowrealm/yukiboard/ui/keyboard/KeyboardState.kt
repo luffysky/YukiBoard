@@ -207,66 +207,106 @@ data class KeyboardState(
         // 注音佈局
         // =================================================================
         fun bopomofoRows(): List<List<KeyModel>> = listOf(
-            // 大千式標準排列（ㄦ 移至底行）
-            // 每個注音/聲調鍵長按可直接輸出注音符號本身（altChars）
+            // 大千式標準排列 — Gboard 風格
+            // 長按注音鍵可輸出對應 QWERTY 英文/數字
+            // Row 1: 聲母+聲調（對應數字鍵 1-0）
             listOf(
-                KeyModel.char("ㄅ", altChars = listOf("ㄅ")),
-                KeyModel.char("ㄉ", altChars = listOf("ㄉ")),
-                KeyModel.char("ˇ", altChars = listOf("ˇ")),
-                KeyModel.char("ˋ", altChars = listOf("ˋ")),
-                KeyModel.char("ㄓ", altChars = listOf("ㄓ")),
-                KeyModel.char("ˊ", altChars = listOf("ˊ")),
-                KeyModel.char("˙", altChars = listOf("˙")),
-                KeyModel.char("ㄚ", altChars = listOf("ㄚ")),
-                KeyModel.char("ㄞ", altChars = listOf("ㄞ")),
-                KeyModel.char("ㄢ", altChars = listOf("ㄢ"))
+                KeyModel.char("ㄅ", altChars = listOf("1", "！", "＠")),
+                KeyModel.char("ㄉ", altChars = listOf("2", "＃", "＄")),
+                KeyModel.char("ˇ", altChars = listOf("3", "％", "＾")),
+                KeyModel.char("ˋ", altChars = listOf("4", "＆", "＊")),
+                KeyModel.char("ㄓ", altChars = listOf("5", "（", "）")),
+                KeyModel.char("ˊ", altChars = listOf("6", "－", "＝")),
+                KeyModel.char("˙", altChars = listOf("7", "＋", "／")),
+                KeyModel.char("ㄚ", altChars = listOf("8", "［", "］")),
+                KeyModel.char("ㄞ", altChars = listOf("9", "｛", "｝")),
+                KeyModel.char("ㄢ", altChars = listOf("0", "～", "｀"))
             ),
+            // Row 2: 聲母+韻母（對應 QWERTY qwertyuiop）
             listOf(
-                KeyModel.char("ㄆ", altChars = listOf("ㄆ")),
-                KeyModel.char("ㄊ", altChars = listOf("ㄊ")),
-                KeyModel.char("ㄍ", altChars = listOf("ㄍ")),
-                KeyModel.char("ㄐ", altChars = listOf("ㄐ")),
-                KeyModel.char("ㄔ", altChars = listOf("ㄔ")),
-                KeyModel.char("ㄗ", altChars = listOf("ㄗ")),
-                KeyModel.char("ㄧ", altChars = listOf("ㄧ")),
-                KeyModel.char("ㄛ", altChars = listOf("ㄛ")),
-                KeyModel.char("ㄟ", altChars = listOf("ㄟ")),
-                KeyModel.char("ㄣ", altChars = listOf("ㄣ"))
+                KeyModel.char("ㄆ", altChars = listOf("q", "Q")),
+                KeyModel.char("ㄊ", altChars = listOf("w", "W")),
+                KeyModel.char("ㄍ", altChars = listOf("e", "E")),
+                KeyModel.char("ㄐ", altChars = listOf("r", "R")),
+                KeyModel.char("ㄔ", altChars = listOf("t", "T")),
+                KeyModel.char("ㄗ", altChars = listOf("y", "Y")),
+                KeyModel.char("ㄧ", altChars = listOf("u", "U")),
+                KeyModel.char("ㄛ", altChars = listOf("i", "I")),
+                KeyModel.char("ㄟ", altChars = listOf("o", "O")),
+                KeyModel.char("ㄣ", altChars = listOf("p", "P"))
             ),
+            // Row 3: 聲母+韻母（對應 QWERTY asdfghjkl;）
             listOf(
-                KeyModel.char("ㄇ", altChars = listOf("ㄇ")),
-                KeyModel.char("ㄋ", altChars = listOf("ㄋ")),
-                KeyModel.char("ㄎ", altChars = listOf("ㄎ")),
-                KeyModel.char("ㄑ", altChars = listOf("ㄑ")),
-                KeyModel.char("ㄕ", altChars = listOf("ㄕ")),
-                KeyModel.char("ㄘ", altChars = listOf("ㄘ")),
-                KeyModel.char("ㄨ", altChars = listOf("ㄨ")),
-                KeyModel.char("ㄜ", altChars = listOf("ㄜ")),
-                KeyModel.char("ㄠ", altChars = listOf("ㄠ")),
-                KeyModel.char("ㄤ", altChars = listOf("ㄤ"))
+                KeyModel.char("ㄇ", altChars = listOf("a", "A")),
+                KeyModel.char("ㄋ", altChars = listOf("s", "S")),
+                KeyModel.char("ㄎ", altChars = listOf("d", "D")),
+                KeyModel.char("ㄑ", altChars = listOf("f", "F")),
+                KeyModel.char("ㄕ", altChars = listOf("g", "G")),
+                KeyModel.char("ㄘ", altChars = listOf("h", "H")),
+                KeyModel.char("ㄨ", altChars = listOf("j", "J")),
+                KeyModel.char("ㄜ", altChars = listOf("k", "K")),
+                KeyModel.char("ㄠ", altChars = listOf("l", "L")),
+                KeyModel.char("ㄤ", altChars = listOf(";", ":"))
             ),
+            // Row 4: ⇧ + 聲母+韻母 + ⌫（對應 QWERTY zxcvbnm,./ + Shift/Backspace）
             listOf(
-                KeyModel.char("ㄈ", altChars = listOf("ㄈ")),
-                KeyModel.char("ㄌ", altChars = listOf("ㄌ")),
-                KeyModel.char("ㄏ", altChars = listOf("ㄏ")),
-                KeyModel.char("ㄒ", altChars = listOf("ㄒ")),
-                KeyModel.char("ㄖ", altChars = listOf("ㄖ")),
-                KeyModel.char("ㄙ", altChars = listOf("ㄙ")),
-                KeyModel.char("ㄩ", altChars = listOf("ㄩ")),
-                KeyModel.char("ㄝ", altChars = listOf("ㄝ")),
-                KeyModel.char("ㄡ", altChars = listOf("ㄡ")),
-                KeyModel.char("ㄥ", altChars = listOf("ㄥ"))
+                KeyModel.special("⇧", KeyboardView.KEYCODE_SHIFT, widthWeight = 1.2f),
+                KeyModel.char("ㄈ", altChars = listOf("z", "Z")),
+                KeyModel.char("ㄌ", altChars = listOf("x", "X")),
+                KeyModel.char("ㄏ", altChars = listOf("c", "C")),
+                KeyModel.char("ㄒ", altChars = listOf("v", "V")),
+                KeyModel.char("ㄖ", altChars = listOf("b", "B")),
+                KeyModel.char("ㄙ", altChars = listOf("n", "N")),
+                KeyModel.char("ㄩ", altChars = listOf("m", "M")),
+                KeyModel.char("ㄝ", altChars = listOf(",", "，")),
+                KeyModel.char("ㄡ", altChars = listOf(".", "。")),
+                KeyModel.char("ㄥ", altChars = listOf("/", "？")),
+                KeyModel.special("⌫", KeyboardView.KEYCODE_DELETE, widthWeight = 1.2f)
             ),
-            // 底行（ㄦ 移至此行）
+            // Row 5: 底行功能鍵
             listOf(
-                KeyModel.char("ㄦ", altChars = listOf("ㄦ")),
-                KeyModel.special("?123", KeyboardView.KEYCODE_SWITCH_NUMBERS, widthWeight = 1.0f),
-                KeyModel.special("⌫", KeyboardView.KEYCODE_DELETE, widthWeight = 1.2f),
+                KeyModel.special("?123", KeyboardView.KEYCODE_SWITCH_NUMBERS, widthWeight = 1.2f),
                 KeyModel.special("切換", KeyboardView.KEYCODE_SWITCH_LANG, widthWeight = 1.0f),
-                KeyModel.special(" ", KeyboardView.KEYCODE_SPACE, widthWeight = 3.0f),
                 KeyModel.special(",", KeyboardView.KEYCODE_COMMA, altChars = listOf("，", "、", "；")),
+                KeyModel.special(" ", KeyboardView.KEYCODE_SPACE, widthWeight = 3.5f),
                 KeyModel.special(".", KeyboardView.KEYCODE_PERIOD, altChars = listOf("。", "！", "？")),
+                KeyModel.char("ㄦ", altChars = listOf("ㄦ")),
                 KeyModel.special("↵", KeyboardView.KEYCODE_ENTER, widthWeight = 1.2f)
+            )
+        )
+
+        // =================================================================
+        // 數字鍵盤（計算機風格，按 numpad 進入）
+        // =================================================================
+        fun numpadRows(): List<List<KeyModel>> = listOf(
+            listOf(
+                KeyModel.special("復原", KeyboardView.KEYCODE_CTRL_Z, widthWeight = 1.5f),
+                KeyModel.special("重做", KeyboardView.KEYCODE_CTRL_Y, widthWeight = 1.5f),
+                KeyModel.char("+", altChars = listOf("±")),
+                KeyModel.char("-", altChars = listOf("–", "—")),
+                KeyModel.char("×", altChars = listOf("*")),
+                KeyModel.char("÷", altChars = listOf("/"))
+            ),
+            listOf(
+                KeyModel.char("1"), KeyModel.char("2"), KeyModel.char("3")
+            ),
+            listOf(
+                KeyModel.char("4"), KeyModel.char("5"), KeyModel.char("6")
+            ),
+            listOf(
+                KeyModel.char("7"), KeyModel.char("8"), KeyModel.char("9")
+            ),
+            listOf(
+                KeyModel.special("ABC", KeyboardView.KEYCODE_SWITCH_ABC, widthWeight = 1.2f),
+                KeyModel.special("!?#", KeyboardView.KEYCODE_SWITCH_NUMBERS, widthWeight = 1.2f),
+                KeyModel.char("0"),
+                KeyModel.char(".", altChars = listOf(",", "=")),
+                KeyModel.special("⌫", KeyboardView.KEYCODE_DELETE, widthWeight = 1.2f)
+            ),
+            listOf(
+                KeyModel.special("切換", KeyboardView.KEYCODE_SWITCH_LANG, widthWeight = 1.0f),
+                KeyModel.special(" ", KeyboardView.KEYCODE_SPACE, widthWeight = 4f),
+                KeyModel.special("↵", KeyboardView.KEYCODE_ENTER, widthWeight = 1.5f)
             )
         )
 
@@ -310,9 +350,10 @@ data class KeyboardState(
                 KeyModel.char("——")
             ),
             listOf(
-                KeyModel.special("ABC", KeyboardView.KEYCODE_SWITCH_ABC, widthWeight = 1.5f),
+                KeyModel.special("ABC", KeyboardView.KEYCODE_SWITCH_ABC, widthWeight = 1.3f),
+                KeyModel.special("⌨", KeyboardView.KEYCODE_SWITCH_NUMPAD, widthWeight = 1.0f),
                 KeyModel.special(",", KeyboardView.KEYCODE_COMMA),
-                KeyModel.special(" ", KeyboardView.KEYCODE_SPACE, widthWeight = 5f),
+                KeyModel.special(" ", KeyboardView.KEYCODE_SPACE, widthWeight = 4f),
                 KeyModel.special(".", KeyboardView.KEYCODE_PERIOD),
                 KeyModel.special("↵", KeyboardView.KEYCODE_ENTER, widthWeight = 1.5f)
             )

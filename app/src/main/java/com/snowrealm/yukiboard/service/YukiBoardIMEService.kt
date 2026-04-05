@@ -1122,8 +1122,16 @@ class YukiBoardIMEService : InputMethodService() {
         }
 
         // 顯示當前引擎（方便除錯）
-        val engineName = if (speechEngine is WhisperSpeechEngine) "Whisper API" else "Android 內建"
-        keyboardView.showToast("語音引擎：$engineName")
+        val isWhisper = speechEngine is WhisperSpeechEngine
+        val engineName = if (isWhisper) "Whisper API" else "Android 內建"
+        val debugInfo = if (isWhisper) {
+            val key = com.snowrealm.yukiboard.BuildConfig.OPENAI_API_KEY.takeIf { it.isNotBlank() }
+                ?: com.snowrealm.yukiboard.claw.provider.AIProviderManager
+                    .getInstance(applicationContext)
+                    .getApiKey(com.snowrealm.yukiboard.claw.provider.AIProviderType.OPENAI)
+            " (Key: ${key?.take(8) ?: "無"}...)"
+        } else ""
+        keyboardView.showToast("語音引擎：$engineName$debugInfo")
 
         characterView?.playListening()
 
@@ -1158,10 +1166,18 @@ class YukiBoardIMEService : InputMethodService() {
                     characterView?.playIdle()
                 }
             },
-            onError = { _ ->
+            onError = { errorCode ->
                 keyboardView.voiceListeningLocale = null
                 characterView?.playIdle()
                 currentInputConnection?.finishComposingText()
+                val errorMsg = when (errorCode) {
+                    WhisperSpeechEngine.ERROR_NO_API_KEY -> "語音辨識失敗：未設定 API Key"
+                    WhisperSpeechEngine.ERROR_NO_PERMISSION -> "語音辨識失敗：無麥克風權限"
+                    WhisperSpeechEngine.ERROR_AUDIO_INIT -> "語音辨識失敗：錄音初始化失敗"
+                    WhisperSpeechEngine.ERROR_NETWORK -> "語音辨識失敗：網路錯誤"
+                    else -> "語音辨識錯誤 ($errorCode)"
+                }
+                keyboardView.showToast(errorMsg)
             }
         )
     }
