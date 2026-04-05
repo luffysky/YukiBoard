@@ -1271,7 +1271,13 @@ class KeyboardView(context: Context) : View(context) {
     private fun showAltPopup(key: KeyModel, anchorRect: RectF) {
         dismissPopup()
 
-        val allChars = listOf(key.label) + key.altChars
+        // 注音/聲調鍵：長按只顯示 altChars（英文/數字），不重複顯示注音本身
+        val isBopomofoKey = key.label.length == 1 && isBopomofoOrTone(key.label[0])
+        val allChars = if (isBopomofoKey && key.altChars.isNotEmpty()) {
+            key.altChars
+        } else {
+            listOf(key.label) + key.altChars
+        }
         altPopupChars = allChars
         altPopupOriginKey = key
         altPopupActive = true
@@ -1316,11 +1322,10 @@ class KeyboardView(context: Context) : View(context) {
         if (idx in altPopupChars.indices) {
             val ch = altPopupChars[idx]
             val originKey = altPopupOriginKey
-            // 如果原始按鍵是注音/聲調，且選的是 altChar（非原始字元），直接 raw commit
+            // 如果原始按鍵是注音/聲調，altChar 全部直接 raw commit（英文/數字/符號）
             val isOriginBopomofo = originKey != null && originKey.label.length == 1 &&
                     isBopomofoOrTone(originKey.label[0])
-            if (isOriginBopomofo && idx > 0) {
-                // altChar 是注音符號���身 → 直接輸出（不走 InputRouter）
+            if (isOriginBopomofo) {
                 onRawCommitListener?.invoke(ch)
             } else {
                 val output = if ((isShifted || isCapsLock) && ch.length == 1) ch.uppercase() else ch
