@@ -2049,12 +2049,15 @@ class SettingsActivity : AppCompatActivity() {
                         val engine = com.snowrealm.yukiboard.speech.GoogleCloudTtsEngine(key)
                         engine.speak(testText, null, prefs.ttsSpeed) {
                             mainHandler.post {
-                                if (!engine.isSpeaking) {
+                                val err = engine.lastError
+                                if (err != null) {
                                     android.widget.Toast.makeText(this@SettingsActivity,
-                                        "Google Cloud TTS 無回應，可能 API Key 無效或未啟用 Text-to-Speech API", android.widget.Toast.LENGTH_LONG).show()
+                                        "Google TTS 失敗：$err", android.widget.Toast.LENGTH_LONG).show()
+                                    (btn as TextView).text = "❌ $err"
                                 }
                                 engine.destroy()
-                                resetBtn()
+                                // 5 秒後重置按鈕（讓使用者看到錯誤）
+                                mainHandler.postDelayed({ resetBtn() }, if (err != null) 8000L else 500L)
                             }
                         }
                     }

@@ -41,6 +41,10 @@ class GoogleCloudTtsEngine(
     override var isReady: Boolean = true
         private set
 
+    /** 最後一次 API 錯誤訊息（供 UI 顯示） */
+    var lastError: String? = null
+        private set
+
     override val isSpeaking: Boolean
         get() = audioTrack?.playState == AudioTrack.PLAYSTATE_PLAYING
 
@@ -122,16 +126,23 @@ class GoogleCloudTtsEngine(
 
         return try {
             client.newCall(request).execute().use { response ->
+                val bodyStr = response.body?.string()
                 if (!response.isSuccessful) {
-                    Log.w(tag, "API error ${response.code}: ${response.body?.string()?.take(200)}")
+                    lastError = "HTTP ${response.code}: ${bodyStr?.take(300)}"
+                    Log.w(tag, "API error: $lastError")
                     return null
                 }
-                val json = JSONObject(response.body?.string() ?: return null)
+                val json = JSONObject(bodyStr ?: return null)
                 val audioContent = json.optString("audioContent", "")
-                if (audioContent.isBlank()) return null
+                if (audioContent.isBlank()) {
+                    lastError = "API 回傳無 audioContent"
+                    return null
+                }
+                lastError = null
                 Base64.decode(audioContent, Base64.DEFAULT)
             }
         } catch (e: Exception) {
+            lastError = "網路錯誤: ${e.message}"
             Log.e(tag, "synthesize failed", e)
             null
         }
