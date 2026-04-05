@@ -65,8 +65,18 @@ android {
         buildConfigField "String", "NEWEBPAY_HASH_IV", "\"${localProps.getProperty('NEWEBPAY_HASH_IV', System.getenv('NEWEBPAY_HASH_IV') ?: '')}\""
     }
 
+    signingConfigs {
+        release {
+            storeFile file("${rootProject.projectDir}/keystore/yukiboard-release.jks")
+            storePassword "yukiboard2026"
+            keyAlias "yukiboard"
+            keyPassword "yukiboard2026"
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig signingConfigs.release
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             firebaseAppDistribution {

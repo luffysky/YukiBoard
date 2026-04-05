@@ -18,5 +18,6 @@ local.properties
 .claude/
 .env
 app/google-services.json
+keystore/
 test_kb_*.png
 test_screen.png
