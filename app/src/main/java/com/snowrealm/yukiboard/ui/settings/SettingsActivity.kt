@@ -1971,7 +1971,14 @@ class SettingsActivity : AppCompatActivity() {
             text = "▶ 測試語音輸出"
             textSize = 13f
             setTextColor(0xFF66AAFF.toInt())
-            setPadding(dp(4), dp(8), dp(4), dp(4))
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            isClickable = true
+            isFocusable = true
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xFF1A2744.toInt())
+                cornerRadius = dp(6).toFloat()
+                setStroke(1, 0xFF3A5580.toInt())
+            }
             setOnClickListener {
                 // 先存 EditText 當前值（避免焦點未離開時 prefs 還沒更新）
                 prefs.googleCloudTtsApiKey = keyInput.text.toString().trim()
