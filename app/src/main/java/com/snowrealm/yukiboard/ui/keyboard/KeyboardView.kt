@@ -399,6 +399,67 @@ class KeyboardView(context: Context) : View(context) {
         onSwipeInputListener = listener
     }
 
+    // ─── 連擊粒子特效 (ComboTracker J-3) ──────────────────────
+    private data class Particle(var x: Float, var y: Float, var vx: Float, var vy: Float,
+                                var life: Float, var color: Int, var size: Float)
+    private val comboParticles = mutableListOf<Particle>()
+    private var comboGlowAlpha = 0f
+
+    /** 觸發連擊粒子特效 */
+    fun triggerComboEffect(level: Int) {
+        val count = when (level) { 1 -> 8; 2 -> 16; 3 -> 30; else -> 50 }
+        val baseColor = when (level) {
+            1 -> 0xFFFFD700.toInt()   // 金色
+            2 -> 0xFFFF6600.toInt()   // 橙色
+            3 -> 0xFFFF3366.toInt()   // 紅粉
+            else -> 0xFFFF00FF.toInt() // 洋紅
+        }
+        val cx = width / 2f
+        val cy = candidateBarHeight * 0.5f
+        val random = java.util.Random()
+        for (i in 0 until count) {
+            val angle = random.nextFloat() * Math.PI.toFloat() * 2
+            val speed = (2f + random.nextFloat() * 4f) * density
+            comboParticles.add(Particle(
+                x = cx + (random.nextFloat() - 0.5f) * width * 0.3f,
+                y = cy,
+                vx = kotlin.math.cos(angle) * speed,
+                vy = kotlin.math.sin(angle) * speed - 2f * density,
+                life = 1f,
+                color = baseColor,
+                size = (2f + random.nextFloat() * 3f) * density
+            ))
+        }
+        comboGlowAlpha = 0.6f
+        invalidate()
+    }
+
+    private fun updateAndDrawParticles(canvas: Canvas) {
+        if (comboParticles.isEmpty() && comboGlowAlpha <= 0f) return
+        val iter = comboParticles.iterator()
+        while (iter.hasNext()) {
+            val p = iter.next()
+            p.x += p.vx
+            p.y += p.vy
+            p.vy += 0.3f * density // 重力
+            p.life -= 0.025f
+            if (p.life <= 0f) { iter.remove(); continue }
+            val alpha = (p.life * 255).toInt().coerceIn(0, 255)
+            keyPaint.color = (p.color and 0x00FFFFFF) or (alpha shl 24)
+            canvas.drawCircle(p.x, p.y, p.size * p.life, keyPaint)
+        }
+        // 背景光暈
+        if (comboGlowAlpha > 0f) {
+            comboGlowAlpha -= 0.015f
+            val a = (comboGlowAlpha * 40).toInt().coerceIn(0, 40)
+            keyPaint.color = (0xFFD700 and 0x00FFFFFF) or (a shl 24)
+            canvas.drawRect(0f, 0f, width.toFloat(), candidateBarHeight, keyPaint)
+        }
+        if (comboParticles.isNotEmpty() || comboGlowAlpha > 0f) {
+            postInvalidateDelayed(16)
+        }
+    }
+
     // 外層發光 Paint（粗線 + 半透明，不用 BlurMaskFilter 以保效能）
     private val swipeGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -736,6 +797,9 @@ class KeyboardView(context: Context) : View(context) {
         if (swipePoints.size >= 2 || (swipePoints.size == 1 && isSwipingActive)) {
             drawSwipeTrail(canvas)
         }
+
+        // 連擊粒子特效
+        updateAndDrawParticles(canvas)
 
         // 長按 alt-char overlay（最頂層）
         drawAltPopupOverlay(canvas)

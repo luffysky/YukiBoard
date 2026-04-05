@@ -20,6 +20,10 @@ class SmartInputManager(context: Context) {
     val phrasePredictor = PhrasePredictor(context)
     val sentencePredictor = SentencePredictor(context)
     val habitTracker = TypingHabitTracker(context)
+    val personalDictionary = PersonalDictionary(context)
+    val styleProfiler = StyleProfiler(context)
+    val comboTracker = ComboTracker()
+    val emotionSticker = EmotionStickerEngine()
 
     private var dictionary: EnglishDictionary? = null
     private var correctionEngine: SmartCorrectionEngine? = null
@@ -59,6 +63,10 @@ class SmartInputManager(context: Context) {
         if (habitTrackEnabled) {
             habitTracker.recordCommit(word, appPackage)
         }
+        // J-1: 個人詞庫三層學習
+        personalDictionary.recordUsage(word)
+        // J-2: 語氣風格分析
+        styleProfiler.analyze(word, appPackage)
     }
 
     // ─────────────── 整句預測 ───────────────
@@ -185,15 +193,32 @@ class SmartInputManager(context: Context) {
         return dictionary?.swipeSuggest(chars) ?: emptyList()
     }
 
+    /** 候選命中 — 觸發連擊計數 */
+    fun onCandidateHit() {
+        comboTracker.hit()
+    }
+
+    /** 取得語氣加分（候選字排序用） */
+    fun getStyleBoost(word: String, appPackage: String? = null): Float {
+        return styleProfiler.styleBoost(word, appPackage)
+    }
+
+    /** 取得情緒貼圖推薦標籤 */
+    fun getEmotionStickerTags(text: String): List<String> {
+        return emotionSticker.recommend(text)
+    }
+
     /** 定期儲存（onFinishInputView 呼叫） */
     fun persist() {
         phrasePredictor.save()
         sentencePredictor.save()
         habitTracker.save()
+        styleProfiler.save()
     }
 
     /** 定期清理過期資料 */
     fun maintenance() {
         adaptiveDictionary.purgeStale()
+        personalDictionary.maintenance()
     }
 }

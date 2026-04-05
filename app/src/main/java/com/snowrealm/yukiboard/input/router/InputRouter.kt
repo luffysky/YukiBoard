@@ -230,12 +230,16 @@ class InputRouter(private val context: Context) {
                     activeEngine.reset()
                     candidateManager.clear()
                     onTextCommitted(selected)
+                    smartInput.onCandidateHit()
                     return InputResult.CommitText(selected)
                 }
                 return InputResult.Idle
             }
         }
-        if (result is InputResult.CommitText) onTextCommitted(result.text)
+        if (result is InputResult.CommitText) {
+            onTextCommitted(result.text)
+            smartInput.onCandidateHit()
+        }
         updateCandidates()
         return result
     }
@@ -356,7 +360,20 @@ class InputRouter(private val context: Context) {
                 sourceMap[word] = CandidateSource.USER_DICT  // 最高優先來源
             }
 
-            // 6. 完全匹配 composing 加分（使用者可能就是要打這個詞）
+            // 6. 個人詞庫三層詞（J-1: PINNED/LEARNED 加分）
+            val personalSuggestions = smartInput.personalDictionary.suggest(composing, 5)
+            personalSuggestions.forEachIndexed { i, word ->
+                scored[word] = (scored[word] ?: 0f) + (8f - i).coerceAtLeast(2f)
+                sourceMap.putIfAbsent(word, CandidateSource.USER_DICT)
+            }
+
+            // 7. 語氣風格加分（J-2: 符合當前語氣偏好的候選字加分）
+            for ((word, _) in scored.toMap()) {
+                val boost = smartInput.getStyleBoost(word, currentAppPackage)
+                if (boost > 0) scored[word] = (scored[word] ?: 0f) + boost
+            }
+
+            // 8. 完全匹配 composing 加分（使用者可能就是要打這個詞）
             scored[composing.lowercase()]?.let { prev ->
                 scored[composing.lowercase()] = prev + 3f
             }

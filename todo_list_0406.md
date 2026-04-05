@@ -310,33 +310,31 @@
 ### 批次 J — 個人風格智慧系統（個人風格任務包 4 批）
 
 #### J-1 PersonalDictionary（個人詞庫核心）
-- [ ] `input/smart/PersonalDictionary.kt` — 三層自動學詞（PINNED→LEARNED→CANDIDATE）
-  - 7天內使用≥3次 → 升為常用詞
-  - 30天未使用 → 自動降級
-  - 使用者可手動釘選（永不降級）或刪除
-- [ ] 整合 TypingHabitTracker 詞頻 + UserDictionary 手動詞
+- ✅ `input/smart/PersonalDictionary.kt` — 三層自動學詞（PINNED→LEARNED→CANDIDATE）
+  - 使用 ≥3 次 → 升為 LEARNED
+  - 30天未使用 → 降級，60天 → 刪除
+  - 手動釘選（永不降級）/ 取消釘選 / 刪除
+- ✅ 整合 SmartInputManager + InputRouter 候選字排序
 - [ ] 設定頁 UI：個人詞庫管理（釘選/刪除/匯出）
 
 #### J-2 StyleProfiler（語氣風格學習）
-- [ ] `input/smart/StyleProfiler.kt` — 語尾詞統計 + 短語模式 + App 維度語氣分數
-  - 記錄常用語尾（啦/哈/嗚嗚/XD/www 等）
-  - 分析正式/輕鬆/可愛/專業傾向
-  - 不同 App 不同風格（Line 偏輕鬆 vs Gmail 偏正式）
-- [ ] 候選字列融入語氣預測（淡紫色標示）
+- ✅ `input/smart/StyleProfiler.kt` — 語尾詞統計 + App 維度語氣分數
+  - 4 風格軸：FORMAL/CASUAL/CUTE/PROFESSIONAL
+  - 不同 App 不同風格偏好
+- ✅ 候選字列融入語氣加分（styleBoost 影響排序）
 
 #### J-3 ComboTracker（隱形連擊計數器）
-- [ ] `input/smart/ComboTracker.kt` — 打字命中預測時累加連擊
-  - 觸發閾值粒子特效（5/10/20/50 連擊）
-  - 不顯示分數，只有視覺回饋
-  - 停止打字 3 秒歸零
-- [ ] KeyboardView 粒子動畫整合
+- ✅ `input/smart/ComboTracker.kt` — 選字命中累加連擊
+  - 4 閾值：5/10/20/50 連擊觸發不同粒子特效
+  - 3 秒無操作歸零
+- ✅ KeyboardView 粒子動畫整合（金/橙/紅粉/洋紅 4 級）
 
 #### J-4 EmotionStickerEngine（情緒貼圖自動推薦）
-- [ ] `input/smart/EmotionStickerEngine.kt` — 依打字情緒推薦貼圖
-  - ToneDetector 情緒 → 匹配貼圖包標籤
-  - 候選列末尾浮出 1~3 張推薦貼圖縮圖
-  - 點擊直接送出貼圖
-- [ ] StickerPanelView 貼圖標籤系統
+- ✅ `input/smart/EmotionStickerEngine.kt` — 依打字情緒推薦貼圖標籤
+  - 7 情緒分類 + 關鍵詞/Emoji 偵測
+  - recommend() 回傳貼圖標籤
+- [ ] StickerPanelView 貼圖標籤系統（接收推薦顯示）
+- [ ] 候選列末尾浮出推薦貼圖縮圖
 
 ---
 

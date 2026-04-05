@@ -300,6 +300,11 @@ class YukiBoardIMEService : InputMethodService() {
             }
             keyboardView.updateComposingText(inputRouter.composingText)
             keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
+            // J-3: 連擊粒子特效
+            val comboEffect = inputRouter.smartInput.comboTracker.consumeEffect()
+            if (comboEffect != null) {
+                keyboardView.triggerComboEffect(comboEffect.ordinal + 1)
+            }
         }
         keyboardView.setOnSpaceLongPressListener { pressed ->
             if (prefs.gyroscopeCursorEnabled) {
