@@ -97,11 +97,7 @@ class GoogleCloudTtsEngine(
     // ─────────────── 內部方法 ───────────────
 
     private fun synthesize(text: String, locale: String?, speed: Float): ByteArray? {
-        val langCode = locale ?: voiceName.substringBeforeLast("-").let {
-            // "zh-TW-Wavenet-A" → "zh-TW"
-            val parts = voiceName.split("-")
-            if (parts.size >= 2) "${parts[0]}-${parts[1]}" else "zh-TW"
-        }
+        val langCode = locale ?: detectLanguage(text)
 
         // 選擇符合語言的 voice
         val selectedVoice = pickVoice(langCode)
@@ -162,6 +158,18 @@ class GoogleCloudTtsEngine(
             lang.startsWith("de") ->
                 "de-DE" to "de-DE-Wavenet-A"
             else -> "zh-TW" to "zh-TW-Wavenet-A"
+        }
+    }
+
+    /** 根據文字內容自動偵測語言 */
+    private fun detectLanguage(text: String): String {
+        val sample = text.take(50)
+        return when {
+            sample.any { it in '\u3040'..'\u309F' || it in '\u30A0'..'\u30FF' } -> "ja-JP"
+            sample.any { it in '\uAC00'..'\uD7AF' } -> "ko-KR"
+            sample.any { it in '\u4E00'..'\u9FFF' } -> "zh-TW"
+            sample.all { it.code < 128 } -> "en-US"
+            else -> "zh-TW"
         }
     }
 
