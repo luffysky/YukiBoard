@@ -219,6 +219,9 @@ class SettingsActivity : AppCompatActivity() {
             inputChildren += switchRow("語氣偵測", "偵測打字語氣", prefs.toneDetection) { prefs.toneDetection = it }
             inputChildren += switchRow("懸浮面板", "啟用懸浮面板功能", prefs.floatingPanelEnabled) { prefs.floatingPanelEnabled = it }
             inputChildren += switchRow("遠端鍵盤", "藍牙/WiFi 遠端控制", prefs.remoteKeyboardEnabled) { prefs.remoteKeyboardEnabled = it }
+
+            // 語音引擎選擇
+            inputChildren += speechEngineSelector()
         })
 
         // ═══════════════════════════════════════════════════════
@@ -1605,6 +1608,55 @@ class SettingsActivity : AppCompatActivity() {
                 cornerRadius = dp(8).toFloat()
             }
             setOnClickListener { onClick() }
+        }
+    }
+
+    /** 語音引擎選擇器：Android 內建 / OpenAI Whisper */
+    private fun speechEngineSelector(): LinearLayout {
+        val options = arrayOf("Android 內建", "OpenAI Whisper")
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(8), dp(6), dp(8), dp(6))
+            gravity = android.view.Gravity.CENTER_VERTICAL
+
+            val textContainer = LinearLayout(this@SettingsActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            textContainer.addView(TextView(this@SettingsActivity).apply {
+                text = "語音辨識引擎"
+                textSize = 14f
+                setTextColor(0xFFE8F4FF.toInt())
+            })
+            textContainer.addView(TextView(this@SettingsActivity).apply {
+                text = "Whisper 需要 OpenAI API Key"
+                textSize = 11f
+                setTextColor(0xFF6688AA.toInt())
+            })
+            addView(textContainer)
+
+            val btnLabel = TextView(this@SettingsActivity).apply {
+                text = options[prefs.speechEngineType.coerceIn(0, options.lastIndex)]
+                textSize = 13f
+                setTextColor(0xFF9ECFFF.toInt())
+                setPadding(dp(10), dp(6), dp(10), dp(6))
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    setColor(0xFF1A2744.toInt())
+                    cornerRadius = dp(6).toFloat()
+                    setStroke(1, 0xFF3A5580.toInt())
+                }
+                setOnClickListener {
+                    android.app.AlertDialog.Builder(this@SettingsActivity, android.R.style.Theme_Material_Dialog_Alert)
+                        .setTitle("選擇語音辨識引擎")
+                        .setSingleChoiceItems(options, prefs.speechEngineType) { dialog, which ->
+                            prefs.speechEngineType = which
+                            text = options[which]
+                            dialog.dismiss()
+                        }
+                        .show()
+                }
+            }
+            addView(btnLabel)
         }
     }
 

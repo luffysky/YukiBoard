@@ -71,7 +71,13 @@ class AndroidSpeechEngine(context: Context) : SpeechInputEngine {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, locale)
             putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, false)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+            // 降低靜音偵測敏感度，避免過早截斷
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 1000L)
+            // 偏好離線模型（如有）→ 減少延遲
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
             // 多語言辨識：除主語言外，也接受其他常用語言
             val extraLangs = SUPPORTED_LOCALES.filter { it != locale }
             putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", extraLangs.toTypedArray())

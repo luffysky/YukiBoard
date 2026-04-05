@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 31
-        versionName "0.5.7"
+        versionCode 32
+        versionName "0.5.8"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -75,7 +75,7 @@ android {
             debuggable true
             firebaseAppDistribution {
                 groups = "testers"
-                releaseNotes = "v${android.defaultConfig.versionName}\n- fix: 橫向模式一般輸入改為全寬（移除側邊面板，跟直向一致）\n- 設計者/開發者模式側邊快捷鍵保留"
+                releaseNotes = "v${android.defaultConfig.versionName}\n- feat: OpenAI Whisper 語音辨識引擎（設定頁可切換）\n- fix: 優化 SpeechRecognizer 靜音偵測參數\n- fix: 滑動輸入候選改為模糊匹配+鄰近鍵+評分排序"
             }
         }
     }

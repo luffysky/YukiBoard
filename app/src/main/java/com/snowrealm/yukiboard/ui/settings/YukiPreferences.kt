@@ -86,6 +86,9 @@ class YukiPreferences(context: Context) {
     var toneDetection: Boolean by BoolPref("tone_detection", true)
     var rawBopomofoMode: Boolean by BoolPref("raw_bopomofo", false)
     var swipeTrailEnabled: Boolean by BoolPref("swipe_trail", true)
+
+    /** 語音引擎：0=Android 內建, 1=OpenAI Whisper */
+    var speechEngineType: Int by IntPref("speech_engine_type", 0)
     var smartCorrection: Boolean by BoolPref("smart_correction", true)
     var adaptiveDict: Boolean by BoolPref("adaptive_dict", true)
     var phrasePredict: Boolean by BoolPref("phrase_predict", true)

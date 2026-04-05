@@ -27,6 +27,7 @@ import com.snowrealm.yukiboard.remote.RemoteKeyboardService
 import com.snowrealm.yukiboard.remote.WifiKeyboardServer
 import com.snowrealm.yukiboard.speech.AndroidSpeechEngine
 import com.snowrealm.yukiboard.speech.SpeechInputEngine
+import com.snowrealm.yukiboard.speech.WhisperSpeechEngine
 import com.snowrealm.yukiboard.theme.KeyboardTheme
 import com.snowrealm.yukiboard.theme.ThemeManager
 import com.snowrealm.yukiboard.ui.keyboard.KeyModel
@@ -1067,8 +1068,32 @@ class YukiBoardIMEService : InputMethodService() {
             return
         }
 
-        if (speechEngine == null) {
-            speechEngine = AndroidSpeechEngine(applicationContext)
+        // 根據設定選擇語音引擎（每次重新建立，確保設定變更即時生效）
+        val desiredType = prefs.speechEngineType
+        val needRecreate = when {
+            speechEngine == null -> true
+            desiredType == 1 && speechEngine !is WhisperSpeechEngine -> true
+            desiredType == 0 && speechEngine !is AndroidSpeechEngine -> true
+            else -> false
+        }
+        if (needRecreate) {
+            speechEngine?.destroy()
+            speechEngine = if (desiredType == 1) {
+                val buildKey = com.snowrealm.yukiboard.BuildConfig.OPENAI_API_KEY
+                val apiKey = buildKey.takeIf { it.isNotBlank() }
+                    ?: com.snowrealm.yukiboard.claw.provider.AIProviderManager
+                        .getInstance(applicationContext)
+                        .getApiKey(com.snowrealm.yukiboard.claw.provider.AIProviderType.OPENAI)
+                if (apiKey.isNullOrBlank()) {
+                    keyboardView.showToast("請先設定 OpenAI API Key")
+                    // fallback 到內建引擎
+                    AndroidSpeechEngine(applicationContext)
+                } else {
+                    WhisperSpeechEngine(apiKey)
+                }
+            } else {
+                AndroidSpeechEngine(applicationContext)
+            }
         }
 
         characterView?.playListening()
