@@ -49,7 +49,7 @@ android {
         buildConfigField "String", "INVITE_HMAC_SECRET", "\"${localProps.getProperty('INVITE_HMAC_SECRET', System.getenv('INVITE_HMAC_SECRET') ?: 'yukiboard_dev_2026')}\""
         buildConfigField "String", "PLATFORM_API_KEY", "\"${localProps.getProperty('PLATFORM_API_KEY', System.getenv('PLATFORM_API_KEY') ?: '')}\""
         // Insight Engine 貼圖 + GIF API
-        buildConfigField "String", "INSIGHT_API_BASE_URL", "\"${localProps.getProperty('INSIGHT_API_BASE_URL', System.getenv('INSIGHT_API_BASE_URL') ?: 'https://insight.snowrealm.com')}\""
+        buildConfigField "String", "INSIGHT_API_BASE_URL", "\"${localProps.getProperty('INSIGHT_API_BASE_URL', System.getenv('INSIGHT_API_BASE_URL') ?: 'https://insight.snowrealm.pet')}\""
         buildConfigField "String", "GIPHY_API_KEY", "\"${localProps.getProperty('GIPHY_API_KEY', System.getenv('GIPHY_API_KEY') ?: '')}\""
         // AI Provider Keys（開發用，正式版由使用者自行輸入）
         buildConfigField "String", "OPENAI_API_KEY", "\"${localProps.getProperty('OPENAI_API_KEY', System.getenv('OPENAI_API_KEY') ?: '')}\""
