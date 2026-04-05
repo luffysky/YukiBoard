@@ -17,7 +17,7 @@ enum class InviteCodeType(val char: Char, val dailyTokenLimit: Int) {
 
 class InviteCodeManager(context: Context) {
 
-    private val prefs = run {
+    private val prefs = try {
         val masterKey = MasterKey.Builder(context)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
             .build()
@@ -28,6 +28,9 @@ class InviteCodeManager(context: Context) {
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
         )
+    } catch (e: Exception) {
+        android.util.Log.w("InviteCodeMgr", "EncryptedPrefs failed, fallback", e)
+        context.getSharedPreferences("yukiboard_invite_fallback", Context.MODE_PRIVATE)
     }
 
     /** Validate invite code format: YUKI-{PAYLOAD}-{HMAC8} */

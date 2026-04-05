@@ -31,15 +31,33 @@ class SnowRealmAuthClient(context: Context) {
     private val baseUrl = BuildConfig.INSIGHT_API_BASE_URL.trimEnd('/')
     private val json = Json { ignoreUnknownKeys = true }
 
-    private val masterKey = MasterKey.Builder(appContext)
-        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-        .build()
-
-    private val prefs = EncryptedSharedPreferences.create(
-        appContext, "yukiboard_auth", masterKey,
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-    )
+    private val prefs = try {
+        val masterKey = MasterKey.Builder(appContext)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        EncryptedSharedPreferences.create(
+            appContext, "yukiboard_auth", masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    } catch (e: Exception) {
+        // Keystore 損壞：刪除舊檔案後重建，若仍失敗則 fallback 普通 prefs
+        android.util.Log.w("SnowRealmAuth", "EncryptedPrefs failed, rebuilding", e)
+        try {
+            appContext.getSharedPreferences("yukiboard_auth", Context.MODE_PRIVATE)
+                .edit().clear().apply()
+            val masterKey = MasterKey.Builder(appContext)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
+            EncryptedSharedPreferences.create(
+                appContext, "yukiboard_auth", masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        } catch (_: Exception) {
+            appContext.getSharedPreferences("yukiboard_auth_fallback", Context.MODE_PRIVATE)
+        }
+    }
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
