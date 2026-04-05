@@ -850,20 +850,18 @@ class YukiBoardIMEService : InputMethodService() {
                 }
                 p.onPickBackground = {
                     try {
-                        val intent = android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT).apply {
-                            addCategory(android.content.Intent.CATEGORY_OPENABLE)
-                            type = "image/*"
-                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        val intent = Intent(this, com.snowrealm.yukiboard.ui.settings.BackgroundPickerActivity::class.java).apply {
+                            putExtra(com.snowrealm.yukiboard.ui.settings.BackgroundPickerActivity.EXTRA_PICK_TYPE, "image")
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         }
                         startActivity(intent)
                     } catch (_: Exception) {}
                 }
                 p.onPickVideo = {
                     try {
-                        val intent = android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT).apply {
-                            addCategory(android.content.Intent.CATEGORY_OPENABLE)
-                            type = "video/*"
-                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        val intent = Intent(this, com.snowrealm.yukiboard.ui.settings.BackgroundPickerActivity::class.java).apply {
+                            putExtra(com.snowrealm.yukiboard.ui.settings.BackgroundPickerActivity.EXTRA_PICK_TYPE, "video")
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         }
                         startActivity(intent)
                     } catch (_: Exception) {}

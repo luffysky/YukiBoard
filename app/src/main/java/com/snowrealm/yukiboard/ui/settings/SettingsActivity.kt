@@ -2039,7 +2039,15 @@ class SettingsActivity : AppCompatActivity() {
                                     resetBtn()
                                     return@post
                                 }
-                                (btn as TextView).text = "🔊 播放中..."
+                                // 檢查媒體音量
+                                val audioMgr = getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+                                val vol = audioMgr.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
+                                val maxVol = audioMgr.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
+                                android.util.Log.i("TTS_TEST", "engine=${engine?.javaClass?.simpleName}, isReady=${engine?.isReady}, vol=$vol/$maxVol")
+                                if (vol == 0) {
+                                    android.widget.Toast.makeText(this@SettingsActivity, "媒體音量為 0，請調高音量", android.widget.Toast.LENGTH_LONG).show()
+                                }
+                                (btn as TextView).text = "🔊 播放中... (vol=$vol/$maxVol)"
                                 engine?.speak(testText, null, prefs.ttsSpeed) {
                                     mainHandler.post { engine?.destroy(); resetBtn() }
                                 }

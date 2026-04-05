@@ -96,6 +96,12 @@
             android:label="登入 SnowRealm"
             android:exported="false" />
 
+        <!-- 背景選擇器（IME 代理用透明 Activity） -->
+        <activity
+            android:name=".ui.settings.BackgroundPickerActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:exported="false" />
+
         <!-- 貼圖/GIF 圖片分享用 FileProvider -->
         <provider
             android:name="androidx.core.content.FileProvider"

@@ -2,6 +2,8 @@ package com.snowrealm.yukiboard.speech
 
 import android.content.Context
 import android.media.AudioAttributes
+import android.media.AudioManager
+import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
@@ -79,11 +81,12 @@ class AndroidTtsEngine(context: Context, private val onInitDone: ((Boolean) -> U
 
         // 設定語言
         val javaLocale = locale?.let { parseLocale(it) } ?: detectLocale(text)
-        val result = engine.setLanguage(javaLocale)
-        if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-            Log.w(tag, "Language not supported: $javaLocale, falling back to default")
+        val langResult = engine.setLanguage(javaLocale)
+        if (langResult == TextToSpeech.LANG_MISSING_DATA || langResult == TextToSpeech.LANG_NOT_SUPPORTED) {
+            Log.w(tag, "Language not supported: $javaLocale (result=$langResult), falling back to default")
             engine.setLanguage(Locale.getDefault())
         }
+        Log.i(tag, "speak: locale=$javaLocale, langResult=$langResult, text=${text.take(30)}")
 
         // 設定語速
         engine.setSpeechRate(speed.coerceIn(0.25f, 4.0f))
@@ -93,7 +96,14 @@ class AndroidTtsEngine(context: Context, private val onInitDone: ((Boolean) -> U
             pendingCallbacks[utteranceId] = onDone
         }
 
-        engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+        // 明確指定音頻串流為 STREAM_MUSIC
+        val params = Bundle().apply {
+            putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC)
+        }
+        val speakResult = engine.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+        if (speakResult != TextToSpeech.SUCCESS) {
+            Log.e(tag, "speak() returned error: $speakResult")
+        }
     }
 
     override fun stop() {
