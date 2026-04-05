@@ -6,11 +6,14 @@ import com.snowrealm.yukiboard.BuildConfig
 import com.snowrealm.yukiboard.auth.InviteCodeManager
 import com.snowrealm.yukiboard.auth.SnowRealmAuthClient
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -79,6 +82,7 @@ class SnowRealmProvider(private val context: Context) : AIProvider {
             put("prompt", prompt)
             if (systemPrompt.isNotBlank()) put("system_prompt", systemPrompt)
             put("max_tokens", 1024)
+            put("stream", true)
         }.toString()
 
         val request = Request.Builder()
@@ -88,27 +92,55 @@ class SnowRealmProvider(private val context: Context) : AIProvider {
             .post(requestBody.toRequestBody(JSON_MEDIA_TYPE))
             .build()
 
-        val response = client.newCall(request).execute()
-        val body = response.body?.string() ?: ""
+        val response = withContext(IO) { client.newCall(request).execute() }
 
         if (!response.isSuccessful) {
+            val errBody = response.body?.string() ?: ""
             val errMsg = try {
-                json.parseToJsonElement(body).jsonObject["error"]?.jsonPrimitive?.content
+                json.parseToJsonElement(errBody).jsonObject["error"]?.jsonPrimitive?.content
             } catch (_: Exception) { null }
             throw RuntimeException(errMsg ?: "AI 代理錯誤 (${response.code})")
         }
 
-        val jsonResponse = json.parseToJsonElement(body).jsonObject
-        val text = jsonResponse["text"]?.jsonPrimitive?.content ?: ""
-        val tokensUsed = jsonResponse["tokens_used"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+        // SSE 串流解析
+        val source = response.body?.source() ?: throw RuntimeException("empty response body")
+        val buffer = okio.Buffer()
+        var totalTokens = 0
 
-        // 同步本地額度（server 是權威來源，但本地也要更新 UI 顯示）
-        if (tokensUsed > 0) {
-            inviteManager.consumeTokens(tokensUsed)
+        try {
+            while (!source.exhausted()) {
+                source.read(buffer, 4096)
+                val chunk = buffer.readUtf8()
+                chunk.split("\n").forEach { line ->
+                    val trimmed = line.trim()
+                    if (!trimmed.startsWith("data:")) return@forEach
+                    val data = trimmed.removePrefix("data:").trim()
+                    if (data == "[DONE]") return@forEach
+                    try {
+                        val obj = json.parseToJsonElement(data).jsonObject
+                        val text = obj["text"]?.jsonPrimitive?.content ?: return@forEach
+                        if (text.isNotEmpty()) emit(text)
+                        obj["tokens_used"]?.jsonPrimitive?.content?.toIntOrNull()?.let {
+                            totalTokens += it
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+        } finally {
+            source.close()
+            response.close()
         }
 
-        emit(text)
-    }.flowOn(Dispatchers.IO)
+        if (totalTokens > 0) inviteManager.consumeTokens(totalTokens)
+    }.flowOn(IO)
+
+    /** 根據使用者訂閱等級回傳推薦 model */
+    fun getRecommendedModel(plan: SnowRealmAuthClient.UserPlan): String = when (plan) {
+        SnowRealmAuthClient.UserPlan.FREE -> "anthropic/claude-haiku-4-5-20251001"
+        SnowRealmAuthClient.UserPlan.PLUS -> "anthropic/claude-sonnet-4-6"
+        SnowRealmAuthClient.UserPlan.PRO,
+        SnowRealmAuthClient.UserPlan.ENTERPRISE -> "anthropic/claude-opus-4-6"
+    }
 
     override suspend fun validateKey(apiKey: String): Boolean {
         // SnowRealm 用邀請碼或平台禮遇登入

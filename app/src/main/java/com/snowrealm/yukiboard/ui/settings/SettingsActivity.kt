@@ -71,21 +71,24 @@ class SettingsActivity : AppCompatActivity() {
             setPadding(dp(16), dp(32), dp(16), dp(24))
         }
 
-        // ── 標題 + 教學按鈕 ──
-        val titleRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(8), 0, dp(8), dp(16))
-        }
-        titleRow.addView(TextView(this).apply {
+        // ── 標題列 ──
+        root.addView(TextView(this).apply {
             text = getString(R.string.settings_title)
             textSize = 24f
             setTextColor(0xFFE8F4FF.toInt())
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setPadding(dp(8), 0, dp(8), dp(8))
         })
-        titleRow.addView(Button(this).apply {
+
+        // ── 按鈕列（獨立一行，不擠壓標題）──
+        val btnRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(8), 0, dp(8), dp(16))
+        }
+        btnRow.addView(Button(this).apply {
             text = "功能說明"
             setTextColor(0xFFFFFFFF.toInt())
             textSize = 13f
+            minWidth = 0; minimumWidth = 0; minHeight = 0; minimumHeight = 0
             background = GradientDrawable().apply {
                 setColor(0xFF2A3A5C.toInt())
                 cornerRadius = dp(8).toFloat()
@@ -99,10 +102,11 @@ class SettingsActivity : AppCompatActivity() {
                 startActivity(Intent(this@SettingsActivity, HelpActivity::class.java))
             }
         })
-        titleRow.addView(Button(this).apply {
+        btnRow.addView(Button(this).apply {
             text = "Z幣錢包"
             setTextColor(0xFFFFFFFF.toInt())
             textSize = 13f
+            minWidth = 0; minimumWidth = 0; minHeight = 0; minimumHeight = 0
             background = GradientDrawable().apply {
                 setColor(0xFFD4A017.toInt())
                 cornerRadius = dp(8).toFloat()
@@ -116,11 +120,12 @@ class SettingsActivity : AppCompatActivity() {
                 startActivity(Intent(this@SettingsActivity, com.snowrealm.yukiboard.ui.currency.ZCoinWalletActivity::class.java))
             }
         })
-        titleRow.addView(Button(this).apply {
+        btnRow.addView(Button(this).apply {
             val auth = com.snowrealm.yukiboard.auth.SnowRealmAuthClient(this@SettingsActivity)
             text = if (auth.isLoggedIn) auth.currentDisplayName ?: "帳號" else "登入"
             setTextColor(0xFFFFFFFF.toInt())
             textSize = 13f
+            minWidth = 0; minimumWidth = 0; minHeight = 0; minimumHeight = 0
             background = GradientDrawable().apply {
                 setColor(if (auth.isLoggedIn) 0xFF1B6B3A.toInt() else 0xFF4A90E2.toInt())
                 cornerRadius = dp(8).toFloat()
@@ -130,7 +135,7 @@ class SettingsActivity : AppCompatActivity() {
                 startActivity(Intent(this@SettingsActivity, com.snowrealm.yukiboard.ui.auth.LoginActivity::class.java))
             }
         })
-        root.addView(titleRow)
+        root.addView(btnRow)
 
         // ═══════════════════════════════════════════════════════
         // 1. AI 功能
@@ -292,6 +297,33 @@ class SettingsActivity : AppCompatActivity() {
 
             // 候選字來源顏色說明
             smartChildren += buildCandidateColorLegend()
+        })
+
+        // ═══════════════════════════════════════════════════════
+        // Insight 整合（登入後才顯示完整選項）
+        // ═══════════════════════════════════════════════════════
+        val insightAuth = com.snowrealm.yukiboard.auth.SnowRealmAuthClient.getInstance(this)
+        val insightChildren = mutableListOf<View>()
+        root.addView(cardGroup("Insight 整合", null, null, insightChildren) {
+            // Plan badge
+            if (insightAuth.isLoggedIn) {
+                val user = insightAuth.currentUser
+                val planText = when (user?.plan) {
+                    com.snowrealm.yukiboard.auth.SnowRealmAuthClient.UserPlan.PLUS -> "Plus ⭐"
+                    com.snowrealm.yukiboard.auth.SnowRealmAuthClient.UserPlan.PRO -> "Pro 🔥"
+                    com.snowrealm.yukiboard.auth.SnowRealmAuthClient.UserPlan.ENTERPRISE -> "Enterprise 🏢"
+                    else -> "Free"
+                }
+                insightChildren += TextView(this).apply {
+                    text = "訂閱等級：$planText"
+                    textSize = 14f
+                    setTextColor(0xFF40E0D0.toInt())
+                    setPadding(dp(16), dp(8), dp(16), dp(8))
+                }
+            }
+            insightChildren += switchRow("情境問卷", "打字時觸發問卷，回答得 Z 幣", prefs.insightSurveyEnabled) { prefs.insightSurveyEnabled = it }
+            insightChildren += switchRow("主題雲端同步", "自動同步在 Insight 購買的主題", prefs.insightThemeSyncEnabled) { prefs.insightThemeSyncEnabled = it }
+            insightChildren += switchRow("設定備份", "登入後自動備份鍵盤設定", prefs.insightSettingsBackup) { prefs.insightSettingsBackup = it }
         })
 
         // ═══════════════════════════════════════════════════════

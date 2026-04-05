@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 65
-        versionName "0.8.23"
+        versionCode 66
+        versionName "0.9.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,10 +82,11 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: LINE 登入改 state 編碼（跨 App cookie 不通修正）\n" +
-                    "- fix: Google 登入同步修正 mobile state 傳遞\n" +
-                    "- fix: 註冊頁切換 App 回來狀態保留（驗證碼不再遺失）\n" +
-                    "- fix: 登出按鈕 + Snippet addView crash"
+                    "- feat: Insight 深度整合（AI 串流/問卷/主題同步/設定備份/社群分享）\n" +
+                    "- feat: InsightApiClient 統一 API 入口 + 401 auto-refresh\n" +
+                    "- feat: SnowRealmProvider SSE 串流升級\n" +
+                    "- feat: UserProfile 補 plan/avatarUrl + 設定頁 Insight 區塊\n" +
+                    "- fix: 設定頁 header 標題換行排版修正"
             }
         }
         debug {
@@ -94,10 +95,11 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: LINE 登入改 state 編碼（跨 App cookie 不通修正）\n" +
-                    "- fix: Google 登入同步修正 mobile state 傳遞\n" +
-                    "- fix: 註冊頁切換 App 回來狀態保留（驗證碼不再遺失）\n" +
-                    "- fix: 登出按鈕 + Snippet addView crash"
+                    "- feat: Insight 深度整合（AI 串流/問卷/主題同步/設定備份/社群分享）\n" +
+                    "- feat: InsightApiClient 統一 API 入口 + 401 auto-refresh\n" +
+                    "- feat: SnowRealmProvider SSE 串流升級\n" +
+                    "- feat: UserProfile 補 plan/avatarUrl + 設定頁 Insight 區塊\n" +
+                    "- fix: 設定頁 header 標題換行排版修正"
             }
         }
     }

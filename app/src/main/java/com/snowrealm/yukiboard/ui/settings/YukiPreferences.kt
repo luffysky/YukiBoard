@@ -127,6 +127,13 @@ class YukiPreferences(context: Context) {
     // ══════��══════════���══════════════════════════════��══════════
     var remoteKeyboardEnabled: Boolean by BoolPref("remote_keyboard", true)
 
+    // ═══════════════════════════════════════════════════════════
+    // Insight 整合
+    // ═══════════════════════════════════════════════════════════
+    var insightSurveyEnabled: Boolean by BoolPref("insight_survey", false)     // 預設關（opt-in）
+    var insightThemeSyncEnabled: Boolean by BoolPref("insight_theme_sync", true)
+    var insightSettingsBackup: Boolean by BoolPref("insight_settings_backup", true)
+
     // ══��═════════════════════════��═════════════════════���════════
     // 鍵盤尺寸 / 懸浮模式（保留原有欄位）
     // ════════════════════════════════════��══════════════════════

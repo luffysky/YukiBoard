@@ -138,15 +138,19 @@ class SnowRealmAuthClient(context: Context) {
             val user = UserProfile(
                 id = me.userId,
                 email = me.userName,
-                displayName = me.userName,
+                displayName = me.displayName.ifBlank { me.userName },
                 role = me.role,
-                tenantId = me.tenantId
+                tenantId = me.tenantId,
+                avatarUrl = me.avatarUrl,
+                plan = parsePlan(me.plan.ifBlank { me.role })
             )
             // 儲存使用者資料
             prefs.edit()
                 .putString(KEY_USER_ID, user.id)
                 .putString(KEY_EMAIL, user.email)
                 .putString(KEY_DISPLAY_NAME, user.displayName)
+                .putString(KEY_AVATAR_URL, user.avatarUrl)
+                .putString(KEY_PLAN, me.plan)
                 .apply()
             user
         } catch (_: Exception) { null }
@@ -160,6 +164,8 @@ class SnowRealmAuthClient(context: Context) {
             .remove(KEY_EMAIL)
             .remove(KEY_DISPLAY_NAME)
             .remove(KEY_TOKEN_EXPIRY)
+            .remove(KEY_AVATAR_URL)
+            .remove(KEY_PLAN)
             .apply()
     }
 
@@ -244,9 +250,11 @@ class SnowRealmAuthClient(context: Context) {
             val user = UserProfile(
                 id = me?.userId ?: userId,
                 email = me?.userName ?: loginEmail,
-                displayName = me?.userName ?: loginEmail,
+                displayName = me?.displayName?.ifBlank { null } ?: me?.userName ?: loginEmail,
                 role = me?.role ?: loginResponse.user?.role ?: "",
-                tenantId = me?.tenantId ?: tenantId
+                tenantId = me?.tenantId ?: tenantId,
+                avatarUrl = me?.avatarUrl ?: "",
+                plan = parsePlan(me?.plan ?: me?.role)
             )
 
             saveSession(token, user)
@@ -262,6 +270,8 @@ class SnowRealmAuthClient(context: Context) {
             .putString(KEY_USER_ID, user.id)
             .putString(KEY_EMAIL, user.email)
             .putString(KEY_DISPLAY_NAME, user.displayName)
+            .putString(KEY_AVATAR_URL, user.avatarUrl)
+            .putString(KEY_PLAN, user.plan.name.lowercase())
             .putLong(KEY_TOKEN_EXPIRY, System.currentTimeMillis() + TOKEN_LIFETIME_MS)
             .apply()
     }
@@ -307,11 +317,18 @@ class SnowRealmAuthClient(context: Context) {
     data class MeResponse(
         val userId: String = "",
         val userName: String = "",
+        val displayName: String = "",
         val role: String = "",
         val tenantId: String = "",
         val tenantName: String = "",
-        val adminTitle: String = ""
+        val adminTitle: String = "",
+        val avatarUrl: String = "",
+        val plan: String = ""
     )
+
+    enum class UserPlan {
+        FREE, PLUS, PRO, ENTERPRISE
+    }
 
     @Serializable
     data class UserProfile(
@@ -320,8 +337,23 @@ class SnowRealmAuthClient(context: Context) {
         val displayName: String = "",
         val role: String = "",
         val tenantId: String = "",
-        val zCoinBalance: Int = 0
+        val zCoinBalance: Int = 0,
+        val avatarUrl: String = "",
+        val plan: UserPlan = UserPlan.FREE
     )
+
+    /** 從 prefs 取得當前登入使用者資料 */
+    val currentUser: UserProfile?
+        get() {
+            prefs.getString(KEY_TOKEN, null) ?: return null
+            return UserProfile(
+                id = prefs.getString(KEY_USER_ID, "") ?: "",
+                email = prefs.getString(KEY_EMAIL, "") ?: "",
+                displayName = prefs.getString(KEY_DISPLAY_NAME, "") ?: "",
+                avatarUrl = prefs.getString(KEY_AVATAR_URL, "") ?: "",
+                plan = parsePlan(prefs.getString(KEY_PLAN, null))
+            )
+        }
 
     companion object {
         private const val KEY_TOKEN = "jwt_token"
@@ -329,7 +361,16 @@ class SnowRealmAuthClient(context: Context) {
         private const val KEY_EMAIL = "user_email"
         private const val KEY_DISPLAY_NAME = "display_name"
         private const val KEY_TOKEN_EXPIRY = "token_expiry"
+        private const val KEY_AVATAR_URL = "avatar_url"
+        private const val KEY_PLAN = "user_plan"
         private const val TOKEN_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000L // 7 days
+
+        fun parsePlan(raw: String?): UserPlan = when (raw?.lowercase()) {
+            "plus" -> UserPlan.PLUS
+            "pro" -> UserPlan.PRO
+            "enterprise" -> UserPlan.ENTERPRISE
+            else -> UserPlan.FREE
+        }
 
         @Volatile
         private var instance: SnowRealmAuthClient? = null
