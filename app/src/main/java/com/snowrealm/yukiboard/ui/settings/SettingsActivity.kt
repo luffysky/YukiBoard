@@ -2044,10 +2044,18 @@ class SettingsActivity : AppCompatActivity() {
                             resetBtn()
                             return@setOnClickListener
                         }
+                        (btn as TextView).text = "🔊 呼叫 Google Cloud..."
+                        android.widget.Toast.makeText(this@SettingsActivity, "API Key: ${key.take(10)}... 呼叫中", android.widget.Toast.LENGTH_SHORT).show()
                         val engine = com.snowrealm.yukiboard.speech.GoogleCloudTtsEngine(key)
-                        (btn as TextView).text = "🔊 播放中..."
                         engine.speak(testText, null, prefs.ttsSpeed) {
-                            mainHandler.post { engine.destroy(); resetBtn() }
+                            mainHandler.post {
+                                if (!engine.isSpeaking) {
+                                    android.widget.Toast.makeText(this@SettingsActivity,
+                                        "Google Cloud TTS 無回應，可能 API Key 無效或未啟用 Text-to-Speech API", android.widget.Toast.LENGTH_LONG).show()
+                                }
+                                engine.destroy()
+                                resetBtn()
+                            }
                         }
                     }
                     else -> {
