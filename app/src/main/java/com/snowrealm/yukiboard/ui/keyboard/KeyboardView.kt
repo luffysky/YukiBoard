@@ -1257,6 +1257,16 @@ class KeyboardView(context: Context) : View(context) {
                     isShiftKey && isCapsLock -> "⇪"
                     isShiftKey && isShifted -> "⇧"
                     ctrlHint != null -> "^${key.label.uppercase()}"
+                    // ABC 按鈕依 inputMode 動態顯示
+                    key.code == KEYCODE_SWITCH_ABC -> when (currentInputMode) {
+                        com.snowrealm.yukiboard.input.router.InputMode.BOPOMOFO -> "注音"
+                        com.snowrealm.yukiboard.input.router.InputMode.JAPANESE -> "あ"
+                        com.snowrealm.yukiboard.input.router.InputMode.KOREAN -> "가"
+                        com.snowrealm.yukiboard.input.router.InputMode.PINYIN -> "拼音"
+                        com.snowrealm.yukiboard.input.router.InputMode.CANGJIE,
+                        com.snowrealm.yukiboard.input.router.InputMode.SPEED_CANGJIE -> "倉頡"
+                        else -> "ABC"
+                    }
                     shouldUpper && !key.isSpecial && key.label.length == 1 -> key.label.uppercase()
                     else -> key.label
                 }
@@ -1866,24 +1876,30 @@ class KeyboardView(context: Context) : View(context) {
                     return true
                 }
 
-                // 候選列觸控選字
+                // 候選列觸控選字（支援點擊 + 滑動釋放選字）
                 if (candidateTouchActive && candidates.isNotEmpty()) {
                     candidateTouchActive = false
-                    if (candidateIsDragging) {
-                        candidateIsDragging = false
-                        performClick()
-                        return true
-                    }
+                    val totalDragX = Math.abs(x - candidateDownX)
+
                     // 展開箭頭：點擊右側 ▼ 區域
-                    if (hasExpandArrow && candidateDownX >= width.toFloat() - expandArrowWidth) {
+                    if (!candidateIsDragging && hasExpandArrow && candidateDownX >= width.toFloat() - expandArrowWidth) {
                         isCandidateExpanded = !isCandidateExpanded
                         expandScrollOffset = 0f
                         invalidate()
                         performClick()
                         return true
                     }
-                    // 用 ACTION_DOWN 的 x 算出候選字 index（不依���繪製時的 rect）
-                    val idx = hitTestCandidateIndex(candidateDownX)
+
+                    // 大幅水平滑動（>80dp）只當捲動，不選字
+                    if (candidateIsDragging && totalDragX > 80 * density) {
+                        candidateIsDragging = false
+                        performClick()
+                        return true
+                    }
+                    candidateIsDragging = false
+
+                    // 用釋放位置 x 算候選字 index（滑動選字）
+                    val idx = hitTestCandidateIndex(x)
                     if (idx >= 0 && idx < candidates.size) {
                         onCandidateSpeakListener?.invoke(candidates[idx])
                         onCandidateSelectListener?.invoke(idx)
