@@ -2,7 +2,7 @@
 
 > 整合 todo-list-0405 + 總任��包 + 滑動輸入任務包 + Games_add + Games_bug
 > ~~刪除線~~ = 已完成 / ✅ = 已完成
-> 版本：**v0.5.4**（versionCode 28）
+> 版本：**v0.5.9**（versionCode 33）
 
 ---
 
@@ -140,6 +140,31 @@
 - ✅ **SwipeTrail 滑動軌跡特效** — 紫色光暈路徑 + 起點光圈 + 按鍵高亮 + 400ms 淡出
 - ✅ **swipeTrailEnabled 開關** — YukiPreferences + 設定頁
 
+
+### v0.5.5 — 注音長按直出 + 橫向鍵盤修正
+- ✅ **注音/聲調長按直出** — 長按注音鍵顯示該符號為 altChar，滑動選取直接輸出（不走 InputRouter）
+- ✅ **橫向鍵盤高度修正** — landscape ratio × 1.6（min 0.55, max 0.75）+ rowHeight 42→48dp
+
+### v0.5.6 — 滑動輸入完整實作
+- ✅ **滑動輸入管線** — KeyboardView key sequence tracking → InputRouter.swipeSuggest() → 候選列
+- ✅ **EnglishDictionary.swipeSuggest()** — 子序列匹配 + 首尾字母 + 頻率排序
+- ✅ **ChewingInputEngine.lookupByBopomofoString()** — 注音滑動解碼���音節切割 + 查詞）
+- ✅ **onSwipeInputListener** — 滑動候選直接 commit，不走 InputRouter
+
+### v0.5.7 — 橫向模式一般輸入全寬
+- ✅ **橫向 NORMAL 模式移除側邊面板** — getLandscapeLayout() NORMAL 返回 emptyList()
+- ✅ 設計者/開發者模式側邊快捷鍵保留
+
+### v0.5.8 — Whisper 語音引擎 + 滑動匹配優化
+- ✅ **WhisperSpeechEngine** — AudioRecord 錄音→WAV→OpenAI Whisper API + partial result
+- ✅ **AndroidSpeechEngine 優化** — 靜音偵測延長 2.5s + 最低收音 1s + 候選數 5
+- ✅ **設定頁語音引擎切換** — Android 內建 / OpenAI Whisper 選擇器
+- ✅ **滑動輸入模糊匹配** — 鄰近鍵���錯 + 評分排序 + 搜尋範圍 500→2000
+
+### v0.5.9 — 輸入法測試頁
+- ✅ **InputTestActivity** — 12 種輸入欄位完整測試（中英/密碼/Email/URL/數字/電話/搜尋/多行/Snippet/Emoji）
+- ✅ **設定頁新增綠色「輸入法完整測試」按鈕**
+
 ---
 
 ## 當前版本待實作（v0.5.5+）
@@ -169,7 +194,7 @@
 
 #### A-5 KeyboardView 滑動整合
 - ~~[x] 滑動軌跡視覺效果（淡紫色半透明 Path + 外發光 + 起點圓點）~~ — v0.5.4 SwipeTrail
-- [ ] `onTouchEvent` 根據 `prefs.swipeInputEnabled` 切換點擊/滑動模式
+- ✅ `onTouchEvent` 根據 `prefs.swipeInputEnabled` 切換點擊/滑動模式
 - [ ] `notifyBopomofoLayout()` 在注音鍵盤 layout 後通知 decoder
 - [ ] `onSwipeInput` 回呼接口
 
@@ -313,7 +338,7 @@
 - [ ] SwipeGestureDetector.kt — 點擊 vs 滑動區分（12dp 閾值）
 - [ ] BopomofoSwipeDecoder.kt — 座標序列→注音符號序列
 - [ ] SwipeCandidateRanker.kt — 合併 ChewingEngine + RimeDict 排序
-- [ ] YukiBoardIMEService 整合 handleSwipeInput()
+- ✅ YukiBoardIMEService 整合 handleSwipeInput()
 
 #### K-2 滑動候選字視覺標示
 - [ ] 滑動候選標記淡紫色 #B39DDB + 左側 ≈ 符號
@@ -388,7 +413,8 @@
 ### 工具面板
 - [ ] 計算機面板（基礎四則 + 科學計算）
 - [ ] 常用語面板（自訂快捷短語���）
-- [ ] 色碼選擇器面板���HEX/RGB 取色）
+- [ ] 色碼選擇器面板
+- [ ] 單位換算面板（長度/重量/溫度/貨幣）���HEX/RGB 取色）
 - [ ] 單���換算面板（長度/重量/溫度/貨幣）
 
 ### ��人化
