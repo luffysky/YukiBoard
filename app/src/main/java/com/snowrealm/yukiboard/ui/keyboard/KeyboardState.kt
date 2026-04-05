@@ -208,34 +208,58 @@ data class KeyboardState(
         // =================================================================
         fun bopomofoRows(): List<List<KeyModel>> = listOf(
             // 大千式標準排列（ㄦ 移至底行）
+            // 每個注音/聲調鍵長按可直接輸出注音符號本身（altChars）
             listOf(
-                KeyModel.char("ㄅ"), KeyModel.char("ㄉ"),
-                KeyModel.char("ˇ"), KeyModel.char("ˋ"),
-                KeyModel.char("ㄓ"), KeyModel.char("ˊ"),
-                KeyModel.char("˙"),
-                KeyModel.char("ㄚ"), KeyModel.char("ㄞ"), KeyModel.char("ㄢ")
+                KeyModel.char("ㄅ", altChars = listOf("ㄅ")),
+                KeyModel.char("ㄉ", altChars = listOf("ㄉ")),
+                KeyModel.char("ˇ", altChars = listOf("ˇ")),
+                KeyModel.char("ˋ", altChars = listOf("ˋ")),
+                KeyModel.char("ㄓ", altChars = listOf("ㄓ")),
+                KeyModel.char("ˊ", altChars = listOf("ˊ")),
+                KeyModel.char("˙", altChars = listOf("˙")),
+                KeyModel.char("ㄚ", altChars = listOf("ㄚ")),
+                KeyModel.char("ㄞ", altChars = listOf("ㄞ")),
+                KeyModel.char("ㄢ", altChars = listOf("ㄢ"))
             ),
             listOf(
-                KeyModel.char("ㄆ"), KeyModel.char("ㄊ"), KeyModel.char("ㄍ"),
-                KeyModel.char("ㄐ"), KeyModel.char("ㄔ"), KeyModel.char("ㄗ"),
-                KeyModel.char("ㄧ"), KeyModel.char("ㄛ"), KeyModel.char("ㄟ"),
-                KeyModel.char("ㄣ")
+                KeyModel.char("ㄆ", altChars = listOf("ㄆ")),
+                KeyModel.char("ㄊ", altChars = listOf("ㄊ")),
+                KeyModel.char("ㄍ", altChars = listOf("ㄍ")),
+                KeyModel.char("ㄐ", altChars = listOf("ㄐ")),
+                KeyModel.char("ㄔ", altChars = listOf("ㄔ")),
+                KeyModel.char("ㄗ", altChars = listOf("ㄗ")),
+                KeyModel.char("ㄧ", altChars = listOf("ㄧ")),
+                KeyModel.char("ㄛ", altChars = listOf("ㄛ")),
+                KeyModel.char("ㄟ", altChars = listOf("ㄟ")),
+                KeyModel.char("ㄣ", altChars = listOf("ㄣ"))
             ),
             listOf(
-                KeyModel.char("ㄇ"), KeyModel.char("ㄋ"), KeyModel.char("ㄎ"),
-                KeyModel.char("ㄑ"), KeyModel.char("ㄕ"), KeyModel.char("ㄘ"),
-                KeyModel.char("ㄨ"), KeyModel.char("ㄜ"), KeyModel.char("ㄠ"),
-                KeyModel.char("ㄤ")
+                KeyModel.char("ㄇ", altChars = listOf("ㄇ")),
+                KeyModel.char("ㄋ", altChars = listOf("ㄋ")),
+                KeyModel.char("ㄎ", altChars = listOf("ㄎ")),
+                KeyModel.char("ㄑ", altChars = listOf("ㄑ")),
+                KeyModel.char("ㄕ", altChars = listOf("ㄕ")),
+                KeyModel.char("ㄘ", altChars = listOf("ㄘ")),
+                KeyModel.char("ㄨ", altChars = listOf("ㄨ")),
+                KeyModel.char("ㄜ", altChars = listOf("ㄜ")),
+                KeyModel.char("ㄠ", altChars = listOf("ㄠ")),
+                KeyModel.char("ㄤ", altChars = listOf("ㄤ"))
             ),
             listOf(
-                KeyModel.char("ㄈ"), KeyModel.char("ㄌ"), KeyModel.char("ㄏ"),
-                KeyModel.char("ㄒ"), KeyModel.char("ㄖ"), KeyModel.char("ㄙ"),
-                KeyModel.char("ㄩ"), KeyModel.char("ㄝ"), KeyModel.char("ㄡ"),
-                KeyModel.char("ㄥ")
+                KeyModel.char("ㄈ", altChars = listOf("ㄈ")),
+                KeyModel.char("ㄌ", altChars = listOf("ㄌ")),
+                KeyModel.char("ㄏ", altChars = listOf("ㄏ")),
+                KeyModel.char("ㄒ", altChars = listOf("ㄒ")),
+                KeyModel.char("ㄖ", altChars = listOf("ㄖ")),
+                KeyModel.char("ㄙ", altChars = listOf("ㄙ")),
+                KeyModel.char("ㄩ", altChars = listOf("ㄩ")),
+                KeyModel.char("ㄝ", altChars = listOf("ㄝ")),
+                KeyModel.char("ㄡ", altChars = listOf("ㄡ")),
+                KeyModel.char("ㄥ", altChars = listOf("ㄥ"))
             ),
             // 底行（ㄦ 移至此行）
             listOf(
-                KeyModel.char("ㄦ"),
+                KeyModel.char("ㄦ", altChars = listOf("ㄦ")),
                 KeyModel.special("?123", KeyboardView.KEYCODE_SWITCH_NUMBERS, widthWeight = 1.0f),
                 KeyModel.special("⌫", KeyboardView.KEYCODE_DELETE, widthWeight = 1.2f),
                 KeyModel.special("切換", KeyboardView.KEYCODE_SWITCH_LANG, widthWeight = 1.0f),

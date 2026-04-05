@@ -243,6 +243,19 @@ class YukiBoardIMEService : InputMethodService() {
         keyboardView.setOnKeyPressListener { keyCode, label ->
             handleKeyPress(keyCode, label)
         }
+        // 長按注音/聲調直接輸出（不走 InputRouter）
+        keyboardView.setOnRawCommitListener { text ->
+            val ic = currentInputConnection ?: return@setOnRawCommitListener
+            // 先提交正在組合的注音
+            val composing = inputRouter.composingText
+            if (composing.isNotEmpty()) {
+                ic.commitText(composing, 1)
+                inputRouter.reset()
+                keyboardView.updateComposingText("")
+                keyboardView.updateCandidates(emptyList())
+            }
+            ic.commitText(text, 1)
+        }
         keyboardView.setOnModeChangedListener { mode ->
             manualModeOverride = true
             characterView?.playSwitchLang()
@@ -386,9 +399,8 @@ class YukiBoardIMEService : InputMethodService() {
             android.view.Gravity.TOP
         ))
 
-        // 套用儲存的鍵盤高度
-        val screenH = resources.displayMetrics.heightPixels
-        val kbHeight = (screenH * prefs.keyboardHeightRatio).toInt()
+        // 套用儲存的鍵盤高度（橫向使用更高比例，避免太扁）
+        val kbHeight = calculateKeyboardHeight()
         rootContainer.addView(keyboardContainer, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             kbHeight
@@ -418,9 +430,8 @@ class YukiBoardIMEService : InputMethodService() {
         super.onStartInputView(info, restarting)
         inputRouter.reset()
 
-        // 重新套用鍵盤高度（設定頁可能已修改）
-        val screenH = resources.displayMetrics.heightPixels
-        val kbHeight = (screenH * prefs.keyboardHeightRatio).toInt()
+        // 重新套用鍵盤高度（設定頁可能已修改 / 螢幕旋轉）
+        val kbHeight = calculateKeyboardHeight()
         keyboardContainer.layoutParams?.let { lp ->
             if (lp.height != kbHeight) {
                 lp.height = kbHeight
@@ -1087,6 +1098,20 @@ class YukiBoardIMEService : InputMethodService() {
     // =========================================================================
     // 鍵盤尺寸調整
     // =========================================================================
+
+    /** 計算鍵盤高度（橫向時使用更高比例，避免按鍵太扁） */
+    private fun calculateKeyboardHeight(): Int {
+        val isLandscape = resources.configuration.orientation ==
+                android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val screenH = resources.displayMetrics.heightPixels
+        return if (isLandscape) {
+            // 橫向：螢幕高度較小，使用較高比例（至少 0.55，最多 0.75）
+            val landscapeRatio = (prefs.keyboardHeightRatio * 1.6f).coerceIn(0.55f, 0.75f)
+            (screenH * landscapeRatio).toInt()
+        } else {
+            (screenH * prefs.keyboardHeightRatio).toInt()
+        }
+    }
 
     private fun adjustKeyboardHeight(deltaY: Float) {
         val screenH = resources.displayMetrics.heightPixels

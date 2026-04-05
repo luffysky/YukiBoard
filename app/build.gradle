@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 28
-        versionName "0.5.4"
+        versionCode 29
+        versionName "0.5.5"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -75,7 +75,7 @@ android {
             debuggable true
             firebaseAppDistribution {
                 groups = "testers"
-                releaseNotes = "v${android.defaultConfig.versionName}\n- feat: 長按滑動選字（alt-char / 環形選單直接滑動選取，不用抬手再點）\n- feat: SwipeTrail 滑動軌跡特效（紫色光暈路徑 + 按鍵高亮 + 淡出動畫）\n- 設定頁新增「滑動軌跡特效」開關"
+                releaseNotes = "v${android.defaultConfig.versionName}\n- feat: 注音鍵盤長按直接輸出注音符號/聲調（不用開直打模式）\n- fix: 橫向鍵盤太扁 — 自動提高高度比例 + 行高加大\n- 更新 todo_list_0406.md 新增個人風格智慧系統 + SwipeTrail 任務規劃"
             }
         }
     }

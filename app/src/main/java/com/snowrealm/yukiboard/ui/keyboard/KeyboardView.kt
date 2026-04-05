@@ -128,6 +128,12 @@ class KeyboardView(context: Context) : View(context) {
         onModeChangedListener = listener
     }
 
+    /** 直接提交文字（不走 InputRouter），用於長按彈出的注音符號/聲調直接��出 */
+    private var onRawCommitListener: ((text: String) -> Unit)? = null
+    fun setOnRawCommitListener(listener: (text: String) -> Unit) {
+        onRawCommitListener = listener
+    }
+
     private var onCandidateSelectListener: ((index: Int) -> Unit)? = null
     fun setOnCandidateSelectListener(listener: (index: Int) -> Unit) {
         onCandidateSelectListener = listener
@@ -254,7 +260,7 @@ class KeyboardView(context: Context) : View(context) {
 
     // 直向行高 vs 橫向行高（預設值，實際可能被容器高度壓縮）
     private val rowHeightPortrait = 52f * density
-    private val rowHeightLandscape = 42f * density
+    private val rowHeightLandscape = 48f * density
 
     /** 實際使用的行高，由 onMeasure 動態計算以適配容器 */
     private var actualRowHeight = rowHeightPortrait
@@ -1175,12 +1181,29 @@ class KeyboardView(context: Context) : View(context) {
         val idx = altPopupHoveredIndex
         if (idx in altPopupChars.indices) {
             val ch = altPopupChars[idx]
-            val output = if ((isShifted || isCapsLock) && ch.length == 1) ch.uppercase() else ch
-            onKeyPressListener?.invoke(ch[0].code, output)
-            autoUnshift()
+            val originKey = altPopupOriginKey
+            // 如果原始按鍵是注音/聲調，且選的是 altChar（非原始字元），直接 raw commit
+            val isOriginBopomofo = originKey != null && originKey.label.length == 1 &&
+                    isBopomofoOrTone(originKey.label[0])
+            if (isOriginBopomofo && idx > 0) {
+                // altChar 是注音符號���身 → 直接輸出（不走 InputRouter）
+                onRawCommitListener?.invoke(ch)
+            } else {
+                val output = if ((isShifted || isCapsLock) && ch.length == 1) ch.uppercase() else ch
+                onKeyPressListener?.invoke(ch[0].code, output)
+                autoUnshift()
+            }
         }
         dismissAltPopup()
     }
+
+    /** 判斷是否為注音符號或聲調符號 */
+    private fun isBopomofoOrTone(ch: Char): Boolean =
+        ch in '\u3105'..'\u312F' ||  // ㄅ-ㄩ
+        ch == '\u02CA' ||            // ˊ
+        ch == '\u02C7' ||            // ˇ
+        ch == '\u02CB' ||            // ˋ
+        ch == '\u02D9'               // ˙
 
     /** 根據手指位置更新 alt popup 的 hover 狀態 */
     private fun updateAltPopupHover(x: Float, y: Float) {

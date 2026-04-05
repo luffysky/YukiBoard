@@ -2,7 +2,7 @@
 
 > 整合 todo-list-0405 + 總任��包 + 滑動輸入任務包 + Games_add + Games_bug
 > ~~刪除線~~ = 已完成 / ✅ = 已完成
-> 版本：**v0.4.2**（versionCode 16）
+> 版本：**v0.5.4**（versionCode 28）
 
 ---
 
@@ -113,9 +113,36 @@
 - ✅ **GIF 傳送改善** — 下載改 OkHttp + URL path 副檔名判斷 + commitContent fallback Toast
 - ✅ **GIF 搜尋框 CJK 組字提示** — 搜尋框顯示組字中的注音/拼音 hint
 
+### v0.4.8~v0.5.0 — 主題面板 + 背景設定 + 影片即時生效
+- ✅ **主題面板整合完整背景設定** + 設定頁預覽即時更新
+- ✅ **影片背景比例/XY 調整即時生效**
+- ✅ **影片背景切換/清除時 crash 修復**
+
+### v0.5.1 — 候選字修復 + 自訂詞庫 + 功能接線
+- ✅ **多音節候選字 fallback 修復** — 所有音節的候選字都顯��（不再只有最後一個）
+- ✅ **UserDictionary 手動注音→詞對應** — addManual/queryByBopomofo + 設定頁 UI
+- ✅ **ToneDetector 接線** — 提交文字≥2字時分析語氣，負面情緒雪凜回應
+- ✅ **SecretMessageManager 修正** — 改為 Enter 整句加密（不再逐字加密）+ 預設關閉
+- ✅ **FloatingPanelManager 接線** — 註冊天氣/Claw 懸浮面板
+- ✅ **NextActionPredictor 接線** — 空候選列顯示情境建議
+
+### v0.5.2 — 句子級上下文預測
+- ✅ **SentencePredictor** — 三層預測：學習 bigram + 內建回覆模板（中/英/日/韓 100+）+ 前綴續寫
+- ✅ **SmartInputManager 整合** — updateSentenceContext / onSentenceCommitted
+- ✅ **InputRouter 整合** — CJK + 英文模式候選列皆附加句子預測
+
+### v0.5.3 — 直打注音 + 全專案掃描
+- ✅ **rawBopomofoMode** — 注音符號直接輸出不轉漢字 + 設定頁開關
+
+### v0.5.4 — 長按滑動選字 + SwipeTrail
+- ✅ **Alt-char popup 改為 inline overlay** — 長按後直接滑到目標字放開選中
+- ✅ **環形選單滑動選取** — RadialModeMenu / RadialLanguageMenu 長按不用抬手直接滑選
+- ✅ **SwipeTrail 滑動軌跡特效** — 紫色光暈路徑 + 起點光圈 + 按鍵高亮 + 400ms 淡出
+- ✅ **swipeTrailEnabled 開關** — YukiPreferences + 設定頁
+
 ---
 
-## 當前版本待實作（v0.4.0+）
+## 當前版本待實作（v0.5.5+）
 
 ### 批次 A — 滑動輸入 + RIME 詞庫（8 步）
 
@@ -141,7 +168,7 @@
   - 完整序列查詢 + 子序列查詞 + 前綴匹配
 
 #### A-5 KeyboardView 滑動整合
-- [ ] 滑動軌跡視覺效果（淡紫色半透明 Path + 外發光 + 起點圓點）
+- ~~[x] 滑動軌跡視覺效果（淡紫色半透明 Path + 外發光 + 起點圓點）~~ — v0.5.4 SwipeTrail
 - [ ] `onTouchEvent` 根據 `prefs.swipeInputEnabled` 切換點擊/滑動模式
 - [ ] `notifyBopomofoLayout()` 在注音鍵盤 layout 後通知 decoder
 - [ ] `onSwipeInput` 回呼接口
@@ -247,7 +274,54 @@
 
 ---
 
-## 下個版本（v0.5.0）
+### 批次 J — 個人風格智慧系統（個人風格任務包 4 批）
+
+#### J-1 PersonalDictionary（個人詞庫核心）
+- [ ] `input/smart/PersonalDictionary.kt` — 三層自動學詞（PINNED→LEARNED→CANDIDATE）
+  - 7天內使用≥3次 → 升為常用詞
+  - 30天未使用 → 自動降級
+  - 使用者可手動釘選（永不降級）或刪除
+- [ ] 整合 TypingHabitTracker 詞頻 + UserDictionary 手動詞
+- [ ] 設定頁 UI：個人詞庫管理（釘選/刪除/匯出）
+
+#### J-2 StyleProfiler（語氣風格學習）
+- [ ] `input/smart/StyleProfiler.kt` — 語尾詞統計 + 短語模式 + App 維度語氣分數
+  - 記錄常用語尾（啦/哈/嗚嗚/XD/www 等）
+  - 分析正式/輕鬆/可愛/專業傾向
+  - 不同 App 不同風格（Line 偏輕鬆 vs Gmail 偏正式）
+- [ ] 候選字列融入語氣預測（淡紫色標示）
+
+#### J-3 ComboTracker（隱形連擊計數器）
+- [ ] `input/smart/ComboTracker.kt` — 打字命中預測時累加連擊
+  - 觸發閾值粒子特效（5/10/20/50 連擊）
+  - 不顯示分數，只有視覺回饋
+  - 停止打字 3 秒歸零
+- [ ] KeyboardView 粒子動畫整合
+
+#### J-4 EmotionStickerEngine（情緒貼圖自動推薦）
+- [ ] `input/smart/EmotionStickerEngine.kt` — 依打字情緒推薦貼圖
+  - ToneDetector 情緒 → 匹配貼圖包標籤
+  - 候選列末尾浮出 1~3 張推薦貼圖縮圖
+  - 點擊直接送出貼圖
+- [ ] StickerPanelView 貼圖標籤系統
+
+---
+
+### 批次 K — SwipeTrail 進階 + 滑動輸入邏輯
+
+#### K-1 滑動輸入邏輯（接 A-3~A-6）
+- [ ] SwipeGestureDetector.kt — 點擊 vs 滑動區分（12dp 閾值）
+- [ ] BopomofoSwipeDecoder.kt — 座標序列→注音符號序列
+- [ ] SwipeCandidateRanker.kt — 合併 ChewingEngine + RimeDict 排序
+- [ ] YukiBoardIMEService 整合 handleSwipeInput()
+
+#### K-2 滑動候選字視覺標示
+- [ ] 滑動候選標記淡紫色 #B39DDB + 左側 ≈ 符號
+- [ ] `markSwipeCandidates()` 方法
+
+---
+
+## 下個版本（v0.6.0）
 
 ### 新增遊戲（Games_add.md 規劃 + 總任務包 第八批）
 
@@ -352,32 +426,36 @@
 ## 實作順序建議
 
 ```
-v0.4.0 重點：滑動輸入 + 智慧候選字 + 開關系統 + AI Skill
+v0.5.5+ 接下來的優先順序
 ─────────────────────────────────────────────────────
-批次 A（滑動輸入 + RIME 詞庫）         ← 核心差異化功能
+批次 J-1（PersonalDictionary）         ← 個人詞庫核心，所有智慧功能基礎
   ↓
-批次 B（全功能開關設定系統）            ← 基礎建設，後續功能都依賴
+批次 J-2（StyleProfiler）             ← 語氣學習，讓候選字更貼近用戶
   ↓
-批次 C（智慧候選字升級）               ← 輸入法核心���驗
+批次 C 剩餘（候選字視覺分類標示）       ← 候選列 UX 完善
   ↓
-批次 D（AI Skill × 12）               ← 功能量最大
+批次 J-3（ComboTracker）              ← 隱形遊戲化，增加黏著度
   ↓
-批次 E（AI Provider 擴充���             ← 讓 AI 功��有免費���案
+批次 J-4（EmotionStickerEngine）      ← 情緒貼圖推薦
   ↓
-批次 F（雪凜人格系統）                 ← 角色差異化
+批次 K（滑動輸入邏輯 + 視覺標示）       ← 接上 SwipeTrail 做完整滑動輸入
   ↓
-批次 G（語境預測 + Whisper）           ← 進階 AI
+批次 A 剩餘（RIME 詞庫 + 滑動解碼）    ← 大詞庫支援
   ↓
-批次 H（API 串接 + 環境）              ← GIF / 翻譯實際可用
+批次 E（AI Provider 擴充）             ← 讓 AI 功能有免費方案
   ↓
-批次 I（懸浮面板群完善）               ← UI ��驗打磨
+批次 G 剩餘（WhisperSkill）            ← 語音 AI
+  ↓
+批次 H 剩餘（MLKit 翻譯 + .env）       ← 翻譯實際可用
+
+已完成：B ✅ D ✅ F ✅ I ✅
 ```
 
 ---
 
 ## 備註
 
-- 版本號：**v0.4.2**（versionCode 16）
+- 版本號：**v0.5.4**（versionCode 28）
 - deploy 指令：`bash scripts/deploy.sh "更新��明"` 或 `./gradlew appDistributionUploadDebug`
 - Firebase App Distribution 測��群��：`testers`
 - google-services.json 已在 .gitignore
