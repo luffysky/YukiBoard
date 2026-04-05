@@ -928,9 +928,13 @@ class KeyboardView(context: Context) : View(context) {
         candidatePaint.textAlign = Paint.Align.CENTER
         candidatePaint.textSize = 15f * density
 
-        // 計算每個��選字寬度���快取（供 touch 用）
-        val candWidths = candidates.mapIndexed { i, it ->
-            val display = if (isSwipeCandidateMode && i == 0) "≈$it" else it
+        // 計算每個候選字寬度並快取（供 touch 用，含前綴）
+        val candWidths = candidates.mapIndexed { i, text ->
+            val display = when {
+                isSwipeCandidateMode && i == 0 -> "≈$text"
+                candidateSourceMap[text] == CandidateSource.AI -> "✨$text"
+                else -> text
+            }
             candidatePaint.measureText(display) + candPadH * 2
         }
         candWidthsCache = candWidths

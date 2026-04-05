@@ -243,6 +243,9 @@ class SettingsActivity : AppCompatActivity() {
             smartChildren += switchRow("自動學詞", "常用字彙自動加入字典", prefs.adaptiveDict) { prefs.adaptiveDict = it }
             smartChildren += switchRow("語句預測", "預測下一個可能的詞或片語", prefs.phrasePredict) { prefs.phrasePredict = it }
             smartChildren += switchRow("習慣追蹤", "學習打字習慣提升預測精準度", prefs.habitTracking) { prefs.habitTracking = it }
+
+            // 候選字來源顏色說明
+            smartChildren += buildCandidateColorLegend()
         })
 
         // ═══════════════════════════════════════════════════════
@@ -2059,6 +2062,54 @@ class SettingsActivity : AppCompatActivity() {
         }
         outer.addView(testBtn)
 
+        return outer
+    }
+
+    private fun buildCandidateColorLegend(): View {
+        val outer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+        }
+        val title = TextView(this).apply {
+            text = "候選字顏色說明"
+            textSize = 12f
+            setTextColor(0xFF7FD8FF.toInt())
+            setPadding(0, 0, 0, dp(6))
+        }
+        outer.addView(title)
+
+        val legends = listOf(
+            0xFFCCCCCC.toInt() to "白/灰 — 字典匹配（一般候選）",
+            0xFFFF9933.toInt() to "橙色 — 智慧糾錯（拼字修正）",
+            0xFF66CC88.toInt() to "綠色 — 自適應學習（常用詞）",
+            0xFF66AAFF.toInt() to "藍�� — 語句預測（bigram/trigram）",
+            0xFFFFD700.toInt() to "金色 — 使用者詞庫（自訂/學習詞）",
+            0xFFBB88FF.toInt() to "紫色 — 整句預測",
+            0xFFE8B84D.toInt() to "金色 ✨ — AI 候選（Claw AI 生成）"
+        )
+        for ((color, desc) in legends) {
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(0, dp(2), 0, dp(2))
+                gravity = android.view.Gravity.CENTER_VERTICAL
+            }
+            val dot = View(this).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(10), dp(10)).apply {
+                    setMargins(0, 0, dp(8), 0)
+                }
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    shape = android.graphics.drawable.GradientDrawable.OVAL
+                    setColor(color)
+                }
+            }
+            row.addView(dot)
+            row.addView(TextView(this).apply {
+                text = desc
+                textSize = 11f
+                setTextColor(0xFFAABBCC.toInt())
+            })
+            outer.addView(row)
+        }
         return outer
     }
 

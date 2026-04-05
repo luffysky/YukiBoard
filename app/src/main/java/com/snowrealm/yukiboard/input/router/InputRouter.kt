@@ -277,16 +277,22 @@ class InputRouter(private val context: Context) {
         val raw = activeEngine.getCandidates()
         val composing = activeEngine.composingText
 
-        // 非英文模式：引擎候選 + 自適應字典 + 上下文 bigram/trigram + 整句預測
+        // 非英文模式：引擎候選 + 自適應字典排序（composing 有值才加整句預測）
         if (currentMode != InputMode.ENGLISH) {
-            candidateSourceMap = emptyMap() // 非英文暫不追蹤來源
-            // ── 整句預測（放在候選列末端，用於直接選句）──
-            val sentenceSuggestions = smartInput.getSentencePredictions(
-                contextBeforeCursor, composing, 3
-            )
+            candidateSourceMap = emptyMap()
+
+            if (raw.isEmpty()) {
+                // 沒有候選就不顯示，不硬塞預測
+                candidateManager.update(emptyList())
+                return
+            }
+
+            // 有 composing 才做整句預測
+            val sentenceSuggestions = if (composing.isNotEmpty()) {
+                smartInput.getSentencePredictions(contextBeforeCursor, composing, 3)
+            } else emptyList()
 
             if (raw.size > 1) {
-                // 從上下文提取最近幾個字/詞（CJK 每個字算一個 token）
                 val contextWords = extractContextWords(contextBeforeCursor)
                 val contextPredictions = if (contextWords.isNotEmpty()) {
                     smartInput.predictWithContext(contextWords, 10)
@@ -296,16 +302,13 @@ class InputRouter(private val context: Context) {
 
                 val boosted = raw.sortedWith(compareByDescending<String> { word ->
                     var score = 0f
-                    // 自適應字典分數
                     val freq = smartInput.adaptiveDictionary.getFrequency(word)
                     if (freq > 0) score += freq + 50
-                    // 上下文 bigram/trigram 加權
                     val ctxScore = contextPredictions[word]
                     if (ctxScore != null) score += ctxScore * 5
                     score
-                }.thenBy { raw.indexOf(it) })  // 其他保持原順序
+                }.thenBy { raw.indexOf(it) })
 
-                // 合併：單字候選在前，整句建議在後
                 val combined = boosted.toMutableList()
                 for (s in sentenceSuggestions) {
                     if (s !in combined) combined.add(s)
@@ -378,15 +381,7 @@ class InputRouter(private val context: Context) {
                 scored[composing.lowercase()] = prev + 3f
             }
         } else {
-            // composing 為空：下一詞預測 + 情境建議
-            val predictions = smartInput.getPhrasePredictions(5)
-            predictions.forEachIndexed { i, word ->
-                scored[word] = (scored[word] ?: 0f) + (6f - i).coerceAtLeast(1f)
-            }
-            val context = smartInput.getContextSuggestions(currentAppPackage, 3)
-            context.forEachIndexed { i, word ->
-                scored[word] = (scored[word] ?: 0f) + (5f - i).coerceAtLeast(1f)
-            }
+            // composing 為空：不主動顯示預測，避免干擾
         }
 
         val sorted = scored.entries
@@ -395,17 +390,17 @@ class InputRouter(private val context: Context) {
             .map { it.key }
             .toMutableList()
 
-        // 英文也加整句預測
-        val enSentences = smartInput.getSentencePredictions(
-            contextBeforeCursor, composing, 3
-        )
-        for (s in enSentences) {
-            if (s !in sorted) sorted.add(s)
-        }
-
-        // 整句預測標記來源
-        for (s in enSentences) {
-            sourceMap.putIfAbsent(s, CandidateSource.SENTENCE)
+        // 有 composing 才加整句預測，沒在打字不干擾
+        if (composing.isNotEmpty()) {
+            val enSentences = smartInput.getSentencePredictions(
+                contextBeforeCursor, composing, 3
+            )
+            for (s in enSentences) {
+                if (s !in sorted) sorted.add(s)
+            }
+            for (s in enSentences) {
+                sourceMap.putIfAbsent(s, CandidateSource.SENTENCE)
+            }
         }
 
         candidateSourceMap = sourceMap
