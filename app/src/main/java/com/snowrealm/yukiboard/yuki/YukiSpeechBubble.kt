@@ -54,12 +54,18 @@ class YukiSpeechBubble(context: Context) : View(context) {
         visibility = GONE
     }
 
-    /** 顯示泡泡，自動定位到 anchorView 上方 */
+    /** TTS 朗讀回呼 — 由 IME Service 注入 */
+    var onSpeakRequest: ((text: String) -> Unit)? = null
+
+    /** 顯示泡泡，自動定位到 anchorView 上方，並用 TTS 朗讀 */
     fun show(message: String, anchorView: View) {
         text = message
         isVisible = true
         visibility = VISIBLE
         alpha = 1f
+
+        // TTS 朗讀泡泡文字
+        onSpeakRequest?.invoke(message)
 
         // 定位到 anchor 上方
         post {

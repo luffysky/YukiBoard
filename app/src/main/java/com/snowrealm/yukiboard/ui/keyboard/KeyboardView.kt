@@ -145,6 +145,12 @@ class KeyboardView(context: Context) : View(context) {
         onCandidateExpandListener = listener
     }
 
+    /** 候選字朗讀回呼 — 選字時觸發，由 IME Service 判斷是否 TTS */
+    private var onCandidateSpeakListener: ((text: String) -> Unit)? = null
+    fun setOnCandidateSpeakListener(listener: (text: String) -> Unit) {
+        onCandidateSpeakListener = listener
+    }
+
     private var onLanguageSelectedListener: ((RadialLanguageMenu.LanguageOption) -> Unit)? = null
     fun setOnLanguageSelectedListener(listener: (RadialLanguageMenu.LanguageOption) -> Unit) {
         onLanguageSelectedListener = listener
@@ -1819,6 +1825,7 @@ class KeyboardView(context: Context) : View(context) {
                     if (row >= 0) {
                         val index = row * EXPAND_GRID_COLS + col
                         if (index in allCandidates.indices) {
+                            onCandidateSpeakListener?.invoke(allCandidates[index])
                             onCandidateSelectListener?.invoke(index)
                             isCandidateExpanded = false
                             expandScrollOffset = 0f
@@ -1854,6 +1861,7 @@ class KeyboardView(context: Context) : View(context) {
                     // 用 ACTION_DOWN 的 x 算出候選字 index（不依���繪製時的 rect）
                     val idx = hitTestCandidateIndex(candidateDownX)
                     if (idx >= 0 && idx < candidates.size) {
+                        onCandidateSpeakListener?.invoke(candidates[idx])
                         onCandidateSelectListener?.invoke(idx)
                         performClick()
                         return true

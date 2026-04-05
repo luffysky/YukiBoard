@@ -100,6 +100,9 @@ class YukiBoardIMEService : InputMethodService() {
     // 語音輸入
     private var speechEngine: SpeechInputEngine? = null
 
+    // TTS 語音輸出
+    private var ttsEngine: com.snowrealm.yukiboard.speech.SpeechOutputEngine? = null
+
     // 雪凜系統
     private var yukiCommentEngine: com.snowrealm.yukiboard.yuki.YukiCommentEngine? = null
     private var yukiSpeechBubble: com.snowrealm.yukiboard.yuki.YukiSpeechBubble? = null
@@ -205,6 +208,9 @@ class YukiBoardIMEService : InputMethodService() {
         // 下一步動作預測
         nextActionPredictor = com.snowrealm.yukiboard.input.predict.RuleBasedPredictor()
 
+        // TTS 語音輸出引擎
+        initTtsEngine()
+
         // 懸浮面板回調：AI 結果插入輸入框
         clawResultFloatingPanel?.onInsertToInput = { text ->
             val ic = currentInputConnection
@@ -271,6 +277,7 @@ class YukiBoardIMEService : InputMethodService() {
                 exitGameMode()
             }
         }
+        keyboardView.setOnCandidateSpeakListener { text -> onCandidateSpeak(text) }
         keyboardView.setOnCandidateSelectListener { index ->
             // 滑動輸入候選：直接 commit，不走 InputRouter
             if (swipeInputPending && index in swipeInputCandidates.indices) {
@@ -414,6 +421,7 @@ class YukiBoardIMEService : InputMethodService() {
         ).apply { gravity = android.view.Gravity.TOP or android.view.Gravity.START }
         keyboardContainer.addView(bubble, bubbleParams)
         yukiSpeechBubble = bubble
+        bubble.onSpeakRequest = { text -> onYukiSpeak(text) }
 
         // 面板容器（覆蓋在鍵盤上方，從頂部對齊）
         panelContainer = FrameLayout(this)
@@ -578,6 +586,7 @@ class YukiBoardIMEService : InputMethodService() {
         gyroController.unregister()
         gameLoop?.stop()
         speechEngine?.destroy()
+        ttsEngine?.destroy()
         btKeyboard?.destroy()
         wifiServer?.destroy()
         stickerRepository?.destroy()
@@ -758,6 +767,9 @@ class YukiBoardIMEService : InputMethodService() {
                 if (source.isNotEmpty()) p.sourceText = source
                 p.onTranslatedSelected = { translated ->
                     currentInputConnection?.commitText(translated, 1)
+                }
+                p.onSpeakRequest = { text, locale ->
+                    onTranslateSpeakRequest(text, locale)
                 }
                 val engine = translateEngine
                 if (engine != null) {
@@ -1148,6 +1160,48 @@ class YukiBoardIMEService : InputMethodService() {
         speechEngine?.stopListening()
         keyboardView.voiceListeningLocale = null
         characterView?.playIdle()
+    }
+
+    // =========================================================================
+    // TTS 語音輸出
+    // =========================================================================
+
+    private fun initTtsEngine() {
+        ttsEngine?.destroy()
+        ttsEngine = when (prefs.ttsEngineType) {
+            1 -> {
+                val apiKey = prefs.googleCloudTtsApiKey
+                if (apiKey.isNotBlank()) {
+                    com.snowrealm.yukiboard.speech.GoogleCloudTtsEngine(apiKey)
+                } else {
+                    com.snowrealm.yukiboard.speech.AndroidTtsEngine(applicationContext)
+                }
+            }
+            else -> com.snowrealm.yukiboard.speech.AndroidTtsEngine(applicationContext)
+        }
+    }
+
+    /** TTS 朗讀（帶語言與語速設定） */
+    private fun ttsSpeak(text: String, locale: String? = null, onDone: (() -> Unit)? = null) {
+        ttsEngine?.speak(text, locale, prefs.ttsSpeed, onDone)
+    }
+
+    /** 翻譯面板朗讀回呼 */
+    private fun onTranslateSpeakRequest(text: String, locale: String) {
+        if (!prefs.ttsTranslateRead) return
+        ttsSpeak(text, locale)
+    }
+
+    /** 候選字朗讀（無障礙） */
+    private fun onCandidateSpeak(text: String) {
+        if (!prefs.ttsCandidateRead) return
+        ttsSpeak(text)
+    }
+
+    /** Yuki 角色語音回應 */
+    private fun onYukiSpeak(text: String) {
+        if (!prefs.ttsYukiVoice) return
+        ttsSpeak(text)
     }
 
     // =========================================================================

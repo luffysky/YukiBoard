@@ -57,6 +57,9 @@ class TranslatePanelView(context: Context) : View(context) {
     /** 點擊翻譯結果時回呼 */
     var onTranslatedSelected: ((String) -> Unit)? = null
 
+    /** 朗讀翻譯結果回呼 — 由 IME Service 注入 TTS */
+    var onSpeakRequest: ((text: String, locale: String) -> Unit)? = null
+
     /** 請求焦點到翻譯輸入框（讓鍵盤打的字進到這裡） */
     var onRequestInputMode: ((Boolean) -> Unit)? = null
 
@@ -83,6 +86,8 @@ class TranslatePanelView(context: Context) : View(context) {
     private var sourceRect = RectF()
     private var clearRect = RectF()
     private var translateBtnRect = RectF()
+    private var speakSourceRect = RectF()
+    private var speakResultRect = RectF()
     private val fromLangRects = mutableListOf<Pair<RectF, Int>>()
     private val toLangRects = mutableListOf<Pair<RectF, Int>>()
     private var showFromPicker = false
@@ -161,6 +166,23 @@ class TranslatePanelView(context: Context) : View(context) {
             clearRect = RectF()
         }
 
+        // 來源朗讀按鈕 🔊
+        if (displayText.isNotEmpty()) {
+            val speakSize = 28 * density
+            val speakX = if (!clearRect.isEmpty) clearRect.left - speakSize - 4 * density
+                         else sourceRect.right - speakSize - 8 * density
+            speakSourceRect = RectF(speakX, sourceRect.centerY() - speakSize / 2,
+                speakX + speakSize, sourceRect.centerY() + speakSize / 2)
+            val speakPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                textAlign = Paint.Align.CENTER
+                textSize = 16f * density
+                color = theme.candidateSelectedColorInt
+            }
+            canvas.drawText("🔊", speakSourceRect.centerX(), speakSourceRect.centerY() + 6 * density, speakPaint)
+        } else {
+            speakSourceRect = RectF()
+        }
+
         // 翻譯按鈕
         val btnY = srcY + srcH + 6 * density
         val btnH = 32 * density
@@ -184,6 +206,25 @@ class TranslatePanelView(context: Context) : View(context) {
         resultPaint.alpha = if (translatedText.isEmpty()) 100 else 255
         canvas.drawText(resDisplay, resultRect.left + 12 * density, resultRect.centerY() + resultPaint.textSize / 3f, resultPaint)
         resultPaint.alpha = 255
+
+        // 翻譯結果朗讀按鈕 🔊
+        if (translatedText.isNotEmpty()) {
+            val speakSize = 32 * density
+            speakResultRect = RectF(
+                resultRect.right - speakSize - 8 * density,
+                resultRect.centerY() - speakSize / 2,
+                resultRect.right - 8 * density,
+                resultRect.centerY() + speakSize / 2
+            )
+            val speakPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                textAlign = Paint.Align.CENTER
+                textSize = 18f * density
+                color = theme.candidateSelectedColorInt
+            }
+            canvas.drawText("🔊", speakResultRect.centerX(), speakResultRect.centerY() + 7 * density, speakPaint)
+        } else {
+            speakResultRect = RectF()
+        }
 
         // 語言選擇下拉（如果展開）
         if (showFromPicker) drawLangPicker(canvas, fromRect.left, headerH, fromLangIndex, isFrom = true)
@@ -307,6 +348,25 @@ class TranslatePanelView(context: Context) : View(context) {
                 toLangIndex = tmp
                 translate()
                 invalidate()
+                performClick()
+                return true
+            }
+
+            // 朗讀來源文字
+            if (!speakSourceRect.isEmpty && speakSourceRect.contains(event.x, event.y)) {
+                val text = if (isInputMode && inputBuffer.isNotEmpty()) inputBuffer.toString() else sourceText
+                if (text.isNotEmpty()) {
+                    onSpeakRequest?.invoke(text, languages[fromLangIndex].code)
+                }
+                performClick()
+                return true
+            }
+
+            // 朗讀翻譯結果
+            if (!speakResultRect.isEmpty && speakResultRect.contains(event.x, event.y)) {
+                if (translatedText.isNotEmpty()) {
+                    onSpeakRequest?.invoke(translatedText, languages[toLangIndex].code)
+                }
                 performClick()
                 return true
             }

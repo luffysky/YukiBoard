@@ -227,6 +227,14 @@ class SettingsActivity : AppCompatActivity() {
         })
 
         // ═══════════════════════════════════════════════════════
+        // 6.5 TTS 語音輸出
+        // ═══════════════════════════════════════════════════════
+        val ttsChildren = mutableListOf<View>()
+        root.addView(cardGroup("語音輸出 (TTS)", null, null, ttsChildren) {
+            ttsChildren += ttsSettingsSection()
+        })
+
+        // ═══════════════════════════════════════════════════════
         // 7. 智慧輸入
         // ═══════════════════════════════════════════════════════
         val smartChildren = mutableListOf<View>()
@@ -1821,6 +1829,173 @@ class SettingsActivity : AppCompatActivity() {
         write(v and 0xFF); write((v shr 8) and 0xFF)
     }
 
+
+    /** TTS 語音輸出設定區塊 */
+    private fun ttsSettingsSection(): LinearLayout {
+        val outer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(8), dp(6), dp(8), dp(6))
+        }
+
+        // TTS 引擎選擇
+        val engineOptions = arrayOf("Android 內建 (免費/離線)", "Google Cloud TTS (高品質)")
+        val engineRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+        val engineText = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        engineText.addView(TextView(this).apply {
+            text = "TTS 引擎"
+            textSize = 14f
+            setTextColor(0xFFE8F4FF.toInt())
+        })
+        engineText.addView(TextView(this).apply {
+            text = "Google Cloud 需要 API Key"
+            textSize = 11f
+            setTextColor(0xFF6688AA.toInt())
+        })
+        engineRow.addView(engineText)
+
+        val engineBtn = TextView(this).apply {
+            text = engineOptions[prefs.ttsEngineType.coerceIn(0, engineOptions.lastIndex)]
+            textSize = 12f
+            setTextColor(0xFF9ECFFF.toInt())
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xFF1A2744.toInt())
+                cornerRadius = dp(6).toFloat()
+                setStroke(1, 0xFF3A5580.toInt())
+            }
+            setOnClickListener {
+                android.app.AlertDialog.Builder(this@SettingsActivity, android.R.style.Theme_Material_Dialog_Alert)
+                    .setTitle("選擇 TTS 引擎")
+                    .setSingleChoiceItems(engineOptions, prefs.ttsEngineType) { dialog, which ->
+                        prefs.ttsEngineType = which
+                        text = engineOptions[which]
+                        dialog.dismiss()
+                    }
+                    .show()
+            }
+        }
+        engineRow.addView(engineBtn)
+        outer.addView(engineRow)
+
+        // Google Cloud TTS API Key
+        val keyRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(0, dp(8), 0, 0)
+        }
+        keyRow.addView(TextView(this).apply {
+            text = "Google Cloud API Key"
+            textSize = 12f
+            setTextColor(0xFF8899BB.toInt())
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.4f)
+        })
+        val keyInput = android.widget.EditText(this).apply {
+            setText(prefs.googleCloudTtsApiKey)
+            textSize = 12f
+            setTextColor(0xFFCCDDEE.toInt())
+            setHintTextColor(0xFF445566.toInt())
+            hint = "輸入 API Key"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setSingleLine()
+            setPadding(dp(8), dp(4), dp(8), dp(4))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xFF0D1525.toInt())
+                cornerRadius = dp(4).toFloat()
+                setStroke(1, 0xFF334466.toInt())
+            }
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.6f)
+            setOnFocusChangeListener { _, hasFocus ->
+                if (!hasFocus) prefs.googleCloudTtsApiKey = text.toString().trim()
+            }
+        }
+        keyRow.addView(keyInput)
+        outer.addView(keyRow)
+
+        // 分隔線
+        outer.addView(View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(1)
+            ).apply { setMargins(0, dp(10), 0, dp(6)) }
+            setBackgroundColor(0xFF223344.toInt())
+        })
+
+        // 功能開關
+        outer.addView(switchRow("翻譯朗讀", "翻譯完成後自動朗讀結果", prefs.ttsTranslateRead) { prefs.ttsTranslateRead = it })
+        outer.addView(switchRow("Yuki 語音", "雪凜對話泡泡同步語音", prefs.ttsYukiVoice) { prefs.ttsYukiVoice = it })
+        outer.addView(switchRow("候選字朗讀", "無障礙：選字時唸出候選字", prefs.ttsCandidateRead) { prefs.ttsCandidateRead = it })
+
+        // 語速調整
+        val speedRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(0, dp(6), 0, dp(4))
+        }
+        speedRow.addView(TextView(this).apply {
+            text = "語速"
+            textSize = 13f
+            setTextColor(0xFFAABBCC.toInt())
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        })
+        val speedLabel = TextView(this).apply {
+            text = "%.1fx".format(prefs.ttsSpeed)
+            textSize = 12f
+            setTextColor(0xFF9ECFFF.toInt())
+            setPadding(dp(8), 0, dp(8), 0)
+        }
+        val speedBar = android.widget.SeekBar(this).apply {
+            max = 30 // 0.5 ~ 2.0, step 0.05 → 30 steps
+            progress = ((prefs.ttsSpeed - 0.5f) / 0.05f).toInt().coerceIn(0, 30)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
+                    val speed = 0.5f + progress * 0.05f
+                    speedLabel.text = "%.1fx".format(speed)
+                    if (fromUser) prefs.ttsSpeed = speed
+                }
+                override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
+                override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {}
+            })
+        }
+        speedRow.addView(speedBar)
+        speedRow.addView(speedLabel)
+        outer.addView(speedRow)
+
+        // TTS 測試按鈕
+        val testBtn = TextView(this).apply {
+            text = "▶ 測試語音輸出"
+            textSize = 13f
+            setTextColor(0xFF66AAFF.toInt())
+            setPadding(dp(4), dp(8), dp(4), dp(4))
+            setOnClickListener {
+                val engine: com.snowrealm.yukiboard.speech.SpeechOutputEngine = when (prefs.ttsEngineType) {
+                    1 -> {
+                        val key = prefs.googleCloudTtsApiKey
+                        if (key.isBlank()) {
+                            android.widget.Toast.makeText(this@SettingsActivity, "請先填入 Google Cloud API Key", android.widget.Toast.LENGTH_SHORT).show()
+                            return@setOnClickListener
+                        }
+                        com.snowrealm.yukiboard.speech.GoogleCloudTtsEngine(key)
+                    }
+                    else -> com.snowrealm.yukiboard.speech.AndroidTtsEngine(applicationContext)
+                }
+                // 等 TTS 引擎初始化後播放
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    engine.speak("你好，我是雪凜。YukiBoard 語音輸出測試成功！", "zh-TW", prefs.ttsSpeed) {
+                        engine.destroy()
+                    }
+                }, 500)
+            }
+        }
+        outer.addView(testBtn)
+
+        return outer
+    }
 
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()

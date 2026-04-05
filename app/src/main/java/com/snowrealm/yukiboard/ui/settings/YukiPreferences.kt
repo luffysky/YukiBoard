@@ -89,6 +89,24 @@ class YukiPreferences(context: Context) {
 
     /** 語音引擎：0=Android 內建, 1=OpenAI Whisper */
     var speechEngineType: Int by IntPref("speech_engine_type", 0)
+
+    // ═══════════════════════════════════════════════════════════
+    // TTS 語音輸出
+    // ═══════════════════════════════════════════════════════════
+    /** TTS 引擎：0=Android 內建, 1=Google Cloud TTS */
+    var ttsEngineType: Int by IntPref("tts_engine_type", 0)
+    /** TTS 朗讀翻譯結果 */
+    var ttsTranslateRead: Boolean by BoolPref("tts_translate_read", true)
+    /** TTS Yuki 角色語音回應 */
+    var ttsYukiVoice: Boolean by BoolPref("tts_yuki_voice", true)
+    /** TTS 無障礙候選字朗讀 */
+    var ttsCandidateRead: Boolean by BoolPref("tts_candidate_read", false)
+    /** TTS 語速（0.5~2.0） */
+    var ttsSpeed: Float by FloatPref("tts_speed", 1.0f)
+    /** Google Cloud TTS API Key */
+    var googleCloudTtsApiKey: String
+        get() = prefs.getString("google_cloud_tts_key", "") ?: ""
+        set(value) = prefs.edit().putString("google_cloud_tts_key", value).apply()
     var smartCorrection: Boolean by BoolPref("smart_correction", true)
     var adaptiveDict: Boolean by BoolPref("adaptive_dict", true)
     var phrasePredict: Boolean by BoolPref("phrase_predict", true)
