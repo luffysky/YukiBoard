@@ -189,18 +189,18 @@
 - [ ] 新增 `input/swipe/SwipeCandidateRanker.kt`（合併 ChewingEngine + RimeDict 結果排序）
 
 #### A-4 ChewingInputEngine 擴充
-- [ ] 新增 `lookupByBopomofoSequence(bopomofoSeq)` — 連續注��查詞（供滑動輸入用）
+- ✅ 新增 `lookupByBopomofoString()` — 連續注��查詞（供滑動輸入用）
   - 完整序列查詢 + 子序列查詞 + 前綴匹配
 
 #### A-5 KeyboardView 滑動整合
 - ~~[x] 滑動軌跡視覺效果（淡紫色半透明 Path + 外發光 + 起點圓點）~~ — v0.5.4 SwipeTrail
 - ✅ `onTouchEvent` 根據 `prefs.swipeInputEnabled` 切換點擊/滑動模式
 - [ ] `notifyBopomofoLayout()` 在注音鍵盤 layout 後通知 decoder
-- [ ] `onSwipeInput` 回呼接口
+- ✅ `onSwipeInputListener` 回呼接口 — v0.5.6
 
 #### A-6 YukiBoardIMEService 整合
 - [ ] `onCreateInputView()` 初始化 RimeDictionary（IO thread）
-- [ ] 設定 `keyboardView.onSwipeInput` 回呼
+- ✅ 設定 `keyboardView.onSwipeInputListener` 回呼 — v0.5.6
 - [ ] `handleSwipeInput()` → SwipeCandidateRanker → 更新候選列
 
 #### A-7 YukiPreferences 開關
@@ -274,8 +274,8 @@
 ### 批次 G — 語境預測 + WhisperSkill（總任務包 第十批）
 
 - ~~[x] NextActionPredictor 本地 intentPatterns（0 token）+ AI 意圖預測（邀請碼解鎖）~~
-- [ ] WhisperSkill 實作（MediaRecorder + OpenAI Whisper API multipart 上傳）
-- [ ] InviteCodeActivity UI 美化 + 驗證流程完整化
+- ✅ WhisperSkill 實作 + WhisperSpeechEngine（AudioRecord + Whisper API）— v0.5.8
+- ✅ InviteCodeActivity UI + 驗證流程
 - ~~[x] TokenBudgetManager 每日重置邏輯~~
 
 ---
@@ -284,7 +284,7 @@
 
 - ~~[x] GiphyApiClient.kt（trending + search）→ GifPanelView 串接~~
 - [ ] 翻譯引擎接 MLKit Translation 離線模型 → TranslatePanelView
-- [ ] `.env.example` 範本檔案
+- ✅ `.env.example` 範本檔案
 - [ ] CLAUDE.md 補充各 Key 用途與申請網址
 
 ---
@@ -439,7 +439,7 @@
 - [ ] 面板 UI 重構��向上展開 + 長按懸浮化（PanelCoordinator）
 
 ### Lottie 佔位動畫
-- [ ] yuki_freeze.json（情緒冷靜期結冰）
+- ✅ yuki_freeze.json（情緒冷靜期結冰）
 - [ ] yuki_battle_idle.json（遊戲待機）
 - [ ] yuki_cupid.json（情聖月老）
 - [ ] 所有 Lottie 載入處加 fallback 邏輯
