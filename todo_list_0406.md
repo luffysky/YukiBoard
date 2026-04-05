@@ -500,36 +500,87 @@
 ## 實作順序建議
 
 ```
-v0.5.5+ 接下來的優先順序
-─────────────────────────────────────────────────────
-批次 J-1（PersonalDictionary）         ← 個人詞庫核心，所有智慧功能基礎
-  ↓
-批次 J-2（StyleProfiler）             ← 語氣學習，讓候選字更貼近用戶
-  ↓
-批次 C 剩餘（候選字視覺分類標示）       ← 候選列 UX 完善
-  ↓
-批次 J-3（ComboTracker）              ← 隱形遊戲化，增加黏著度
-  ↓
-批次 J-4（EmotionStickerEngine）      ← 情緒貼圖推薦
-  ↓
-批次 K（滑動輸入邏輯 + 視覺標示）       ← 接上 SwipeTrail 做完整滑動輸入
-  ↓
-批次 L-1（FraudAIAnalyzer）            ← 防詐 AI 規則+Gemini 上線
-  ↓
-批次 L-2（回報系統）                    ← 收集資料，為訓練模型做準備
-  ↓
-批次 A 剩餘（RIME 詞庫 + 滑動解碼）    ← 大詞庫支援
-  ↓
-批次 E（AI Provider 擴充）             ← 讓 AI 功能有免費方案
-  ↓
-批次 G 剩餘（WhisperSkill）            ← 語音 AI
-  ↓
-批次 H 剩餘（MLKit 翻譯 + .env）       ← 翻譯實際可用
+v0.6.0 實作路線圖（2026-04 更新）
+═══════════════════════════════════════════════════════════════
 
-已完成：B ✅ D ✅ F ✅ I ✅
+第一優先：核心輸入體驗修復（直接影響使用者打字）
+───────────────────────────────────────────────────
+  C-fix  候選字修復 3 項                    ← lookupMultiSyllable fallback + UserDictionary 注音 + 詞庫管理 UI
+    ↓
+  C-vis  候選字視覺分類標示                  ← 5 色分類讓使用者知道候選來源
+    ↓
+  K-adv  滑動輸入進階 5 項                   ← SwipeGestureDetector + BopomofoSwipeDecoder + 視覺標記
+    ↓
+  遊戲 Bug 修復 3 項                        ← scrollY / lifecycle / 詞庫搬遷
+
+第二優先：智慧輸入系統（提升打字效率，增加黏著度）
+───────────────────────────────────────────────────
+  J-1  PersonalDictionary                   ← 三層自動學詞，所有智慧功能基礎
+    ↓
+  J-2  StyleProfiler                        ← 語氣學習，候選字更貼近用戶
+    ↓
+  J-3  ComboTracker                         ← 隱形遊戲化連擊系統 + 粒子特效
+    ↓
+  J-4  EmotionStickerEngine                 ← 情緒貼圖推薦
+
+第三優先：AI 擴充（讓 AI 功能有免費方案 + 更好體驗）
+───────────────────────────────────────────────────
+  E-providers  Gemini/Groq/Nano Provider    ← 免費 AI 方案 + 離線推論
+    ↓
+  E-stream   AI streaming + debounce        ← 串流即時顯示 + 候選列 AI 標記
+    ↓
+  E-guide    ApiGuideActivity               ← 使用者自助申請教學
+
+第四優先：防詐 AI 上線（社會價值 + 差異化功能）
+───────────────────────────────────────────────────
+  L-1  FraudAIAnalyzer + Formatter          ← 規則引擎 + Gemini Flash 分析
+    ↓
+  L-2  回報系統 + Supabase                   ← 收集資料為訓練做準備
+
+第五優先：基礎建設補完
+───────────────────────────────────────────────────
+  A-rime   RIME 詞庫 + RimeDictionary       ← 大詞庫支援（23 萬→50 萬+）
+    ↓
+  H-rest   MLKit 翻譯 + invite 腳本          ← 翻譯面板實際可用
+    ↓
+  中文 n-gram 上下文串聯預測                  ← 中文候選字語意排序
+
+第六優先：v0.6.0 新遊戲 + 面板（內容擴充）
+───────────────────────────────────────────────────
+  新遊戲 4 款一輪                            ← MusicTyping + YukiHouse + CrosswordGame + WordleGame
+    ↓
+  新遊戲 5 款二輪                            ← TypingFarm + WordChain + SecretDiary + EmotionThermometer + SpeedTypingBattle
+    ↓
+  工具面板 4 項                              ← 計算機 + 常用語 + 色碼 + 單位換算
+    ↓
+  TypingBossRaid + TypingProfileCard         ← 對戰/社群型（需連線）
+
+長期目標（v0.7.0+）
+───────────────────────────────────────────────────
+  L-3~L-5  防詐 TFLite 本地模型              ← 合成資料→訓練→打包（需 3 個月回報資料）
+    ↓
+  經濟系統   Z 幣 + 藍新 + 皮膚商城           ← 變現基礎
+    ↓
+  個人化     打字統計 + 音效包 + 震動模式      ← 提升個性化
+    ↓
+  無障礙     單手/大字模式                    ← 擴大用戶群
+    ↓
+  UI/UX     背景平移 + 裁切框 + 面板重構      ← 體驗打磨
+    ↓
+  Lottie    正式角色動畫 + fallback           ← 需設計師
+    ↓
+  進階輸入   手寫/OCR/ghost text/語氣改寫     ← 重量級功能
+    ↓
+  雪凜深度   TTS + 對話 + 教學 + 日記 UI     ← 角色深化
+    ↓
+  連線/跨App  打字競速 v2 + CoinBeast 聯動   ← 社群生態
+    ↓
+  3D/AR     AR 雪凜 + VR 預留                ← 最後做
+    ↓
+  上架       Play Store                      ← 所有核心功能完成後
+
+已完成：B ✅ D ✅ F ✅ G(WhisperSkill) ✅ I ✅
 ```
-
----
 
 ## 備註
 
