@@ -207,7 +207,7 @@ data class KeyboardState(
         // 注音佈局
         // =================================================================
         fun bopomofoRows(): List<List<KeyModel>> = listOf(
-            // 大千式標準排列 — 長按對應 QWERTY 英文/數字
+            // 大千式標準排列 — 長按對應 QWERTY 英文小寫+大寫/數字
             listOf(
                 KeyModel.char("ㄅ", altChars = listOf("1")),
                 KeyModel.char("ㄉ", altChars = listOf("2")),
@@ -221,37 +221,37 @@ data class KeyboardState(
                 KeyModel.char("ㄢ", altChars = listOf("0"))
             ),
             listOf(
-                KeyModel.char("ㄆ", altChars = listOf("q")),
-                KeyModel.char("ㄊ", altChars = listOf("w")),
-                KeyModel.char("ㄍ", altChars = listOf("e")),
-                KeyModel.char("ㄐ", altChars = listOf("r")),
-                KeyModel.char("ㄔ", altChars = listOf("t")),
-                KeyModel.char("ㄗ", altChars = listOf("y")),
-                KeyModel.char("ㄧ", altChars = listOf("u")),
-                KeyModel.char("ㄛ", altChars = listOf("i")),
-                KeyModel.char("ㄟ", altChars = listOf("o")),
-                KeyModel.char("ㄣ", altChars = listOf("p"))
+                KeyModel.char("ㄆ", altChars = listOf("q", "Q")),
+                KeyModel.char("ㄊ", altChars = listOf("w", "W")),
+                KeyModel.char("ㄍ", altChars = listOf("e", "E")),
+                KeyModel.char("ㄐ", altChars = listOf("r", "R")),
+                KeyModel.char("ㄔ", altChars = listOf("t", "T")),
+                KeyModel.char("ㄗ", altChars = listOf("y", "Y")),
+                KeyModel.char("ㄧ", altChars = listOf("u", "U")),
+                KeyModel.char("ㄛ", altChars = listOf("i", "I")),
+                KeyModel.char("ㄟ", altChars = listOf("o", "O")),
+                KeyModel.char("ㄣ", altChars = listOf("p", "P"))
             ),
             listOf(
-                KeyModel.char("ㄇ", altChars = listOf("a")),
-                KeyModel.char("ㄋ", altChars = listOf("s")),
-                KeyModel.char("ㄎ", altChars = listOf("d")),
-                KeyModel.char("ㄑ", altChars = listOf("f")),
-                KeyModel.char("ㄕ", altChars = listOf("g")),
-                KeyModel.char("ㄘ", altChars = listOf("h")),
-                KeyModel.char("ㄨ", altChars = listOf("j")),
-                KeyModel.char("ㄜ", altChars = listOf("k")),
-                KeyModel.char("ㄠ", altChars = listOf("l")),
+                KeyModel.char("ㄇ", altChars = listOf("a", "A")),
+                KeyModel.char("ㄋ", altChars = listOf("s", "S")),
+                KeyModel.char("ㄎ", altChars = listOf("d", "D")),
+                KeyModel.char("ㄑ", altChars = listOf("f", "F")),
+                KeyModel.char("ㄕ", altChars = listOf("g", "G")),
+                KeyModel.char("ㄘ", altChars = listOf("h", "H")),
+                KeyModel.char("ㄨ", altChars = listOf("j", "J")),
+                KeyModel.char("ㄜ", altChars = listOf("k", "K")),
+                KeyModel.char("ㄠ", altChars = listOf("l", "L")),
                 KeyModel.char("ㄤ", altChars = listOf(";"))
             ),
             listOf(
-                KeyModel.char("ㄈ", altChars = listOf("z")),
-                KeyModel.char("ㄌ", altChars = listOf("x")),
-                KeyModel.char("ㄏ", altChars = listOf("c")),
-                KeyModel.char("ㄒ", altChars = listOf("v")),
-                KeyModel.char("ㄖ", altChars = listOf("b")),
-                KeyModel.char("ㄙ", altChars = listOf("n")),
-                KeyModel.char("ㄩ", altChars = listOf("m")),
+                KeyModel.char("ㄈ", altChars = listOf("z", "Z")),
+                KeyModel.char("ㄌ", altChars = listOf("x", "X")),
+                KeyModel.char("ㄏ", altChars = listOf("c", "C")),
+                KeyModel.char("ㄒ", altChars = listOf("v", "V")),
+                KeyModel.char("ㄖ", altChars = listOf("b", "B")),
+                KeyModel.char("ㄙ", altChars = listOf("n", "N")),
+                KeyModel.char("ㄩ", altChars = listOf("m", "M")),
                 KeyModel.char("ㄝ", altChars = listOf(",")),
                 KeyModel.char("ㄡ", altChars = listOf(".")),
                 KeyModel.char("ㄥ", altChars = listOf("/"))

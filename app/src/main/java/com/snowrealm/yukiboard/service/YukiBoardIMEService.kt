@@ -1939,18 +1939,18 @@ class YukiBoardIMEService : InputMethodService() {
 
         keyboardView.updateComposingText(inputRouter.composingText)
 
-        // 候選列為空時，顯示下一步動作預測提示
+        // 候選列為空時，僅在開發者模式且有高信心預測時顯示提示
         val candidates = inputRouter.candidates.toMutableList()
         if (candidates.isEmpty() && inputRouter.composingText.isEmpty()) {
             val predictor = nextActionPredictor
-            if (predictor != null) {
+            if (predictor != null && keyboardView.currentMode == KeyboardMode.DEVELOPER) {
                 val predCtx = com.snowrealm.yukiboard.input.predict.PredictionContext(
                     composingText = inputRouter.composingText,
                     textBeforeCursor = inputRouter.contextBeforeCursor,
                     keyboardMode = keyboardView.currentMode,
                     appPackage = inputRouter.currentAppPackage ?: ""
                 )
-                val actions = predictor.predict(predCtx)
+                val actions = predictor.predict(predCtx).filter { it.confidence >= 0.8f }
                 for (action in actions.take(3)) {
                     candidates.add(action.displayText)
                 }
