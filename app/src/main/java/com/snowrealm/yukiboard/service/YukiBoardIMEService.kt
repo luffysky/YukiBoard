@@ -59,6 +59,7 @@ class YukiBoardIMEService : InputMethodService() {
     private lateinit var rootContainer: LinearLayout
     private lateinit var toolbarView: ToolbarView
     private lateinit var panelContainer: FrameLayout
+    private lateinit var topPanelContainer: FrameLayout
     private lateinit var keyboardContainer: FrameLayout
     private var panelControlBar: View? = null
     private var isPanelBehindKeyboard = false
@@ -532,6 +533,14 @@ class YukiBoardIMEService : InputMethodService() {
             android.view.Gravity.TOP
         ))
 
+        // 上方面板容器（翻譯/GIF 等需要打字的面板放這裡，不擋鍵盤）
+        topPanelContainer = FrameLayout(this)
+        topPanelContainer.visibility = View.GONE
+        rootContainer.addView(topPanelContainer, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ))
+
         // 套用儲存的鍵盤高度（橫向使用更高比例，避免太扁）
         val kbHeight = calculateKeyboardHeight()
         rootContainer.addView(keyboardContainer, LinearLayout.LayoutParams(
@@ -927,7 +936,9 @@ class YukiBoardIMEService : InputMethodService() {
         translatePanel?.exitInputMode()
         gifPanel?.exitInputMode()
         panelContainer.removeAllViews()
-        panelContainer.visibility = View.VISIBLE
+        panelContainer.visibility = View.GONE
+        topPanelContainer.removeAllViews()
+        topPanelContainer.visibility = View.GONE
 
         val theme = ThemeManager.getInstance(this).currentTheme
         val panelView: View = when (panel) {
@@ -1183,15 +1194,21 @@ class YukiBoardIMEService : InputMethodService() {
             else -> return
         }
 
-        panelContainer.addView(panelView)
-
-        // 加入面板控制列（透明度 + 圖層交換）
-        showPanelControlBar()
-
-        // 重設圖層順序
-        if (isPanelBehindKeyboard) {
-            isPanelBehindKeyboard = false
-            panelContainer.bringToFront()
+        // 翻譯/GIF 面板放在鍵盤上方（不擋鍵盤，可同時打字）
+        val isTopPanel = panel == PanelType.TRANSLATE || panel == PanelType.GIF
+        if (isTopPanel) {
+            topPanelContainer.addView(panelView)
+            topPanelContainer.visibility = View.VISIBLE
+        } else {
+            panelContainer.addView(panelView)
+            panelContainer.visibility = View.VISIBLE
+            // 加入面板控制列（透明度 + 圖層交換）
+            showPanelControlBar()
+            // 重設圖層順序
+            if (isPanelBehindKeyboard) {
+                isPanelBehindKeyboard = false
+                panelContainer.bringToFront()
+            }
         }
     }
 
@@ -1200,6 +1217,8 @@ class YukiBoardIMEService : InputMethodService() {
         toolbarView.activePanel = null
         panelContainer.removeAllViews()
         panelContainer.visibility = View.GONE
+        topPanelContainer.removeAllViews()
+        topPanelContainer.visibility = View.GONE
         hidePanelControlBar()
         // 回到鍵盤時確保 InputConnection composing 狀態乾淨
         currentInputConnection?.finishComposingText()
