@@ -139,9 +139,12 @@ class CalculatorPanelView(context: Context) : View(context) {
             btnPaint.alpha = 255
 
             // 文字
-            textPaint.color = if (btn.type == ButtonType.OPERATOR || btn.type == ButtonType.EQUALS)
-                0xFF1A1A1A.toInt() else 0xFFFFFFFF.toInt()
-            if (btn.type == ButtonType.INSERT) textPaint.color = 0xFFFFFFFF.toInt()
+            textPaint.color = when (btn.type) {
+                ButtonType.OPERATOR, ButtonType.EQUALS -> 0xFF1A1A1A.toInt()
+                ButtonType.INSERT -> 0xFFFFFFFF.toInt()
+                ButtonType.FUNCTION -> 0xFFFFFFFF.toInt()
+                ButtonType.NUMBER -> theme.keyLabelColorInt
+            }
             val textY = btn.rect.centerY() + textPaint.textSize * 0.35f
             canvas.drawText(btn.label, btn.rect.centerX(), textY, textPaint)
         }

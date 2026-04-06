@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 82
-        versionName "0.9.16"
+        versionCode 83
+        versionName "0.9.17"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,9 +82,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 五語容錯（英/日/韓/拼音/注音鄰近鍵+語音相似修正）\n" +
-                    "- feat: AUTO智慧中英切換（注音鍵盤免手動切語言）\n" +
-                    "- feat: 滑動輸入改版（速度感知停頓偵測取代路徑記錄）"
+                    "- fix: 注音整句 composing（候選字累積、上下文排序）\n" +
+                    "- fix: 計算機面板數字白底白字不可見\n" +
+                    "- feat: AUTO 模式鍵盤標示（空白鍵+ABC 顯示「自動」）"
             }
         }
         debug {
@@ -93,9 +93,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 五語容錯（英/日/韓/拼音/注音鄰近鍵+語音相似修正）\n" +
-                    "- feat: AUTO智慧中英切換（注音鍵盤免手動切語言）\n" +
-                    "- feat: 滑動輸入改版（速度感知停頓偵測取代路徑記錄）"
+                    "- fix: 注音整句 composing（候選字累積、上下文排序）\n" +
+                    "- fix: 計算機面板數字白底白字不可見\n" +
+                    "- feat: AUTO 模式鍵盤標示（空白鍵+ABC 顯示「自動」）"
             }
         }
     }

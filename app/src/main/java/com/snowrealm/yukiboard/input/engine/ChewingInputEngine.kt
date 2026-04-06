@@ -208,9 +208,24 @@ class ChewingInputEngine(
             return InputResult.CommitText(" ")
         }
 
+        // 沒有新的注音在打，但有已選字 → commit 整句
+        if (bopomofoBuffer.isEmpty() && selectedBuffer.isNotEmpty()) {
+            val text = selectedBuffer.toString()
+            reset()
+            return InputResult.CommitText(text)
+        }
+
         if (isSelectingCandidate && currentCandidates.isNotEmpty()) {
-            // 空白鍵 = 確認第一候選
-            return selectCandidateAt(0)
+            // 空白鍵 = 確認第一候選，累積到 selectedBuffer
+            val selected = currentCandidates[0]
+            selectedBuffer.append(selected)
+            bopomofoBuffer.clear()
+            isSelectingCandidate = false
+            lastCommittedChar = selected
+            // 沒有更多注音 → commit 整句
+            val text = selectedBuffer.toString()
+            reset()
+            return InputResult.CommitText(text)
         }
 
         // 查字典（自動處理單/多音節）
@@ -236,23 +251,37 @@ class ChewingInputEngine(
 
     override fun processEnter(): InputResult {
         if (composingText.isEmpty()) return InputResult.Idle
-        // 如果有候選，選第一個；否則 commit 原文
-        if (isSelectingCandidate && currentCandidates.isNotEmpty()) {
-            confirmFirstCandidate()
-        }
-        val text = composingText
+        // 先把未完成的注音轉成漢字（取第一候選）
+        commitRemainingBopomofo()
+        val text = selectedBuffer.toString()
         reset()
-        return InputResult.CommitText(text)
+        return if (text.isNotEmpty()) InputResult.CommitText(text) else InputResult.Idle
     }
 
     override fun forceCommit(): InputResult {
         if (composingText.isEmpty()) return InputResult.Idle
+        commitRemainingBopomofo()
+        val text = selectedBuffer.toString()
+        reset()
+        return if (text.isNotEmpty()) InputResult.CommitText(text) else InputResult.Idle
+    }
+
+    /** 把 bopomofoBuffer 中未完成的注音轉成漢字加入 selectedBuffer */
+    private fun commitRemainingBopomofo() {
+        if (bopomofoBuffer.isEmpty()) return
         if (isSelectingCandidate && currentCandidates.isNotEmpty()) {
             confirmFirstCandidate()
+        } else {
+            // 沒有候選：嘗試查字典
+            updateCandidatesFromBuffer()
+            if (currentCandidates.isNotEmpty()) {
+                confirmFirstCandidate()
+            } else {
+                // 真的查不到：把注音原文加入（最後手段）
+                selectedBuffer.append(bopomofoBuffer)
+                bopomofoBuffer.clear()
+            }
         }
-        val text = composingText
-        reset()
-        return InputResult.CommitText(text)
     }
 
     override fun getCandidates(): List<String> = currentCandidates
@@ -275,16 +304,13 @@ class ChewingInputEngine(
         selectedBuffer.append(selected)
         bopomofoBuffer.clear()
         isSelectingCandidate = false
+        lastCommittedChar = selected.last().toString()
 
-        // 直接 commit 已選字
-        val text = selectedBuffer.toString()
-        selectedBuffer.clear()
-        lastCommittedChar = text
+        // 不立刻 commit：把選字累積在 selectedBuffer，讓使用者繼續打下一個詞
+        // 產生下一字預測候選（用最後一個字查上下文）
+        currentCandidates = getNextCharPredictions(lastCommittedChar)
 
-        // 產生下一字預測候選
-        currentCandidates = getNextCharPredictions(text)
-
-        return InputResult.CommitText(text)
+        return InputResult.ComposingUpdated(composingText)
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -643,7 +669,7 @@ class ChewingInputEngine(
         if (currentCandidates.isNotEmpty()) {
             val first = currentCandidates[0]
             selectedBuffer.append(first)
-            lastCommittedChar = first
+            lastCommittedChar = first.last().toString()
             bopomofoBuffer.clear()
             currentCandidates = emptyList()
             isSelectingCandidate = false

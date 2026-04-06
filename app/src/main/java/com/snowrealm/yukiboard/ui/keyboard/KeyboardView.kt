@@ -1339,8 +1339,11 @@ class KeyboardView(context: Context) : View(context) {
                         com.snowrealm.yukiboard.input.router.InputMode.PINYIN -> "拼音"
                         com.snowrealm.yukiboard.input.router.InputMode.CANGJIE,
                         com.snowrealm.yukiboard.input.router.InputMode.SPEED_CANGJIE -> "倉頡"
+                        com.snowrealm.yukiboard.input.router.InputMode.AUTO -> "自動"
                         else -> "ABC"
                     }
+                    // 空白鍵：AUTO 模式顯示「自動」標示
+                    key.code == KEYCODE_SPACE && currentInputMode == com.snowrealm.yukiboard.input.router.InputMode.AUTO -> "自動"
                     shouldUpper && !key.isSpecial && key.label.length == 1 -> key.label.uppercase()
                     else -> key.label
                 }
