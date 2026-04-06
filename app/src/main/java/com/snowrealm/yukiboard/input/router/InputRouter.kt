@@ -189,7 +189,21 @@ class InputRouter(private val context: Context) {
             autoDetectAndSwitch(label)
         }
 
-        val result = activeEngine.processChar(label)
+        // AUTO 模式下，按鍵 label 可能跟當前引擎不匹配
+        // 例如注音鍵盤發出 "ㄇ" 但引擎切到了英文 → 需要轉成 "a"
+        val effectiveLabel = if (inputMode == InputMode.AUTO) {
+            val ch = label.firstOrNull()
+            val isBopoLabel = ch != null && (ch in '\u3105'..'\u312F' || ch in setOf('ˉ','ˊ','ˇ','ˋ','˙'))
+            if (isBopoLabel && activeEngine is EnglishInputEngine) {
+                // 注音符號 → 英文引擎：轉成 QWERTY
+                BOPOMOFO_TO_QWERTY[label] ?: label
+            } else if (!isBopoLabel && ch != null && ch.isLetter() && activeEngine is ChewingInputEngine) {
+                // 英文字母 → 注音引擎：轉成注音符號
+                QWERTY_TO_BOPOMOFO[ch.lowercaseChar()] ?: label
+            } else label
+        } else label
+
+        val result = activeEngine.processChar(effectiveLabel)
         updateCandidates()
         return result
     }
@@ -299,11 +313,12 @@ class InputRouter(private val context: Context) {
             ch.lowercaseChar()
         } else null
 
-        // 無法映射到英文的注音鍵（ㄅㄉㄅㄦ 等數字行或聲調鍵）→ 明確注音
+        // 無法映射到英文的注音鍵（ㄅㄉㄦ 等數字行或聲調鍵）→ 明確注音
         if (qwertyChar == null && isBopomofoKey) {
-            if (currentMode != InputMode.BOPOMOFO) {
-                switchToClean(InputMode.BOPOMOFO)
-                // 把之前累積的注音 feed 回引擎
+            if (activeEngine !is ChewingInputEngine) {
+                activeEngine.reset()
+                candidateManager.clear()
+                activeEngine = bopomofoEngine
                 for (sym in autoBopomofoBuffer) bopomofoEngine.processChar(sym)
             }
             autoQwertyBuffer.clear()
@@ -350,14 +365,18 @@ class InputRouter(private val context: Context) {
         // ── 決策：只有分數差距明顯時才切換 ──
         val threshold = if (autoQwertyBuffer.length <= 2) 40 else 20
 
-        if (engScore - bopoScore >= threshold && currentMode != InputMode.ENGLISH) {
-            switchToClean(InputMode.ENGLISH)
-            // 把之前累積的英文鍵 feed 回引擎（不含當前這個鍵，當前鍵由 processInput 處理）
+        if (engScore - bopoScore >= threshold && activeEngine !is EnglishInputEngine) {
+            // 切到英文引擎（保持 currentMode = AUTO）
+            activeEngine.reset()
+            candidateManager.clear()
+            activeEngine = englishEngine
             for (c in autoQwertyBuffer.toString().dropLast(1)) {
                 englishEngine.processChar(c.toString())
             }
-        } else if (bopoScore - engScore >= threshold && currentMode != InputMode.BOPOMOFO) {
-            switchToClean(InputMode.BOPOMOFO)
+        } else if (bopoScore - engScore >= threshold && activeEngine !is ChewingInputEngine) {
+            activeEngine.reset()
+            candidateManager.clear()
+            activeEngine = bopomofoEngine
             for (sym in autoBopomofoBuffer.dropLast(1)) {
                 bopomofoEngine.processChar(sym)
             }
@@ -566,12 +585,16 @@ class InputRouter(private val context: Context) {
         val trimmed = text.trim()
         if (trimmed.isBlank()) return
 
-        // AUTO 模式：commit 後重置雙重評分緩衝
-        autoQwertyBuffer.clear()
-        autoBopomofoBuffer.clear()
-        autoEnglishScore = 0
-        autoBopomofoScore = 0
-        autoLastCommitWasEnglish = trimmed.all { it.code < 128 }
+        // AUTO 模式：commit 後重置雙重評分緩衝，準備下一個詞
+        if (currentMode == InputMode.AUTO) {
+            autoQwertyBuffer.clear()
+            autoBopomofoBuffer.clear()
+            autoEnglishScore = 0
+            autoBopomofoScore = 0
+            autoLastCommitWasEnglish = trimmed.all { it.code < 128 }
+            // 重置回默認引擎，下一個詞重新判斷
+            activeEngine = engineForMode(InputMode.AUTO)
+        }
 
         val hasCjk = trimmed.any { it.code in 0x4E00..0x9FFF || it.code in 0x3400..0x4DBF }
         val hasKana = trimmed.any { it.code in 0x3040..0x30FF }

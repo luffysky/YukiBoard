@@ -2186,9 +2186,24 @@ class YukiBoardIMEService : InputMethodService() {
                 val isBopomofo = ch != null && (ch in '\u3105'..'\u312F' || ch in '\u02CA'..'\u02CB' || ch == '\u02C7' || ch == '\u02D9')
                 if (ch != null && !ch.isLetter() && !isBopomofo) {
                     // 先提交正在組合的文字
-                    val composing = inputRouter.composingText
-                    if (composing.isNotEmpty()) {
-                        applyInputResult(ic, InputResult.CommitText(composing))
+                    if (inputRouter.composingText.isNotEmpty()) {
+                        // 用 processSpace 觸發引擎轉換（注音→漢字），而非直接 commit 原始注音符號
+                        val spaceResult = inputRouter.processSpace()
+                        if (spaceResult is InputResult.CommitText) {
+                            // 去掉 processSpace 附帶的空格
+                            val trimmed = spaceResult.text.trimEnd()
+                            if (trimmed.isNotEmpty()) {
+                                ic.setComposingText("", 0)
+                                ic.finishComposingText()
+                                ic.commitText(trimmed, 1)
+                            }
+                        } else {
+                            // processSpace 沒能轉換（如進入候選選字模式），forceCommit
+                            val commitResult = inputRouter.getActiveEngine().forceCommit()
+                            if (commitResult is InputResult.CommitText) {
+                                applyInputResult(ic, commitResult)
+                            }
+                        }
                         inputRouter.reset()
                     }
                     ic.commitText(label, 1)
