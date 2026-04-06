@@ -129,6 +129,9 @@ class YukiBoardIMEService : InputMethodService() {
     private var weatherFloatingPanel: com.snowrealm.yukiboard.weather.WeatherFloatingPanel? = null
     private var clawResultFloatingPanel: com.snowrealm.yukiboard.ui.floating.ClawResultFloatingPanel? = null
 
+    // RIME 詞庫
+    private var rimeDictionary: com.snowrealm.yukiboard.input.dictionary.RimeDictionary? = null
+
     // 下一步動作預測
     private var nextActionPredictor: com.snowrealm.yukiboard.input.predict.NextActionPredictor? = null
 
@@ -166,6 +169,12 @@ class YukiBoardIMEService : InputMethodService() {
         snippetManager = SnippetManager(applicationContext)
         appModeDetector = AppModeDetector()
         prefs = YukiPreferences(applicationContext)
+
+        // RIME 詞庫初始化（IO thread）
+        if (prefs.rimeDictEnabled) {
+            rimeDictionary = com.snowrealm.yukiboard.input.dictionary.RimeDictionary(applicationContext)
+            serviceScope.launch { rimeDictionary?.init() }
+        }
 
         // 套用使用者選擇的輸入法
         val savedModes = prefs.enabledInputModes
@@ -822,6 +831,7 @@ class YukiBoardIMEService : InputMethodService() {
         particleView?.stop()
         backgroundView?.destroy()
         translateEngine?.close()
+        rimeDictionary?.close()
         serviceScope.cancel()
     }
 

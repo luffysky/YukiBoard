@@ -91,6 +91,9 @@ class YukiPreferences(context: Context) {
     var toneDetection: Boolean by BoolPref("tone_detection", true)
     var rawBopomofoMode: Boolean by BoolPref("raw_bopomofo", false)
     var swipeTrailEnabled: Boolean by BoolPref("swipe_trail", true)
+    var rimeDictEnabled: Boolean by BoolPref("rime_dict", true)
+    var swipeSelfLearn: Boolean by BoolPref("swipe_self_learn", true)
+    var correctionSelfLearn: Boolean by BoolPref("correction_self_learn", true)
 
     /** 啟用的輸入法（逗號分隔的 InputMode name，空=全開） */
     var enabledInputModes: String

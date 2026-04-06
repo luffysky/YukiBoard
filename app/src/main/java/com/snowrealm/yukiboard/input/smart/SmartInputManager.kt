@@ -2,6 +2,7 @@ package com.snowrealm.yukiboard.input.smart
 
 import android.content.Context
 import com.snowrealm.yukiboard.input.dictionary.EnglishDictionary
+import com.snowrealm.yukiboard.input.swipe.SwipeLearnManager
 
 /**
  * 智慧輸入總管 — 統合糾錯、自適應字典、語句預測、習慣追蹤。
@@ -24,6 +25,8 @@ class SmartInputManager(context: Context) {
     val styleProfiler = StyleProfiler(context)
     val comboTracker = ComboTracker()
     val emotionSticker = EmotionStickerEngine()
+    val swipeLearnManager = SwipeLearnManager(context)
+    val correctionLearnManager = CorrectionLearnManager(context)
 
     private var dictionary: EnglishDictionary? = null
     private var correctionEngine: SmartCorrectionEngine? = null
@@ -38,7 +41,7 @@ class SmartInputManager(context: Context) {
     /** 設定字典參考（由 EnglishInputEngine 提供） */
     fun setDictionary(dict: EnglishDictionary) {
         dictionary = dict
-        correctionEngine = SmartCorrectionEngine(dict, adaptiveDictionary)
+        correctionEngine = SmartCorrectionEngine(dict, adaptiveDictionary, correctionLearnManager)
     }
 
     // ─────────────── 打字時呼叫 ───────────────
@@ -180,6 +183,30 @@ class SmartInputManager(context: Context) {
         return (app + period).distinct().take(max)
     }
 
+    // ─────────────── 自我學習回饋 ───────────────
+
+    /**
+     * 使用者從滑動候選中選擇了某個詞時呼叫。
+     * 記錄到 SwipeLearnManager，下次相同滑動軌跡優先顯示。
+     */
+    fun onSwipeWordCommitted(bopomofoKey: String, word: String) {
+        swipeLearnManager.recordSelection(bopomofoKey, word)
+    }
+
+    /**
+     * 使用者接受了自動校正建議時呼叫。
+     */
+    fun onCorrectionAccepted(typed: String, corrected: String) {
+        correctionLearnManager.recordAccepted(typed, corrected)
+    }
+
+    /**
+     * 使用者拒絕了自動校正建議時呼叫（選了其他候選或直接按掉）。
+     */
+    fun onCorrectionRejected(typed: String, corrected: String) {
+        correctionLearnManager.recordRejected(typed, corrected)
+    }
+
     // ─────────────── 生命週期 ───────────────
 
     /** 換行 / 切 App 時重置上下文 */
@@ -214,11 +241,14 @@ class SmartInputManager(context: Context) {
         sentencePredictor.save()
         habitTracker.save()
         styleProfiler.save()
+        swipeLearnManager.save()
+        correctionLearnManager.save()
     }
 
     /** 定期清理過期資料 */
     fun maintenance() {
         adaptiveDictionary.purgeStale()
         personalDictionary.maintenance()
+        swipeLearnManager.purgeStale()
     }
 }

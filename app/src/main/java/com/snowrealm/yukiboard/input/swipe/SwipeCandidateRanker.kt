@@ -12,8 +12,14 @@ import com.snowrealm.yukiboard.input.smart.SmartInputManager
 class SwipeCandidateRanker(
     private val smartInput: SmartInputManager,
     private val chewingEngine: ChewingInputEngine?,
-    private val decoder: BopomofoSwipeDecoder = BopomofoSwipeDecoder()
+    private val decoder: BopomofoSwipeDecoder = BopomofoSwipeDecoder(),
+    private val swipeLearnManager: SwipeLearnManager? = null
 ) {
+
+    companion object {
+        /** 滑動學習加分權重 */
+        private const val SWIPE_LEARN_WEIGHT = 15.0f
+    }
 
     /**
      * 注音滑動排序：主序列 + 鄰近替代方案全部查詞，合併排分。
@@ -72,6 +78,17 @@ class SwipeCandidateRanker(
         for ((word, score) in scored) {
             val freq = smartInput.adaptiveDictionary.getFrequency(word)
             if (freq > 0) scored[word] = score + freq + 10f
+        }
+
+        // 4. 滑動學習加分（使用者過去選過的詞優先）
+        if (swipeLearnManager != null) {
+            val bopomofoKey = bopomofoSymbols.joinToString("")
+            for ((word, score) in scored.toMap()) {
+                val learnBoost = swipeLearnManager.getBoost(bopomofoKey, word)
+                if (learnBoost > 0f) {
+                    scored[word] = score + learnBoost * SWIPE_LEARN_WEIGHT
+                }
+            }
         }
 
         return scored.entries

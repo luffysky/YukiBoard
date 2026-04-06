@@ -190,16 +190,16 @@
 ### 批次 A — 滑動輸入 + RIME 詞庫（8 步）
 
 #### A-1 RIME 詞庫轉換腳本
-- [ ] 下載 RIME 詞庫（bopomofo_tw.dict.yaml + terra_pinyin.dict.yaml）→ `scripts/dicts/`
-- [ ] 新增 `scripts/convert_rime_dict.py`（拼音→注音轉換 + SQLite 輸出）
+- ~~[ ] 下載 RIME 詞庫（bopomofo_tw.dict.yaml + terra_pinyin.dict.yaml）→ `scripts/dicts/`~~ — v0.9.26 scripts/dicts/ 已建立
+- ~~[ ] 新增 `scripts/convert_rime_dict.py`（拼音→注音轉換 + SQLite 輸出）~~ — v0.9.26 已完成（支援 --local / 下載）
 - [ ] `app/build.gradle` 加入 `convertRimeDict` task（build 前自動執行）
-- [ ] `app/src/main/assets/.gitignore` 排除 rime_bopomofo.db
+- ~~[ ] `app/src/main/assets/.gitignore` 排除 rime_bopomofo.db~~ — v0.9.26
 
 #### A-2 RimeDictionary.kt（Android 查詢層）
-- [ ] 新增 `input/dictionary/RimeDictionary.kt`
-  - assets → filesDir 複製（首次啟動）
-  - 精確查詢（含聲調）+ 去聲調模糊匹配 + 前綴匹配（滑動用）
-  - `query()` / `queryPrefix()` / `isAvailable()` / `close()`
+- ~~[ ] 新增 `input/dictionary/RimeDictionary.kt`~~ — v0.9.26
+  - ~~assets → filesDir 複製（首次啟動）~~
+  - ~~精確查詢（含聲調）+ 去聲調模糊匹配 + 前綴匹配（滑動用）~~
+  - ~~`query()` / `queryPrefix()` / `isAvailable()` / `close()`~~
 
 #### A-3 滑動手勢偵測
 - ✅ 新增 `input/swipe/SwipeGestureDetector.kt`（點擊 vs 滑動區分，12dp 閾值）
@@ -213,22 +213,22 @@
 #### A-5 KeyboardView 滑動整合
 - ~~[x] 滑動軌跡視覺效果（淡紫色半透明 Path + 外發光 + 起點圓點）~~ — v0.5.4 SwipeTrail
 - ✅ `onTouchEvent` 根據 `prefs.swipeInputEnabled` 切換點擊/滑動模式
-- [ ] `notifyBopomofoLayout()` 在注音鍵盤 layout 後通知 decoder
+- ~~[ ] `notifyBopomofoLayout()` 在注音鍵盤 layout 後通知 decoder~~ — 不需要，decoder 使用靜態鄰近表
 - ✅ `onSwipeInputListener` 回呼接口 — v0.5.6
 
 #### A-6 YukiBoardIMEService 整合
-- [ ] `onCreateInputView()` 初始化 RimeDictionary（IO thread）
+- ~~[ ] `onCreateInputView()` 初始化 RimeDictionary（IO thread）~~ — v0.9.26 onCreate() 中初始化
 - ✅ 設定 `keyboardView.onSwipeInputListener` 回呼 — v0.5.6
 - ✅ `handleSwipeInput()` → SwipeCandidateRanker → 更新候選列（v0.9.21 多段累加候選）
 
 #### A-7 YukiPreferences 開關
 - ~~[x] `swipeInputEnabled: Boolean`（預設 true）~~ — 已在 YukiPreferences.swipeInput
-- [ ] `rimeDictEnabled: Boolean`（預設 true）
-- ~~[x] SettingsActivity 輸入行為群組加入對應開關~~ — 已有「滑動輸入」switchRow
+- ~~[ ] `rimeDictEnabled: Boolean`（預設 true）~~ — v0.9.26 + 設定頁開關
+- ~~[x] SettingsActivity 輸入行為群組加入對應開關~~ — 已有「滑動輸入」+ RIME + 自我學習開關
 
 #### A-8 候選字視覺標示
-- [ ] 滑動候選���記淡紫色 #B39DDB + 左側 ≈ 符號
-- [ ] `markSwipeCandidates()` 方法
+- ~~[ ] 滑動候選標記淡紫色 #B39DDB + 左側 ≈ 符號~~ — 已有 isSwipeCandidateMode 淡紫色渲染
+- ~~[ ] `markSwipeCandidates()` 方法~~ — 已存在 KeyboardView.markSwipeCandidates()
 
 ---
 

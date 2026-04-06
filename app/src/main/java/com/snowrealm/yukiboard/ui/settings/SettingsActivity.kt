@@ -260,6 +260,9 @@ class SettingsActivity : AppCompatActivity() {
             inputChildren += switchRow("滑動輸入", "滑動手勢輸入", prefs.swipeInput) { prefs.swipeInput = it }
             inputChildren += switchRow("滑動軌跡特效", "滑動時顯示紫色光暈路徑", prefs.swipeTrailEnabled) { prefs.swipeTrailEnabled = it }
             inputChildren += switchRow("自動更正", "英文自動更正", prefs.autoCorrect) { prefs.autoCorrect = it }
+            inputChildren += switchRow("RIME 詞庫", "啟用 RIME 大型注音詞庫（更準確的候選字）", prefs.rimeDictEnabled) { prefs.rimeDictEnabled = it }
+            inputChildren += switchRow("滑動自我學習", "記住你選過的滑動候選，越用越準", prefs.swipeSelfLearn) { prefs.swipeSelfLearn = it }
+            inputChildren += switchRow("糾錯自我學習", "記住你接受/拒絕的校正，越改越聰明", prefs.correctionSelfLearn) { prefs.correctionSelfLearn = it }
             inputChildren += switchRow("Snippet 展開", "開發者模式：縮寫 + Tab 展開", prefs.snippetEnabled) { prefs.snippetEnabled = it }
 
             inputChildren += switchRow("私房話模式", "AES 加密訊息（Enter 送出時加密）", prefs.secretMessageMode) { prefs.secretMessageMode = it }

@@ -14,7 +14,8 @@ import com.snowrealm.yukiboard.input.dictionary.EnglishDictionary
  */
 class SmartCorrectionEngine(
     private val dictionary: EnglishDictionary,
-    private val adaptiveDictionary: AdaptiveDictionary
+    private val adaptiveDictionary: AdaptiveDictionary,
+    private val correctionLearnManager: CorrectionLearnManager? = null
 ) {
 
     /**
@@ -39,6 +40,16 @@ class SmartCorrectionEngine(
         // 階段 3：上下文加權（bigram）
         if (prevWord != null) {
             boostByContext(prevWord, candidates)
+        }
+
+        // 階段 4：校正學習加權（使用者歷史接受/拒絕）
+        if (correctionLearnManager != null) {
+            for ((candidate, score) in candidates.toMap()) {
+                val learnBoost = correctionLearnManager.getBoost(lower, candidate)
+                if (learnBoost != 0f) {
+                    candidates[candidate] = score + learnBoost * CORRECTION_LEARN_WEIGHT
+                }
+            }
         }
 
         return candidates.entries
@@ -117,6 +128,9 @@ class SmartCorrectionEngine(
     }
 
     companion object {
+        /** 校正學習加分權重 */
+        private const val CORRECTION_LEARN_WEIGHT = 8.0f
+
         /** QWERTY 鍵盤鄰近鍵映射 */
         private val KEYBOARD_NEIGHBORS = mapOf(
             'q' to "wa", 'w' to "qeas", 'e' to "wrds", 'r' to "etdf",
