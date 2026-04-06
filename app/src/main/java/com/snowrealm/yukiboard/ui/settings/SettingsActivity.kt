@@ -842,24 +842,36 @@ class SettingsActivity : AppCompatActivity() {
 
         tv.surfaceTextureListener = object : android.view.TextureView.SurfaceTextureListener {
             override fun onSurfaceTextureAvailable(st: android.graphics.SurfaceTexture, w: Int, h: Int) {
-                try {
-                    val mp = android.media.MediaPlayer().apply {
-                        setDataSource(filePath)
-                        setSurface(android.view.Surface(st))
-                        isLooping = true
-                        setVolume(0f, 0f)
-                        prepareAsync()
-                        setOnPreparedListener { player ->
-                            bgVideoWidth = player.videoWidth
-                            bgVideoHeight = player.videoHeight
-                            updateVideoPreviewTransform()
-                            player.start()
+                activityScope.launch(Dispatchers.IO) {
+                    try {
+                        val mp = android.media.MediaPlayer().apply {
+                            setDataSource(filePath)
+                        }
+                        withContext(Dispatchers.Main) {
+                            try {
+                                mp.setSurface(android.view.Surface(st))
+                                mp.isLooping = true
+                                mp.setVolume(0f, 0f)
+                                mp.setOnPreparedListener { player ->
+                                    bgVideoWidth = player.videoWidth
+                                    bgVideoHeight = player.videoHeight
+                                    updateVideoPreviewTransform()
+                                    player.start()
+                                }
+                                mp.prepareAsync()
+                                bgVideoPlayer = mp
+                            } catch (e: Exception) {
+                                bgPreviewLabel?.text = "🎬 影片播放失敗"
+                                bgPreviewLabel?.visibility = View.VISIBLE
+                                try { mp.release() } catch (_: Exception) {}
+                            }
+                        }
+                    } catch (e: Exception) {
+                        withContext(Dispatchers.Main) {
+                            bgPreviewLabel?.text = "🎬 影片載入失敗"
+                            bgPreviewLabel?.visibility = View.VISIBLE
                         }
                     }
-                    bgVideoPlayer = mp
-                } catch (e: Exception) {
-                    bgPreviewLabel?.text = "🎬 影片播放失敗"
-                    bgPreviewLabel?.visibility = View.VISIBLE
                 }
             }
             override fun onSurfaceTextureSizeChanged(st: android.graphics.SurfaceTexture, w: Int, h: Int) {
@@ -1002,22 +1014,37 @@ class SettingsActivity : AppCompatActivity() {
     /** 重新載入完整預覽的背景 bitmap（圖片或影片第一幀） */
     private fun reloadFullPreviewBitmap() {
         val savedBg = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getSavedBackground(this)
-        fullPreviewBgBitmap = if (savedBg != null) {
-            if (com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.isVideoFile(savedBg)) {
-                try {
+
+        if (savedBg == null) {
+            fullPreviewBgBitmap = null
+            fullPreviewView?.invalidate()
+            return
+        }
+
+        activityScope.launch(Dispatchers.IO) {
+            val bmp = try {
+                if (com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.isVideoFile(savedBg)) {
                     val retriever = android.media.MediaMetadataRetriever()
-                    retriever.setDataSource(savedBg.absolutePath)
-                    val frame = retriever.getFrameAtTime(0)
-                    retriever.release()
-                    frame
-                } catch (_: Exception) { null }
-            } else {
-                try {
+                    try {
+                        retriever.setDataSource(savedBg.absolutePath)
+                        retriever.getFrameAtTime(
+                            0,
+                            android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC
+                        )
+                    } finally {
+                        retriever.release()
+                    }
+                } else {
                     val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = 4 }
                     android.graphics.BitmapFactory.decodeFile(savedBg.absolutePath, opts)
-                } catch (_: Exception) { null }
+                }
+            } catch (_: Exception) { null }
+
+            withContext(Dispatchers.Main) {
+                fullPreviewBgBitmap = bmp
+                fullPreviewView?.invalidate()
             }
-        } else null
+        }
     }
 
     private fun buildFullKeyboardPreview(): View {
@@ -2536,6 +2563,16 @@ class SettingsActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Toast.makeText(this, "背景設定失敗: ${e.message}", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        bgVideoPlayer?.pause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        bgVideoPlayer?.start()
     }
 
     override fun onDestroy() {

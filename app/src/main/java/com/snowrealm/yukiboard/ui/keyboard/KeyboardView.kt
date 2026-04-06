@@ -482,7 +482,7 @@ class KeyboardView(context: Context) : View(context) {
             canvas.drawRect(0f, 0f, width.toFloat(), candidateBarHeight, keyPaint)
         }
         if (comboParticles.isNotEmpty() || comboGlowAlpha > 0f) {
-            postInvalidateDelayed(16)
+            postInvalidateDelayed(32)  // 30fps 夠了，降低到 32ms
         }
     }
 

@@ -94,8 +94,10 @@ class KeyboardParticleView(context: Context) : View(context) {
             }
         }
 
-        // 16ms ~ 60fps
-        postInvalidateOnAnimation()
+        // 還有活著的粒子才繼續 invalidate，否則停下來
+        if (particles.isNotEmpty()) {
+            postInvalidateOnAnimation()
+        }
     }
 
     private fun spawnParticle(): Particle {

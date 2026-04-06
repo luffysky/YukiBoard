@@ -970,4 +970,15 @@ class ThemePanelView(context: Context) : View(context) {
         super.performClick()
         return true
     }
+
+    private var onDetachCallback: (() -> Unit)? = null
+
+    fun addOnDetachListener(callback: () -> Unit) {
+        onDetachCallback = callback
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        onDetachCallback?.invoke()
+    }
 }

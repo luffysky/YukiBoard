@@ -25,13 +25,22 @@ class ThemeManager private constructor(context: Context) {
         }
         set(value) {
             prefs.edit().putString(KEY_THEME_ID, value.id).apply()
-            _onThemeChanged?.invoke(value)
+            themeChangedListeners.forEach { it(value) }
         }
 
-    private var _onThemeChanged: ((KeyboardTheme) -> Unit)? = null
+    private val themeChangedListeners = mutableListOf<(KeyboardTheme) -> Unit>()
+
+    fun addOnThemeChangedListener(listener: (KeyboardTheme) -> Unit) {
+        themeChangedListeners.add(listener)
+    }
+
+    fun removeOnThemeChangedListener(listener: (KeyboardTheme) -> Unit) {
+        themeChangedListeners.remove(listener)
+    }
 
     fun setOnThemeChangedListener(listener: (KeyboardTheme) -> Unit) {
-        _onThemeChanged = listener
+        themeChangedListeners.clear()
+        themeChangedListeners.add(listener)
     }
 
     companion object {

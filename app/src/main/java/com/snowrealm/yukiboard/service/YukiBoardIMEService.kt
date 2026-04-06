@@ -74,6 +74,7 @@ class YukiBoardIMEService : InputMethodService() {
     private var characterView: CharacterView? = null
     private var particleView: com.snowrealm.yukiboard.animation.KeyboardParticleView? = null
     private var backgroundView: com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView? = null
+    private var bgUpdateReceiver: android.content.BroadcastReceiver? = null
 
     // 面板
     private var activePanel: PanelType? = null
@@ -515,6 +516,22 @@ class YukiBoardIMEService : InputMethodService() {
         // 寬度調整（非滿版時置中）
         applyKeyboardWidth(rootContainer)
 
+        // 註冊背景更新廣播接收器
+        bgUpdateReceiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+                backgroundView?.let { bg ->
+                    bg.clearBackground()
+                    bg.reloadFromStorage()
+                }
+                keyboardView.hasCustomBackground = prefs.useCustomBackground
+                keyboardView.invalidate()
+                themePanel?.reloadPreviewBitmap()
+                themePanel?.invalidate()
+            }
+        }
+        val bgFilter = android.content.IntentFilter("com.snowrealm.yukiboard.ACTION_BG_UPDATED")
+        registerReceiver(bgUpdateReceiver, bgFilter, android.content.Context.RECEIVER_NOT_EXPORTED)
+
         return rootContainer
     }
 
@@ -605,6 +622,15 @@ class YukiBoardIMEService : InputMethodService() {
         keyboardView.swipeTrailEnabled = prefs.swipeTrailEnabled
         keyboardView.swipeInputEnabled = prefs.swipeInput
 
+        // 影片背景耗電提示（僅顯示一次）
+        val savedBg = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getSavedBackground(this)
+        if (savedBg != null && com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.isVideoFile(savedBg)) {
+            if (!prefs.videoBgWarnShown) {
+                prefs.videoBgWarnShown = true
+                keyboardView.showToast("提示：影片背景較耗電，可在主題設定改用圖片")
+            }
+        }
+
         // 遊戲模式恢復
         if (isInGameMode) {
             gameLoop?.resume()
@@ -642,6 +668,8 @@ class YukiBoardIMEService : InputMethodService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        bgUpdateReceiver?.let { try { unregisterReceiver(it) } catch (_: Exception) {} }
+        bgUpdateReceiver = null
         shakeDetector.stop()
         gyroController.unregister()
         gameLoop?.stop()
@@ -909,6 +937,15 @@ class YukiBoardIMEService : InputMethodService() {
                     prefs.useCustomBackground = false
                     applyTheme(selected)
                     p.previewBgBitmap = null
+                }
+                val themeListener: (com.snowrealm.yukiboard.theme.KeyboardTheme) -> Unit = { newTheme ->
+                    p.currentThemeId = newTheme.id
+                    p.theme = newTheme
+                    p.invalidate()
+                }
+                tm.addOnThemeChangedListener(themeListener)
+                p.addOnDetachListener {
+                    tm.removeOnThemeChangedListener(themeListener)
                 }
                 p.onPickBackground = {
                     try {

@@ -159,6 +159,15 @@ class CharacterView @JvmOverloads constructor(
         }
     }
 
+    override fun onVisibilityChanged(changedView: android.view.View, visibility: Int) {
+        super.onVisibilityChanged(changedView, visibility)
+        if (visibility == VISIBLE) {
+            if (wanderEnabled) startWandering()
+        } else {
+            stopWandering()
+        }
+    }
+
     // =========================================================================
     // 遊走動畫
     // =========================================================================

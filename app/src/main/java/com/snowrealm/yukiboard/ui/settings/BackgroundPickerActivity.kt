@@ -80,6 +80,11 @@ class BackgroundPickerActivity : Activity() {
                 dest.outputStream().use { output -> input.copyTo(output) }
             }
             prefs.useCustomBackground = true
+
+            val intent = android.content.Intent("com.snowrealm.yukiboard.ACTION_BG_UPDATED")
+            intent.setPackage(packageName)
+            sendBroadcast(intent)
+
             Toast.makeText(this, "背景已設定", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
             Toast.makeText(this, "背景設定失敗: ${e.message}", Toast.LENGTH_SHORT).show()

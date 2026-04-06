@@ -98,6 +98,12 @@ class KeyboardGLSurfaceView @JvmOverloads constructor(
             renderer.onSurfaceChanged(null, surfaceWidth, surfaceHeight)
 
             while (running) {
+                // alpha 為 0（功能關閉）時降低到 2fps 節能
+                if (renderer.alpha <= 0.01f) {
+                    try { Thread.sleep(500) } catch (_: InterruptedException) { break }
+                    continue
+                }
+
                 val w = surfaceWidth
                 val h = surfaceHeight
                 GLES20.glViewport(0, 0, w, h)
