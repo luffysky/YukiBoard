@@ -2,6 +2,7 @@ package com.snowrealm.yukiboard.ui.auth
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import com.snowrealm.yukiboard.auth.SnowRealmAuthClient
 import kotlinx.coroutines.*
@@ -36,11 +37,14 @@ class OAuthCallbackActivity : AppCompatActivity() {
             return
         }
 
-        val authClient = SnowRealmAuthClient(this)
+        val authClient = SnowRealmAuthClient.getInstance(this)
         authClient.saveTokenDirectly(token)
 
+        Log.d("OAuthCallback", "Token received: ${token.take(20)}...")
         scope.launch {
-            authClient.fetchMe()
+            val me = authClient.fetchMe()
+            Log.d("OAuthCallback", "fetchMe result: ${me?.displayName}, role=${me?.role}, tenant=${me?.tenantId}")
+            Log.d("OAuthCallback", "isLoggedIn=${authClient.isLoggedIn}, currentUser=${authClient.currentUser}")
             withContext(Dispatchers.Main) {
                 // 回到 LoginActivity 並通知成功
                 val loginIntent = Intent(this@OAuthCallbackActivity, LoginActivity::class.java).apply {

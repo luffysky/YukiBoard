@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 66
-        versionName "0.9.0"
+        versionCode 71
+        versionName "0.9.5"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,11 +82,8 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: Insight 深度整合（AI 串流/問卷/主題同步/設定備份/社群分享）\n" +
-                    "- feat: InsightApiClient 統一 API 入口 + 401 auto-refresh\n" +
-                    "- feat: SnowRealmProvider SSE 串流升級\n" +
-                    "- feat: UserProfile 補 plan/avatarUrl + 設定頁 Insight 區塊\n" +
-                    "- fix: 設定頁 header 標題換行排版修正"
+                    "- fix: 登入成功後 recreate 顯示已登入 UI\n" +
+                    "- debug: OAuthCallback + fetchMe 加 log 追蹤登入資料"
             }
         }
         debug {
@@ -95,11 +92,8 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: Insight 深度整合（AI 串流/問卷/主題同步/設定備份/社群分享）\n" +
-                    "- feat: InsightApiClient 統一 API 入口 + 401 auto-refresh\n" +
-                    "- feat: SnowRealmProvider SSE 串流升級\n" +
-                    "- feat: UserProfile 補 plan/avatarUrl + 設定頁 Insight 區塊\n" +
-                    "- fix: 設定頁 header 標題換行排版修正"
+                    "- fix: 登入成功後 recreate 顯示已登入 UI\n" +
+                    "- debug: OAuthCallback + fetchMe 加 log 追蹤登入資料"
             }
         }
     }

@@ -52,7 +52,8 @@ class LoginActivity : AppCompatActivity() {
         if (intent?.getBooleanExtra("oauth_success", false) == true) {
             if (authClient.isLoggedIn) {
                 setResult(RESULT_OK)
-                finish()
+                // 重新建構 UI 顯示已登入狀態
+                recreate()
             }
         }
     }
@@ -104,18 +105,27 @@ class LoginActivity : AppCompatActivity() {
                 else -> "Free"
             }
 
+            val nameOrEmail = user?.displayName?.ifBlank { null }
+                ?: authClient.currentEmail?.ifBlank { null }
+                ?: "已登入"
+            val roleText = when (user?.role) {
+                "super_admin" -> "Super Admin"
+                "admin" -> "Admin"
+                "editor" -> "Editor"
+                "viewer" -> "Viewer"
+                else -> null
+            }
+
             root.addView(TextView(this).apply {
-                text = "已登入"; textSize = 14f; setTextColor(0xFF40E0D0.toInt())
-                gravity = Gravity.CENTER; setPadding(0, (16 * d).toInt(), 0, (8 * d).toInt())
-            })
-            root.addView(TextView(this).apply {
-                text = user?.displayName ?: authClient.currentEmail ?: ""
-                textSize = 20f; setTextColor(Color.WHITE)
+                text = nameOrEmail; textSize = 22f; setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER; typeface = Typeface.DEFAULT_BOLD
+                setPadding(0, (20 * d).toInt(), 0, (4 * d).toInt())
             })
+            // 方案 + 特權
+            val badgeText = if (roleText != null) "$planText · $roleText" else "$planText 方案"
             root.addView(TextView(this).apply {
-                text = "$planText 方案"; textSize = 13f; setTextColor(0x99FFFFFF.toInt())
-                gravity = Gravity.CENTER; setPadding(0, (4 * d).toInt(), 0, (24 * d).toInt())
+                text = badgeText; textSize = 13f; setTextColor(0xFF40E0D0.toInt())
+                gravity = Gravity.CENTER; setPadding(0, 0, 0, (24 * d).toInt())
             })
 
             // 登出按鈕

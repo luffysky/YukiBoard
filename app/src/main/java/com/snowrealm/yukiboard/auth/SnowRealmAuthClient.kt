@@ -151,9 +151,14 @@ class SnowRealmAuthClient(context: Context) {
                 .putString(KEY_DISPLAY_NAME, user.displayName)
                 .putString(KEY_AVATAR_URL, user.avatarUrl)
                 .putString(KEY_PLAN, me.plan)
+                .putString(KEY_ROLE, user.role)
+                .putString("tenant_id", user.tenantId)
                 .apply()
             user
-        } catch (_: Exception) { null }
+        } catch (e: Exception) {
+            android.util.Log.e("AuthClient", "fetchMe failed", e)
+            null
+        }
     }
 
     /** 登出 */
@@ -166,6 +171,7 @@ class SnowRealmAuthClient(context: Context) {
             .remove(KEY_TOKEN_EXPIRY)
             .remove(KEY_AVATAR_URL)
             .remove(KEY_PLAN)
+            .remove(KEY_ROLE)
             .apply()
     }
 
@@ -272,6 +278,7 @@ class SnowRealmAuthClient(context: Context) {
             .putString(KEY_DISPLAY_NAME, user.displayName)
             .putString(KEY_AVATAR_URL, user.avatarUrl)
             .putString(KEY_PLAN, user.plan.name.lowercase())
+            .putString(KEY_ROLE, user.role)
             .putLong(KEY_TOKEN_EXPIRY, System.currentTimeMillis() + TOKEN_LIFETIME_MS)
             .apply()
     }
@@ -351,6 +358,8 @@ class SnowRealmAuthClient(context: Context) {
                 email = prefs.getString(KEY_EMAIL, "") ?: "",
                 displayName = prefs.getString(KEY_DISPLAY_NAME, "") ?: "",
                 avatarUrl = prefs.getString(KEY_AVATAR_URL, "") ?: "",
+                role = prefs.getString(KEY_ROLE, "") ?: "",
+                tenantId = prefs.getString("tenant_id", "") ?: "",
                 plan = parsePlan(prefs.getString(KEY_PLAN, null))
             )
         }
@@ -363,6 +372,7 @@ class SnowRealmAuthClient(context: Context) {
         private const val KEY_TOKEN_EXPIRY = "token_expiry"
         private const val KEY_AVATAR_URL = "avatar_url"
         private const val KEY_PLAN = "user_plan"
+        private const val KEY_ROLE = "user_role"
         private const val TOKEN_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000L // 7 days
 
         fun parsePlan(raw: String?): UserPlan = when (raw?.lowercase()) {
