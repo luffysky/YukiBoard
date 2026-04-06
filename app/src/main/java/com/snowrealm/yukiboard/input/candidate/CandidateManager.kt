@@ -46,6 +46,22 @@ class CandidateManager {
     val hasPrevPage: Boolean get() = pageIndex > 0
 
     fun update(newCandidates: List<String>) {
+        // 自動歸檔：如果有舊的當前段候選字，且新候選字跟舊的不同，
+        // 把舊候選存入歷史（使用者持續打字不選字時，前段候選不會消失）
+        if (currentCandidateCount > 0 && newCandidates.isNotEmpty()) {
+            val oldCurrent = _candidates.take(currentCandidateCount)
+            if (oldCurrent != newCandidates.take(oldCurrent.size)) {
+                for (c in oldCurrent) {
+                    if (c !in _historyCandidates && c !in newCandidates) {
+                        _historyCandidates.add(c)
+                    }
+                }
+                while (_historyCandidates.size > 30) {
+                    _historyCandidates.removeAt(0)
+                }
+            }
+        }
+
         _candidates.clear()
         _candidates.addAll(newCandidates)
         // 加入歷史候選字（去重）
