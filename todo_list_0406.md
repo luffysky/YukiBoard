@@ -353,37 +353,81 @@
 - ✅ `markSwipeCandidates()` 方法
 
 
-### 批次 L — 防詐 AI 對話模型（FraudAI 任務包 5 批）
+### 批次 L — 防詐 AI 對話模型（FraudAI 任務包 8 批）
 
-> 路線：規則引擎 → AI 分析 → 本地 TFLite 模型（離線零費用）
+> 路線：規則引擎 → 被動偵測 → 自我學習 → 雲端聚合 → TFLite 離線模型
 > 參考：YukiBoard_FraudAI_Model_Tasks.md
 
-#### L-1 FraudAIAnalyzer（規則 + Gemini Flash，現在可上線）
-- [ ] security/FraudAIAnalyzer.kt — A+B 混合架構（規則引擎 < 1ms + AI 深度分析）
-- [ ] security/ConversationFormatter.kt — LINE 對話格式化（說話者辨識 + 截斷）
-- [ ] 整合 ClawPanelView 防詐分析流程
+#### L-1 FraudAIAnalyzer（規則 + Gemini Flash）✅ v0.9.9
+- ✅ security/FraudAIAnalyzer.kt — A+B 混合架構（規則引擎 8 類 170+ 關鍵字 < 1ms + AI 串流深度分析）
+- ✅ security/ConversationFormatter.kt — LINE/Messenger/WhatsApp 對話格式化（說話者辨識 + 截斷）
+- ✅ 整合 ClawPanelView 防詐分析流程 + ClawToolbarView 🛡️ 防詐按鈕
+- ✅ FraudDetectSkill.kt — Claw Skill 整合
 
-#### L-2 回報系統（資料收集，訓練模型用）
-- [ ] security/FraudReportManager.kt — 匿名化 + Supabase 上傳
-- [ ] Supabase 建 fraud_reports 表（RLS insert only）
-- [ ] ClawPanelView 加「回報詐騙 / 不是詐騙」按鈕
-- [ ] 同意聲明對話框（隱私保護）
+#### L-1.5 被動偵測（輸入時自動掃描）✅ v0.9.10
+- ✅ onStartInputView 讀取輸入框上下文（最多 2000 字）背景跑規則引擎
+- ✅ 風險 ≥ 30 → 雪凜泡泡警告（5 秒）+ 驚訝表情
+- ✅ 點擊泡泡 → 自動開啟 Claw 面板 fraud_detect 深度分析
 
-#### L-3 合成訓練資料生成
+#### L-2 本地回饋自我學習（個人化權重調整）
+- [ ] security/FraudFeedbackStore.kt — SQLite 儲存使用者回饋
+  - 表結構：id / text_hash / fraud_type / is_fraud(bool) / timestamp / matched_keywords
+  - 每次回饋後更新本地權重：「確實詐騙」→ 命中關鍵字 weight +2；「不是詐騙」→ weight -1
+- [ ] security/FraudRuleWeightManager.kt — 動態權重管理
+  - 載入預設權重 + 本地回饋調整 = 最終權重
+  - FraudAIAnalyzer 改為讀取動態權重（取代硬編碼 weight）
+  - 個人化關鍵字學習：使用者標記詐騙時，自動提取新關鍵字加入個人規則
+- [ ] ClawPanelView 防詐結果加「✅ 確實是詐騙 / ❌ 不是詐騙」回饋按鈕
+- [ ] 回饋後雪凜回應（「記住了！下次會更注意」/「好的，誤判了抱歉」）
+
+#### L-3 回報系統（匿名聚合，群體智慧）
+- [ ] security/FraudReportManager.kt — 匿名化處理
+  - 文字 → SHA-256 hash（不上傳原文）
+  - 只上傳：fraud_type / matched_keywords / is_fraud / rule_score / device_locale
+- [ ] Supabase 建 fraud_reports 表（RLS insert only，使用者只能寫不能讀）
+- [ ] ClawPanelView 加「回報詐騙 / 不是詐騙」按鈕（接 FraudReportManager）
+- [ ] 同意聲明對話框（首次回報時顯示隱私說明，opt-in）
+- [ ] YukiPreferences 加 fraudReportConsent: Boolean
+
+#### L-4 雲端規則下發（定期更新）
+- [ ] Supabase 建 fraud_rules_v2 表（type / keyword / weight / updated_at）
+- [ ] security/FraudRuleSync.kt — App 啟動時拉最新規則
+  - 每 24 小時同步一次（SharedPreferences 記錄 lastSyncTime）
+  - 合併遠端規則 + 本地回饋權重 = 最終規則集
+  - 新增詐騙類型可動態擴充（不用更新 App）
+- [ ] Supabase Edge Function：聚合所有用戶回饋 → 自動調整全局權重
+  - 回報數 ≥ 10 且「是詐騙」比例 ≥ 70% → 關鍵字 weight 上調
+  - 「不是詐騙」比例 ≥ 60% → weight 下調或移除
+
+#### L-5 合成訓練資料生成
 - [ ] scripts/generate_fraud_training_data.py — Claude API 批次生成
-- [ ] 5 種詐騙類型 × 200 筆 + 1000 筆正常對話
+- [ ] 8 種詐騙類型 × 200 筆 + 1000 筆正常對話
 - [ ] 輸出 JSONL（fraud_conversations + safe_conversations）
+- [ ] 加入真實回報資料（L-3 收集）作為訓練補充
 
-#### L-4 DistilBERT 訓練（Google Colab��
+#### L-6 DistilBERT 訓練（Google Colab）
 - [ ] scripts/train_fraud_detector.ipynb — bert-base-chinese fine-tune
-- [ ] 訓練/驗證分割 + accuracy metrics
-- [ ] PyTorch → ONNX → TFLite 轉換
+- [ ] 訓練/驗證分割 + accuracy / precision / recall / F1 metrics
+- [ ] PyTorch → ONNX → TFLite 轉換（INT8 量化，模型 < 30MB）
+- [ ] 定期用新回報資料 retrain（每月/每季）
 
-#### L-5 Android TFLite ��地模型整合
+#### L-7 Android TFLite 本地模型整合
 - [ ] security/FraudLocalModel.kt — 離線推論（50-80ms）
-- [ ] assets/fraud_detector.tflite 打包
-- [ ] FraudAIAnalyzer 優先用本地模型，fallback Gemini Flash
-- [ ] build.gradle 加 TFLite 依賴
+  - Tokenizer（WordPiece）+ TFLite Interpreter
+  - 輸出：fraud_probability(0~1) + fraud_type
+- [ ] assets/fraud_detector.tflite 打包（首版 ~25MB）
+- [ ] FraudAIAnalyzer 三層架構：本地模型 → 規則引擎 → AI 深度分析
+  - 本地模型可用時優先（離線、零費用、50ms）
+  - 模型不可用時 fallback 規則引擎
+  - 風險高時可選 AI 深度分析（消耗 token）
+- [ ] build.gradle 加 TFLite 依賴（org.tensorflow:tensorflow-lite）
+- [ ] 設定頁加「防詐模型更新」按鈕（手動下載最新 tflite）
+
+#### L-8 持續學習閉環
+- [ ] 模型版本管理 — Supabase 存 model_version / download_url / min_app_version
+- [ ] App 啟動時檢查模型版本，有新版自動下載替換
+- [ ] 訓練管線自動化 — GitHub Actions 定期跑 Colab notebook
+- [ ] A/B 測試框架 — 規則引擎 vs TFLite 模型準確度對比 dashboard
 
 ---
 
@@ -769,9 +813,41 @@ Phase 3：上架準備
 
 ---
 
+## 🔴 關鍵問題（v0.9.21 掃描）
+
+- [ ] **藍新金流未接**：build.gradle 有 NEWEBPAY_MERCHANT_ID / HASH_KEY / HASH_IV，但無付款處理程式碼。Z幣儲值無法使用
+- [ ] **Supabase 未接**：build.gradle 有 YUKIBOARD_SUPABASE_URL / ANON_KEY，但 codebase 零整合。Z幣餘額、排行榜、皮膚商城後端缺失
+
+## 🟡 中等問題（v0.9.21 掃描）
+
+- [ ] **AI Writer 開關無效**：`YukiPreferences.aiWriter` 有 switch 但 Service 未檢查就執行 WriterSkill
+- [ ] **AI EmojiTranslate 開關無效**：`YukiPreferences.aiEmojiTranslate` 同上
+- [ ] **AI ToneAdjust 無前端觸發**：後端 ToneAdjustSkill 存在但沒有 UI 入口呼叫
+- [ ] **AI CodeComplete / RegexGen 開關**：設定有但無明確整合路徑
+- [ ] **GIF 面板搜尋**：onSearch 依賴 GiphyApiClient + API key，無 key 時無法搜尋
+- [ ] **天氣面板穿衣建議**：outfitText UI 有但推薦邏輯是 stub（"需解鎖"）
+- [ ] **TTS 設定**：ttsTranslateRead / ttsCandidateRead 偏好可能未完全生效
+- [ ] **VRM 3D 角色**：框架完整但模型素材 / 資產管線不確定
+- [ ] **EmotionalCooldownManager**：情緒冷靜期管理器邏輯可能不完整
+- [ ] **OpenWeather API**：key 有設定但實際 API 呼叫完整性待確認
+
+## 🆕 新功能：悄悄話解密面板
+
+- [ ] **解密面板 UI**：工具列新增「🔐」按鈕，開啟 DecryptPanelView
+  - 上方：密碼輸入框（對方約定的密碼）
+  - 中間：貼上加密訊息的輸入框
+  - 下方：「解密」按鈕 → 顯示原始明文
+  - 支援「複製明文」按鈕
+- [ ] **加密模式改為密碼制**：私房話模式從固定 passphrase 改為使用者自訂密碼
+  - 發送方：長按工具列🔐 或在設定設定密碼 → Enter 送出時用該密碼 AES 加密
+  - 接收方：開啟解密面板 → 輸入密碼 → 貼上密文 → 解密
+- [ ] **加密訊息格式**：`[YUKI🔐]Base64密文` 讓雙方辨識這是 YukiBoard 加密訊息
+
+---
+
 ## 備註
 
-- 版本號：**v0.8.0**（versionCode 60）
+- 版本號：**v0.9.21**（versionCode 87）
 - deploy 指令：`bash scripts/deploy.sh "更新說明"` 或 `./gradlew appDistributionUploadDebug`
 - Firebase App Distribution 測��群��：`testers`
 - google-services.json 已在 .gitignore
