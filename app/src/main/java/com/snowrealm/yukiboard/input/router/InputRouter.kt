@@ -263,6 +263,15 @@ class InputRouter(private val context: Context) {
             candidateManager.archiveCurrentAsHistory(displayedText)
         }
 
+        // 歷史候選字：不在引擎候選內 → 直接 commit，清掉 composing
+        if (displayedText != null && candidateSourceMap[displayedText] == CandidateSource.HISTORY) {
+            activeEngine.reset()
+            candidateManager.clear()
+            onTextCommitted(displayedText)
+            smartInput.onCandidateHit()
+            return InputResult.CommitText(displayedText)
+        }
+
         val result = when (val eng = activeEngine) {
             is ChewingInputEngine -> {
                 val engineIndex = if (displayedText != null) eng.getCandidates().indexOf(displayedText).takeIf { it >= 0 } ?: index else index
@@ -365,13 +374,23 @@ class InputRouter(private val context: Context) {
         // 訊號一：字典命中
         if (englishSoFar.length >= 2) {
             val engCands = (englishEngine as? EnglishInputEngine)?.getCandidatesForPrefix(englishSoFar) ?: emptyList()
-            if (engCands.isNotEmpty()) engScore += engCands.size.coerceAtMost(5) * 10 + 30
+            if (engCands.isNotEmpty()) {
+                engScore += engCands.size.coerceAtMost(5) * 10 + 30
+                // 完整匹配加大分（如 "apple" 完全命中字典詞）
+                if (engCands.any { it.equals(englishSoFar, ignoreCase = true) }) {
+                    engScore += 50
+                }
+            }
         }
         if (autoBopomofoBuffer.isNotEmpty()) {
-            val bopoCands = (bopomofoEngine as? ChewingInputEngine)?.getCandidatesForBopomofo(
-                autoBopomofoBuffer.joinToString("")
-            ) ?: emptyList()
-            if (bopoCands.isNotEmpty()) bopoScore += bopoCands.size.coerceAtMost(5) * 10 + 30
+            val bopoStr = autoBopomofoBuffer.joinToString("")
+            val bopoCands = (bopomofoEngine as? ChewingInputEngine)?.getCandidatesForBopomofo(bopoStr) ?: emptyList()
+            if (bopoCands.isNotEmpty()) {
+                bopoScore += bopoCands.size.coerceAtMost(5) * 10 + 30
+            } else if (autoBopomofoBuffer.size >= 3) {
+                // 3+ 注音組合查無結果 → 很可能不是要打中文，減分
+                bopoScore -= 20
+            }
         }
 
         // 訊號二：上下文連續性
@@ -380,6 +399,11 @@ class InputRouter(private val context: Context) {
         // 訊號三：長度合理性
         if (englishSoFar.length in 2..15) engScore += 10
         if (autoBopomofoBuffer.size >= 2) bopoScore += 10
+
+        // 訊號四：3+ 字元英文有候選但注音無候選 → 明確英文意圖
+        if (englishSoFar.length >= 3 && engScore > 30 && bopoScore <= 30) {
+            engScore += 40
+        }
 
         autoEnglishScore = engScore
         autoBopomofoScore = bopoScore
@@ -482,26 +506,51 @@ class InputRouter(private val context: Context) {
                     if (freq > 0) score += freq + 50
                     val ctxScore = contextPredictions[word]
                     if (ctxScore != null) score += ctxScore * 5
-                    // 串聯預測加分
+                    // 串聯預測加分（上一字的接續候選）
                     val ngramScore = nextCharBoost[word]
                     if (ngramScore != null) score += ngramScore * 3
                     score
                 }.thenBy { raw.indexOf(it) })
 
-                val combined = boosted.toMutableList()
+                // 排序：整句預測 → 串聯接續候選 → 一般排序候選
+                val combined = mutableListOf<String>()
+                // 1. 整句預測排最前（最可能是用戶想要的完整詞）
                 for (s in sentenceSuggestions) {
                     if (s !in combined) combined.add(s)
                 }
-                // 標記歷史候選字來源
+                // 2. 串聯接續候選排第二（上一字預測的下一字）
+                val continuationCands = nextCharBoost.entries
+                    .filter { it.key in raw }
+                    .sortedByDescending { it.value }
+                    .map { it.key }
+                for (c in continuationCands) {
+                    if (c !in combined) combined.add(c)
+                }
+                // 3. 其餘候選按分數排
+                for (b in boosted) {
+                    if (b !in combined) combined.add(b)
+                }
+                // 標記來源
                 for (h in candidateManager.historyCandidates) {
                     historySourceMap[h] = CandidateSource.HISTORY
+                }
+                for (s in sentenceSuggestions) {
+                    historySourceMap[s] = CandidateSource.SENTENCE
+                }
+                for (c in continuationCands) {
+                    historySourceMap[c] = CandidateSource.PREDICTION
                 }
                 candidateSourceMap = historySourceMap
                 candidateManager.update(combined)
             } else {
-                val combined = raw.toMutableList()
+                // 整句預測排前面
+                val combined = mutableListOf<String>()
                 for (s in sentenceSuggestions) {
                     if (s !in combined) combined.add(s)
+                    historySourceMap[s] = CandidateSource.SENTENCE
+                }
+                for (r in raw) {
+                    if (r !in combined) combined.add(r)
                 }
                 for (h in candidateManager.historyCandidates) {
                     historySourceMap[h] = CandidateSource.HISTORY

@@ -64,11 +64,12 @@ class CandidateManager {
         }
 
         _candidates.clear()
-        _candidates.addAll(newCandidates)
-        // 加入歷史候選字（去重）
+        // 歷史候選字排在前面（使用者最可能想回選的）
         for (h in _historyCandidates) {
-            if (h !in _candidates) _candidates.add(h)
+            if (h !in newCandidates) _candidates.add(h)
         }
+        // 當前段候選字排在後面
+        _candidates.addAll(newCandidates)
         currentCandidateCount = newCandidates.size
         pageIndex = 0
         focusedIndex = -1

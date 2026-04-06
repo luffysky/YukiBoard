@@ -615,20 +615,38 @@ class ChewingInputEngine(
             }
         }
 
-        // ── 4. 每個音節都加單字候選（backup） ──
-        // 查不到詞組時，至少讓每個音節的字都顯示出來
-        // 讓用戶可以逐字選，而不是只看到最後一個音節
-        if (results.isEmpty()) {
-            // 完全查不到詞組：每個音節都加，第一個音節排最前
-            syllables.forEachIndexed { i, syllable ->
-                val chars = lookupCandidates(syllable)
-                results.addAll(chars.take(if (i == 0) 10 else 6))
+        // ── 4. 組合候選：從每個音節的 top 候選字排列組合成句子 ──
+        // 例如 ㄕㄨ→輸, ㄌㄜ→了, ㄋㄧ→你 → 組合出「輸了你」
+        val syllableTopChars = syllables.map { syllable ->
+            val raw = lookupCandidates(syllable).filter { it.length == 1 }
+            // 高頻常用字優先排序（字典序不反映使用頻率）
+            val boosted = raw.sortedByDescending { COMMON_CHAR_FREQ[it[0]] ?: 0 }
+            boosted.take(8)
+        }
+        if (syllableTopChars.all { it.isNotEmpty() }) {
+            val composed = mutableListOf<String>()
+            // 第一個：每個音節的最高頻候選
+            val best = syllableTopChars.joinToString("") { it[0] }
+            composed.add(best)
+            // 各位置嘗試替換為第 2~4 候選
+            for (pos in syllableTopChars.indices) {
+                for (altIdx in 1 until minOf(4, syllableTopChars[pos].size)) {
+                    val alt = syllableTopChars.mapIndexed { i, chars ->
+                        if (i == pos) chars[altIdx] else chars[0]
+                    }.joinToString("")
+                    if (alt !in composed) composed.add(alt)
+                }
             }
-        } else {
-            // 有部分結果：只補最後音節防止候選太少
-            val lastSyllable = syllables.last()
-            val lastChars = lookupCandidates(lastSyllable)
-            results.addAll(lastChars.take(10))
+            // 組合候選排在最前面
+            for (c in composed.take(10)) {
+                if (c !in results) results.add(c)
+            }
+        }
+
+        // ── 5. 每個音節的單字候選（backup） ──
+        syllables.forEachIndexed { i, syllable ->
+            val chars = lookupCandidates(syllable)
+            results.addAll(chars.take(if (i == 0) 6 else 4))
         }
 
         return results.toList()
@@ -847,5 +865,48 @@ class ChewingInputEngine(
         val syllables = segmentSyllables(bopomofo)
         return if (syllables.size >= 2) lookupMultiSyllable(syllables)
                else lookupCandidates(bopomofo)
+    }
+
+    companion object {
+        /**
+         * 中文高頻字權重表（前 200 常用字）。
+         * 用於滑動輸入組合候選字排序：字典收錄順序不反映使用頻率，
+         * 需要此表把「了、的、是、不」等超高頻字提前。
+         */
+        val COMMON_CHAR_FREQ: Map<Char, Int> = mapOf(
+            '的' to 100, '一' to 99, '是' to 98, '不' to 97, '了' to 96,
+            '在' to 95, '人' to 94, '有' to 93, '我' to 92, '他' to 91,
+            '這' to 90, '中' to 89, '大' to 88, '來' to 87, '上' to 86,
+            '個' to 85, '國' to 84, '到' to 83, '會' to 82, '說' to 81,
+            '時' to 80, '要' to 79, '就' to 78, '出' to 77, '也' to 76,
+            '你' to 75, '對' to 74, '生' to 73, '能' to 72, '子' to 71,
+            '那' to 70, '得' to 69, '於' to 68, '著' to 67, '下' to 66,
+            '自' to 65, '之' to 64, '年' to 63, '過' to 62, '發' to 61,
+            '後' to 60, '作' to 59, '裡' to 58, '用' to 57, '道' to 56,
+            '行' to 55, '所' to 54, '然' to 53, '家' to 52, '種' to 51,
+            '事' to 50, '成' to 49, '方' to 48, '多' to 47, '經' to 46,
+            '麼' to 45, '去' to 44, '法' to 43, '學' to 42, '如' to 41,
+            '都' to 40, '同' to 39, '現' to 38, '當' to 37, '沒' to 36,
+            '動' to 35, '面' to 34, '起' to 33, '看' to 32, '定' to 31,
+            '天' to 30, '分' to 29, '還' to 28, '進' to 27, '好' to 26,
+            '小' to 25, '部' to 24, '其' to 23, '些' to 22, '主' to 21,
+            '樣' to 20, '理' to 19, '心' to 18, '她' to 17, '本' to 16,
+            '前' to 15, '開' to 14, '但' to 13, '因' to 12, '只' to 11,
+            '從' to 10, '想' to 9, '實' to 8, '日' to 7, '軍' to 6,
+            '者' to 5, '意' to 4, '無' to 3, '力' to 2, '它' to 1,
+            // 口語高頻補充
+            '吃' to 75, '喝' to 70, '做' to 65, '打' to 60, '走' to 55,
+            '給' to 50, '讓' to 45, '把' to 80, '被' to 75, '跟' to 70,
+            '很' to 80, '可' to 75, '會' to 82, '和' to 78, '們' to 76,
+            '為' to 68, '什' to 65, '怎' to 60, '嗎' to 55, '吧' to 50,
+            '呢' to 50, '啊' to 45, '哦' to 40, '嘛' to 35, '喔' to 35,
+            '嗯' to 30, '欸' to 25, '耶' to 20,
+            // 動詞
+            '知' to 60, '問' to 55, '買' to 50, '賣' to 45, '回' to 65,
+            '找' to 55, '等' to 50, '聽' to 45, '寫' to 40, '讀' to 35,
+            '住' to 50, '坐' to 45, '站' to 40, '睡' to 40, '醒' to 35,
+            '輸' to 35, '贏' to 30, '死' to 40, '活' to 40, '愛' to 55,
+            '恨' to 30, '怕' to 35, '哭' to 30, '笑' to 35, '玩' to 40,
+        )
     }
 }

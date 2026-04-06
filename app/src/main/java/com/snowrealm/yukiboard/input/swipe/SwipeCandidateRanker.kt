@@ -29,7 +29,10 @@ class SwipeCandidateRanker(
         // 1. 主序列查詞（最高權重）
         val primary = chewingEngine.lookupByBopomofoString(bopomofoSymbols.joinToString(""))
         primary.forEachIndexed { i, word ->
-            scored[word] = (scored[word] ?: 0f) + (20f - i * 0.5f).coerceAtLeast(5f)
+            var base = (20f - i * 0.5f).coerceAtLeast(5f)
+            // 多字組合候選加分（覆蓋更多音節 = 更可能是用戶意圖）
+            if (word.length > 1) base += word.length * 8f
+            scored[word] = (scored[word] ?: 0f) + base
         }
 
         // 2. 鄰近替代序列查詞（降低權重）
