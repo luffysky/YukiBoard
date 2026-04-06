@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 91
-        versionName "0.9.25"
+        versionCode 92
+        versionName "0.9.26"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,13 +82,13 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
+                    "- feat: TTS 音色搜尋 — 可依語言/名稱即時過濾\n" +
                     "- fix: 雪凜 VRM/Lottie 即時切換 — 設定頁切換後不再消失\n" +
                     "- fix: VRM 初始化失敗自動 fallback 回 Lottie\n" +
-                    "- feat: 雪凜角色開關（設定頁可完全隱藏）\n" +
+                    "- feat: 雪凜角色開關\n" +
                     "- feat: TTS 語音音色選擇器 + 試聽\n" +
-                    "- fix: 按鍵上標/文字溢出裁切\n" +
                     "- feat: 按鍵文字透明度拉桿\n" +
-                    "- feat: 常用語面板擴充（11 分類 + 日韓英）+ tab 列捲動\n" +
+                    "- feat: 常用語面板擴充（11 分類 + 日韓英）\n" +
                     "- feat: 日文漢字辭書 3000+"
             }
         }
@@ -98,13 +98,13 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
+                    "- feat: TTS 音色搜尋 — 可依語言/名稱即時過濾\n" +
                     "- fix: 雪凜 VRM/Lottie 即時切換 — 設定頁切換後不再消失\n" +
                     "- fix: VRM 初始化失敗自動 fallback 回 Lottie\n" +
-                    "- feat: 雪凜角色開關（設定頁可完全隱藏）\n" +
+                    "- feat: 雪凜角色開關\n" +
                     "- feat: TTS 語音音色選擇器 + 試聽\n" +
-                    "- fix: 按鍵上標/文字溢出裁切\n" +
                     "- feat: 按鍵文字透明度拉桿\n" +
-                    "- feat: 常用語面板擴充（11 分類 + 日韓英）+ tab 列捲動\n" +
+                    "- feat: 常用語面板擴充（11 分類 + 日韓英）\n" +
                     "- feat: 日文漢字辭書 3000+"
             }
         }

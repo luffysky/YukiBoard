@@ -2205,46 +2205,110 @@ class SettingsActivity : AppCompatActivity() {
                         .thenByDescending { it.quality }
                         .thenBy { it.name })
 
-                    val displayNames = arrayOf("🔄 系統預設") + sorted.map { v ->
+                    // 建立顯示名稱對應
+                    fun voiceLabel(v: android.speech.tts.Voice): String {
                         val lang = v.locale.displayLanguage
                         val country = v.locale.displayCountry.takeIf { it.isNotEmpty() }?.let { " ($it)" } ?: ""
                         val q = if (v.quality >= 400) " ★" else if (v.quality >= 300) " ☆" else ""
                         val net = if (v.isNetworkConnectionRequired) " ☁" else ""
-                        "$lang$country$q$net — ${v.name}"
-                    }.toTypedArray()
+                        return "$lang$country$q$net — ${v.name}"
+                    }
 
-                    val currentIdx = if (prefs.ttsVoiceName.isEmpty()) 0
-                        else sorted.indexOfFirst { it.name == prefs.ttsVoiceName }.let { if (it >= 0) it + 1 else 0 }
+                    // 自訂 Dialog：搜索框 + 列表
+                    val dialogLayout = LinearLayout(this@SettingsActivity).apply {
+                        orientation = LinearLayout.VERTICAL
+                        setPadding(dp(16), dp(12), dp(16), 0)
+                    }
 
-                    android.app.AlertDialog.Builder(this@SettingsActivity, android.R.style.Theme_Material_Dialog_Alert)
-                        .setTitle("選擇語音音色 (${sorted.size} 種)")
-                        .setSingleChoiceItems(displayNames, currentIdx) { dialog, which ->
-                            if (which == 0) {
-                                prefs.ttsVoiceName = ""
-                                (btn as TextView).text = "系統預設"
-                            } else {
-                                val selected = sorted[which - 1]
-                                prefs.ttsVoiceName = selected.name
-                                (btn as TextView).text = displayNames[which].take(35)
-
-                                // 試聽選中的語音
-                                val tmpEngine = btn.tag as? android.speech.tts.TextToSpeech
-                                if (tmpEngine != null) {
-                                    tmpEngine.voice = selected
-                                    tmpEngine.setSpeechRate(prefs.ttsSpeed)
-                                    tmpEngine.speak("你好，我是雪凜", android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "preview")
-                                }
-                            }
-                            dialog.dismiss()
+                    val searchBox = android.widget.EditText(this@SettingsActivity).apply {
+                        hint = "搜尋語言或音色名稱…"
+                        textSize = 14f
+                        setTextColor(0xFFE8F4FF.toInt())
+                        setHintTextColor(0xFF556677.toInt())
+                        background = android.graphics.drawable.GradientDrawable().apply {
+                            setColor(0xFF1A2A3A.toInt())
+                            cornerRadius = dp(8).toFloat()
+                            setStroke(1, 0xFF334455.toInt())
                         }
+                        setPadding(dp(12), dp(8), dp(12), dp(8))
+                        inputType = android.text.InputType.TYPE_CLASS_TEXT
+                        isSingleLine = true
+                    }
+                    dialogLayout.addView(searchBox, LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { bottomMargin = dp(8) })
+
+                    val listView = android.widget.ListView(this@SettingsActivity)
+                    dialogLayout.addView(listView, LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, dp(360)
+                    ))
+
+                    // 可過濾的列表資料
+                    val allItems = listOf<Pair<String, android.speech.tts.Voice?>>(
+                        "🔄 系統預設" to null
+                    ) + sorted.map { voiceLabel(it) to it }
+
+                    var filteredItems = allItems.toMutableList()
+                    val adapter = android.widget.ArrayAdapter(
+                        this@SettingsActivity,
+                        android.R.layout.simple_list_item_single_choice,
+                        filteredItems.map { it.first }.toMutableList()
+                    )
+                    listView.adapter = adapter
+                    listView.choiceMode = android.widget.ListView.CHOICE_MODE_SINGLE
+
+                    // 選中目前的語音
+                    val currentIdx = if (prefs.ttsVoiceName.isEmpty()) 0
+                        else allItems.indexOfFirst { it.second?.name == prefs.ttsVoiceName }.let { if (it >= 0) it else 0 }
+                    listView.setItemChecked(currentIdx, true)
+                    listView.setSelection(currentIdx)
+
+                    val dlg = android.app.AlertDialog.Builder(this@SettingsActivity, android.R.style.Theme_Material_Dialog_Alert)
+                        .setTitle("選擇語音音色 (${sorted.size} 種)")
+                        .setView(dialogLayout)
                         .setOnDismissListener {
-                            // 延遲關閉，讓試聽播完
                             handler.postDelayed({
                                 (btn.tag as? android.speech.tts.TextToSpeech)?.shutdown()
                                 btn.tag = null
                             }, 3000)
                         }
                         .show()
+
+                    // 搜索過濾
+                    searchBox.addTextChangedListener(object : android.text.TextWatcher {
+                        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+                        override fun afterTextChanged(s: android.text.Editable?) {
+                            val q = s?.toString()?.trim()?.lowercase() ?: ""
+                            filteredItems = if (q.isEmpty()) allItems.toMutableList()
+                                else allItems.filter { it.first.lowercase().contains(q) }.toMutableList()
+                            adapter.clear()
+                            adapter.addAll(filteredItems.map { it.first })
+                            adapter.notifyDataSetChanged()
+                        }
+                    })
+
+                    // 點選項目
+                    listView.setOnItemClickListener { _, _, position, _ ->
+                        val item = filteredItems.getOrNull(position) ?: return@setOnItemClickListener
+                        if (item.second == null) {
+                            prefs.ttsVoiceName = ""
+                            (btn as TextView).text = "系統預設"
+                        } else {
+                            val selected = item.second!!
+                            prefs.ttsVoiceName = selected.name
+                            (btn as TextView).text = item.first.take(35)
+
+                            // 試聽選中的語音
+                            val tmpEngine = btn.tag as? android.speech.tts.TextToSpeech
+                            if (tmpEngine != null) {
+                                tmpEngine.voice = selected
+                                tmpEngine.setSpeechRate(prefs.ttsSpeed)
+                                tmpEngine.speak("你好，我是雪凜", android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "preview")
+                            }
+                        }
+                        dlg.dismiss()
+                    }
                 }
             }
             btn.tag = tmpTts
