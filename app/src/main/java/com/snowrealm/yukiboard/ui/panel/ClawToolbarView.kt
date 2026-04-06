@@ -64,6 +64,7 @@ class ClawToolbarView(context: Context) : View(context) {
         SkillButton("yuki_chat", "❄️", "雪凜", "general"),
         SkillButton("mood_diary", "📔", "心情", "general"),
         SkillButton("weather", "🌤️", "天氣", "general"),
+        SkillButton("fraud_detect", "🛡️", "防詐", "general"),
         SkillButton("animation_suggest", "🎬", "動畫", "general")
     )
 

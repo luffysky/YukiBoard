@@ -579,8 +579,11 @@ class KeyboardView(context: Context) : View(context) {
         isSwipeCandidateMode = false
         candidateScrollX = 0f
         highlightedCandidateIndex = -1
-        isCandidateExpanded = false
-        expandScrollOffset = 0f
+        // 有新候選字時保持展開狀態，空候選時收合
+        if (list.isEmpty()) {
+            isCandidateExpanded = false
+            expandScrollOffset = 0f
+        }
         invalidate()
     }
 
@@ -1911,14 +1914,13 @@ class KeyboardView(context: Context) : View(context) {
                         if (index in allCandidates.indices) {
                             onCandidateSpeakListener?.invoke(allCandidates[index])
                             onCandidateSelectListener?.invoke(index)
-                            isCandidateExpanded = false
-                            expandScrollOffset = 0f
+                            // 選字後保持展開，不關閉面板
                             invalidate()
                             performClick()
                             return true
                         }
                     }
-                    // 點擊空白區域收合
+                    // 點擊空白區域（超出候選字範圍）收合
                     isCandidateExpanded = false
                     expandScrollOffset = 0f
                     invalidate()

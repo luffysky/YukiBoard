@@ -39,6 +39,7 @@ class ClawClient(context: Context) {
             "yuki_chat"       -> YukiChatSkill(appContext, provider)
             "mood_diary"      -> MoodDiarySkill(provider)
             "weather"         -> WeatherSkill(appContext, provider)
+            "fraud_detect"    -> FraudDetectSkill(appContext)
             else              -> null
         }
     }
@@ -47,7 +48,8 @@ class ClawClient(context: Context) {
         "ai_prediction", "writer", "translate", "cupid", "context",
         "animation", "whisper", "grammar_check", "tone_adjust", "summarize",
         "meme_text", "emoji_translate", "quick_reply", "code_complete",
-        "regex_gen", "commit_message", "yuki_chat", "mood_diary", "weather"
+        "regex_gen", "commit_message", "yuki_chat", "mood_diary", "weather",
+        "fraud_detect"
     )
 
     /**

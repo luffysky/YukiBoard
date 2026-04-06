@@ -82,9 +82,10 @@ class ClawPanelView(context: Context) : LinearLayout(context) {
     }
 
     private fun executeSkill(skillId: String) {
-        val client = clawClient ?: return
+        val client = clawClient
 
-        if (!client.isAvailable()) {
+        // 防詐偵測不需要 AI key（本地規則引擎），其他 skill 需要
+        if (skillId != "fraud_detect" && (client == null || !client.isAvailable())) {
             onLockTapped?.invoke()
             return
         }
@@ -113,6 +114,12 @@ class ClawPanelView(context: Context) : LinearLayout(context) {
 
         currentJob = scope.launch {
             try {
+                // 防詐偵測：先跑規則引擎，再串流 AI 分析
+                if (skillId == "fraud_detect") {
+                    executeFraudDetect(input.text, client)
+                    return@launch
+                }
+
                 // 嘗試串流模式（邊收邊顯示）
                 val lang = detectInputLanguage(input.text)
                 val systemPrompt = "You are YukiBoard keyboard assistant. Reply in $lang. Be concise."
@@ -121,7 +128,7 @@ class ClawPanelView(context: Context) : LinearLayout(context) {
                 var hasStream = false
 
                 withContext(Dispatchers.IO) {
-                    client.streamSkill(prompt, systemPrompt)
+                    client!!.streamSkill(prompt, systemPrompt)
                 }.collect { chunk ->
                     hasStream = true
                     accumulated.append(chunk)
@@ -141,15 +148,57 @@ class ClawPanelView(context: Context) : LinearLayout(context) {
                 } else {
                     // 串流不可用 → fallback 到一次性執行
                     val output = withContext(Dispatchers.IO) {
-                        client.executeSkill(skillId, input)
+                        client!!.executeSkill(skillId, input)
                     }
                     resultView.showResults(output.suggestions)
                 }
                 // 更新 token 額度
-                toolbarView.remainingTokens = client.getRemainingTokens()
+                toolbarView.remainingTokens = client?.getRemainingTokens() ?: 0
             } catch (e: Exception) {
                 resultView.showError(e.message ?: "執行失敗")
             }
+        }
+    }
+
+    /**
+     * 防詐偵測流程：A 層規則引擎（即時）→ B 層 AI 串流分析（風險 ≥ 30）
+     */
+    private suspend fun executeFraudDetect(text: String, client: ClawClient?) {
+        val analyzer = com.snowrealm.yukiboard.security.FraudAIAnalyzer(context)
+
+        // A 層：本地規則引擎（< 1ms）
+        val ruleResult = withContext(Dispatchers.Default) {
+            analyzer.analyzeByRules(text)
+        }
+        val ruleText = analyzer.formatRuleResult(ruleResult)
+        resultView.showStreamingText(ruleText)
+
+        // B 層：風險 ≥ 30 且有 AI → 串流深度分析
+        if (ruleResult.riskScore >= 30 && client != null && client.isAvailable()) {
+            val accumulated = StringBuilder()
+            accumulated.appendLine(ruleText)
+            accumulated.appendLine()
+            accumulated.appendLine("── AI 深度分析 ──")
+
+            try {
+                val flow = withContext(Dispatchers.IO) {
+                    analyzer.analyzeByAI(text, client, ruleResult)
+                }
+                flow.collect { chunk ->
+                    accumulated.append(chunk)
+                    withContext(Dispatchers.Main) {
+                        resultView.showStreamingText(accumulated.toString())
+                    }
+                }
+            } catch (_: Exception) {
+                accumulated.appendLine("\n(AI 分析不可用，僅顯示規則引擎結果)")
+            }
+
+            resultView.showResults(listOf(accumulated.toString()))
+            toolbarView.remainingTokens = client.getRemainingTokens()
+        } else {
+            // 只顯示規則結果
+            resultView.showResults(listOf(ruleText))
         }
     }
 

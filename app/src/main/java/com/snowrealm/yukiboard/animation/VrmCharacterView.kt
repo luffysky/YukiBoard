@@ -1,11 +1,9 @@
 package com.snowrealm.yukiboard.animation
 
 import android.content.Context
-import android.graphics.PixelFormat
 import android.util.AttributeSet
 import android.view.Choreographer
-import android.view.SurfaceHolder
-import android.view.SurfaceView
+import android.view.TextureView
 import com.google.android.filament.*
 import com.google.android.filament.android.DisplayHelper
 import com.google.android.filament.android.UiHelper
@@ -36,7 +34,7 @@ class VrmCharacterView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0
-) : SurfaceView(context, attrs, defStyleAttr) {
+) : TextureView(context, attrs, defStyleAttr) {
 
     companion object {
         init {
@@ -143,10 +141,9 @@ class VrmCharacterView @JvmOverloads constructor(
     }
 
     init {
-        setZOrderOnTop(true)
         isClickable = false
         isFocusable = false
-        holder.setFormat(PixelFormat.TRANSLUCENT)
+        isOpaque = false
 
         initFilament()
     }
