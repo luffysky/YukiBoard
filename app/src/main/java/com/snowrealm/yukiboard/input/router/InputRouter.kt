@@ -31,10 +31,10 @@ class InputRouter(private val context: Context) {
         userDict = userDict
     )
     private val pinyinEngine: InputEngine by lazy { PinyinInputEngine() }
-    private val cangjieEngine: InputEngine by lazy { CangjieInputEngine(speedMode = false) }
-    private val speedCangjieEngine: InputEngine by lazy { CangjieInputEngine(speedMode = true) }
-    private val japaneseEngine: InputEngine by lazy { JapaneseInputEngine() }
-    private val koreanEngine: InputEngine by lazy { KoreanInputEngine() }
+    private val cangjieEngine: InputEngine by lazy { CangjieInputEngine(speedMode = false, context = context) }
+    private val speedCangjieEngine: InputEngine by lazy { CangjieInputEngine(speedMode = true, context = context) }
+    private val japaneseEngine: InputEngine by lazy { JapaneseInputEngine(context) }
+    private val koreanEngine: InputEngine by lazy { KoreanInputEngine(context) }
 
     val candidateManager = CandidateManager()
     val smartInput = SmartInputManager(context)
@@ -274,24 +274,57 @@ class InputRouter(private val context: Context) {
 
         val result = when (val eng = activeEngine) {
             is ChewingInputEngine -> {
-                val engineIndex = if (displayedText != null) eng.getCandidates().indexOf(displayedText).takeIf { it >= 0 } ?: index else index
-                eng.selectCandidateAt(engineIndex)
+                val engineIndex = if (displayedText != null) eng.getCandidates().indexOf(displayedText).takeIf { it >= 0 } else null
+                if (engineIndex != null) {
+                    eng.selectCandidateAt(engineIndex)
+                } else if (displayedText != null) {
+                    // 候選來自整句預測/上下文等，不在引擎內 → 直接 commit
+                    eng.reset()
+                    candidateManager.clear()
+                    onTextCommitted(displayedText)
+                    smartInput.onCandidateHit()
+                    return InputResult.CommitText(displayedText)
+                } else InputResult.Idle
             }
             is PinyinInputEngine -> {
-                val engineIndex = if (displayedText != null) eng.getCandidates().indexOf(displayedText).takeIf { it >= 0 } ?: index else index
-                eng.selectCandidateAt(engineIndex)
+                val engineIndex = if (displayedText != null) eng.getCandidates().indexOf(displayedText).takeIf { it >= 0 } else null
+                if (engineIndex != null) {
+                    eng.selectCandidateAt(engineIndex)
+                } else if (displayedText != null) {
+                    eng.reset(); candidateManager.clear()
+                    onTextCommitted(displayedText); smartInput.onCandidateHit()
+                    return InputResult.CommitText(displayedText)
+                } else InputResult.Idle
             }
             is CangjieInputEngine -> {
-                val engineIndex = if (displayedText != null) eng.getCandidates().indexOf(displayedText).takeIf { it >= 0 } ?: index else index
-                eng.selectCandidateAt(engineIndex)
+                val engineIndex = if (displayedText != null) eng.getCandidates().indexOf(displayedText).takeIf { it >= 0 } else null
+                if (engineIndex != null) {
+                    eng.selectCandidateAt(engineIndex)
+                } else if (displayedText != null) {
+                    eng.reset(); candidateManager.clear()
+                    onTextCommitted(displayedText); smartInput.onCandidateHit()
+                    return InputResult.CommitText(displayedText)
+                } else InputResult.Idle
             }
             is JapaneseInputEngine -> {
-                val engineIndex = if (displayedText != null) eng.getCandidates().indexOf(displayedText).takeIf { it >= 0 } ?: index else index
-                eng.selectCandidateAt(engineIndex)
+                val engineIndex = if (displayedText != null) eng.getCandidates().indexOf(displayedText).takeIf { it >= 0 } else null
+                if (engineIndex != null) {
+                    eng.selectCandidateAt(engineIndex)
+                } else if (displayedText != null) {
+                    eng.reset(); candidateManager.clear()
+                    onTextCommitted(displayedText); smartInput.onCandidateHit()
+                    return InputResult.CommitText(displayedText)
+                } else InputResult.Idle
             }
             is KoreanInputEngine -> {
-                val engineIndex = if (displayedText != null) eng.getCandidates().indexOf(displayedText).takeIf { it >= 0 } ?: index else index
-                eng.selectCandidateAt(engineIndex)
+                val engineIndex = if (displayedText != null) eng.getCandidates().indexOf(displayedText).takeIf { it >= 0 } else null
+                if (engineIndex != null) {
+                    eng.selectCandidateAt(engineIndex)
+                } else if (displayedText != null) {
+                    eng.reset(); candidateManager.clear()
+                    onTextCommitted(displayedText); smartInput.onCandidateHit()
+                    return InputResult.CommitText(displayedText)
+                } else InputResult.Idle
             }
             else -> {
                 // 英文：通用候選選擇（含 fallback）
@@ -488,14 +521,21 @@ class InputRouter(private val context: Context) {
             }
 
             // 有 composing 才做整句預測
+            // 過濾非 CJK 候選（防止英文詞透過學習模型洩漏到中文/日文/韓文模式）
+            val isCjkMode = currentMode in setOf(
+                InputMode.BOPOMOFO, InputMode.PINYIN, InputMode.CANGJIE,
+                InputMode.SPEED_CANGJIE, InputMode.JAPANESE, InputMode.KOREAN, InputMode.AUTO
+            )
             val sentenceSuggestions = if (composing.isNotEmpty()) {
                 smartInput.getSentencePredictions(contextBeforeCursor, composing, 3)
+                    .let { if (isCjkMode) it.filter { s -> s.any { c -> c.code > 0x2E80 } } else it }
             } else emptyList()
 
             if (raw.size > 1) {
                 val contextWords = extractContextWords(contextBeforeCursor)
                 val contextPredictions = if (contextWords.isNotEmpty()) {
                     smartInput.predictWithContext(contextWords, 10)
+                        .let { if (isCjkMode) it.filter { w -> w.any { c -> c.code > 0x2E80 } } else it }
                         .withIndex()
                         .associate { (i, w) -> w to (10f - i).coerceAtLeast(1f) }
                 } else emptyMap()

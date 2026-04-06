@@ -1,6 +1,10 @@
 package com.snowrealm.yukiboard.input.engine
 
+import android.content.Context
+import com.snowrealm.yukiboard.R
 import com.snowrealm.yukiboard.input.router.InputResult
+import java.io.BufferedReader
+import java.io.InputStreamReader
 
 /**
  * 日本語輸入引擎。
@@ -8,7 +12,7 @@ import com.snowrealm.yukiboard.input.router.InputResult
  * 功能：
  * - ローマ字→ひらがな即時変換（全標準音節 + 拗音 + 促音 + 撥音）
  * - ひらがな⇔カタカナ切替
- * - 漢字候補表示（スペースキーで変換、内蔵辞書 ~2000 語）
+ * - 漢字候補表示（スペースキーで変換、辞書 ~5000 語）
  * - 候補選択（selectCandidateAt）
  *
  * 設計：
@@ -18,7 +22,9 @@ import com.snowrealm.yukiboard.input.router.InputResult
  * - Space で漢字変換モードへ遷移、候補リストを生成
  * - Enter で仮名のまま確定
  */
-class JapaneseInputEngine : InputEngine {
+class JapaneseInputEngine(context: Context? = null) : InputEngine {
+
+    private val kanjiDictionary: Map<String, List<String>> = loadKanjiDictionary(context)
 
     // ── State ──────────────────────────────────────────────
 
@@ -336,7 +342,7 @@ class JapaneseInputEngine : InputEngine {
         val results = mutableListOf<String>()
 
         // Exact match
-        KANJI_DICTIONARY[reading]?.let { results.addAll(it) }
+        kanjiDictionary[reading]?.let { results.addAll(it) }
 
         // If no exact match, try substring matches for compound words
         if (results.isEmpty() && reading.length > 1) {
@@ -368,7 +374,7 @@ class JapaneseInputEngine : InputEngine {
             val maxLen = minOf(reading.length - pos, 8)
             for (len in maxLen downTo 1) {
                 val segment = reading.substring(pos, pos + len)
-                val entry = KANJI_DICTIONARY[segment]
+                val entry = kanjiDictionary[segment]
                 if (entry != null) {
                     parts.add(entry)
                     pos += len
@@ -678,13 +684,38 @@ class JapaneseInputEngine : InputEngine {
             put("-", "ー")
         }
 
-        // ── Kanji Dictionary (~2000 common words) ──────────
-        //
-        // Format: hiragana reading → list of kanji/words sorted by frequency.
-        // This is a built-in starter dictionary; a production deployment would
-        // load a much larger dictionary from assets.
+        /**
+         * 從 res/raw/ja_kanji_dict.txt 載入漢字辭書。
+         * 格式：reading\tkanji1 kanji2 kanji3 ...
+         */
+        fun loadKanjiDictionary(context: Context?): Map<String, List<String>> {
+            if (context != null) {
+                try {
+                    val map = mutableMapOf<String, List<String>>()
+                    val input = context.resources.openRawResource(R.raw.ja_kanji_dict)
+                    BufferedReader(InputStreamReader(input, Charsets.UTF_8)).use { reader ->
+                        reader.forEachLine { line ->
+                            if (line.isNotBlank() && !line.startsWith('#')) {
+                                val parts = line.split('\t', limit = 2)
+                                if (parts.size == 2) {
+                                    val reading = parts[0].trim()
+                                    val words = parts[1].trim().split(' ')
+                                        .filter { it.isNotBlank() }
+                                    if (reading.isNotEmpty() && words.isNotEmpty()) {
+                                        map[reading] = words
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (map.size > 100) return map
+                } catch (_: Exception) { /* fall through to built-in */ }
+            }
+            return BUILTIN_KANJI_DICTIONARY
+        }
 
-        private val KANJI_DICTIONARY: Map<String, List<String>> = buildMap(2200) {
+        /** 内蔵フォールバック辞書（ファイル読込失敗時用） */
+        private val BUILTIN_KANJI_DICTIONARY: Map<String, List<String>> = buildMap(2200) {
 
             // ── Single-kanji high-frequency ────────────────
             put("ひ", listOf("日", "火", "陽", "灯"))

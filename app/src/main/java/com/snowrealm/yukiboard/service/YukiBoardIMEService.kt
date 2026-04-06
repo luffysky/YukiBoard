@@ -342,6 +342,7 @@ class YukiBoardIMEService : InputMethodService() {
                 }
                 swipeInputPending = false
                 swipeInputCandidates = emptyList()
+                swipeAccumulated.clear()
                 keyboardView.updateComposingText("")
                 keyboardView.updateCandidates(emptyList())
                 return@setOnCandidateSelectListener
@@ -2023,20 +2024,65 @@ class YukiBoardIMEService : InputMethodService() {
         val candidates = inputRouter.swipeSuggest(labels)
 
         if (candidates.isNotEmpty()) {
-            // 顯示滑動軌跡對應的注音/字母作為 composing text
-            val composing = labels.joinToString("")
-            keyboardView.updateComposingText(composing)
-            keyboardView.updateCandidates(candidates)
+            // 累積這次滑動的候選
+            swipeAccumulated.add(candidates)
+
+            // 組合候選字列表：多段滑動組合 + 各段候選
+            val combined = buildSwipeCombinedCandidates()
+
+            // composing text 顯示所有段的滑動軌跡
+            keyboardView.updateComposingText("…")
+            keyboardView.updateCandidates(combined)
             keyboardView.markSwipeCandidates(true)
 
-            // 標記正在滑動輸入模式，選字時直接 commit（不走 InputRouter）
             swipeInputPending = true
-            swipeInputCandidates = candidates
+            swipeInputCandidates = combined
         }
+    }
+
+    /**
+     * 多段滑動候選組合：
+     * 假設累積了 [["今","金"], ["天","添"]]
+     * 組合出 ["今天","金天","今添", "今","金","天","添"]
+     */
+    private fun buildSwipeCombinedCandidates(): List<String> {
+        if (swipeAccumulated.isEmpty()) return emptyList()
+        if (swipeAccumulated.size == 1) return swipeAccumulated[0]
+
+        val result = mutableListOf<String>()
+
+        // 1. 組合前面所有段的 top 候選 + 最新段的各候選
+        //    例如 [今,金] + [天,添] → 今天, 今添, 金天
+        val prefixParts = swipeAccumulated.dropLast(1)
+        val lastPart = swipeAccumulated.last()
+
+        // 取前段 top-1 組成前綴
+        val bestPrefix = prefixParts.joinToString("") { it.firstOrNull() ?: "" }
+        // 最後一段各候選組合
+        for (c in lastPart.take(8)) {
+            val combo = bestPrefix + c
+            if (combo !in result) result.add(combo)
+        }
+        // 2. 取前段的替代組合（每段取 top-2）
+        if (prefixParts.size == 1 && prefixParts[0].size > 1) {
+            for (altIdx in 1 until minOf(3, prefixParts[0].size)) {
+                val altPrefix = prefixParts[0][altIdx]
+                val combo = altPrefix + (lastPart.firstOrNull() ?: "")
+                if (combo !in result) result.add(combo)
+            }
+        }
+        // 3. 附加最新段的單獨候選（方便使用者只選最後一個字）
+        for (c in lastPart.take(5)) {
+            if (c !in result) result.add(c)
+        }
+
+        return result
     }
 
     private var swipeInputPending = false
     private var swipeInputCandidates: List<String> = emptyList()
+    /** 累積的滑動候選（每次滑動產生的候選列表） */
+    private val swipeAccumulated = mutableListOf<List<String>>()
 
     private fun handleKeyPress(keyCode: Int, label: String) {
         // F-12: 語音輸入中按鍵先停止語音，避免 partial result 互蓋
@@ -2047,6 +2093,7 @@ class YukiBoardIMEService : InputMethodService() {
         if (swipeInputPending) {
             swipeInputPending = false
             swipeInputCandidates = emptyList()
+            swipeAccumulated.clear()
         }
         // 翻譯面板輸入模式：CJK 走 InputRouter，英文直接輸入
         val tp = translatePanel

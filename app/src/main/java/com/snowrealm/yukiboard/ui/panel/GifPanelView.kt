@@ -83,8 +83,7 @@ class GifPanelView(context: Context) : View(context) {
         val w = MeasureSpec.getSize(widthMeasureSpec).let {
             if (it > 0) it else resources.displayMetrics.widthPixels
         }
-        // 輸入模式時只顯示搜尋列，讓鍵盤有更多空間
-        val h = if (isInputMode) searchBarH.toInt() else (200 * density).toInt()
+        val h = (200 * density).toInt()
         setMeasuredDimension(w, h)
     }
 
@@ -339,7 +338,6 @@ class GifPanelView(context: Context) : View(context) {
                             isInputMode = true
                             inputBuffer.clear()
                             if (searchQuery.isNotEmpty()) inputBuffer.append(searchQuery)
-                            requestLayout()
                             invalidate()
                         }
                         performClick()
@@ -405,14 +403,12 @@ class GifPanelView(context: Context) : View(context) {
         if (!isInputMode) return
         if (inputBuffer.isNotEmpty()) {
             isInputMode = false
-            requestLayout()
             search(inputBuffer.toString())
         }
     }
 
     fun exitInputMode() {
         isInputMode = false
-        requestLayout()
         invalidate()
     }
 

@@ -1,6 +1,10 @@
 package com.snowrealm.yukiboard.input.engine
 
+import android.content.Context
+import com.snowrealm.yukiboard.R
 import com.snowrealm.yukiboard.input.router.InputResult
+import java.io.BufferedReader
+import java.io.InputStreamReader
 
 /**
  * 倉頡/速成輸入引擎。
@@ -24,7 +28,12 @@ import com.snowrealm.yukiboard.input.router.InputResult
  *
  * @param speedMode true = 速成模式（首尾碼匹配），false = 完整倉頡模式
  */
-class CangjieInputEngine(private val speedMode: Boolean = false) : InputEngine {
+class CangjieInputEngine(private val speedMode: Boolean = false, context: Context? = null) : InputEngine {
+
+    init {
+        // 嘗試從檔案載入更大的字典
+        if (context != null) CangjieDict.loadFromResource(context)
+    }
 
     companion object {
         /** 有效倉頡字母（x 不使用） */
@@ -178,13 +187,52 @@ class CangjieInputEngine(private val speedMode: Boolean = false) : InputEngine {
 internal object CangjieDict {
 
     /** 碼 → 字列表 */
-    private val dict: Map<String, List<String>> by lazy { buildDict() }
+    private var dict: Map<String, List<String>> = emptyMap()
+        get() { if (field.isEmpty()) field = buildDict(); return field }
 
     /** 速成用：(首碼, 尾碼) → 字列表 */
-    private val speedIndex: Map<Pair<Char, Char>, List<String>> by lazy { buildSpeedIndex() }
+    private var speedIndex: Map<Pair<Char, Char>, List<String>> = emptyMap()
+        get() { if (field.isEmpty()) field = buildSpeedIndex(); return field }
 
     /** 首碼 → 字列表（速成 1 碼用） */
-    private val prefixIndex: Map<Char, List<String>> by lazy { buildPrefixIndex() }
+    private var prefixIndex: Map<Char, List<String>> = emptyMap()
+        get() { if (field.isEmpty()) field = buildPrefixIndex(); return field }
+
+    /** 從 res/raw/cangjie_dict.txt 載入更大字典 */
+    fun loadFromResource(context: Context) {
+        try {
+            val result = mutableMapOf<String, MutableList<String>>()
+            val input = context.resources.openRawResource(R.raw.cangjie_dict)
+            BufferedReader(InputStreamReader(input, Charsets.UTF_8)).use { reader ->
+                reader.forEachLine { line ->
+                    val trimmed = line.trim()
+                    if (trimmed.isEmpty() || trimmed.startsWith('#')) return@forEachLine
+                    val spaceIdx = trimmed.indexOf(' ')
+                    if (spaceIdx < 1) return@forEachLine
+                    val code = trimmed.substring(0, spaceIdx)
+                    val chars = trimmed.substring(spaceIdx + 1)
+                    val list = result.getOrPut(code) { mutableListOf() }
+                    for (ch in chars) {
+                        if (!ch.isWhitespace() && ch.toString() !in list) {
+                            list.add(ch.toString())
+                        }
+                    }
+                }
+            }
+            if (result.size > 100) {
+                // 合併內建字典（確保不遺漏）
+                for ((code, builtinChars) in buildDict()) {
+                    val fileChars = result.getOrPut(code) { mutableListOf() }
+                    for (c in builtinChars) {
+                        if (c !in fileChars) fileChars.add(c)
+                    }
+                }
+                dict = result
+                speedIndex = emptyMap()  // 觸發重建
+                prefixIndex = emptyMap()
+            }
+        } catch (_: Exception) { /* 使用內建字典 */ }
+    }
 
     fun lookup(code: String): List<String> = dict[code] ?: emptyList()
 

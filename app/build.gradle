@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 86
-        versionName "0.9.20"
+        versionCode 87
+        versionName "0.9.21"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,11 +82,14 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 翻譯面板輸入框支援中文注音輸入（組字+選字）\n" +
-                    "- feat: 翻譯結果「插入」按鈕 — 一鍵推送到 App 輸入框\n" +
-                    "- feat: libchewing 詞庫合併（+29K 字詞、+75K 詞組）\n" +
-                    "- feat: 統一詞庫調度 + 中文自動學詞\n" +
-                    "- fix: 歷史候選字 auto-archive 修正"
+                    "- feat: RIME 拼音詞庫合併（+58K 字詞、+14K 詞組）\n" +
+                    "- feat: 五語詞庫大擴充（英 50K / 韓 2.6K / 倉頡 5K）\n" +
+                    "- fix: 候選字排序 — 當前候選排前、歷史排後\n" +
+                    "- fix: 注音選字殘留 — 整句預測候選直接 commit\n" +
+                    "- fix: CJK 模式過濾英文洩漏候選\n" +
+                    "- feat: 滑動輸入多段累加候選\n" +
+                    "- fix: GIF 面板搜尋框不再跳掉\n" +
+                    "- chore: 移除設定「直打注音」（已整合至鍵盤）"
             }
         }
         debug {
@@ -95,11 +98,14 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 翻譯面板輸入框支援中文注音輸入（組字+選字）\n" +
-                    "- feat: 翻譯結果「插入」按鈕 — 一鍵推送到 App 輸入框\n" +
-                    "- feat: libchewing 詞庫合併（+29K 字詞、+75K 詞組）\n" +
-                    "- feat: 統一詞庫調度 + 中文自動學詞\n" +
-                    "- fix: 歷史候選字 auto-archive 修正"
+                    "- feat: RIME 拼音詞庫合併（+58K 字詞、+14K 詞組）\n" +
+                    "- feat: 五語詞庫大擴充（英 50K / 韓 2.6K / 倉頡 5K）\n" +
+                    "- fix: 候選字排序 — 當前候選排前、歷史排後\n" +
+                    "- fix: 注音選字殘留 — 整句預測候選直接 commit\n" +
+                    "- fix: CJK 模式過濾英文洩漏候選\n" +
+                    "- feat: 滑動輸入多段累加候選\n" +
+                    "- fix: GIF 面板搜尋框不再跳掉\n" +
+                    "- chore: 移除設定「直打注音」（已整合至鍵盤）"
             }
         }
     }

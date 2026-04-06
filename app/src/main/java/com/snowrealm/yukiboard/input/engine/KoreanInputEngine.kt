@@ -1,6 +1,10 @@
 package com.snowrealm.yukiboard.input.engine
 
+import android.content.Context
+import com.snowrealm.yukiboard.R
 import com.snowrealm.yukiboard.input.router.InputResult
+import java.io.BufferedReader
+import java.io.InputStreamReader
 
 /**
  * Korean (Hangul) input engine implementing the standard 2-set Dubeolsik (두벌식) keyboard layout.
@@ -15,7 +19,9 @@ import com.snowrealm.yukiboard.input.router.InputResult
  * Supports compound vowels (ㅘ, ㅙ, ㅚ, ㅝ, ㅞ, ㅟ, ㅢ) and compound jongsung
  * (ㄳ, ㄵ, ㄶ, ㄺ, ㄻ, ㄼ, ㄽ, ㄾ, ㄿ, ㅀ, ㅄ).
  */
-class KoreanInputEngine : InputEngine {
+class KoreanInputEngine(context: Context? = null) : InputEngine {
+
+    private val wordDictionary: List<String> = loadKoreanWords(context)
 
     // ──────────────────────────────────────────────────────────────
     // Tables
@@ -174,54 +180,36 @@ class KoreanInputEngine : InputEngine {
         private fun isConsonant(jamo: Char): Boolean = jamo in CONSONANTS
         private fun isVowel(jamo: Char): Boolean = jamo in VOWELS
 
-        /** 韓文常用詞庫（前綴匹配用） */
-        val KOREAN_DICTIONARY = listOf(
-            // 人稱
+        /** 從 res/raw/ko_words.txt 載入韓文詞庫 */
+        fun loadKoreanWords(context: Context?): List<String> {
+            if (context != null) {
+                try {
+                    val words = mutableListOf<String>()
+                    val input = context.resources.openRawResource(R.raw.ko_words)
+                    BufferedReader(InputStreamReader(input, Charsets.UTF_8)).use { reader ->
+                        reader.forEachLine { line ->
+                            val w = line.trim()
+                            if (w.isNotEmpty() && !w.startsWith('#')) words.add(w)
+                        }
+                    }
+                    if (words.size > 100) return words
+                } catch (_: Exception) { /* fall through */ }
+            }
+            return BUILTIN_KOREAN_WORDS
+        }
+
+        private val BUILTIN_KOREAN_WORDS = listOf(
             "나", "너", "우리", "저", "그", "그녀", "사람", "친구",
-            // 問候
-            "안녕", "안녕하세요", "감사합니다", "고맙습니다", "죄송합니다", "미안합니다",
-            "반갑습니다", "잘 부탁합니다", "네", "아니요",
-            // 日常
-            "오늘", "내일", "어제", "지금", "이것", "그것", "저것", "여기", "거기", "저기",
-            "시간", "날씨", "학교", "회사", "집", "가족", "음식", "물", "밥", "커피",
-            // 動詞
-            "하다", "가다", "오다", "보다", "먹다", "마시다", "읽다", "쓰다", "듣다",
-            "말하다", "있다", "없다", "알다", "모르다", "좋다", "싫다", "원하다", "필요하다",
-            "생각하다", "느끼다", "사랑하다", "만나다", "기다리다", "배우다", "가르치다",
-            "일하다", "쉬다", "자다", "일어나다", "운동하다", "공부하다", "놀다",
-            // 形容詞
-            "좋은", "나쁜", "큰", "작은", "많은", "적은", "새로운", "오래된",
-            "빠른", "느린", "쉬운", "어려운", "예쁜", "멋진", "재미있는", "재미없는",
-            "맛있는", "맛없는", "따뜻한", "차가운", "뜨거운", "시원한",
-            // 數字
+            "안녕", "안녕하세요", "감사합니다", "고맙습니다", "죄송합니다",
+            "오늘", "내일", "어제", "지금", "시간", "날씨", "학교", "회사", "집",
+            "하다", "가다", "오다", "보다", "먹다", "마시다", "읽다", "쓰다",
+            "말하다", "있다", "없다", "알다", "모르다", "좋다", "싫다",
+            "좋은", "나쁜", "큰", "작은", "많은", "적은", "새로운",
             "하나", "둘", "셋", "넷", "다섯", "여섯", "일곱", "여덟", "아홉", "열",
-            "백", "천", "만",
-            // 時間
-            "월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일",
-            "아침", "점심", "저녁", "오전", "오후", "밤",
-            "일월", "이월", "삼월", "사월", "오월", "유월", "칠월", "팔월",
-            "구월", "시월", "십일월", "십이월",
-            // 場所
-            "서울", "부산", "인천", "대구", "광주", "대전", "울산", "제주",
-            "한국", "일본", "중국", "미국", "영국",
-            "병원", "은행", "마트", "식당", "카페", "공항", "역", "호텔",
-            // 食物
-            "김치", "불고기", "비빔밥", "된장찌개", "김밥", "떡볶이", "삼겹살", "치킨", "라면",
-            // 交通
-            "버스", "지하철", "택시", "비행기", "기차", "자동차", "자전거",
-            // 科技
-            "컴퓨터", "인터넷", "핸드폰", "게임", "사진", "동영상", "음악", "영화",
-            "프로그램", "앱", "웹사이트", "이메일", "메시지", "전화",
-            // 常用表達
-            "괜찮아요", "잠깐만요", "어떻게", "왜", "어디", "언제", "누가",
-            "얼마", "무엇", "어떤",
-            "정말", "진짜", "아마", "물론", "그래서", "그런데", "하지만",
-            "그리고", "또는", "때문에",
-            // SNS
-            "ㅋㅋㅋ", "ㅎㅎㅎ", "ㅠㅠ", "대박", "화이팅", "힘내세요",
-            "축하합니다", "잘했어", "수고했어", "사랑해", "보고싶어",
-            // 敬語
-            "감사드립니다", "실례합니다", "수고하셨습니다", "안녕히가세요", "안녕히계세요"
+            "서울", "부산", "한국", "일본", "중국", "미국",
+            "김치", "불고기", "비빔밥", "떡볶이", "치킨", "라면",
+            "컴퓨터", "인터넷", "핸드폰", "게임", "사진", "음악", "영화",
+            "정말", "진짜", "대박", "화이팅", "사랑해"
         )
     }
 
@@ -371,7 +359,7 @@ class KoreanInputEngine : InputEngine {
         val current = composingText
         if (current.isEmpty()) return emptyList()
         // 前綴匹配詞庫
-        val exact = KOREAN_DICTIONARY.filter { it.startsWith(current) && it != current }.take(8)
+        val exact = wordDictionary.filter { it.startsWith(current) && it != current }.take(8)
         if (exact.isNotEmpty()) return exact
         // 查無結果 → Jamo 鄰近鍵容錯
         return fuzzyCorrectKorean(current, 5)
@@ -431,7 +419,7 @@ class KoreanInputEngine : InputEngine {
                         jungsungIdx * JONGSUNG_COUNT + jongsungIdx
                     val altChar = (HANGUL_BASE + altCode).toChar()
                     val altWord = input.substring(0, charIdx) + altChar + input.substring(charIdx + 1)
-                    KOREAN_DICTIONARY.filter { it.startsWith(altWord) }.take(2)
+                    wordDictionary.filter { it.startsWith(altWord) }.take(2)
                         .forEach { results.add(it) }
                 }
             }
@@ -444,7 +432,7 @@ class KoreanInputEngine : InputEngine {
                         altIdx * JONGSUNG_COUNT + jongsungIdx
                     val altChar = (HANGUL_BASE + altCode).toChar()
                     val altWord = input.substring(0, charIdx) + altChar + input.substring(charIdx + 1)
-                    KOREAN_DICTIONARY.filter { it.startsWith(altWord) }.take(2)
+                    wordDictionary.filter { it.startsWith(altWord) }.take(2)
                         .forEach { results.add(it) }
                 }
             }
