@@ -401,10 +401,19 @@ class YukiBoardIMEService : InputMethodService() {
         keyboardView.setOnLanguageSelectedListener { option ->
             when (option) {
                 is RadialLanguageMenu.LanguageOption.Language -> {
-                    inputRouter.switchTo(option.mode)
+                    val mode = option.mode
+                    // AUTO 模式：同步設定 + 顯示注音佈局（中英都能用）
+                    if (mode == InputMode.AUTO) {
+                        prefs.autoInputMode = true
+                    } else if (prefs.autoInputMode) {
+                        // 手動選了其他語言 → 關閉 AUTO
+                        prefs.autoInputMode = false
+                    }
+                    inputRouter.switchTo(mode)
                     characterView?.playSwitchLang()
-                    keyboardView.currentInputMode = option.mode
-                    keyboardView.updateKeyRows(rowsForInputMode(option.mode))
+                    keyboardView.currentInputMode = mode
+                    keyboardView.updateKeyRows(rowsForInputMode(mode))
+                    keyboardView.showToast(if (mode == InputMode.AUTO) "⚡ 已啟動智慧輸入法" else mode.displayName)
                 }
                 is RadialLanguageMenu.LanguageOption.Emoji -> {
                     // 切換到 Emoji 面板
@@ -2241,7 +2250,7 @@ class YukiBoardIMEService : InputMethodService() {
                 }
             }
         }
-        keyboardView.updateCandidates(candidates)
+        keyboardView.updateCandidates(candidates, inputRouter.candidateSourceMap)
 
         // AI 候選字 debounce：有組字或上下文時觸發
         requestAICandidates()
@@ -2405,6 +2414,11 @@ class YukiBoardIMEService : InputMethodService() {
         }
         ic?.finishComposingText()
 
+        // AUTO 模式下短按切換 → 退出 AUTO，回到正常循環
+        if (inputRouter.inputMode == InputMode.AUTO) {
+            prefs.autoInputMode = false
+        }
+
         inputRouter.toggleLanguage()
         characterView?.playSwitchLang()
         keyboardView.currentInputMode = inputRouter.inputMode
@@ -2420,6 +2434,8 @@ class YukiBoardIMEService : InputMethodService() {
         com.snowrealm.yukiboard.input.router.InputMode.SPEED_CANGJIE -> KeyboardState.cangjieRows()
         com.snowrealm.yukiboard.input.router.InputMode.JAPANESE -> KeyboardState.japaneseRows()
         com.snowrealm.yukiboard.input.router.InputMode.KOREAN -> KeyboardState.koreanRows()
+        // AUTO 模式用注音佈局（中英都能打，自動辨識）
+        com.snowrealm.yukiboard.input.router.InputMode.AUTO -> KeyboardState.bopomofoRows()
         else -> KeyboardState.defaultQwertyRows()
     }
 

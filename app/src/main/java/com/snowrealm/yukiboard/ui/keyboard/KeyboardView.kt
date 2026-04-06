@@ -968,6 +968,17 @@ class KeyboardView(context: Context) : View(context) {
             fixedLeft += composingPaint.measureText(displayText) + 8f * density
         }
 
+        // AUTO 模式提示（候選字為空且無組字時顯示）
+        if (candidates.isEmpty() && composingText.isEmpty()
+            && currentInputMode == com.snowrealm.yukiboard.input.router.InputMode.AUTO) {
+            altHintPaint.color = (theme.candidateTextColorInt and 0x00FFFFFF) or 0x66000000
+            altHintPaint.textSize = 12f * density
+            altHintPaint.textAlign = Paint.Align.LEFT
+            canvas.drawText("已啟動智慧輸入法", fixedLeft, candidateBarHeight * 0.65f, altHintPaint)
+            altHintPaint.textSize = 10f * density
+            return
+        }
+
         // 候選字區域（橫向捲動）
         if (candidates.isEmpty()) return
 
@@ -1011,6 +1022,7 @@ class KeyboardView(context: Context) : View(context) {
 
             if (right > fixedLeft && left < width.toFloat() - arrowSpace) {
                 // 候選字來源色彩（滑動模式統一淡紫色）
+                val isHistory = candidateSourceMap[text] == CandidateSource.HISTORY
                 val sourceColor = if (isSwipeCandidateMode) 0xFFB39DDB.toInt()
                 else when (candidateSourceMap[text]) {
                     CandidateSource.CORRECTION -> 0xFFFF9933.toInt()  // 橙色：糾錯
@@ -1019,10 +1031,14 @@ class KeyboardView(context: Context) : View(context) {
                     CandidateSource.USER_DICT  -> 0xFFFFD700.toInt()  // 金色：使用者詞庫
                     CandidateSource.SENTENCE   -> 0xFFBB88FF.toInt()  // 紫色：整句
                     CandidateSource.AI         -> 0xFFE8B84D.toInt()  // 金色：AI ✨
+                    CandidateSource.HISTORY    -> 0 // 歷史候選用淡化主題色
                     else -> 0 // DICTIONARY 或無來源 → 用主題預設色
                 }
 
-                if (i == 0 && candidates.size > 1) {
+                if (isHistory) {
+                    // 歷史候選字：淡化顯示（alpha 50%）
+                    candidatePaint.color = (theme.candidateTextColorInt and 0x00FFFFFF) or 0x80000000.toInt()
+                } else if (i == 0 && candidates.size > 1) {
                     keyPaint.color = if (sourceColor != 0) sourceColor else theme.candidateSelectedColorInt
                     keyPaint.alpha = 40
                     val pill = RectF(left + 2 * density, 4 * density, right - 2 * density, candidateBarHeight - 4 * density)
@@ -1170,12 +1186,14 @@ class KeyboardView(context: Context) : View(context) {
             canvas.drawRoundRect(rect, 6 * density, 6 * density, keyPaint)
 
             // 候選字文字（來源色彩）
+            val isHistoryItem = candidateSourceMap[text] == CandidateSource.HISTORY
             val srcColor = when (candidateSourceMap[text]) {
                 CandidateSource.CORRECTION -> 0xFFFF9933.toInt()
                 CandidateSource.ADAPTIVE   -> 0xFF66CC88.toInt()
                 CandidateSource.PREDICTION -> 0xFF66AAFF.toInt()
                 CandidateSource.USER_DICT  -> 0xFFFFD700.toInt()
                 CandidateSource.SENTENCE   -> 0xFFBB88FF.toInt()
+                CandidateSource.HISTORY    -> (theme.candidateTextColorInt and 0x00FFFFFF) or 0x80000000.toInt()
                 else -> theme.candidateTextColorInt
             }
             candidatePaint.color = srcColor
@@ -1939,6 +1957,12 @@ class KeyboardView(context: Context) : View(context) {
                 if (swipeInputEnabled && !isLongPressTriggered && y >= candidateBarHeight) {
                     val moveHit = keyEntries.firstOrNull { it.touchRect.contains(x, y) }
                     if (moveHit != null && !moveHit.key.isSpecial) {
+                        // 首鍵補充：如果 ACTION_DOWN 沒接收到首鍵（觸摸邊界），在此補上
+                        if (swipeKeySequence.isEmpty() && confirmedSwipeKeys.isEmpty()) {
+                            swipeKeySequence.add(moveHit.key)
+                            confirmedSwipeKeys.add(moveHit.key)
+                            lastConfirmedKey = moveHit.key
+                        }
                         val lastKey = swipeKeySequence.lastOrNull()
                         if (lastKey == null || lastKey.label != moveHit.key.label) {
                             swipeKeySequence.add(moveHit.key)
@@ -2012,9 +2036,12 @@ class KeyboardView(context: Context) : View(context) {
                     return true
                 }
                 confirmedSwipeKeys.clear()
-                lastConfirmedKey = null
                 swipeKeySequence.clear()
                 isSwipeGesture = false
+
+                // 非滑動手勢：標記當前按鍵為已確認，防止 onSwipeEnd 重複 commit
+                val hitForConfirm = keyEntries.firstOrNull { it.touchRect.contains(x, y) }?.key
+                if (hitForConfirm != null) lastConfirmedKey = hitForConfirm
 
                 // 展開面板觸控選字（滑動中不選字）
                 if (isCandidateExpanded && y > candidateBarHeight && allCandidates.isNotEmpty()) {
@@ -2113,6 +2140,7 @@ class KeyboardView(context: Context) : View(context) {
                 }
                 // 滑動路徑結束
                 onSwipeEnd()
+                lastConfirmedKey = null
             }
 
             MotionEvent.ACTION_CANCEL -> {

@@ -173,7 +173,8 @@ class InputRouter(private val context: Context) {
         InputMode.SPEED_CANGJIE -> speedCangjieEngine
         InputMode.JAPANESE -> japaneseEngine
         InputMode.KOREAN -> koreanEngine
-        InputMode.AUTO -> englishEngine
+        // AUTO 模式預設注音引擎（使用者打英文時自動切換）
+        InputMode.AUTO -> bopomofoEngine
     }
 
     // -------------------------------------------------------------------------
@@ -241,6 +242,12 @@ class InputRouter(private val context: Context) {
     fun selectCandidate(index: Int): InputResult {
         // 候選列可能被自適應字典重新排序，需把 UI 索引映射回引擎索引
         val displayedText = candidateManager.candidates.getOrNull(index)
+
+        // 選字前：把當前段候選存入歷史（供後續顯示淺色歷史候選）
+        if (displayedText != null) {
+            candidateManager.archiveCurrentAsHistory(displayedText)
+        }
+
         val result = when (val eng = activeEngine) {
             is ChewingInputEngine -> {
                 val engineIndex = if (displayedText != null) eng.getCandidates().indexOf(displayedText).takeIf { it >= 0 } ?: index else index
@@ -414,10 +421,18 @@ class InputRouter(private val context: Context) {
 
         // 非英文模式：引擎候選 + 自適應字典排序（composing 有值才加整句預測）
         if (currentMode != InputMode.ENGLISH) {
-            candidateSourceMap = emptyMap()
+            val historySourceMap = mutableMapOf<String, CandidateSource>()
 
+            if (raw.isEmpty() && candidateManager.historyCandidates.isEmpty()) {
+                // 沒有候選也沒歷史就不顯示
+                candidateSourceMap = emptyMap()
+                candidateManager.update(emptyList())
+                return
+            }
             if (raw.isEmpty()) {
-                // 沒有候選就不顯示，不硬塞預測
+                // 只有歷史候選
+                for (h in candidateManager.historyCandidates) historySourceMap[h] = CandidateSource.HISTORY
+                candidateSourceMap = historySourceMap
                 candidateManager.update(emptyList())
                 return
             }
@@ -457,12 +472,21 @@ class InputRouter(private val context: Context) {
                 for (s in sentenceSuggestions) {
                     if (s !in combined) combined.add(s)
                 }
+                // 標記歷史候選字來源
+                for (h in candidateManager.historyCandidates) {
+                    historySourceMap[h] = CandidateSource.HISTORY
+                }
+                candidateSourceMap = historySourceMap
                 candidateManager.update(combined)
             } else {
                 val combined = raw.toMutableList()
                 for (s in sentenceSuggestions) {
                     if (s !in combined) combined.add(s)
                 }
+                for (h in candidateManager.historyCandidates) {
+                    historySourceMap[h] = CandidateSource.HISTORY
+                }
+                candidateSourceMap = historySourceMap
                 candidateManager.update(combined)
             }
             return
@@ -547,6 +571,10 @@ class InputRouter(private val context: Context) {
             }
         }
 
+        // 標記歷史候選字來源
+        for (h in candidateManager.historyCandidates) {
+            sourceMap[h] = CandidateSource.HISTORY
+        }
         candidateSourceMap = sourceMap
         candidateManager.update(sorted)
     }
@@ -586,14 +614,14 @@ class InputRouter(private val context: Context) {
         if (trimmed.isBlank()) return
 
         // AUTO 模式：commit 後重置雙重評分緩衝，準備下一個詞
+        // 但保留當前引擎，不強制跳回英文（修復自動跳英文鍵盤問題）
         if (currentMode == InputMode.AUTO) {
             autoQwertyBuffer.clear()
             autoBopomofoBuffer.clear()
             autoEnglishScore = 0
             autoBopomofoScore = 0
             autoLastCommitWasEnglish = trimmed.all { it.code < 128 }
-            // 重置回默認引擎，下一個詞重新判斷
-            activeEngine = engineForMode(InputMode.AUTO)
+            // 不再重置 activeEngine — 讓使用者繼續用當前語言引擎
         }
 
         val hasCjk = trimmed.any { it.code in 0x4E00..0x9FFF || it.code in 0x3400..0x4DBF }
@@ -636,6 +664,7 @@ enum class CandidateSource {
     USER_DICT,    // 使用者自訂詞庫
     SENTENCE,     // 整句預測
     AI,           // AI 建議（Claw）
+    HISTORY,      // 歷史候選字（前面詞段未選的）
 }
 
 enum class InputMode(val displayName: String, val shortLabel: String) {

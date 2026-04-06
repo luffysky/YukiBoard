@@ -33,11 +33,35 @@ class SwipeCandidateRanker(
         }
 
         // 2. 鄰近替代序列查詞（降低權重）
-        val alternatives = decoder.alternatives(bopomofoSymbols, 4)
+        val alternatives = decoder.alternatives(bopomofoSymbols, 6)
         for (altSeq in alternatives) {
             val altResults = chewingEngine.lookupByBopomofoString(altSeq.joinToString(""))
             altResults.take(5).forEachIndexed { i, word ->
                 scored[word] = (scored[word] ?: 0f) + (8f - i).coerceAtLeast(1f)
+            }
+        }
+
+        // 2b. 主序列無結果時：更積極搜索（去掉可能滑錯的尾端注音、嘗試子序列）
+        if (scored.isEmpty() && bopomofoSymbols.size >= 3) {
+            // 去尾嘗試（可能多滑到最後一個鍵）
+            val trimmed = bopomofoSymbols.dropLast(1)
+            val trimResults = chewingEngine.lookupByBopomofoString(trimmed.joinToString(""))
+            trimResults.take(5).forEachIndexed { i, word ->
+                scored[word] = (scored[word] ?: 0f) + (10f - i).coerceAtLeast(2f)
+            }
+            // 去頭嘗試（首鍵可能滑錯）
+            val trimHead = bopomofoSymbols.drop(1)
+            val headResults = chewingEngine.lookupByBopomofoString(trimHead.joinToString(""))
+            headResults.take(5).forEachIndexed { i, word ->
+                scored[word] = (scored[word] ?: 0f) + (10f - i).coerceAtLeast(2f)
+            }
+            // 更多鄰近替代（擴大搜索範圍）
+            val moreAlts = decoder.alternatives(bopomofoSymbols, 12)
+            for (altSeq in moreAlts) {
+                val altResults = chewingEngine.lookupByBopomofoString(altSeq.joinToString(""))
+                altResults.take(3).forEachIndexed { i, word ->
+                    scored[word] = (scored[word] ?: 0f) + (6f - i).coerceAtLeast(1f)
+                }
             }
         }
 

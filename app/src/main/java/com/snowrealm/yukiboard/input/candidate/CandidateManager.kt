@@ -8,6 +8,7 @@ package com.snowrealm.yukiboard.input.candidate
  * - 管理分頁（每頁最多 [PAGE_SIZE] 個候選詞）
  * - 追蹤使用者選擇的候選詞
  * - 支援「預測」標記（灰色字，區分智慧預測 vs 一般候選）
+ * - 候選字歷史累積：選字後前一段候選保存為歷史，使用者可回頭選
  *
  * Tab 鍵導航：
  * - 按 Tab = 選中下一個候選
@@ -25,6 +26,15 @@ class CandidateManager {
     var focusedIndex: Int = -1
         private set
 
+    // ─── 候選字歷史累積 ───
+    /** 歷史候選字（前面詞段選過但未選的候選字） */
+    private val _historyCandidates = mutableListOf<String>()
+    val historyCandidates: List<String> get() = _historyCandidates.toList()
+
+    /** 目前段的候選字數量（用於區分 current vs history） */
+    var currentCandidateCount: Int = 0
+        private set
+
     val currentPage: List<String>
         get() {
             val from = pageIndex * PAGE_SIZE
@@ -38,8 +48,31 @@ class CandidateManager {
     fun update(newCandidates: List<String>) {
         _candidates.clear()
         _candidates.addAll(newCandidates)
+        // 加入歷史候選字（去重）
+        for (h in _historyCandidates) {
+            if (h !in _candidates) _candidates.add(h)
+        }
+        currentCandidateCount = newCandidates.size
         pageIndex = 0
         focusedIndex = -1
+    }
+
+    /**
+     * 選字時呼叫：把當前段的候選字存入歷史（排除已選的），
+     * 供後續顯示為淺色歷史候選字。
+     */
+    fun archiveCurrentAsHistory(selectedText: String) {
+        // 把目前段的非選中候選字存到歷史（保留最近 20 個）
+        val currentOnly = _candidates.take(currentCandidateCount)
+        for (c in currentOnly) {
+            if (c != selectedText && c !in _historyCandidates) {
+                _historyCandidates.add(c)
+            }
+        }
+        // 限制歷史大小
+        while (_historyCandidates.size > 20) {
+            _historyCandidates.removeAt(0)
+        }
     }
 
     fun nextPage() {
@@ -74,8 +107,15 @@ class CandidateManager {
 
     fun clear() {
         _candidates.clear()
+        _historyCandidates.clear()
+        currentCandidateCount = 0
         pageIndex = 0
         focusedIndex = -1
+    }
+
+    /** 只清歷史，不清當前候選 */
+    fun clearHistory() {
+        _historyCandidates.clear()
     }
 
     companion object {

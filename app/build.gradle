@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 83
-        versionName "0.9.17"
+        versionCode 84
+        versionName "0.9.18"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,9 +82,11 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 注音整句 composing（候選字累積、上下文排序）\n" +
-                    "- fix: 計算機面板數字白底白字不可見\n" +
-                    "- feat: AUTO 模式鍵盤標示（空白鍵+ABC 顯示「自動」）"
+                    "- feat: 候選字歷史累積（選字後前段候選保留，淡色顯示）\n" +
+                    "- feat: AUTO 智慧輸入法直接從鍵盤啟動（長按切換鍵）\n" +
+                    "- fix: AUTO 模式不再每次 commit 後跳回英文鍵盤\n" +
+                    "- fix: 數字/符號鍵重複輸入問題\n" +
+                    "- fix: 滑動輸入首鍵漏接 + 鄰近鍵加強糾錯"
             }
         }
         debug {
@@ -93,9 +95,11 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 注音整句 composing（候選字累積、上下文排序）\n" +
-                    "- fix: 計算機面板數字白底白字不可見\n" +
-                    "- feat: AUTO 模式鍵盤標示（空白鍵+ABC 顯示「自動」）"
+                    "- feat: 候選字歷史累積（選字後前段候選保留，淡色顯示）\n" +
+                    "- feat: AUTO 智慧輸入法直接從鍵盤啟動（長按切換鍵）\n" +
+                    "- fix: AUTO 模式不再每次 commit 後跳回英文鍵盤\n" +
+                    "- fix: 數字/符號鍵重複輸入問題\n" +
+                    "- fix: 滑動輸入首鍵漏接 + 鄰近鍵加強糾錯"
             }
         }
     }

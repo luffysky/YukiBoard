@@ -78,11 +78,11 @@ class RadialLanguageMenu(
     )
 
     private val items = listOf(
+        SectorItem(LanguageOption.Language(InputMode.AUTO), "⚡", "自動"),
         SectorItem(LanguageOption.Language(InputMode.ENGLISH), "EN", "English"),
         SectorItem(LanguageOption.Language(InputMode.BOPOMOFO), "注", "注音"),
         SectorItem(LanguageOption.Language(InputMode.PINYIN), "拼", "拼音"),
         SectorItem(LanguageOption.Language(InputMode.CANGJIE), "倉", "倉頡"),
-        SectorItem(LanguageOption.Language(InputMode.SPEED_CANGJIE), "速", "速成"),
         SectorItem(LanguageOption.Language(InputMode.JAPANESE), "あ", "日本語"),
         SectorItem(LanguageOption.Language(InputMode.KOREAN), "한", "한국어"),
         SectorItem(LanguageOption.Emoji, "😀", "Emoji"),
