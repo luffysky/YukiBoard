@@ -52,6 +52,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class YukiBoardIMEService : InputMethodService() {
 
@@ -75,6 +76,8 @@ class YukiBoardIMEService : InputMethodService() {
     private var particleView: com.snowrealm.yukiboard.animation.KeyboardParticleView? = null
     private var backgroundView: com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView? = null
     private var bgUpdateReceiver: android.content.BroadcastReceiver? = null
+    private val fraudAnalyzer by lazy { com.snowrealm.yukiboard.security.FraudAIAnalyzer(this) }
+    private var lastFraudScanText: String? = null  // 避免重複掃描同一段文字
 
     // 面板
     private var activePanel: PanelType? = null
@@ -631,9 +634,53 @@ class YukiBoardIMEService : InputMethodService() {
             }
         }
 
+        // 防詐被動偵測：掃描輸入框上下文
+        scanForFraud()
+
         // 遊戲模式恢復
         if (isInGameMode) {
             gameLoop?.resume()
+        }
+    }
+
+    /**
+     * 被動防詐偵測 — 讀取輸入框上方文字，背景跑規則引擎。
+     * 風險 ≥ 30 → 雪凜泡泡警告；點泡泡 → 開 Claw 面板深度分析。
+     */
+    private fun scanForFraud() {
+        val ic = currentInputConnection ?: return
+        val textBefore = ic.getTextBeforeCursor(2000, 0)?.toString() ?: return
+        if (textBefore.length < 20) return  // 文字太短不分析
+        if (textBefore == lastFraudScanText) return  // 同一段文字不重複掃
+        lastFraudScanText = textBefore
+
+        serviceScope.launch(Dispatchers.Default) {
+            val result = fraudAnalyzer.analyzeByRules(textBefore)
+            if (result.riskScore >= 30) {
+                val emoji = fraudAnalyzer.getRiskEmoji(result.riskScore)
+                val types = result.matchedTypes.joinToString("/") { it.label }
+                val warning = "$emoji 注意！偵測到${types}特徵，小心詐騙"
+
+                withContext(Dispatchers.Main) {
+                    val charAnchor = characterView as? android.view.View ?: return@withContext
+                    yukiSpeechBubble?.let { bubble ->
+                        bubble.isFraudWarning = true
+                        bubble.onBubbleTapped = {
+                            // 點泡泡 → 開啟 Claw 面板的防詐分析
+                            bubble.hideNow()
+                            showPanel(PanelType.CLAW)
+                            // 延遲一點讓面板建好再觸發 skill
+                            charAnchor.postDelayed({
+                                (panelContainer.getChildAt(0) as? ClawPanelView)
+                                    ?.triggerSkill("fraud_detect")
+                            }, 300)
+                        }
+                        bubble.show(warning, charAnchor)
+                    }
+                    // 雪凜表情反應（驚訝/警覺）
+                    characterView?.playReaction("surprised")
+                }
+            }
         }
     }
 

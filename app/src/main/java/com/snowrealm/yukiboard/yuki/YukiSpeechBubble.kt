@@ -52,10 +52,19 @@ class YukiSpeechBubble(context: Context) : View(context) {
 
     init {
         visibility = GONE
+        setOnClickListener {
+            onBubbleTapped?.invoke()
+        }
     }
 
     /** TTS 朗讀回呼 — 由 IME Service 注入 */
     var onSpeakRequest: ((text: String) -> Unit)? = null
+
+    /** 泡泡被點擊的回呼（可用於展開詳細分析等） */
+    var onBubbleTapped: (() -> Unit)? = null
+
+    /** 當前顯示的泡泡是否為防詐警告（點擊時觸發不同行為） */
+    var isFraudWarning = false
 
     /** 顯示泡泡，自動定位到 anchorView 上方，並用 TTS 朗讀 */
     fun show(message: String, anchorView: View) {
@@ -71,7 +80,9 @@ class YukiSpeechBubble(context: Context) : View(context) {
         post {
             positionAbove(anchorView)
             invalidate()
-            scheduleHide()
+            // 防詐警告顯示更久（5 秒），一般泡泡 2.5 秒
+            val duration = if (isFraudWarning) 5000L else DISPLAY_DURATION_MS
+            scheduleHide(duration)
         }
     }
 
@@ -140,9 +151,9 @@ class YukiSpeechBubble(context: Context) : View(context) {
             .start()
     }
 
-    private fun scheduleHide() {
+    private fun scheduleHide(duration: Long = DISPLAY_DURATION_MS) {
         removeCallbacks(hideRunnable)
-        postDelayed(hideRunnable, DISPLAY_DURATION_MS)
+        postDelayed(hideRunnable, duration)
     }
 
     override fun onDetachedFromWindow() {

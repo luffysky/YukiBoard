@@ -81,6 +81,11 @@ class ClawPanelView(context: Context) : LinearLayout(context) {
         toolbarView.currentMode = mode
     }
 
+    /** 供外部直接觸發特定 Skill（如防詐被動偵測點擊泡泡） */
+    fun triggerSkill(skillId: String) {
+        executeSkill(skillId)
+    }
+
     private fun executeSkill(skillId: String) {
         val client = clawClient
 
