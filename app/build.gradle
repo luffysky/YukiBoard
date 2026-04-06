@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 73
-        versionName "0.9.7"
+        versionCode 74
+        versionName "0.9.8"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,8 +82,10 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: ProGuard rules 補齊（修復 release build 閃退）\n" +
-                    "- keep: OkHttp/kotlinx-serialization/EncryptedPrefs/Filament"
+                    "- fix: 設定頁閃退（影片/圖片背景載入改非同步）\n" +
+                    "- fix: 功能列主題與設定頁即時同步\n" +
+                    "- fix: 功能列選圖/影片後立即預覽\n" +
+                    "- perf: FlowLight/粒子/角色動畫省電優化"
             }
         }
         debug {
@@ -92,8 +94,10 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: ProGuard rules 補齊（修復 release build 閃退）\n" +
-                    "- keep: OkHttp/kotlinx-serialization/EncryptedPrefs/Filament"
+                    "- fix: 設定頁閃退（影片/圖片背景載入改非同步）\n" +
+                    "- fix: 功能列主題與設定頁即時同步\n" +
+                    "- fix: 功能列選圖/影片後立即預覽\n" +
+                    "- perf: FlowLight/粒子/角色動畫省電優化"
             }
         }
     }
