@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 74
-        versionName "0.9.8"
+        versionCode 75
+        versionName "0.9.9"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,10 +82,10 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 設定頁閃退（影片/圖片背景載入改非同步）\n" +
-                    "- fix: 功能列主題與設定頁即時同步\n" +
-                    "- fix: 功能列選圖/影片後立即預覽\n" +
-                    "- perf: FlowLight/粒子/角色動畫省電優化"
+                    "- fix: 候選字下拉選單選字後不再自動關閉\n" +
+                    "- fix: VRM 雪凜角色顯示（SurfaceView→TextureView）\n" +
+                    "- feat: 防詐 AI（規則引擎 8 類 170+ 關鍵字 + AI 深度分析）\n" +
+                    "- fix: 設定頁閃退 + 主題同步 + 背景預覽 + 省電優化"
             }
         }
         debug {
@@ -94,10 +94,10 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 設定頁閃退（影片/圖片背景載入改非同步）\n" +
-                    "- fix: 功能列主題與設定頁即時同步\n" +
-                    "- fix: 功能列選圖/影片後立即預覽\n" +
-                    "- perf: FlowLight/粒子/角色動畫省電優化"
+                    "- fix: 候選字下拉選單選字後不再自動關閉\n" +
+                    "- fix: VRM 雪凜角色顯示（SurfaceView→TextureView）\n" +
+                    "- feat: 防詐 AI（規則引擎 8 類 170+ 關鍵字 + AI 深度分析）\n" +
+                    "- fix: 設定頁閃退 + 主題同步 + 背景預覽 + 省電優化"
             }
         }
     }
