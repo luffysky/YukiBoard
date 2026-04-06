@@ -32,7 +32,14 @@ enum class GameMode(val displayName: String, val icon: String, val category: Gam
     VOICE_GAME("語音遊戲", "🎙️", GameCategory.CHALLENGE),
     // 文字
     WORDLE("猜詞", "🔮", GameCategory.PUZZLE),
-    WORD_CHAIN("接龍", "🎭", GameCategory.PUZZLE);
+    WORD_CHAIN("接龍", "🎭", GameCategory.PUZZLE),
+    CROSSWORD("填字", "🔲", GameCategory.PUZZLE),
+    // 節奏/建造
+    MUSIC_TYPING("音樂打字", "🎵", GameCategory.ACTION),
+    YUKI_HOUSE("雪凜的家", "🏠", GameCategory.CLASSIC),
+    TYPING_FARM("打字農場", "🌱", GameCategory.CLASSIC),
+    // 對戰
+    SPEED_TYPING_BATTLE("打字對決", "⚔️", GameCategory.CHALLENGE);
 }
 
 enum class GameCategory(val displayName: String) {

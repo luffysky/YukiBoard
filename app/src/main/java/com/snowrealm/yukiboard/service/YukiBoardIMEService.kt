@@ -1153,6 +1153,14 @@ class YukiBoardIMEService : InputMethodService() {
                 }
                 p
             }
+            PanelType.PHRASE -> {
+                val p = PhrasePanelView(this)
+                p.theme = theme
+                p.onInsertPhrase = { phrase ->
+                    currentInputConnection?.commitText(phrase, 1)
+                }
+                p
+            }
             else -> return
         }
 
@@ -1846,6 +1854,11 @@ class YukiBoardIMEService : InputMethodService() {
             GameMode.VOICE_GAME -> VoiceGame(ctx)
             GameMode.WORDLE -> WordleGame(ctx)
             GameMode.WORD_CHAIN -> WordChainGame(ctx)
+            GameMode.CROSSWORD -> CrosswordGame(ctx)
+            GameMode.MUSIC_TYPING -> MusicTypingGame(ctx)
+            GameMode.YUKI_HOUSE -> YukiHouseGame(ctx)
+            GameMode.TYPING_FARM -> TypingFarmGame(ctx)
+            GameMode.SPEED_TYPING_BATTLE -> SpeedTypingBattleGame(ctx)
         }
 
         // 建立遊戲鍵盤 View

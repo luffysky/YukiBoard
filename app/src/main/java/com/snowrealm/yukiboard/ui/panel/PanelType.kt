@@ -14,6 +14,7 @@ enum class PanelType(val icon: String, val displayName: String) {
     REMOTE("🔗", "遠端"),
     CLAW("🐾", "Claw AI"),
     CALCULATOR("🧮", "計算機"),
+    PHRASE("💬", "常用語"),
     THEME("🎨", "主題"),
     SETTINGS("⚙", "設定")
 }
