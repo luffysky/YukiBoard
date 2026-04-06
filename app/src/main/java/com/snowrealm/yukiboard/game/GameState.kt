@@ -29,7 +29,10 @@ enum class GameMode(val displayName: String, val icon: String, val category: Gam
     TYPING_RACE("打字競速", "🏎️", GameCategory.CHALLENGE),
     RANDOM_CHALLENGE("隨機挑戰", "🎲", GameCategory.CHALLENGE),
     MOOD_MINER("情緒採礦", "⛏️", GameCategory.CHALLENGE),
-    VOICE_GAME("語音遊戲", "🎙️", GameCategory.CHALLENGE);
+    VOICE_GAME("語音遊戲", "🎙️", GameCategory.CHALLENGE),
+    // 文字
+    WORDLE("猜詞", "🔮", GameCategory.PUZZLE),
+    WORD_CHAIN("接龍", "🎭", GameCategory.PUZZLE);
 }
 
 enum class GameCategory(val displayName: String) {

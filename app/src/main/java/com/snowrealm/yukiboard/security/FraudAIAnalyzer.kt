@@ -22,6 +22,9 @@ import kotlinx.coroutines.withContext
  */
 class FraudAIAnalyzer(private val context: Context) {
 
+    /** 動態權重管理器（個人化回饋調整） */
+    val weightManager by lazy { FraudRuleWeightManager(context) }
+
     // =========================================================================
     // 資料模型
     // =========================================================================
@@ -336,7 +339,7 @@ class FraudAIAnalyzer(private val context: Context) {
         val matchedTypes = mutableSetOf<FraudType>()
         val matchedKeywords = mutableListOf<String>()
 
-        // ── 第一層：單一關鍵字 ──
+        // ── 第一層：單一關鍵字（含個人化權重調整） ──
         for (rule in rules) {
             var ruleHits = 0
             for (keyword in rule.keywords) {
@@ -347,8 +350,10 @@ class FraudAIAnalyzer(private val context: Context) {
             }
             if (ruleHits > 0) {
                 matchedTypes.add(rule.type)
-                // 累進加分：命中越多同類關鍵字，分數指數成長
-                val baseScore = ruleHits * rule.weight
+                // 動態權重：預設 + 個人回饋調整
+                val dynamicWeight = rule.weight + weightManager.getKeywordAdjustment(rule.keywords.first())
+                val effectiveWeight = dynamicWeight.coerceAtLeast(1)
+                val baseScore = ruleHits * effectiveWeight
                 val comboBonus = if (ruleHits >= 3) ruleHits * 5 else 0
                 totalScore += baseScore + comboBonus
             }
@@ -403,6 +408,9 @@ class FraudAIAnalyzer(private val context: Context) {
                 break
             }
         }
+
+        // 個人化回饋加分（類型層級）
+        totalScore += weightManager.getPersonalBonus(matchedTypes.toList())
 
         val riskScore = totalScore.coerceIn(0, 100)
 

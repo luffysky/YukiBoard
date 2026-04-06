@@ -178,34 +178,57 @@ class ClawPanelView(context: Context) : LinearLayout(context) {
         val ruleText = analyzer.formatRuleResult(ruleResult)
         resultView.showStreamingText(ruleText)
 
+        val finalText = StringBuilder()
+
         // B 層：風險 ≥ 30 且有 AI → 串流深度分析
         if (ruleResult.riskScore >= 30 && client != null && client.isAvailable()) {
-            val accumulated = StringBuilder()
-            accumulated.appendLine(ruleText)
-            accumulated.appendLine()
-            accumulated.appendLine("── AI 深度分析 ──")
+            finalText.appendLine(ruleText)
+            finalText.appendLine()
+            finalText.appendLine("── AI 深度分析 ──")
 
             try {
                 val flow = withContext(Dispatchers.IO) {
                     analyzer.analyzeByAI(text, client, ruleResult)
                 }
                 flow.collect { chunk ->
-                    accumulated.append(chunk)
+                    finalText.append(chunk)
                     withContext(Dispatchers.Main) {
-                        resultView.showStreamingText(accumulated.toString())
+                        resultView.showStreamingText(finalText.toString())
                     }
                 }
             } catch (_: Exception) {
-                accumulated.appendLine("\n(AI 分析不可用，僅顯示規則引擎結果)")
+                finalText.appendLine("\n(AI 分析不可用，僅顯示規則引擎結果)")
             }
-
-            resultView.showResults(listOf(accumulated.toString()))
             toolbarView.remainingTokens = client.getRemainingTokens()
         } else {
-            // 只顯示規則結果
-            resultView.showResults(listOf(ruleText))
+            finalText.append(ruleText)
+        }
+
+        // 加入回饋按鈕提示
+        if (ruleResult.matchedTypes.isNotEmpty()) {
+            finalText.appendLine()
+            finalText.appendLine()
+            finalText.appendLine("──────────────")
+            finalText.appendLine("這個判斷準確嗎？你的回饋會幫助雪凜學習")
+        }
+
+        resultView.showResults(listOf(finalText.toString()))
+
+        // 顯示回饋按鈕（儲存最後分析結果供回饋用）
+        if (ruleResult.matchedTypes.isNotEmpty()) {
+            lastFraudResult = ruleResult
+            lastFraudText = text
+            resultView.showFraudFeedbackButtons { isFraud ->
+                analyzer.weightManager.processFeedback(isFraud, ruleResult, text)
+                val response = if (isFraud) "記住了，下次會更注意！" else "好的，誤判了抱歉～"
+                resultView.showResults(listOf(finalText.toString() + "\n\n雪凜：$response"))
+                resultView.hideFraudFeedbackButtons()
+            }
         }
     }
+
+    private var lastFraudResult: com.snowrealm.yukiboard.security.FraudAIAnalyzer.RuleResult? = null
+    private var lastFraudText: String? = null
 
     /** 偵測輸入文字的語言，回傳語言名稱供 system prompt 使用 */
     private fun detectInputLanguage(text: String): String {
@@ -304,6 +327,21 @@ class ClawResultCardView(context: Context) : View(context) {
         errorMessage = message
         loadingSkillId = null
         suggestions = emptyList()
+        invalidate()
+    }
+
+    // ── 防詐回饋按鈕 ──
+    private var fraudFeedbackCallback: ((Boolean) -> Unit)? = null
+    private val feedbackYesRect = RectF()
+    private val feedbackNoRect = RectF()
+
+    fun showFraudFeedbackButtons(callback: (Boolean) -> Unit) {
+        fraudFeedbackCallback = callback
+        invalidate()
+    }
+
+    fun hideFraudFeedbackButtons() {
+        fraudFeedbackCallback = null
         invalidate()
     }
 
@@ -430,6 +468,36 @@ class ClawResultCardView(context: Context) : View(context) {
         }
 
         canvas.restore()
+
+        // ── 防詐回饋按鈕 ──
+        if (fraudFeedbackCallback != null) {
+            val btnW = 100f * density
+            val btnH = 30f * density
+            val btnY = height - btnH - 8f * density
+            val gap = 12f * density
+            val totalW = btnW * 2 + gap
+            val startX = (width - totalW) / 2f
+
+            // 「有風險」按鈕（紅色底）
+            feedbackYesRect.set(startX, btnY, startX + btnW, btnY + btnH)
+            val yesPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0xFFE57373.toInt()
+                style = Paint.Style.FILL
+            }
+            canvas.drawRoundRect(feedbackYesRect, 6f * density, 6f * density, yesPaint)
+            val btnTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0xFFFFFFFF.toInt()
+                textSize = 12f * density
+                textAlign = Paint.Align.CENTER
+            }
+            canvas.drawText("⚠️ 確實有風險", feedbackYesRect.centerX(), feedbackYesRect.centerY() + 4f * density, btnTextPaint)
+
+            // 「沒問題」按鈕（綠色底）
+            feedbackNoRect.set(startX + btnW + gap, btnY, startX + btnW * 2 + gap, btnY + btnH)
+            yesPaint.color = 0xFF66BB6A.toInt()
+            canvas.drawRoundRect(feedbackNoRect, 6f * density, 6f * density, yesPaint)
+            canvas.drawText("✅ 沒有問題", feedbackNoRect.centerX(), feedbackNoRect.centerY() + 4f * density, btnTextPaint)
+        }
     }
 
     private fun wrapText(text: String, paint: Paint, maxWidth: Float): List<String> {
@@ -475,6 +543,19 @@ class ClawResultCardView(context: Context) : View(context) {
                     if (isLocked) {
                         onLockTapped?.invoke()
                         return true
+                    }
+                    // 防詐回饋按鈕
+                    if (fraudFeedbackCallback != null) {
+                        if (feedbackYesRect.contains(event.x, event.y)) {
+                            fraudFeedbackCallback?.invoke(true)
+                            performClick()
+                            return true
+                        }
+                        if (feedbackNoRect.contains(event.x, event.y)) {
+                            fraudFeedbackCallback?.invoke(false)
+                            performClick()
+                            return true
+                        }
                     }
                     // 卡片點擊
                     for ((rect, index) in cardRects) {

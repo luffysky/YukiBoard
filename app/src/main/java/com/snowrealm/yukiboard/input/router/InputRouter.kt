@@ -301,12 +301,21 @@ class InputRouter(private val context: Context) {
                         .associate { (i, w) -> w to (10f - i).coerceAtLeast(1f) }
                 } else emptyMap()
 
+                // 中文上下文串聯預測：上一字 → 下一字
+                val nextCharBoost = if (activeEngine is ChewingInputEngine && !lastCommittedWord.isNullOrEmpty()) {
+                    val predictions = (activeEngine as ChewingInputEngine).getNextCharPredictions(lastCommittedWord!!)
+                    predictions.withIndex().associate { (i, w) -> w to (15f - i * 0.5f).coerceAtLeast(1f) }
+                } else emptyMap()
+
                 val boosted = raw.sortedWith(compareByDescending<String> { word ->
                     var score = 0f
                     val freq = smartInput.adaptiveDictionary.getFrequency(word)
                     if (freq > 0) score += freq + 50
                     val ctxScore = contextPredictions[word]
                     if (ctxScore != null) score += ctxScore * 5
+                    // 串聯預測加分
+                    val ngramScore = nextCharBoost[word]
+                    if (ngramScore != null) score += ngramScore * 3
                     score
                 }.thenBy { raw.indexOf(it) })
 

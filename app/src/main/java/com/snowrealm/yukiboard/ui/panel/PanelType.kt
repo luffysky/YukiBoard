@@ -13,6 +13,7 @@ enum class PanelType(val icon: String, val displayName: String) {
     CLIPBOARD("📋", "剪貼簿"),
     REMOTE("🔗", "遠端"),
     CLAW("🐾", "Claw AI"),
+    CALCULATOR("🧮", "計算機"),
     THEME("🎨", "主題"),
     SETTINGS("⚙", "設定")
 }

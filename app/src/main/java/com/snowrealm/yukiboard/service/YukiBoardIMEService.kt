@@ -1145,6 +1145,14 @@ class YukiBoardIMEService : InputMethodService() {
                 }
                 p
             }
+            PanelType.CALCULATOR -> {
+                val p = CalculatorPanelView(this)
+                p.theme = theme
+                p.onInsertResult = { result ->
+                    currentInputConnection?.commitText(result, 1)
+                }
+                p
+            }
             else -> return
         }
 
@@ -1836,6 +1844,8 @@ class YukiBoardIMEService : InputMethodService() {
             GameMode.TYPING_RACE -> TypingRaceGame(ctx)
             GameMode.RANDOM_CHALLENGE -> RandomChallengeGame(ctx)
             GameMode.VOICE_GAME -> VoiceGame(ctx)
+            GameMode.WORDLE -> WordleGame(ctx)
+            GameMode.WORD_CHAIN -> WordChainGame(ctx)
         }
 
         // 建立遊戲鍵盤 View
