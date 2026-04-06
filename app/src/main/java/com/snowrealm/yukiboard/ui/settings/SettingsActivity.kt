@@ -564,21 +564,22 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         row.addView(styledButton("選圖片", 0xFF2A3A5C.toInt(), 0xFFE8F4FF.toInt()) {
-            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            // ACTION_GET_CONTENT 讓系統顯示相簿 + 檔案管理器供選擇
+            val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE); type = "image/*"
             }
             @Suppress("DEPRECATION")
-            startActivityForResult(intent, REQUEST_PICK_BG_IMAGE)
+            startActivityForResult(Intent.createChooser(intent, "選擇圖片"), REQUEST_PICK_BG_IMAGE)
         }.apply {
             layoutParams = LinearLayout.LayoutParams(0, dp(40), 1f).apply { marginEnd = dp(4) }
         })
 
         row.addView(styledButton("選影片", 0xFF2A3A5C.toInt(), 0xFFE8F4FF.toInt()) {
-            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE); type = "video/*"
             }
             @Suppress("DEPRECATION")
-            startActivityForResult(intent, REQUEST_PICK_BG_VIDEO)
+            startActivityForResult(Intent.createChooser(intent, "選擇影片"), REQUEST_PICK_BG_VIDEO)
         }.apply {
             layoutParams = LinearLayout.LayoutParams(0, dp(40), 1f).apply {
                 marginStart = dp(4); marginEnd = dp(4)
