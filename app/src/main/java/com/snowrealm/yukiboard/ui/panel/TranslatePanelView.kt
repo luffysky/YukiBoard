@@ -63,6 +63,12 @@ class TranslatePanelView(context: Context) : View(context) {
     /** 請求焦點到翻譯輸入框（讓鍵盤打的字進到這裡） */
     var onRequestInputMode: ((Boolean) -> Unit)? = null
 
+    /** 將翻譯結果推送到目前 App 的輸入框 */
+    var onInsertToApp: ((String) -> Unit)? = null
+
+    /** CJK composing 提示（注音組字中顯示） */
+    private var composingHint: String = ""
+
     /** 翻譯引擎回呼 — 由 IME Service 注入 */
     var translationProvider: ((source: String, fromLang: String, toLang: String, callback: (String) -> Unit) -> Unit)? = null
 
@@ -86,6 +92,7 @@ class TranslatePanelView(context: Context) : View(context) {
     private var sourceRect = RectF()
     private var clearRect = RectF()
     private var translateBtnRect = RectF()
+    private var insertBtnRect = RectF()
     private var speakSourceRect = RectF()
     private var speakResultRect = RectF()
     private val fromLangRects = mutableListOf<Pair<RectF, Int>>()
@@ -136,9 +143,12 @@ class TranslatePanelView(context: Context) : View(context) {
             canvas.drawRoundRect(sourceRect, cornerR, cornerR, borderPaint)
         }
 
-        // 來源文字
+        // 來源文字（含 CJK 組字提示）
         val displayText = when {
-            isInputMode && inputBuffer.isNotEmpty() -> inputBuffer.toString()
+            isInputMode && inputBuffer.isNotEmpty() -> {
+                if (composingHint.isNotEmpty()) inputBuffer.toString() + composingHint
+                else inputBuffer.toString()
+            }
             sourceText.isNotEmpty() -> sourceText
             else -> ""
         }
@@ -183,7 +193,7 @@ class TranslatePanelView(context: Context) : View(context) {
             speakSourceRect = RectF()
         }
 
-        // 翻譯按鈕
+        // 翻譯按鈕 + 插入按鈕
         val btnY = srcY + srcH + 6 * density
         val btnH = 32 * density
         translateBtnRect = RectF(width - 80 * density, btnY, width - 8 * density, btnY + btnH)
@@ -192,6 +202,17 @@ class TranslatePanelView(context: Context) : View(context) {
         langPaint.color = 0xFFFFFFFF.toInt()
         langPaint.textSize = 11f * density
         canvas.drawText("翻譯 →", translateBtnRect.centerX(), translateBtnRect.centerY() + langPaint.textSize / 3f, langPaint)
+
+        // 「插入」按鈕：把翻譯結果推送到 App 輸入框
+        if (translatedText.isNotEmpty()) {
+            insertBtnRect = RectF(width - 160 * density, btnY, width - 88 * density, btnY + btnH)
+            btnPaint.color = theme.candidateBarColorInt
+            canvas.drawRoundRect(insertBtnRect, cornerR, cornerR, btnPaint)
+            langPaint.color = theme.candidateSelectedColorInt
+            canvas.drawText("插入 ↗", insertBtnRect.centerX(), insertBtnRect.centerY() + langPaint.textSize / 3f, langPaint)
+        } else {
+            insertBtnRect = RectF()
+        }
         langPaint.textSize = 12f * density
 
         // 翻譯結果（可點擊）
@@ -395,6 +416,15 @@ class TranslatePanelView(context: Context) : View(context) {
                 return true
             }
 
+            // 「插入」按鈕 → 推送翻譯結果到 App
+            if (!insertBtnRect.isEmpty && insertBtnRect.contains(event.x, event.y)) {
+                if (translatedText.isNotEmpty()) {
+                    onInsertToApp?.invoke(translatedText)
+                }
+                performClick()
+                return true
+            }
+
             // 翻譯按鈕
             if (translateBtnRect.contains(event.x, event.y)) {
                 if (isInputMode && inputBuffer.isNotEmpty()) {
@@ -457,9 +487,24 @@ class TranslatePanelView(context: Context) : View(context) {
         invalidate()
     }
 
+    /** 接收 CJK 組字完成的文字（注音選字後） */
+    fun onComposedTextInput(text: String) {
+        if (!isInputMode) return
+        inputBuffer.append(text)
+        composingHint = ""
+        invalidate()
+    }
+
+    /** 更新 CJK 組字提示（注音輸入中） */
+    fun updateComposingHint(hint: String) {
+        composingHint = hint
+        invalidate()
+    }
+
     /** 退出輸入模式 */
     fun exitInputMode() {
         isInputMode = false
+        composingHint = ""
         onRequestInputMode?.invoke(false)
         invalidate()
     }

@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 85
-        versionName "0.9.19"
+        versionCode 86
+        versionName "0.9.20"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,11 +82,11 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 滑動多音節自動組合候選（如 ㄕㄨㄌㄜㄋㄧ → 輸了你）\n" +
-                    "- feat: 高頻字權重排序（了/的/是等常用字優先）\n" +
-                    "- feat: 候選字排序優化（整句預測→串聯接續→一般候選）\n" +
-                    "- feat: 統一詞庫調度（libchewing 詞庫合併 + 自動學詞）\n" +
-                    "- fix: 歷史候選字排在最前面 + 選歷史候選不漏注音"
+                    "- fix: 翻譯面板輸入框支援中文注音輸入（組字+選字）\n" +
+                    "- feat: 翻譯結果「插入」按鈕 — 一鍵推送到 App 輸入框\n" +
+                    "- feat: libchewing 詞庫合併（+29K 字詞、+75K 詞組）\n" +
+                    "- feat: 統一詞庫調度 + 中文自動學詞\n" +
+                    "- fix: 歷史候選字 auto-archive 修正"
             }
         }
         debug {
@@ -95,11 +95,11 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 滑動多音節自動組合候選（如 ㄕㄨㄌㄜㄋㄧ → 輸了你）\n" +
-                    "- feat: 高頻字權重排序（了/的/是等常用字優先）\n" +
-                    "- feat: 候選字排序優化（整句預測→串聯接續→一般候選）\n" +
-                    "- feat: 統一詞庫調度（libchewing 詞庫合併 + 自動學詞）\n" +
-                    "- fix: 歷史候選字排在最前面 + 選歷史候選不漏注音"
+                    "- fix: 翻譯面板輸入框支援中文注音輸入（組字+選字）\n" +
+                    "- feat: 翻譯結果「插入」按鈕 — 一鍵推送到 App 輸入框\n" +
+                    "- feat: libchewing 詞庫合併（+29K 字詞、+75K 詞組）\n" +
+                    "- feat: 統一詞庫調度 + 中文自動學詞\n" +
+                    "- fix: 歷史候選字 auto-archive 修正"
             }
         }
     }

@@ -376,7 +376,7 @@ class YukiBoardIMEService : InputMethodService() {
             if (gpRef != null && gpRef.isInInputMode && result is InputResult.CommitText) {
                 gpRef.onComposedTextInput(result.text)
             } else if (tpRef != null && tpRef.isInInputMode && result is InputResult.CommitText) {
-                tpRef.onCharInput(result.text)
+                tpRef.onComposedTextInput(result.text)
             } else {
                 val ic = currentInputConnection ?: return@setOnCandidateSelectListener
                 applyInputResult(ic, result)
@@ -989,6 +989,9 @@ class YukiBoardIMEService : InputMethodService() {
                 }
                 p.onSpeakRequest = { text, locale ->
                     onTranslateSpeakRequest(text, locale)
+                }
+                p.onInsertToApp = { translated ->
+                    currentInputConnection?.commitText(translated, 1)
                 }
                 val engine = translateEngine
                 if (engine != null) {
@@ -2045,16 +2048,56 @@ class YukiBoardIMEService : InputMethodService() {
             swipeInputPending = false
             swipeInputCandidates = emptyList()
         }
-        // 翻譯面板輸入模式：攔截鍵盤輸入到翻譯框
+        // 翻譯面板輸入模式：CJK 走 InputRouter，英文直接輸入
         val tp = translatePanel
         if (tp != null && tp.isInInputMode) {
+            val isCjk = inputRouter.inputMode != InputMode.ENGLISH
             when (keyCode) {
-                KeyboardView.KEYCODE_DELETE -> tp.onDeleteInput()
-                KeyboardView.KEYCODE_ENTER -> tp.onEnterInput()
-                KeyboardView.KEYCODE_SPACE -> tp.onSpaceInput()
+                KeyboardView.KEYCODE_DELETE -> {
+                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
+                        inputRouter.processDelete()
+                        keyboardView.updateComposingText(inputRouter.composingText)
+                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
+                    } else {
+                        tp.onDeleteInput()
+                    }
+                }
+                KeyboardView.KEYCODE_ENTER -> {
+                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
+                        tp.onComposedTextInput(inputRouter.composingText)
+                        inputRouter.reset()
+                        keyboardView.updateComposingText("")
+                        keyboardView.updateCandidates(emptyList())
+                    }
+                    tp.onEnterInput()
+                }
+                KeyboardView.KEYCODE_SPACE -> {
+                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
+                        val result = inputRouter.processSpace()
+                        if (result is InputResult.CommitText) {
+                            tp.onComposedTextInput(result.text)
+                        }
+                        keyboardView.updateComposingText(inputRouter.composingText)
+                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
+                    } else {
+                        tp.onSpaceInput()
+                    }
+                }
                 KeyboardView.KEYCODE_SWITCH_LANG -> handleSwitchLang()
                 KeyboardView.KEYCODE_SHIFT, KeyboardView.KEYCODE_CTRL -> { }
-                else -> if (label.isNotEmpty() && keyCode >= 0) tp.onCharInput(label)
+                else -> if (label.isNotEmpty() && keyCode >= 0) {
+                    if (isCjk) {
+                        val result = inputRouter.processInput(label)
+                        if (result is InputResult.CommitText) {
+                            tp.onComposedTextInput(result.text)
+                        }
+                        keyboardView.updateComposingText(inputRouter.composingText)
+                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
+                        tp.updateComposingHint(inputRouter.composingText)
+                    } else {
+                        tp.onCharInput(label)
+                    }
+                }
             }
             return
         }
