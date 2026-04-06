@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 87
-        versionName "0.9.21"
+        versionCode 88
+        versionName "0.9.22"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,14 +82,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: RIME 拼音詞庫合併（+58K 字詞、+14K 詞組）\n" +
-                    "- feat: 五語詞庫大擴充（英 50K / 韓 2.6K / 倉頡 5K）\n" +
-                    "- fix: 候選字排序 — 當前候選排前、歷史排後\n" +
-                    "- fix: 注音選字殘留 — 整句預測候選直接 commit\n" +
-                    "- fix: CJK 模式過濾英文洩漏候選\n" +
-                    "- feat: 滑動輸入多段累加候選\n" +
-                    "- fix: GIF 面板搜尋框不再跳掉\n" +
-                    "- chore: 移除設定「直打注音」（已整合至鍵盤）"
+                    "- fix: GIF/翻譯面板關閉後按鍵被攔截 — closePanel 清除面板引用\n" +
+                    "- fix: 面板搜尋框打錯字無法刪除修復\n" +
+                    "- chore: 待辦更新（剪貼簿強化 + 自訂辭彙 + TTS 音色 + 解密面板）"
             }
         }
         debug {
@@ -98,14 +93,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: RIME 拼音詞庫合併（+58K 字詞、+14K 詞組）\n" +
-                    "- feat: 五語詞庫大擴充（英 50K / 韓 2.6K / 倉頡 5K）\n" +
-                    "- fix: 候選字排序 — 當前候選排前、歷史排後\n" +
-                    "- fix: 注音選字殘留 — 整句預測候選直接 commit\n" +
-                    "- fix: CJK 模式過濾英文洩漏候選\n" +
-                    "- feat: 滑動輸入多段累加候選\n" +
-                    "- fix: GIF 面板搜尋框不再跳掉\n" +
-                    "- chore: 移除設定「直打注音」（已整合至鍵盤）"
+                    "- fix: GIF/翻譯面板關閉後按鍵被攔截 — closePanel 清除面板引用\n" +
+                    "- fix: 面板搜尋框打錯字無法刪除修復\n" +
+                    "- chore: 待辦更新（剪貼簿強化 + 自訂辭彙 + TTS 音色 + 解密面板）"
             }
         }
     }

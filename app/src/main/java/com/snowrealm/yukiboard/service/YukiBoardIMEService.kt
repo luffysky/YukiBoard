@@ -1217,6 +1217,11 @@ class YukiBoardIMEService : InputMethodService() {
     }
 
     private fun closePanel() {
+        // 離開面板輸入模式並清除引用，避免已移除面板繼續攔截按鍵
+        translatePanel?.exitInputMode()
+        gifPanel?.exitInputMode()
+        translatePanel = null
+        gifPanel = null
         activePanel = null
         toolbarView.activePanel = null
         panelContainer.removeAllViews()
