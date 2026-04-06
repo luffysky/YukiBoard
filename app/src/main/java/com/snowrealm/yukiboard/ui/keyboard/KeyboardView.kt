@@ -1039,6 +1039,20 @@ class KeyboardView(context: Context) : View(context) {
                 }
                 canvas.drawText(displayText, cx, candidateBarHeight * 0.65f, candidatePaint)
 
+                // 底部來源指示條（非字典來源才顯示）
+                if (sourceColor != 0 && candidateSourceMap[text] != CandidateSource.AI) {
+                    keyPaint.color = sourceColor
+                    keyPaint.alpha = 180
+                    val indicatorH = 2f * density
+                    val indicatorW = (cw * 0.5f).coerceAtMost(20f * density)
+                    canvas.drawRoundRect(
+                        cx - indicatorW / 2f, candidateBarHeight - indicatorH - 1f * density,
+                        cx + indicatorW / 2f, candidateBarHeight - 1f * density,
+                        indicatorH, indicatorH, keyPaint
+                    )
+                    keyPaint.alpha = 255
+                }
+
                 if (i > 0) {
                     dividerPaint.color = (theme.candidateTextColorInt and 0x00FFFFFF) or 0x20000000
                     canvas.drawLine(left, 8 * density, left, candidateBarHeight - 8 * density, dividerPaint)
