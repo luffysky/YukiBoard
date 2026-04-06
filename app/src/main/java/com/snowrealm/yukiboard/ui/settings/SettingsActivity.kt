@@ -235,7 +235,7 @@ class SettingsActivity : AppCompatActivity() {
         val animChildren = mutableListOf<View>()
         root.addView(cardGroup("動畫特效", null, null, animChildren) {
             animChildren += switchRow("流光動畫", "OpenGL ES 流光覆蓋效果", prefs.flowLightEnabled) { prefs.flowLightEnabled = it }
-            animChildren += switchRow("角色動畫", "雪凜 Lottie 浮動角色", prefs.characterAnimEnabled) { prefs.characterAnimEnabled = it }
+            animChildren += switchRow("雪凜角色", "顯示雪凜浮動角色（Lottie / VRM）", prefs.characterAnimEnabled) { prefs.characterAnimEnabled = it }
             animChildren += switchRow("VRM 3D 角色", "3D VRM 模型取代 Lottie 角色", prefs.vrmCharacterEnabled) { prefs.vrmCharacterEnabled = it }
             animChildren += switchRow("按鍵粒子效果", "打字時的粒子動畫", prefs.keyParticleEffect) { prefs.keyParticleEffect = it }
             animChildren += switchRow("按鍵震動", "按鍵時的觸覺回饋", prefs.keyPressVibration) { prefs.keyPressVibration = it }

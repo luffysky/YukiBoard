@@ -657,6 +657,16 @@ class YukiBoardIMEService : InputMethodService() {
         characterView?.visibility = if (prefs.characterAnimEnabled) View.VISIBLE else View.GONE
         yukiSpeechBubble?.visibility = if (prefs.characterAnimEnabled) View.VISIBLE else View.GONE
 
+        // 同步 VRM/Lottie 渲染模式（設定頁可能已切換）
+        characterView?.let { cv ->
+            val wantVrm = prefs.vrmCharacterEnabled
+            if (wantVrm && cv.renderMode != CharacterView.RenderMode.VRM) {
+                cv.initVrmMode()  // VRM init 失敗會自動 fallback 回 Lottie
+            } else if (!wantVrm && cv.renderMode != CharacterView.RenderMode.LOTTIE) {
+                cv.initLottieMode()
+            }
+        }
+
         // 透明鍵盤模式
         applyTransparentMode()
 

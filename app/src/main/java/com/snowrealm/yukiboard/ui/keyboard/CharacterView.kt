@@ -41,7 +41,8 @@ class CharacterView @JvmOverloads constructor(
 
     enum class RenderMode { LOTTIE, VRM }
 
-    private var renderMode = RenderMode.LOTTIE
+    var renderMode = RenderMode.LOTTIE
+        private set
 
     // Lottie 渲染
     private var lottieView: LottieAnimationView? = null
