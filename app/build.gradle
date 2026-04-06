@@ -82,9 +82,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: AI候選字可正常點選（跳過引擎直接commit）\n" +
-                    "- fix: 防詐評分大改+URL掃描+委婉文案+三開關\n" +
-                    "- fix: 9項bug修復（VRM光照/注音排序/面板恢復等）"
+                    "- feat: 五語容錯（英/日/韓/拼音/注音鄰近鍵+語音相似修正）\n" +
+                    "- feat: AUTO智慧中英切換（注音鍵盤免手動切語言）\n" +
+                    "- feat: 滑動輸入改版（速度感知停頓偵測取代路徑記錄）"
             }
         }
         debug {
@@ -93,9 +93,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: AI候選字可正常點選（跳過引擎直接commit）\n" +
-                    "- fix: 防詐評分大改+URL掃描+委婉文案+三開關\n" +
-                    "- fix: 9項bug修復（VRM光照/注音排序/面板恢復等）"
+                    "- feat: 五語容錯（英/日/韓/拼音/注音鄰近鍵+語音相似修正）\n" +
+                    "- feat: AUTO智慧中英切換（注音鍵盤免手動切語言）\n" +
+                    "- feat: 滑動輸入改版（速度感知停頓偵測取代路徑記錄）"
             }
         }
     }
