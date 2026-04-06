@@ -430,7 +430,12 @@ class YukiBoardIMEService : InputMethodService() {
         }
 
         keyboardView.onSwipeSyllableConfirmed = { label ->
-            currentInputConnection?.commitText(label, 1)
+            // 注音符號/聲調不直接 commit（等滑動結束由候選字選擇）
+            val ch = label.firstOrNull()
+            val isBopomofo = ch != null && (ch in '\u3105'..'\u312F' || ch in setOf('ˉ','ˊ','ˇ','ˋ','˙'))
+            if (!isBopomofo) {
+                currentInputConnection?.commitText(label, 1)
+            }
         }
 
         // 自訂圖片/影片背景（最底層）
@@ -2414,9 +2419,13 @@ class YukiBoardIMEService : InputMethodService() {
         }
         ic?.finishComposingText()
 
-        // AUTO 模式下短按切換 → 退出 AUTO，回到正常循環
+        // AUTO 模式下短按切換 → 切鍵盤佈局（英文↔注音），保持 AUTO
         if (inputRouter.inputMode == InputMode.AUTO) {
-            prefs.autoInputMode = false
+            inputRouter.toggleAutoLayout()
+            keyboardView.updateKeyRows(rowsForAutoLayout())
+            keyboardView.showToast(if (inputRouter.autoLayout == InputRouter.AutoLayout.QWERTY) "⚡ 自動·英文鍵盤" else "⚡ 自動·注音鍵盤")
+            keyboardView.updateCandidates(emptyList(), emptyMap())
+            return
         }
 
         inputRouter.toggleLanguage()
@@ -2424,6 +2433,15 @@ class YukiBoardIMEService : InputMethodService() {
         keyboardView.currentInputMode = inputRouter.inputMode
         keyboardView.updateKeyRows(rowsForInputMode(inputRouter.inputMode))
         keyboardView.updateCandidates(emptyList(), emptyMap())
+    }
+
+    /** AUTO 模式下根據佈局偏好取得鍵盤行 */
+    private fun rowsForAutoLayout(): List<List<KeyModel>> {
+        return if (inputRouter.autoLayout == InputRouter.AutoLayout.QWERTY) {
+            KeyboardState.defaultQwertyRows()
+        } else {
+            KeyboardState.bopomofoRows()
+        }
     }
 
     /** 根據輸入模式取得對應鍵盤佈局 */
@@ -2434,8 +2452,8 @@ class YukiBoardIMEService : InputMethodService() {
         com.snowrealm.yukiboard.input.router.InputMode.SPEED_CANGJIE -> KeyboardState.cangjieRows()
         com.snowrealm.yukiboard.input.router.InputMode.JAPANESE -> KeyboardState.japaneseRows()
         com.snowrealm.yukiboard.input.router.InputMode.KOREAN -> KeyboardState.koreanRows()
-        // AUTO 模式用注音佈局（中英都能打，自動辨識）
-        com.snowrealm.yukiboard.input.router.InputMode.AUTO -> KeyboardState.bopomofoRows()
+        // AUTO 模式：根據使用者選擇的佈局顯示
+        com.snowrealm.yukiboard.input.router.InputMode.AUTO -> rowsForAutoLayout()
         else -> KeyboardState.defaultQwertyRows()
     }
 

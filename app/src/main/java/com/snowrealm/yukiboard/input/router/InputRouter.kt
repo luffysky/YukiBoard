@@ -50,6 +50,16 @@ class InputRouter(private val context: Context) {
     var autoEnglishScore = 0; private set
     var autoBopomofoScore = 0; private set
 
+    /** AUTO 模式下目前的鍵盤佈局（使用者可自由切換，不影響 AUTO 判斷） */
+    enum class AutoLayout { QWERTY, BOPOMOFO }
+    var autoLayout: AutoLayout = AutoLayout.BOPOMOFO
+        private set
+
+    /** AUTO 模式下切換鍵盤佈局（短按切換鍵） */
+    fun toggleAutoLayout() {
+        autoLayout = if (autoLayout == AutoLayout.QWERTY) AutoLayout.BOPOMOFO else AutoLayout.QWERTY
+    }
+
     // 注音符號 → 對應 QWERTY 小寫字母（大千式標準配置）
     private val BOPOMOFO_TO_QWERTY: Map<String, String> = mapOf(
         "ㄆ" to "q", "ㄊ" to "w", "ㄍ" to "e", "ㄐ" to "r", "ㄔ" to "t",
@@ -216,6 +226,11 @@ class InputRouter(private val context: Context) {
     }
 
     fun processSpace(): InputResult {
+        // 空白鍵選字前：歸檔當前候選到歷史
+        if (candidateManager.candidates.isNotEmpty()) {
+            val firstCandidate = candidateManager.candidates.firstOrNull() ?: ""
+            candidateManager.archiveCurrentAsHistory(firstCandidate)
+        }
         val result = activeEngine.processSpace()
         if (result is InputResult.CommitText) {
             onTextCommitted(result.text)
@@ -370,7 +385,12 @@ class InputRouter(private val context: Context) {
         autoBopomofoScore = bopoScore
 
         // ── 決策：只有分數差距明顯時才切換 ──
-        val threshold = if (autoQwertyBuffer.length <= 2) 40 else 20
+        // 前 2 字符閾值較高避免誤判，3+ 字符降低閾值加速切換
+        val threshold = when {
+            autoQwertyBuffer.length <= 1 -> 50  // 單字符不輕易切
+            autoQwertyBuffer.length == 2 -> 30  // 2 字符適中
+            else -> 15  // 3+ 字符，快速響應
+        }
 
         if (engScore - bopoScore >= threshold && activeEngine !is EnglishInputEngine) {
             // 切到英文引擎（保持 currentMode = AUTO）

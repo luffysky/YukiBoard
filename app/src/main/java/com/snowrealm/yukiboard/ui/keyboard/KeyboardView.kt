@@ -1880,7 +1880,16 @@ class KeyboardView(context: Context) : View(context) {
                 swipeVelocityPoints.clear()
                 swipeDownX = x
                 swipeDownY = y
-                val hit = keyEntries.firstOrNull { it.touchRect.contains(x, y) }
+                var hit = keyEntries.firstOrNull { it.touchRect.contains(x, y) }
+                // 精確命中失敗時，找最近的按鍵（擴大觸控範圍，改善首鍵捕捉）
+                if (hit == null && y >= candidateBarHeight) {
+                    val expandPx = 8f * density
+                    hit = keyEntries.firstOrNull {
+                        val r = it.touchRect
+                        x >= r.left - expandPx && x <= r.right + expandPx &&
+                        y >= r.top - expandPx && y <= r.bottom + expandPx
+                    }
+                }
                 if (hit != null) {
                     pressedKey = hit.key
                     longPressKey = hit.key
@@ -1955,7 +1964,15 @@ class KeyboardView(context: Context) : View(context) {
                 }
                 // 滑動輸入：追蹤經過的按鍵
                 if (swipeInputEnabled && !isLongPressTriggered && y >= candidateBarHeight) {
-                    val moveHit = keyEntries.firstOrNull { it.touchRect.contains(x, y) }
+                    var moveHit = keyEntries.firstOrNull { it.touchRect.contains(x, y) }
+                    // 擴大觸控範圍（滑動時手指容易偏移）
+                    if (moveHit == null) {
+                        val ep = 6f * density
+                        moveHit = keyEntries.firstOrNull {
+                            val r = it.touchRect
+                            x >= r.left - ep && x <= r.right + ep && y >= r.top - ep && y <= r.bottom + ep
+                        }
+                    }
                     if (moveHit != null && !moveHit.key.isSpecial) {
                         // 首鍵補充：如果 ACTION_DOWN 沒接收到首鍵（觸摸邊界），在此補上
                         if (swipeKeySequence.isEmpty() && confirmedSwipeKeys.isEmpty()) {
