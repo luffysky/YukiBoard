@@ -2145,6 +2145,113 @@ class SettingsActivity : AppCompatActivity() {
             setBackgroundColor(0xFF223344.toInt())
         })
 
+        // 語音選擇（列出所有裝置可用語音）
+        val voiceRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(0, dp(4), 0, dp(4))
+        }
+        val voiceTextCol = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.4f)
+        }
+        voiceTextCol.addView(TextView(this).apply {
+            text = "語音音色"
+            textSize = 14f
+            setTextColor(0xFFE8F4FF.toInt())
+        })
+        voiceTextCol.addView(TextView(this).apply {
+            text = "選擇 TTS 語音"
+            textSize = 10f
+            setTextColor(0xFF667788.toInt())
+        })
+        voiceRow.addView(voiceTextCol)
+
+        val currentVoiceName = prefs.ttsVoiceName
+        val voiceBtn = TextView(this).apply {
+            text = if (currentVoiceName.isEmpty()) "系統預設" else currentVoiceName.substringAfterLast("#").take(30)
+            textSize = 12f
+            setTextColor(0xFF9ECFFF.toInt())
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xFF1A2A3A.toInt())
+                cornerRadius = dp(6).toFloat()
+            }
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.6f)
+        }
+        voiceBtn.setOnClickListener { btn ->
+            val handler = android.os.Handler(android.os.Looper.getMainLooper())
+            // 初始化一個臨時 TTS 引擎來列出語音
+            val tmpTts = android.speech.tts.TextToSpeech(this@SettingsActivity) { status ->
+                if (status != android.speech.tts.TextToSpeech.SUCCESS) {
+                    handler.post { android.widget.Toast.makeText(this@SettingsActivity, "TTS 初始化失敗", android.widget.Toast.LENGTH_SHORT).show() }
+                    return@TextToSpeech
+                }
+                handler.post {
+                    val voices = try {
+                        (btn.tag as? android.speech.tts.TextToSpeech)?.voices?.toList() ?: emptyList()
+                    } catch (_: Exception) { emptyList() }
+
+                    if (voices.isEmpty()) {
+                        android.widget.Toast.makeText(this@SettingsActivity, "無可用語音", android.widget.Toast.LENGTH_SHORT).show()
+                        (btn.tag as? android.speech.tts.TextToSpeech)?.shutdown()
+                        btn.tag = null
+                        return@post
+                    }
+
+                    // 按語言分組排序
+                    val sorted = voices.sortedWith(compareBy<android.speech.tts.Voice> { it.locale.language }
+                        .thenBy { it.locale.country }
+                        .thenByDescending { it.quality }
+                        .thenBy { it.name })
+
+                    val displayNames = arrayOf("🔄 系統預設") + sorted.map { v ->
+                        val lang = v.locale.displayLanguage
+                        val country = v.locale.displayCountry.takeIf { it.isNotEmpty() }?.let { " ($it)" } ?: ""
+                        val q = if (v.quality >= 400) " ★" else if (v.quality >= 300) " ☆" else ""
+                        val net = if (v.isNetworkConnectionRequired) " ☁" else ""
+                        "$lang$country$q$net — ${v.name}"
+                    }.toTypedArray()
+
+                    val currentIdx = if (prefs.ttsVoiceName.isEmpty()) 0
+                        else sorted.indexOfFirst { it.name == prefs.ttsVoiceName }.let { if (it >= 0) it + 1 else 0 }
+
+                    android.app.AlertDialog.Builder(this@SettingsActivity, android.R.style.Theme_Material_Dialog_Alert)
+                        .setTitle("選擇語音音色 (${sorted.size} 種)")
+                        .setSingleChoiceItems(displayNames, currentIdx) { dialog, which ->
+                            if (which == 0) {
+                                prefs.ttsVoiceName = ""
+                                (btn as TextView).text = "系統預設"
+                            } else {
+                                val selected = sorted[which - 1]
+                                prefs.ttsVoiceName = selected.name
+                                (btn as TextView).text = displayNames[which].take(35)
+
+                                // 試聽選中的語音
+                                val tmpEngine = btn.tag as? android.speech.tts.TextToSpeech
+                                if (tmpEngine != null) {
+                                    tmpEngine.voice = selected
+                                    tmpEngine.setSpeechRate(prefs.ttsSpeed)
+                                    tmpEngine.speak("你好，我是雪凜", android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "preview")
+                                }
+                            }
+                            dialog.dismiss()
+                        }
+                        .setOnDismissListener {
+                            // 延遲關閉，讓試聽播完
+                            handler.postDelayed({
+                                (btn.tag as? android.speech.tts.TextToSpeech)?.shutdown()
+                                btn.tag = null
+                            }, 3000)
+                        }
+                        .show()
+                }
+            }
+            btn.tag = tmpTts
+        }
+        voiceRow.addView(voiceBtn)
+        outer.addView(voiceRow)
+
         // 功能開關
         outer.addView(switchRow("翻譯朗讀", "翻譯完成後自動朗讀結果", prefs.ttsTranslateRead) { prefs.ttsTranslateRead = it })
         outer.addView(switchRow("Yuki 語音", "雪凜對話泡泡同步語音", prefs.ttsYukiVoice) { prefs.ttsYukiVoice = it })

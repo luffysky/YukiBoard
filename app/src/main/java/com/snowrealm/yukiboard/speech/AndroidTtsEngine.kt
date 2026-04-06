@@ -21,12 +21,30 @@ class AndroidTtsEngine(context: Context, private val onInitDone: ((Boolean) -> U
     private val tag = "AndroidTtsEngine"
     private var tts: TextToSpeech? = null
     private var pendingCallbacks = mutableMapOf<String, (() -> Unit)?>()
+    private var selectedVoiceName: String? = null
 
     override var isReady: Boolean = false
         private set
 
     override val isSpeaking: Boolean
         get() = tts?.isSpeaking == true
+
+    /** 所有可用語音資訊 */
+    data class VoiceInfo(
+        val name: String,
+        val locale: Locale,
+        val quality: Int,
+        val isNetworkRequired: Boolean
+    ) {
+        /** 顯示用標籤：語言名 + 品質 + 名稱 */
+        fun displayLabel(): String {
+            val lang = locale.displayLanguage
+            val country = locale.displayCountry.takeIf { it.isNotEmpty() }?.let { " ($it)" } ?: ""
+            val q = if (quality >= 400) "★" else if (quality >= 300) "☆" else ""
+            val net = if (isNetworkRequired) " ☁" else ""
+            return "$lang$country $q$net — $name"
+        }
+    }
 
     init {
         tts = TextToSpeech(context.applicationContext) { status ->
@@ -55,11 +73,61 @@ class AndroidTtsEngine(context: Context, private val onInitDone: ((Boolean) -> U
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                         .build()
                 )
-                Log.i(tag, "TTS initialized, engine=${tts?.defaultEngine}")
+                // 套用已選語音
+                if (!selectedVoiceName.isNullOrEmpty()) {
+                    applyVoiceByName(selectedVoiceName!!)
+                }
+                Log.i(tag, "TTS initialized, engine=${tts?.defaultEngine}, voices=${getAvailableVoices().size}")
             } else {
                 Log.e(tag, "TTS init failed, status=$status")
             }
             onInitDone?.invoke(isReady)
+        }
+    }
+
+    /** 取得所有可用語音列表（依語言分組排序） */
+    fun getAvailableVoices(): List<VoiceInfo> {
+        val engine = tts ?: return emptyList()
+        if (!isReady) return emptyList()
+        return try {
+            engine.voices?.map { voice ->
+                VoiceInfo(
+                    name = voice.name,
+                    locale = voice.locale,
+                    quality = voice.quality,
+                    isNetworkRequired = voice.isNetworkConnectionRequired
+                )
+            }?.sortedWith(compareBy<VoiceInfo> { it.locale.language }
+                .thenBy { it.locale.country }
+                .thenByDescending { it.quality }
+                .thenBy { it.name }
+            ) ?: emptyList()
+        } catch (e: Exception) {
+            Log.e(tag, "getAvailableVoices failed", e)
+            emptyList()
+        }
+    }
+
+    /** 依語音名稱設定語音 */
+    fun setVoice(voiceName: String?) {
+        selectedVoiceName = voiceName
+        if (!voiceName.isNullOrEmpty() && isReady) {
+            applyVoiceByName(voiceName)
+        }
+    }
+
+    private fun applyVoiceByName(voiceName: String) {
+        val engine = tts ?: return
+        try {
+            val voice = engine.voices?.firstOrNull { it.name == voiceName }
+            if (voice != null) {
+                engine.voice = voice
+                Log.i(tag, "Voice set: ${voice.name} (${voice.locale})")
+            } else {
+                Log.w(tag, "Voice not found: $voiceName")
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "setVoice failed: $voiceName", e)
         }
     }
 

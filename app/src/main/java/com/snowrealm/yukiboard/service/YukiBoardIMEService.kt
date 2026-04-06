@@ -1526,10 +1526,14 @@ class YukiBoardIMEService : InputMethodService() {
                 if (apiKey.isNotBlank()) {
                     com.snowrealm.yukiboard.speech.GoogleCloudTtsEngine(apiKey)
                 } else {
-                    com.snowrealm.yukiboard.speech.AndroidTtsEngine(applicationContext)
+                    com.snowrealm.yukiboard.speech.AndroidTtsEngine(applicationContext).also {
+                        it.setVoice(prefs.ttsVoiceName.takeIf { v -> v.isNotEmpty() })
+                    }
                 }
             }
-            else -> com.snowrealm.yukiboard.speech.AndroidTtsEngine(applicationContext)
+            else -> com.snowrealm.yukiboard.speech.AndroidTtsEngine(applicationContext).also {
+                it.setVoice(prefs.ttsVoiceName.takeIf { v -> v.isNotEmpty() })
+            }
         }
     }
 

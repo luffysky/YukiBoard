@@ -117,6 +117,10 @@ class YukiPreferences(context: Context) {
     var ttsCandidateRead: Boolean by BoolPref("tts_candidate_read", false)
     /** TTS 語速（0.5~2.0） */
     var ttsSpeed: Float by FloatPref("tts_speed", 1.0f)
+    /** TTS 語音名稱（空字串 = 使用系統預設） */
+    var ttsVoiceName: String
+        get() = prefs.getString("tts_voice_name", "") ?: ""
+        set(value) = prefs.edit().putString("tts_voice_name", value).apply()
     /** Google Cloud TTS API Key */
     var googleCloudTtsApiKey: String
         get() = prefs.getString("google_cloud_tts_key", "") ?: ""
