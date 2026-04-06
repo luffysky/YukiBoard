@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 90
-        versionName "0.9.24"
+        versionCode 91
+        versionName "0.9.25"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,13 +82,14 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: TTS 語音音色選擇器 — 列出裝置所有可用語音 + 試聽\n" +
-                    "- fix: 雪凜角色不見修復 — bringToFront z-order + characterAnimEnabled 同步\n" +
-                    "- fix: 按鍵上標/文字溢出裁切修復\n" +
-                    "- fix: 候選字空白過濾\n" +
-                    "- feat: 按鍵文字透明度拉桿 keyTextOpacity\n" +
+                    "- fix: 雪凜 VRM/Lottie 即時切換 — 設定頁切換後不再消失\n" +
+                    "- fix: VRM 初始化失敗自動 fallback 回 Lottie\n" +
+                    "- feat: 雪凜角色開關（設定頁可完全隱藏）\n" +
+                    "- feat: TTS 語音音色選擇器 + 試聽\n" +
+                    "- fix: 按鍵上標/文字溢出裁切\n" +
+                    "- feat: 按鍵文字透明度拉桿\n" +
                     "- feat: 常用語面板擴充（11 分類 + 日韓英）+ tab 列捲動\n" +
-                    "- feat: 日文漢字辭書擴充 300→3000+"
+                    "- feat: 日文漢字辭書 3000+"
             }
         }
         debug {
@@ -97,13 +98,14 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: TTS 語音音色選擇器 — 列出裝置所有可用語音 + 試聽\n" +
-                    "- fix: 雪凜角色不見修復 — bringToFront z-order + characterAnimEnabled 同步\n" +
-                    "- fix: 按鍵上標/文字溢出裁切修復\n" +
-                    "- fix: 候選字空白過濾\n" +
-                    "- feat: 按鍵文字透明度拉桿 keyTextOpacity\n" +
+                    "- fix: 雪凜 VRM/Lottie 即時切換 — 設定頁切換後不再消失\n" +
+                    "- fix: VRM 初始化失敗自動 fallback 回 Lottie\n" +
+                    "- feat: 雪凜角色開關（設定頁可完全隱藏）\n" +
+                    "- feat: TTS 語音音色選擇器 + 試聽\n" +
+                    "- fix: 按鍵上標/文字溢出裁切\n" +
+                    "- feat: 按鍵文字透明度拉桿\n" +
                     "- feat: 常用語面板擴充（11 分類 + 日韓英）+ tab 列捲動\n" +
-                    "- feat: 日文漢字辭書擴充 300→3000+"
+                    "- feat: 日文漢字辭書 3000+"
             }
         }
     }
