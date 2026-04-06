@@ -470,6 +470,7 @@ class YukiBoardIMEService : InputMethodService() {
         keyboardView.bgOverlayAlpha = prefs.bgOverlayAlpha
         keyboardView.keyScalePercent = prefs.keyScalePercent
         keyboardView.keyOpacity = prefs.keyOpacity
+        keyboardView.keyTextOpacity = prefs.keyTextOpacity
         keyboardView.perKeySizes = prefs.getAllPerKeySizes()
         keyboardView.hapticEnabled = prefs.keyPressVibration
         keyboardView.swipeTrailEnabled = prefs.swipeTrailEnabled
@@ -501,7 +502,7 @@ class YukiBoardIMEService : InputMethodService() {
         glSurfaceView = gl
 
         // 雪凜角色浮動在左上角
-        // VRM 在 IME SurfaceView 下容易出問題，預設 Lottie；使用者可在設定開啟 VRM
+        // VRM 在 IME SurfaceView 下容易出問題，預設 Lottie；���用者可在設定開啟 VRM
         val charSize = (72 * resources.displayMetrics.density).toInt()
         val charView = CharacterView(this)
         if (prefs.vrmCharacterEnabled) {
@@ -514,6 +515,10 @@ class YukiBoardIMEService : InputMethodService() {
         }
         keyboardContainer.addView(charView, charParams)
         characterView = charView
+        // 依偏好設定控制角色顯示
+        if (!prefs.characterAnimEnabled) {
+            charView.visibility = View.GONE
+        }
 
         // 雪凜語音泡泡（顯示微吐槽）
         val bubble = com.snowrealm.yukiboard.yuki.YukiSpeechBubble(this)
@@ -648,6 +653,10 @@ class YukiBoardIMEService : InputMethodService() {
 
         glSurfaceView?.onResume()
 
+        // 同步角色動畫顯示偏好（設定頁可能已更改）
+        characterView?.visibility = if (prefs.characterAnimEnabled) View.VISIBLE else View.GONE
+        yukiSpeechBubble?.visibility = if (prefs.characterAnimEnabled) View.VISIBLE else View.GONE
+
         // 透明鍵盤模式
         applyTransparentMode()
 
@@ -672,6 +681,7 @@ class YukiBoardIMEService : InputMethodService() {
         keyboardView.customKeyLabelColor = prefs.customKeyLabelColor
         keyboardView.keyScalePercent = prefs.keyScalePercent
         keyboardView.keyOpacity = prefs.keyOpacity
+        keyboardView.keyTextOpacity = prefs.keyTextOpacity
         keyboardView.perKeySizes = prefs.getAllPerKeySizes()
         keyboardView.hapticEnabled = prefs.keyPressVibration
         keyboardView.swipeTrailEnabled = prefs.swipeTrailEnabled
@@ -1121,6 +1131,7 @@ class YukiBoardIMEService : InputMethodService() {
                 p.onKeySettingsChanged = {
                     keyboardView.keyScalePercent = prefs.keyScalePercent
                     keyboardView.keyOpacity = prefs.keyOpacity
+        keyboardView.keyTextOpacity = prefs.keyTextOpacity
                     // 透明鍵盤即時套用
                     applyTransparentMode()
                     val bgHasNow = backgroundView?.reloadFromStorage() ?: false
@@ -1236,6 +1247,9 @@ class YukiBoardIMEService : InputMethodService() {
             isPanelBehindKeyboard = false
             panelContainer.bringToFront()
         }
+        // 確保雪凜角色始終在最上層
+        characterView?.bringToFront()
+        yukiSpeechBubble?.bringToFront()
         // 確保鍵盤重新獲得焦點和觸控
         keyboardView.isEnabled = true
         keyboardView.requestFocus()
@@ -1310,11 +1324,11 @@ class YukiBoardIMEService : InputMethodService() {
         panelContainer.alpha = 1f
     }
 
-    /** 交換面板與鍵盤的圖層：面板到後面 → 可打字；再按一次 → 面板回前面 */
+    /** 交換面板與鍵盤的圖層：��板到後面 → 可打字；再按一次 → 面板回前面 */
     private fun togglePanelLayer() {
         isPanelBehindKeyboard = !isPanelBehindKeyboard
         if (isPanelBehindKeyboard) {
-            // 面板移到鍵盤後面：讓 keyboardView 接收觸控
+            // 面板移到鍵盤後面：讓 keyboardView 接收觸���
             keyboardView.bringToFront()
             // 更新按鈕文字
             (panelControlBar as? LinearLayout)?.let { bar ->
@@ -1325,7 +1339,7 @@ class YukiBoardIMEService : InputMethodService() {
                 }
             }
         } else {
-            // 面板回到前面
+            // 面板回到��面
             panelContainer.bringToFront()
             (panelControlBar as? LinearLayout)?.let { bar ->
                 val btn = bar.getChildAt(bar.childCount - 1)
@@ -1335,6 +1349,9 @@ class YukiBoardIMEService : InputMethodService() {
                 }
             }
         }
+        // 確保雪凜角色 + 語音泡泡始終在最上層
+        characterView?.bringToFront()
+        yukiSpeechBubble?.bringToFront()
     }
 
     private fun applyTheme(theme: KeyboardTheme) {

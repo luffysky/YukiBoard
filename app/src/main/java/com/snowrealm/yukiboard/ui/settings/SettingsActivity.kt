@@ -789,7 +789,30 @@ class SettingsActivity : AppCompatActivity() {
             })
         })
 
-        // ── 鍵盤完整預覽（背景 + 遮罩 + 按鍵） ──
+        // ── 文字透明度拉桿 ──
+        val keyTextOpLabel = TextView(this).apply {
+            text = "文字不透明度: %d%%".format((prefs.keyTextOpacity * 100) / 255)
+            textSize = 12f
+            setTextColor(0xFF7FD8FF.toInt())
+            setPadding(dp(12), dp(4), 0, dp(4))
+        }
+        card.addView(keyTextOpLabel)
+        card.addView(SeekBar(this).apply {
+            max = 255
+            progress = prefs.keyTextOpacity
+            setPadding(dp(12), dp(4), dp(12), dp(8))
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+                    prefs.keyTextOpacity = p
+                    keyTextOpLabel.text = "文字不透明度: %d%%".format((p * 100) / 255)
+                    fullPreviewView?.invalidate()
+                }
+                override fun onStartTrackingTouch(sb: SeekBar?) {}
+                override fun onStopTrackingTouch(sb: SeekBar?) {}
+            })
+        })
+
+        // ── ��盤完整預覽（背景 + 遮罩 + 按鍵） ──
         val previewTitle = TextView(this).apply {
             text = "鍵盤預覽"
             textSize = 13f
@@ -1125,8 +1148,13 @@ class SettingsActivity : AppCompatActivity() {
                 val cr = theme.keyCornerRadiusDp * dens * 0.6f
                 val fontSize = 10f * dens * scalePct / 100f
                 textPaint.textSize = fontSize
-                textPaint.color = if (prefs.customKeyLabelColor != 0) prefs.customKeyLabelColor
+                val baseLabelColor = if (prefs.customKeyLabelColor != 0) prefs.customKeyLabelColor
                     else theme.keyLabelColorInt
+                val textAlpha = prefs.keyTextOpacity
+                textPaint.color = if (textAlpha < 255) {
+                    val a = ((baseLabelColor ushr 24) * textAlpha / 255).coerceIn(0, 255)
+                    (a shl 24) or (baseLabelColor and 0x00FFFFFF)
+                } else baseLabelColor
 
                 val totalUnits = rows.maxOf { row -> row.sumOf { it.widthWeight.toDouble() }.toFloat() }
 

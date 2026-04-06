@@ -493,7 +493,7 @@ class InputRouter(private val context: Context) {
     }
 
     private fun updateCandidates() {
-        val raw = activeEngine.getCandidates()
+        val raw = activeEngine.getCandidates().filter { it.isNotBlank() }
         val composing = activeEngine.composingText
 
         // 非英文模式：引擎候選 + 自適應字典排序（composing 有值才加整句預測）
@@ -528,6 +528,7 @@ class InputRouter(private val context: Context) {
             )
             val sentenceSuggestions = if (composing.isNotEmpty()) {
                 smartInput.getSentencePredictions(contextBeforeCursor, composing, 3)
+                    .filter { it.isNotBlank() }
                     .let { if (isCjkMode) it.filter { s -> s.any { c -> c.code > 0x2E80 } } else it }
             } else emptyList()
 

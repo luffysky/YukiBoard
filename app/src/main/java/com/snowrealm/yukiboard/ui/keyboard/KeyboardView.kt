@@ -210,6 +210,9 @@ class KeyboardView(context: Context) : View(context) {
     /** 按鍵背景不透明度 0~255 */
     var keyOpacity: Int = 255
         set(value) { field = value.coerceIn(0, 255); invalidate() }
+    /** 按鍵文字不透明度 0~255 */
+    var keyTextOpacity: Int = 255
+        set(value) { field = value.coerceIn(0, 255); invalidate() }
     /** 個別按鍵尺寸倍率 (keyId -> (widthMul, heightMul)) */
     var perKeySizes: Map<String, Pair<Float, Float>> = emptyMap()
         set(value) { field = value; invalidate() }
@@ -1366,16 +1369,38 @@ class KeyboardView(context: Context) : View(context) {
                     else -> key.label
                 }
 
-                val effectiveLabelColor = if (customKeyLabelColor != 0) customKeyLabelColor else theme.keyLabelColorInt
+                val baseLabelColor = if (customKeyLabelColor != 0) customKeyLabelColor else theme.keyLabelColorInt
+                val effectiveLabelColor = if (keyTextOpacity < 255) {
+                    val a = ((baseLabelColor ushr 24) * keyTextOpacity / 255).coerceIn(0, 255)
+                    (a shl 24) or (baseLabelColor and 0x00FFFFFF)
+                } else baseLabelColor
                 useLabelPaint.color = if (ctrlHint != null) theme.candidateSelectedColorInt else effectiveLabelColor
                 val textY = rect.top + (rect.height() + useLabelPaint.textSize) / 2f - useLabelPaint.descent()
-                canvas.drawText(displayLabel, rect.centerX(), textY, useLabelPaint)
+                val labelWidth = useLabelPaint.measureText(displayLabel)
+                if (labelWidth > rect.width()) {
+                    canvas.save()
+                    canvas.clipRect(rect)
+                    canvas.drawText(displayLabel, rect.centerX(), textY, useLabelPaint)
+                    canvas.restore()
+                } else {
+                    canvas.drawText(displayLabel, rect.centerX(), textY, useLabelPaint)
+                }
 
-                // Alt hint：右上角顯示第一個長按字元
+                // Alt hint：右上角顯示第一個長按字元（clipping 防止溢出）
                 if (key.altChars.isNotEmpty()) {
                     altHintPaint.color = (effectiveLabelColor and 0x00FFFFFF) or 0x80000000.toInt()
                     val hint = key.altChars.first()
-                    canvas.drawText(hint, rect.right - 3f * density, rect.top + 11f * density, altHintPaint)
+                    val hintWidth = altHintPaint.measureText(hint)
+                    val availW = rect.width() - 4f * density
+                    if (hintWidth <= availW) {
+                        canvas.drawText(hint, rect.right - 3f * density, rect.top + altHintPaint.textSize + 1f * density, altHintPaint)
+                    } else {
+                        // 文字太寬：用 clipRect 裁切
+                        canvas.save()
+                        canvas.clipRect(rect)
+                        canvas.drawText(hint, rect.right - 3f * density, rect.top + altHintPaint.textSize + 1f * density, altHintPaint)
+                        canvas.restore()
+                    }
                 }
 
                 x += keyWidth

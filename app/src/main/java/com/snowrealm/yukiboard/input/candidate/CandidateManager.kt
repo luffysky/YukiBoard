@@ -65,11 +65,11 @@ class CandidateManager {
         }
 
         _candidates.clear()
-        // 當前段候選字排最前面（使用者正在打的內容優先）
-        _candidates.addAll(newCandidates)
+        // 當前段候選字排最前面（使用者正在打的內容優先），過濾空白候選
+        _candidates.addAll(newCandidates.filter { it.isNotBlank() })
         // 歷史候選字排後面（前段打過的詞，供回選）
         for (h in _historyCandidates) {
-            if (h !in newCandidates) _candidates.add(h)
+            if (h.isNotBlank() && h !in newCandidates) _candidates.add(h)
         }
         currentCandidateCount = newCandidates.size
         pageIndex = 0

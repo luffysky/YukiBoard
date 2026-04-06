@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 88
-        versionName "0.9.22"
+        versionCode 89
+        versionName "0.9.23"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,9 +82,12 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: GIF/翻譯面板關閉後按鍵被攔截 — closePanel 清除面板引用\n" +
-                    "- fix: 面板搜尋框打錯字無法刪除修復\n" +
-                    "- chore: 待辦更新（剪貼簿強化 + 自訂辭彙 + TTS 音色 + 解密面板）"
+                    "- fix: 雪凜角色不見修復 — bringToFront z-order + characterAnimEnabled 同步\n" +
+                    "- fix: 按鍵上標/文字溢出裁切修復\n" +
+                    "- fix: 候選字空白過濾\n" +
+                    "- feat: 按鍵文字透明度拉桿 keyTextOpacity\n" +
+                    "- feat: 常用語面板擴充（11 分類 + 日韓英）+ tab 列捲動\n" +
+                    "- feat: 日文漢字辭書擴充 300→3000+"
             }
         }
         debug {
@@ -93,9 +96,12 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: GIF/翻譯面板關閉後按鍵被攔截 — closePanel 清除面板引用\n" +
-                    "- fix: 面板搜尋框打錯字無法刪除修復\n" +
-                    "- chore: 待辦更新（剪貼簿強化 + 自訂辭彙 + TTS 音色 + 解密面板）"
+                    "- fix: 雪凜角色不見修復 — bringToFront z-order + characterAnimEnabled 同步\n" +
+                    "- fix: 按鍵上標/文字溢出裁切修復\n" +
+                    "- fix: 候選字空白過濾\n" +
+                    "- feat: 按鍵文字透明度拉桿 keyTextOpacity\n" +
+                    "- feat: 常用語面板擴充（11 分類 + 日韓英）+ tab 列捲動\n" +
+                    "- feat: 日文漢字辭書擴充 300→3000+"
             }
         }
     }
