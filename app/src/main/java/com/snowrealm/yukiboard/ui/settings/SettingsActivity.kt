@@ -159,6 +159,9 @@ class SettingsActivity : AppCompatActivity() {
             aiChildren += switchRow("雪凜聊天", "跟雪凜對話，幫你想怎麼說", prefs.aiYukiChat) { prefs.aiYukiChat = it }
             aiChildren += switchRow("心情日記", "被動偵測打字情緒", prefs.aiMoodDiary) { prefs.aiMoodDiary = it }
             aiChildren += switchRow("天氣助理", "天氣資訊與穿衣建議", prefs.aiWeather) { prefs.aiWeather = it }
+            aiChildren += switchRow("防詐偵測", "分析對話內容偵測可疑模式", prefs.aiFraudDetect) { prefs.aiFraudDetect = it }
+            aiChildren += switchRow("被動防詐掃描", "打字時自動掃描上下文", prefs.aiFraudPassiveScan) { prefs.aiFraudPassiveScan = it }
+            aiChildren += switchRow("連結風險掃描", "自動偵測可疑網址", prefs.aiFraudUrlScan) { prefs.aiFraudUrlScan = it }
 
             // AI 設定按鈕
             aiChildren += Button(this).apply {

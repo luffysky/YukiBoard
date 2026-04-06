@@ -27,15 +27,15 @@ class FraudAIAnalyzer(private val context: Context) {
     // =========================================================================
 
     enum class FraudType(val label: String, val emoji: String) {
-        INVESTMENT("投資詐騙", "📈"),
-        ROMANCE("感情詐騙", "💔"),
-        IMPERSONATION("冒充詐騙", "🎭"),
-        SHOPPING("購物詐騙", "🛒"),
-        PHISHING("釣魚詐騙", "🎣"),
-        GAMBLING("博弈詐騙", "🎰"),
-        LOAN("貸款詐騙", "💳"),
-        JOB("求職詐騙", "💼"),
-        UNKNOWN("疑似詐騙", "⚠️")
+        INVESTMENT("投資風險", "📈"),
+        ROMANCE("感情風險", "💔"),
+        IMPERSONATION("冒充風險", "🎭"),
+        SHOPPING("購物風險", "🛒"),
+        PHISHING("釣魚風險", "🎣"),
+        GAMBLING("博弈風險", "🎰"),
+        LOAN("貸款風險", "💳"),
+        JOB("求職風險", "💼"),
+        UNKNOWN("可疑模式", "⚠️")
     }
 
     data class RuleResult(
@@ -129,8 +129,206 @@ class FraudAIAnalyzer(private val context: Context) {
         ), 9)
     )
 
+    // =========================================================================
+    // 組合模式 — 多個關鍵字同時出現 = 高風險
+    // =========================================================================
+
+    private data class ComboPattern(
+        val type: FraudType,
+        val requiredAny: List<List<String>>,  // 每組至少命中一個
+        val bonusScore: Int,
+        val label: String
+    )
+
+    /** 組合模式：多組關鍵字同時出現才觸發，分數遠高於單一關鍵字 */
+    private val comboPatterns = listOf(
+        // 「老師/導師/助理」+「投資/獲利/入金/群組」= 典型投資詐騙
+        ComboPattern(FraudType.INVESTMENT,
+            listOf(
+                listOf("老師", "導師", "助理", "分析師", "顧問", "學長姐"),
+                listOf("投資", "獲利", "入金", "群", "操盤", "帶單", "跟單", "報酬")
+            ), 55, "老師帶投資"),
+
+        // 「保證/穩賺」+「獲利/報酬/收益」= 不實承諾
+        ComboPattern(FraudType.INVESTMENT,
+            listOf(
+                listOf("保證", "穩賺", "零風險", "絕對", "一定"),
+                listOf("獲利", "報酬", "收益", "賺", "翻倍", "回本")
+            ), 50, "保證獲利話術"),
+
+        // 「加LINE/加我/私訊」+「投資/賺錢/群組」= 引流
+        ComboPattern(FraudType.INVESTMENT,
+            listOf(
+                listOf("加LINE", "加我", "私訊", "加好友", "加入", "進群"),
+                listOf("投資", "賺錢", "獲利", "群組", "投資群", "操盤群")
+            ), 45, "投資引流"),
+
+        // 「點擊/登入」+「連結/網址/URL」+「帳號/密碼/驗證」= 釣魚
+        ComboPattern(FraudType.PHISHING,
+            listOf(
+                listOf("點擊", "登入", "打開", "進入", "前往"),
+                listOf("連結", "網址", "link", "URL", "頁面")
+            ), 45, "釣魚導向"),
+
+        // 「匯款/轉帳」+「安全帳戶/監管/凍結」= 冒充公務員
+        ComboPattern(FraudType.IMPERSONATION,
+            listOf(
+                listOf("匯款", "轉帳", "存入", "ATM"),
+                listOf("安全帳戶", "監管", "凍結", "法院", "檢察")
+            ), 60, "冒充公務員"),
+
+        // 「代購/下單」+「先付/訂金/匯款」= 購物詐騙
+        ComboPattern(FraudType.SHOPPING,
+            listOf(
+                listOf("代購", "下單", "購買", "搶購"),
+                listOf("先付", "訂金", "匯款", "轉帳", "私下交易")
+            ), 40, "購物先付款"),
+
+        // 「借錢/急用」+「愛/寶貝/親愛的」= 感情詐騙
+        ComboPattern(FraudType.ROMANCE,
+            listOf(
+                listOf("借", "急用", "周轉", "手術", "住院"),
+                listOf("愛你", "寶貝", "親愛的", "老婆", "老公", "想你")
+            ), 50, "感情借款"),
+
+        // 「高薪/日薪」+「兼職/在家/簡單」= 求職詐騙
+        ComboPattern(FraudType.JOB,
+            listOf(
+                listOf("高薪", "日薪", "月入", "輕鬆賺"),
+                listOf("兼職", "在家", "簡單", "不用經驗", "手機就能")
+            ), 45, "高薪兼職話術")
+    )
+
+    // =========================================================================
+    // URL 風險偵測
+    // =========================================================================
+
+    /** 高風險短網址域名 */
+    private val suspiciousShortDomains = setOf(
+        "bit.ly", "tinyurl.com", "reurl.cc", "pse.is",
+        "lihi.cc", "lihi1.cc", "lihi2.cc", "lihi3.cc",
+        "is.gd", "v.gd", "shorturl.at", "cutt.ly",
+        "rb.gy", "t.ly", "s.id"
+    )
+
+    /** 高風險 TLD */
+    private val suspiciousTLDs = setOf(
+        ".xyz", ".top", ".club", ".work", ".buzz",
+        ".surf", ".monster", ".icu", ".fun", ".site",
+        ".online", ".click", ".link", ".rest", ".cam",
+        ".gq", ".ml", ".tk", ".cf", ".ga"
+    )
+
+    /** 假冒知名網站的域名模式 */
+    private val impersonationDomainPatterns = listOf(
+        Regex("""(?i)l[i1]ne[\-.]"""),           // l1ne, liine (假 LINE)
+        Regex("""(?i)go+gle(?!\.com)"""),         // gooogle (假 Google)
+        Regex("""(?i)facebo+k(?!\.com)"""),       // facebok (假 Facebook)
+        Regex("""(?i)paypa[l1](?!\.com)"""),      // paypa1 (假 PayPal)
+        Regex("""(?i)app[l1]e(?!\.com)"""),       // app1e (假 Apple)
+        Regex("""(?i)amaz[o0]n(?!\.com)"""),      // amaz0n (假 Amazon)
+        Regex("""(?i)micr[o0]s[o0]ft(?!\.com)"""), // micr0soft
+        Regex("""(?i)instag[r]?am(?!\.com)"""),   // instagam
+    )
+
+    /** URL 提取正則 */
+    private val urlPattern = Regex(
+        """(?i)(?:https?://|www\.)[^\s<>\[\](){}「」『』，。！？、；：\u200B-\u200D\uFEFF]{4,200}"""
+    )
+
+    data class UrlRisk(
+        val url: String,
+        val score: Int,
+        val reasons: List<String>
+    )
+
+    /**
+     * 掃描文本中的 URL 並評估風險。
+     */
+    fun scanUrls(text: String): List<UrlRisk> {
+        val urls = urlPattern.findAll(text).map { it.value }.toList()
+        if (urls.isEmpty()) return emptyList()
+
+        return urls.map { url -> analyzeUrl(url) }
+    }
+
+    private fun analyzeUrl(url: String): UrlRisk {
+        val lower = url.lowercase()
+        var score = 0
+        val reasons = mutableListOf<String>()
+
+        // 1. 短網址（高風險，因為隱藏真實目的地）
+        for (domain in suspiciousShortDomains) {
+            if (lower.contains(domain)) {
+                score += 25
+                reasons.add("短網址（$domain）隱藏真實網址")
+                break
+            }
+        }
+
+        // 2. 可疑 TLD
+        for (tld in suspiciousTLDs) {
+            if (lower.contains(tld)) {
+                score += 20
+                reasons.add("可疑域名後綴（$tld）")
+                break
+            }
+        }
+
+        // 3. 假冒知名網站
+        for (pattern in impersonationDomainPatterns) {
+            if (pattern.containsMatchIn(lower)) {
+                score += 40
+                reasons.add("疑似仿冒知名網站")
+                break
+            }
+        }
+
+        // 4. IP 位址直接存取（非正規網站）
+        if (Regex("""https?://\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}""").containsMatchIn(lower)) {
+            score += 30
+            reasons.add("使用 IP 位址而非域名")
+        }
+
+        // 5. 可疑路徑關鍵字
+        val pathKeywords = listOf("login", "signin", "verify", "confirm", "secure", "account", "update", "wallet", "withdraw")
+        for (kw in pathKeywords) {
+            if (lower.contains(kw)) {
+                score += 10
+                reasons.add("網址包含可疑路徑（$kw）")
+                break
+            }
+        }
+
+        // 6. 非 HTTPS
+        if (lower.startsWith("http://") && !lower.startsWith("https://")) {
+            score += 10
+            reasons.add("未使用加密連線（HTTP）")
+        }
+
+        // 7. 超長子域名（常見於釣魚）
+        val domainPart = lower.removePrefix("https://").removePrefix("http://").split("/").firstOrNull() ?: ""
+        if (domainPart.count { it == '.' } >= 4) {
+            score += 15
+            reasons.add("過多子域名層級")
+        }
+
+        // 8. 包含 @ 符號（嘗試迷惑使用者）
+        if (url.contains("@")) {
+            score += 30
+            reasons.add("網址包含 @ 符號（可能是偽造）")
+        }
+
+        if (reasons.isEmpty()) {
+            reasons.add("未偵測到明顯風險")
+        }
+
+        return UrlRisk(url = url, score = score.coerceIn(0, 100), reasons = reasons)
+    }
+
     /**
      * A 層快速分析 — 本地規則引擎，< 1ms。
+     * 包含：單一關鍵字比對 + 組合模式加分 + URL 風險掃描。
      */
     fun analyzeByRules(text: String): RuleResult {
         val lower = text.lowercase()
@@ -138,6 +336,7 @@ class FraudAIAnalyzer(private val context: Context) {
         val matchedTypes = mutableSetOf<FraudType>()
         val matchedKeywords = mutableListOf<String>()
 
+        // ── 第一層：單一關鍵字 ──
         for (rule in rules) {
             var ruleHits = 0
             for (keyword in rule.keywords) {
@@ -148,18 +347,71 @@ class FraudAIAnalyzer(private val context: Context) {
             }
             if (ruleHits > 0) {
                 matchedTypes.add(rule.type)
-                totalScore += ruleHits * rule.weight
+                // 累進加分：命中越多同類關鍵字，分數指數成長
+                val baseScore = ruleHits * rule.weight
+                val comboBonus = if (ruleHits >= 3) ruleHits * 5 else 0
+                totalScore += baseScore + comboBonus
+            }
+        }
+
+        // ── 第二層：組合模式（最關鍵的改進） ──
+        for (combo in comboPatterns) {
+            val allGroupsHit = combo.requiredAny.all { group ->
+                group.any { keyword -> lower.contains(keyword.lowercase()) }
+            }
+            if (allGroupsHit) {
+                totalScore += combo.bonusScore
+                matchedTypes.add(combo.type)
+                matchedKeywords.add("[組合] ${combo.label}")
+            }
+        }
+
+        // ── 第三層：URL 風險掃描 ──
+        val urlRisks = scanUrls(text)
+        if (urlRisks.isNotEmpty()) {
+            val maxUrlScore = urlRisks.maxOf { it.score }
+            totalScore += maxUrlScore
+            if (maxUrlScore > 0) {
+                matchedTypes.add(FraudType.PHISHING)
+                for (ur in urlRisks.filter { it.score > 0 }) {
+                    matchedKeywords.add("[連結] ${ur.reasons.first()}")
+                }
+            }
+        }
+
+        // ── 第四層：情境加分 ──
+        // 有 URL + 有任何詐騙關鍵字 → 額外加分
+        if (urlRisks.any { it.score > 0 } && matchedTypes.size > 1) {
+            totalScore += 15  // 連結+話術組合更危險
+            matchedKeywords.add("[情境] 可疑連結搭配詐騙話術")
+        }
+        // 出現「不要告訴」「不要跟別人說」「保密」→ 加分
+        val secrecyKeywords = listOf("不要告訴", "不要跟別人說", "保密", "別讓人知道", "先不要說", "私底下")
+        for (sk in secrecyKeywords) {
+            if (lower.contains(sk)) {
+                totalScore += 20
+                matchedKeywords.add("[情境] 要求保密")
+                break
+            }
+        }
+        // 出現「趕快/馬上/立刻/限時」→ 施壓策略加分
+        val urgencyKeywords = listOf("趕快", "馬上", "立刻", "限時", "最後機會", "名額有限", "錯過就沒了", "倒數")
+        for (uk in urgencyKeywords) {
+            if (lower.contains(uk)) {
+                totalScore += 10
+                matchedKeywords.add("[情境] 時間壓力話術")
+                break
             }
         }
 
         val riskScore = totalScore.coerceIn(0, 100)
 
         val summary = when {
-            riskScore == 0 -> "未偵測到明顯詐騙特徵"
-            riskScore < 30 -> "低風險 — 偵測到少量可疑用語，請留意"
-            riskScore < 60 -> "中風險 — 偵測到多個詐騙常見用語，建議提高警覺"
-            riskScore < 80 -> "高風險 — 符合常見詐騙模式，強烈建議停止互動"
-            else -> "極高風險 — 高度疑似詐騙，請立即停止並撥打 165 反詐騙專線"
+            riskScore == 0 -> "目前看起來沒問題"
+            riskScore < 30 -> "有一些常見的可疑用語，留意一下就好"
+            riskScore < 60 -> "雪凜覺得這段對話有些地方需要注意，建議多確認一下"
+            riskScore < 80 -> "這段對話的用語跟常見的風險模式蠻像的，請謹慎判斷"
+            else -> "雪凜非常擔心！這段對話跟已知的風險模式高度吻合，建議先暫停，可撥 165 諮詢"
         }
 
         return RuleResult(
@@ -174,19 +426,20 @@ class FraudAIAnalyzer(private val context: Context) {
     // B 層：AI 深度分析
     // =========================================================================
 
-    private val systemPrompt = """你是台灣反詐騙 AI 助手。分析以下對話內容，判斷是否為詐騙。
+    private val systemPrompt = """你是雪凜鍵盤的安全顧問。分析以下對話內容，評估是否有風險。
 
 請依以下格式回覆：
 1. 【風險等級】低/中/高/極高
-2. 【詐騙類型】投資/感情/冒充/購物/釣魚/博弈/貸款/求職/無
-3. 【分析】用 2-3 句簡短說明為什麼（指出具體可疑之處）
-4. 【建議】給使用者的具體行動建議
+2. 【可能類型】投資/感情/冒充/購物/釣魚/博弈/貸款/求職/無
+3. 【分析】用 2-3 句簡短說明你注意到的地方（客觀描述可疑之處，不要直接斷定是詐騙）
+4. 【建議】給使用者的行動建議（委婉、尊重使用者判斷）
 
 注意：
 - 用繁體中文回覆
-- 語氣堅定但不恐嚇
-- 如果不是詐騙，也要明確說明
-- 提醒 165 反詐騙專線"""
+- 語氣溫和關心，像朋友提醒而非警察辦案
+- 不要直接說「這是詐騙」，改用「這段對話有些地方需要注意」
+- 如果風險不高，也要肯定使用者的判斷
+- 高風險時可以建議撥 165 諮詢（不是報案，是諮詢）"""
 
     /**
      * B 層 AI 串流分析。
@@ -287,12 +540,29 @@ class FraudAIAnalyzer(private val context: Context) {
 
         if (result.matchedKeywords.isNotEmpty()) {
             sb.appendLine()
-            sb.append("可疑關鍵字：${result.matchedKeywords.take(8).joinToString("、")}")
-            if (result.matchedKeywords.size > 8) sb.append("…")
+            val normalKeywords = result.matchedKeywords.filter { !it.startsWith("[") }
+            val comboKeywords = result.matchedKeywords.filter { it.startsWith("[組合]") }
+            val contextKeywords = result.matchedKeywords.filter { it.startsWith("[情境]") }
+            val urlKeywords = result.matchedKeywords.filter { it.startsWith("[連結]") }
+
+            if (normalKeywords.isNotEmpty()) {
+                sb.append("可疑關鍵字：${normalKeywords.take(8).joinToString("、")}")
+                if (normalKeywords.size > 8) sb.append("…")
+                sb.appendLine()
+            }
+            if (comboKeywords.isNotEmpty()) {
+                sb.appendLine("⚡ 組合模式命中：${comboKeywords.joinToString("、") { it.removePrefix("[組合] ") }}")
+            }
+            if (urlKeywords.isNotEmpty()) {
+                sb.appendLine("🔗 連結風險：")
+                urlKeywords.forEach { sb.appendLine("  ${it.removePrefix("[連結] ")}") }
+            }
+            if (contextKeywords.isNotEmpty()) {
+                sb.appendLine("🎯 ${contextKeywords.joinToString("、") { it.removePrefix("[情境] ") }}")
+            }
         }
 
         if (result.riskScore >= 60) {
-            sb.appendLine()
             sb.appendLine()
             sb.appendLine("📞 如有疑慮請撥打 165 反詐騙專線")
         }

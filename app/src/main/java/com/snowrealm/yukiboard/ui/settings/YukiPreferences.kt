@@ -35,6 +35,9 @@ class YukiPreferences(context: Context) {
     var aiYukiChat: Boolean by BoolPref("ai_yuki_chat", true)
     var aiMoodDiary: Boolean by BoolPref("ai_mood_diary", true)
     var aiWeather: Boolean by BoolPref("ai_weather", true)
+    var aiFraudDetect: Boolean by BoolPref("ai_fraud_detect", true)
+    var aiFraudPassiveScan: Boolean by BoolPref("ai_fraud_passive", true)  // 被動掃描（打字時自動偵測）
+    var aiFraudUrlScan: Boolean by BoolPref("ai_fraud_url_scan", true)    // 連結風險掃描
 
     // ══════════════════════════════���════════════════════════���═══
     // 雪凜行為

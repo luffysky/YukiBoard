@@ -31,6 +31,9 @@ class FasterWhisperSpeechEngine(
     override var isListening: Boolean = false
         private set
 
+    /** 外部可設定上下文文字，提升辨識準確度 */
+    var contextText: String? = null
+
     private var audioRecord: AudioRecord? = null
     private var recordingJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -214,7 +217,8 @@ class FasterWhisperSpeechEngine(
             bodyBuilder.addFormDataPart("language", language)
             // 中文時加 prompt 引導輸出繁體
             if (language == "zh") {
-                bodyBuilder.addFormDataPart("initial_prompt", "以下是繁體中文語音內容。")
+                val contextHint = contextText?.takeIf { it.isNotBlank() }?.let { "前文：$it。" } ?: ""
+                bodyBuilder.addFormDataPart("initial_prompt", "${contextHint}以下是繁體中文語音內容。")
             }
         }
         if (apiKey.isNotBlank()) {

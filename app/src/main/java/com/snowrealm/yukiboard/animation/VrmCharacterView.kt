@@ -172,21 +172,29 @@ class VrmCharacterView @JvmOverloads constructor(
                 clear = true
             }
 
-            // 環境光
+            // 環境光（低強度，搭配多方向光模擬均勻環境）
             val ibl = IndirectLight.Builder()
-                .intensity(30000f)
+                .intensity(10000f)
                 .build(eng)
             scene?.indirectLight = ibl
 
-            // 主方向光
-            val lightEntity = EntityManager.get().create()
-            LightManager.Builder(LightManager.Type.DIRECTIONAL)
-                .color(1f, 0.98f, 0.95f)
-                .intensity(100000f)
-                .direction(0.3f, -1f, -0.5f)
-                .castShadows(false)
-                .build(eng, lightEntity)
-            scene?.addEntity(lightEntity)
+            // 四方向打光模擬均勻環境，讓 PBR 材質顏色正確
+            val lights = listOf(
+                Triple(floatArrayOf(1f, 1f, 1f), 80000f, floatArrayOf(0f, -1f, -0.3f)),     // 正面上方
+                Triple(floatArrayOf(0.8f, 0.85f, 1f), 30000f, floatArrayOf(-1f, 0f, 0.5f)), // 左側冷光
+                Triple(floatArrayOf(1f, 0.95f, 0.85f), 25000f, floatArrayOf(1f, 0f, 0.5f)), // 右側暖光
+                Triple(floatArrayOf(0.5f, 0.5f, 0.7f), 15000f, floatArrayOf(0f, 1f, 0.5f)), // 下方補光
+            )
+            lights.forEach { (color, intensity, direction) ->
+                val entity = EntityManager.get().create()
+                LightManager.Builder(LightManager.Type.DIRECTIONAL)
+                    .color(color[0], color[1], color[2])
+                    .intensity(intensity)
+                    .direction(direction[0], direction[1], direction[2])
+                    .castShadows(false)
+                    .build(eng, entity)
+                scene?.addEntity(entity)
+            }
 
             // gltfio
             val materialProvider = UbershaderProvider(eng)

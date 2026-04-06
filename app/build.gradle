@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 76
-        versionName "0.9.10"
+        versionCode 77
+        versionName "0.9.11"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,9 +82,11 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 防詐被動偵測（輸入時自動掃描，雪凜泡泡警告）\n" +
-                    "- feat: 防詐 AI（規則引擎 8 類 170+ 關鍵字 + AI 深度分析）\n" +
-                    "- fix: 候選字下拉 + VRM 角色 + 設定閃退 + 省電優化"
+                    "- fix: 防詐評分大改（組合模式+URL掃描+情境加分+委婉文案）\n" +
+                    "- fix: AI候選字移除✨改金色底色、英文候選fallback\n" +
+                    "- fix: 面板關閉後鍵盤恢復、VRM四方向光照、注音聲調排序\n" +
+                    "- fix: 滑行門檻12dp、Whisper靜音偵測+上下文prompt\n" +
+                    "- feat: 防詐/被動掃描/連結掃描 三開關"
             }
         }
         debug {
@@ -93,9 +95,11 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 防詐被動偵測（輸入時自動掃描，雪凜泡泡警告）\n" +
-                    "- feat: 防詐 AI（規則引擎 8 類 170+ 關鍵字 + AI 深度分析）\n" +
-                    "- fix: 候選字下拉 + VRM 角色 + 設定閃退 + 省電優化"
+                    "- fix: 防詐評分大改（組合模式+URL掃描+情境加分+委婉文案）\n" +
+                    "- fix: AI候選字移除✨改金色底色、英文候選fallback\n" +
+                    "- fix: 面板關閉後鍵盤恢復、VRM四方向光照、注音聲調排序\n" +
+                    "- fix: 滑行門檻12dp、Whisper靜音偵測+上下文prompt\n" +
+                    "- feat: 防詐/被動掃描/連結掃描 三開關"
             }
         }
     }

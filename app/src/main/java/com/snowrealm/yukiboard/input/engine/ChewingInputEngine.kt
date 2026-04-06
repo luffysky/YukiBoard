@@ -329,9 +329,29 @@ class ChewingInputEngine(
             for (p in fullPhrases) { if (p.length > 1) phrases.add(p) }
         }
 
-        // 合併：單字在前，詞組在後，自動去重
-        seen.addAll(singleChars)
-        seen.addAll(phrases)
+        // 合併 + 聲調排序：精確聲調匹配的排最前面
+        val hasTone = bopomofo.isNotEmpty() && bopomofo.last() in toneMarks
+
+        if (hasTone) {
+            // 有聲調：精確匹配優先
+            val exact = dict[bopomofo] ?: emptyList()
+            seen.addAll(exact)
+            singleChars.forEach { if (it !in seen) seen.add(it) }
+        } else if (stripped.isNotEmpty()) {
+            // 無聲調：按一聲→二聲→三聲→四聲→輕聲排列
+            val toneOrder = listOf('ˉ', 'ˊ', 'ˇ', 'ˋ', '˙')
+            for (tone in toneOrder) {
+                val withTone = stripped + tone
+                val chars = dict[withTone] ?: continue
+                chars.forEach { if (it !in seen) seen.add(it) }
+            }
+            // 補入無聲調直接查詢的結果
+            singleChars.forEach { if (it !in seen) seen.add(it) }
+        } else {
+            seen.addAll(singleChars)
+        }
+        // 詞組放後面
+        phrases.forEach { if (it !in seen) seen.add(it) }
         return seen.toList()
     }
 

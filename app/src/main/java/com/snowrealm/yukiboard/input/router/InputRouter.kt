@@ -224,8 +224,9 @@ class InputRouter(private val context: Context) {
                 eng.selectCandidateAt(engineIndex)
             }
             else -> {
-                // 英文：通用候選選擇
+                // 英文：通用候選選擇（含 fallback）
                 val selected = candidateManager.selectAt(index)
+                    ?: candidateManager.candidates.getOrNull(index)
                 if (selected != null) {
                     activeEngine.reset()
                     candidateManager.clear()

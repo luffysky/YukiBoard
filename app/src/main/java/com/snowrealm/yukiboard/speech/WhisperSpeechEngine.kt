@@ -40,7 +40,13 @@ class WhisperSpeechEngine(
     private val audioFormat = AudioFormat.ENCODING_PCM_16BIT
 
     // partial 間隔（毫秒）
-    private val partialIntervalMs = 2500L
+    private val partialIntervalMs = 1500L
+    // 靜音偵測：連續靜音超過此毫秒數自動停止
+    private val silenceThresholdMs = 3000L
+    private val silenceAmplitudeThreshold = 500  // PCM 振幅低於此視為靜音
+
+    /** 外部可設定上下文文字，提升 Whisper 辨識準確度 */
+    var contextText: String? = null
 
     override fun startListening(
         locale: String,
@@ -84,6 +90,7 @@ class WhisperSpeechEngine(
             val buffer = ShortArray(bufferSize / 2)
             var lastPartialTime = System.currentTimeMillis()
             val partialAccumulated = StringBuilder()
+            var silenceStartTime = 0L
 
             try {
                 while (isActive && isListening) {
@@ -95,8 +102,22 @@ class WhisperSpeechEngine(
                             pcmStream.write((buffer[i].toInt() shr 8) and 0xFF)
                         }
 
-                        // 定期送 partial
+                        // 靜音偵測：計算振幅
+                        val maxAmplitude = (0 until read).maxOfOrNull { kotlin.math.abs(buffer[it].toInt()) } ?: 0
                         val now = System.currentTimeMillis()
+                        if (maxAmplitude < silenceAmplitudeThreshold) {
+                            if (silenceStartTime == 0L) silenceStartTime = now
+                            else if (now - silenceStartTime >= silenceThresholdMs && pcmStream.size() > sampleRate * 2) {
+                                // 靜音超過閾值且有足夠音訊 → 自動停止
+                                android.util.Log.i("WhisperEngine", "silence detected, auto-stopping")
+                                isListening = false
+                                break
+                            }
+                        } else {
+                            silenceStartTime = 0L  // 有聲音，重置
+                        }
+
+                        // 定期送 partial
                         if (now - lastPartialTime >= partialIntervalMs && pcmStream.size() > sampleRate * 2) {
                             lastPartialTime = now
                             val partialWav = pcmToWav(pcmStream.toByteArray())
@@ -213,10 +234,11 @@ class WhisperSpeechEngine(
             )
             .addFormDataPart("model", model)
             .addFormDataPart("response_format", "json")
-        // 中文時加 prompt 引導輸出繁體
+        // 中文時加 prompt 引導輸出繁體（含上下文提升準確度）
         if (language == "zh") {
             bodyBuilder.addFormDataPart("language", "zh")
-            bodyBuilder.addFormDataPart("prompt", "以下是繁體中文語音內容。")
+            val contextHint = contextText?.takeIf { it.isNotBlank() }?.let { "前文：$it。" } ?: ""
+            bodyBuilder.addFormDataPart("prompt", "${contextHint}以下是繁體中文語音內容。")
         }
         val body = bodyBuilder.build()
 

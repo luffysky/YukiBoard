@@ -78,6 +78,7 @@ class YukiBoardIMEService : InputMethodService() {
     private var bgUpdateReceiver: android.content.BroadcastReceiver? = null
     private val fraudAnalyzer by lazy { com.snowrealm.yukiboard.security.FraudAIAnalyzer(this) }
     private var lastFraudScanText: String? = null  // 避免重複掃描同一段文字
+    private var fraudScanCommitCount = 0  // 每 N 次提交重新掃描
 
     // 面板
     private var activePanel: PanelType? = null
@@ -648,6 +649,7 @@ class YukiBoardIMEService : InputMethodService() {
      * 風險 ≥ 30 → 雪凜泡泡警告；點泡泡 → 開 Claw 面板深度分析。
      */
     private fun scanForFraud() {
+        if (!prefs.aiFraudDetect || !prefs.aiFraudPassiveScan) return
         val ic = currentInputConnection ?: return
         val textBefore = ic.getTextBeforeCursor(2000, 0)?.toString() ?: return
         if (textBefore.length < 20) return  // 文字太短不分析
@@ -656,10 +658,18 @@ class YukiBoardIMEService : InputMethodService() {
 
         serviceScope.launch(Dispatchers.Default) {
             val result = fraudAnalyzer.analyzeByRules(textBefore)
-            if (result.riskScore >= 30) {
-                val emoji = fraudAnalyzer.getRiskEmoji(result.riskScore)
-                val types = result.matchedTypes.joinToString("/") { it.label }
-                val warning = "$emoji 注意！偵測到${types}特徵，小心詐騙"
+            // URL 獨立掃描（即使整體風險 < 30，有可疑連結也要警告）
+            val urlRisks = fraudAnalyzer.scanUrls(textBefore).filter { it.score >= 20 }
+            val effectiveScore = maxOf(result.riskScore, urlRisks.maxOfOrNull { it.score } ?: 0)
+
+            if (effectiveScore >= 30 || urlRisks.isNotEmpty()) {
+                val emoji = fraudAnalyzer.getRiskEmoji(effectiveScore)
+                val urlWarning = if (urlRisks.isNotEmpty()) "，連結也要小心" else ""
+                val warning = when {
+                    effectiveScore >= 80 -> "$emoji 雪凜很擔心這段對話…點我看看$urlWarning"
+                    effectiveScore >= 60 -> "$emoji 這段對話有些地方要注意唷$urlWarning"
+                    else -> "$emoji 雪凜覺得有些用語要留意一下$urlWarning"
+                }
 
                 withContext(Dispatchers.Main) {
                     val charAnchor = characterView as? android.view.View ?: return@withContext
@@ -711,6 +721,18 @@ class YukiBoardIMEService : InputMethodService() {
         inputRouter.reset()
         shakeDetector.stop()
         gyroController.unregister()
+        // 重置觸控狀態，避免下次鍵盤有殘留
+        if (::keyboardView.isInitialized) {
+            keyboardView.resetTouchState()
+        }
+    }
+
+    override fun onWindowShown() {
+        super.onWindowShown()
+        // 某些 App 不觸發 onStartInputView，在這裡重置確保鍵盤可用
+        if (currentInputConnection != null && ::keyboardView.isInitialized) {
+            keyboardView.resetTouchState()
+        }
     }
 
     override fun onDestroy() {
@@ -1129,6 +1151,10 @@ class YukiBoardIMEService : InputMethodService() {
             isPanelBehindKeyboard = false
             panelContainer.bringToFront()
         }
+        // 確保鍵盤重新獲得焦點和觸控
+        keyboardView.isEnabled = true
+        keyboardView.requestFocus()
+        keyboardView.resetTouchState()
     }
 
     /**
@@ -1336,6 +1362,11 @@ class YukiBoardIMEService : InputMethodService() {
         }
 
         keyboardView.voiceListeningLocale = "auto"
+
+        // 設定上下文文字提升 Whisper 辨識準確度
+        val textBefore = currentInputConnection?.getTextBeforeCursor(200, 0)?.toString()
+        (speechEngine as? WhisperSpeechEngine)?.contextText = textBefore
+        (speechEngine as? FasterWhisperSpeechEngine)?.contextText = textBefore
 
         speechEngine?.startListening(
             locale = localeHint,
@@ -2342,6 +2373,14 @@ class YukiBoardIMEService : InputMethodService() {
                 ic.commitText(result.text, 1)
                 characterView?.playHappy()
                 forwardTextToRemote(result.text)
+
+                // 被動防詐：每 10 次提交重新掃描輸入框上下文
+                fraudScanCommitCount++
+                if (fraudScanCommitCount >= 10) {
+                    fraudScanCommitCount = 0
+                    lastFraudScanText = null  // 清除快取，強制重新掃描
+                    scanForFraud()
+                }
 
                 // 累積句子，用於整句學習
                 sentenceBuffer.append(result.text)

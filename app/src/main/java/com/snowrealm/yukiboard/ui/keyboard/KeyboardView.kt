@@ -417,7 +417,7 @@ class KeyboardView(context: Context) : View(context) {
     private var swipeDownY = 0f
     /** 是否已被判定為滑動（跨越 ≥2 個不同按鍵 且移動距離 > 閾值） */
     private var isSwipeGesture = false
-    private val SWIPE_DISTANCE_THRESHOLD = 20f * density  // 20dp
+    private val SWIPE_DISTANCE_THRESHOLD = 12f * density  // 12dp（降低門檻提升滑行靈敏度）
 
     private var onSwipeInputListener: ((keys: List<KeyModel>) -> Unit)? = null
     /** 設定滑動輸入回呼：收到經過的按鍵序列（去重），由外部解碼成文字 */
@@ -562,6 +562,20 @@ class KeyboardView(context: Context) : View(context) {
 
     fun updateEditorInfo(info: EditorInfo?) {
         rebuildLayoutForOrientation()
+        invalidate()
+    }
+
+    /** 強制重置所有觸控狀態，在面板關閉後呼叫確保鍵盤正常接收輸入 */
+    fun resetTouchState() {
+        candidateTouchActive = false
+        candidateIsDragging = false
+        pressedKey = null
+        isSwipingActive = false
+        swipePoints.clear()
+        swipeKeySequence.clear()
+        isSwipeGesture = false
+        handler.removeCallbacks(longPressRunnable)
+        handler.removeCallbacks(deleteRepeatRunnable)
         invalidate()
     }
 
@@ -951,7 +965,6 @@ class KeyboardView(context: Context) : View(context) {
         val candWidths = candidates.mapIndexed { i, text ->
             val display = when {
                 isSwipeCandidateMode && i == 0 -> "≈$text"
-                candidateSourceMap[text] == CandidateSource.AI -> "✨$text"
                 else -> text
             }
             candidatePaint.measureText(display) + candPadH * 2
@@ -1004,9 +1017,22 @@ class KeyboardView(context: Context) : View(context) {
                 } else {
                     candidatePaint.color = if (sourceColor != 0) sourceColor else theme.candidateTextColorInt
                 }
+                // AI 候選字用加深底色 + 右上角小圓點標記，不加 ✨ 前綴
+                if (candidateSourceMap[text] == CandidateSource.AI) {
+                    keyPaint.color = 0xFFE8B84D.toInt()
+                    keyPaint.alpha = 70
+                    val pill = RectF(left + 2 * density, 4 * density, right - 2 * density, candidateBarHeight - 4 * density)
+                    canvas.drawRoundRect(pill, 6 * density, 6 * density, keyPaint)
+                    keyPaint.alpha = 255
+                    // 右上角小圓點
+                    val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = 0xFFE8B84D.toInt()
+                        style = Paint.Style.FILL
+                    }
+                    canvas.drawCircle(right - 6f * density, 6f * density, 3f * density, dotPaint)
+                }
                 val displayText = when {
                     isSwipeCandidateMode && i == 0 -> "≈$text"
-                    candidateSourceMap[text] == CandidateSource.AI -> "✨$text"
                     else -> text
                 }
                 canvas.drawText(displayText, cx, candidateBarHeight * 0.65f, candidatePaint)
