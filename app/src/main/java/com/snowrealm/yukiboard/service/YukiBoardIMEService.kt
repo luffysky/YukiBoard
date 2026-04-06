@@ -574,6 +574,11 @@ class YukiBoardIMEService : InputMethodService() {
             }
         }
 
+        // AUTO 模式啟動
+        if (prefs.autoInputMode && inputRouter.inputMode != InputMode.AUTO) {
+            inputRouter.switchTo(InputMode.AUTO)
+        }
+
         // 同步鍵盤顯示的語言（保留使用者上次選擇的輸入法）
         keyboardView.currentInputMode = inputRouter.inputMode
         keyboardView.updateKeyRows(rowsForInputMode(inputRouter.inputMode))
@@ -2201,6 +2206,11 @@ class YukiBoardIMEService : InputMethodService() {
 
         // 候選列為空時，僅在開發者模式且有高信心預測時顯示提示
         val candidates = inputRouter.candidates.toMutableList()
+
+        // AUTO 模式：尚未決定語言時，補充雙語候選
+        if (inputRouter.inputMode == InputMode.AUTO && inputRouter.autoQwertyBuffer.isNotEmpty() && candidates.isEmpty()) {
+            candidates.addAll(inputRouter.getAutoCombinedCandidates())
+        }
         if (candidates.isEmpty() && inputRouter.composingText.isEmpty()) {
             val predictor = nextActionPredictor
             if (predictor != null && keyboardView.currentMode == KeyboardMode.DEVELOPER) {

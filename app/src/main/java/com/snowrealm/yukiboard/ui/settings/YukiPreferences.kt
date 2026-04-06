@@ -83,6 +83,7 @@ class YukiPreferences(context: Context) {
     // ══════���══════════════════════════════════════════════════��═
     // 輸入行為
     // ═════════════════════════���═════════════════════════════════
+    var autoInputMode: Boolean by BoolPref("auto_input_mode", false)
     var swipeInput: Boolean by BoolPref("swipe_input", true)
     var autoCorrect: Boolean by BoolPref("auto_correct", true)
     var snippetEnabled: Boolean by BoolPref("snippet_enabled", true)

@@ -220,7 +220,15 @@ class ChewingInputEngine(
             return InputResult.ComposingUpdated(composingText)
         }
 
-        // 查無候選 → 直接 commit 原注音文字
+        // 查無候選 → 嘗試容錯預測
+        val fuzzyResults = fuzzyPredictFromBuffer(bopomofoBuffer.toString())
+        if (fuzzyResults.isNotEmpty()) {
+            currentCandidates = fuzzyResults
+            isSelectingCandidate = true
+            return InputResult.ComposingUpdated(composingText)
+        }
+
+        // 真的找不到 → 直接 commit 原注音文字
         val text = composingText
         reset()
         return InputResult.CommitText(text)
@@ -475,10 +483,19 @@ class ChewingInputEngine(
 
         if (syllables.size >= 2) {
             // ── 多音節：用多音節查詢（詞組優先） ──
-            currentCandidates = lookupMultiSyllable(syllables)
+            val rawResults = lookupMultiSyllable(syllables)
+            currentCandidates = if (rawResults.isNotEmpty()) {
+                sortByToneMatch(rawResults, syllables)
+            } else {
+                fuzzyPredictFromBuffer(bopomofo)
+            }
         } else {
             // ── 單音節：原邏輯 + 上下文排序 ──
-            val regular = lookupCandidates(bopomofo)
+            var regular = lookupCandidates(bopomofo)
+            // 單音節查無結果 → 容錯預測
+            if (regular.isEmpty()) {
+                regular = fuzzyPredictFromBuffer(bopomofo)
+            }
 
             if (lastCommittedChar.isNotEmpty()) {
                 val predictions = getNextCharPredictions(lastCommittedChar)
@@ -682,5 +699,127 @@ class ChewingInputEngine(
         }
         // 去重
         return map.mapValues { (_, v) -> v.distinct() }
+    }
+
+    // ─── 注音容錯用鄰近表（不含聲調鍵） ───
+    private val BOPOMOFO_ADJACENT: Map<String, List<String>> = mapOf(
+        "ㄅ" to listOf("ㄉ", "ㄆ", "ㄊ"),
+        "ㄉ" to listOf("ㄅ", "ㄆ", "ㄊ", "ㄍ"),
+        "ㄓ" to listOf("ㄐ", "ㄔ", "ㄗ"),
+        "ㄚ" to listOf("ㄞ", "ㄧ", "ㄛ", "ㄟ"),
+        "ㄞ" to listOf("ㄚ", "ㄢ", "ㄛ", "ㄟ", "ㄣ"),
+        "ㄢ" to listOf("ㄞ", "ㄟ", "ㄣ"),
+        "ㄆ" to listOf("ㄅ", "ㄉ", "ㄊ", "ㄇ", "ㄋ"),
+        "ㄊ" to listOf("ㄅ", "ㄉ", "ㄆ", "ㄍ", "ㄇ", "ㄋ", "ㄎ"),
+        "ㄍ" to listOf("ㄉ", "ㄊ", "ㄐ", "ㄋ", "ㄎ", "ㄑ"),
+        "ㄐ" to listOf("ㄓ", "ㄍ", "ㄔ", "ㄎ", "ㄑ", "ㄕ"),
+        "ㄔ" to listOf("ㄓ", "ㄐ", "ㄗ", "ㄑ", "ㄕ", "ㄘ"),
+        "ㄗ" to listOf("ㄓ", "ㄔ", "ㄧ", "ㄕ", "ㄘ", "ㄨ"),
+        "ㄧ" to listOf("ㄚ", "ㄗ", "ㄛ", "ㄘ", "ㄨ", "ㄜ"),
+        "ㄛ" to listOf("ㄚ", "ㄞ", "ㄧ", "ㄟ", "ㄨ", "ㄜ", "ㄠ"),
+        "ㄟ" to listOf("ㄚ", "ㄞ", "ㄢ", "ㄛ", "ㄣ", "ㄜ", "ㄠ", "ㄤ"),
+        "ㄣ" to listOf("ㄞ", "ㄢ", "ㄟ", "ㄠ", "ㄤ"),
+        "ㄇ" to listOf("ㄆ", "ㄊ", "ㄋ", "ㄈ", "ㄌ"),
+        "ㄋ" to listOf("ㄆ", "ㄊ", "ㄍ", "ㄇ", "ㄎ", "ㄈ", "ㄌ", "ㄏ"),
+        "ㄎ" to listOf("ㄊ", "ㄍ", "ㄐ", "ㄋ", "ㄑ", "ㄌ", "ㄏ", "ㄒ"),
+        "ㄑ" to listOf("ㄍ", "ㄐ", "ㄔ", "ㄎ", "ㄕ", "ㄏ", "ㄒ", "ㄖ"),
+        "ㄕ" to listOf("ㄐ", "ㄔ", "ㄗ", "ㄑ", "ㄘ", "ㄒ", "ㄖ", "ㄙ"),
+        "ㄘ" to listOf("ㄔ", "ㄗ", "ㄧ", "ㄕ", "ㄨ", "ㄖ", "ㄙ", "ㄩ"),
+        "ㄨ" to listOf("ㄗ", "ㄧ", "ㄛ", "ㄘ", "ㄜ", "ㄙ", "ㄩ", "ㄝ"),
+        "ㄜ" to listOf("ㄧ", "ㄛ", "ㄟ", "ㄨ", "ㄠ", "ㄩ", "ㄝ", "ㄡ"),
+        "ㄠ" to listOf("ㄛ", "ㄟ", "ㄣ", "ㄜ", "ㄤ", "ㄝ", "ㄡ", "ㄥ"),
+        "ㄤ" to listOf("ㄟ", "ㄣ", "ㄠ", "ㄡ", "ㄥ"),
+        "ㄈ" to listOf("ㄇ", "ㄋ", "ㄌ", "ㄦ"),
+        "ㄌ" to listOf("ㄇ", "ㄋ", "ㄎ", "ㄈ", "ㄏ", "ㄦ"),
+        "ㄏ" to listOf("ㄋ", "ㄎ", "ㄑ", "ㄌ", "ㄒ"),
+        "ㄒ" to listOf("ㄎ", "ㄑ", "ㄕ", "ㄏ", "ㄖ"),
+        "ㄖ" to listOf("ㄑ", "ㄕ", "ㄘ", "ㄒ", "ㄙ"),
+        "ㄙ" to listOf("ㄕ", "ㄘ", "ㄨ", "ㄖ", "ㄩ"),
+        "ㄩ" to listOf("ㄘ", "ㄨ", "ㄜ", "ㄙ", "ㄝ"),
+        "ㄝ" to listOf("ㄨ", "ㄜ", "ㄠ", "ㄩ", "ㄡ"),
+        "ㄡ" to listOf("ㄜ", "ㄠ", "ㄤ", "ㄝ", "ㄥ"),
+        "ㄥ" to listOf("ㄠ", "ㄤ", "ㄡ"),
+        "ㄦ" to listOf("ㄈ", "ㄌ"),
+    )
+
+    /**
+     * 注音容錯預測 — 當 buffer 查無候選時，嘗試鄰近符號替換。
+     */
+    private fun fuzzyPredictFromBuffer(bopomofo: String): List<String> {
+        if (bopomofo.isEmpty()) return emptyList()
+        val results = linkedSetOf<String>()
+        val syllables = segmentSyllables(bopomofo)
+        val lastSyllable = syllables.lastOrNull() ?: return emptyList()
+        val lastSylStripped = lastSyllable.trimEnd { it in toneMarks }
+
+        // 策略一：最後一個音節的每個符號換成鄰近符號
+        for (i in lastSylStripped.indices) {
+            val ch = lastSylStripped[i].toString()
+            val neighbors = BOPOMOFO_ADJACENT[ch] ?: continue
+            for (neighbor in neighbors) {
+                val altSyllable = lastSylStripped.substring(0, i) +
+                    neighbor + lastSylStripped.substring(i + 1)
+                val altBopomofo = if (syllables.size > 1) {
+                    syllables.dropLast(1).joinToString("") + altSyllable
+                } else altSyllable
+                val altSyls = segmentSyllables(altBopomofo)
+                val cands = if (altSyls.size >= 2) lookupMultiSyllable(altSyls)
+                            else lookupCandidates(altBopomofo)
+                results.addAll(cands.take(3))
+                if (results.size >= 15) return results.toList()
+            }
+        }
+
+        // 策略二：刪掉最後一個音節重查
+        if (bopomofo.length > 1) {
+            val shorter = bopomofo.dropLast(1)
+            val shorterSyls = segmentSyllables(shorter)
+            val shorterCands = if (shorterSyls.size >= 2) lookupMultiSyllable(shorterSyls)
+                               else lookupCandidates(shorter)
+            results.addAll(shorterCands.take(5))
+        }
+
+        return results.toList()
+    }
+
+    /**
+     * 多音節候選按聲調匹配程度排序。
+     */
+    private fun sortByToneMatch(candidates: List<String>, syllables: List<String>): List<String> {
+        if (syllables.isEmpty()) return candidates
+        val strippedSyllables = syllables.map { it.trimEnd { c -> c in toneMarks } }
+
+        data class Scored(val word: String, val score: Int)
+
+        val scored = candidates.map { word ->
+            var score = 0
+            if (word.length == syllables.size) score += 2
+            word.forEachIndexed { i, ch ->
+                if (i >= syllables.size) return@forEachIndexed
+                val inputStripped = strippedSyllables[i]
+                val inputTone = syllables[i].lastOrNull()?.takeIf { it in toneMarks }
+                val charReadings = reverseIndex[ch.toString()] ?: return@forEachIndexed
+                for (reading in charReadings) {
+                    val readingStripped = reading.trimEnd { it in toneMarks }
+                    val readingTone = reading.lastOrNull()?.takeIf { it in toneMarks }
+                    if (readingStripped == inputStripped) {
+                        score += 1
+                        if (inputTone == null || readingTone == inputTone) { score += 2; break }
+                    }
+                }
+            }
+            Scored(word, score)
+        }
+        return scored.sortedByDescending { it.score }.map { it.word }
+    }
+
+    /**
+     * 不改變引擎狀態，只查詢指定注音是否有候選字（供 AUTO 模式評分用）。
+     */
+    fun getCandidatesForBopomofo(bopomofo: String): List<String> {
+        if (bopomofo.isEmpty()) return emptyList()
+        val syllables = segmentSyllables(bopomofo)
+        return if (syllables.size >= 2) lookupMultiSyllable(syllables)
+               else lookupCandidates(bopomofo)
     }
 }

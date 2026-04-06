@@ -334,6 +334,36 @@ class EnglishDictionary(private val context: Context? = null) {
         var frequency = 0
     }
 
+    /**
+     * 鄰近鍵容錯：對每個位置只嘗試鄰近鍵（比 autocorrect 快且更精準）。
+     */
+    fun fuzzyCorrectWithAdjacency(input: String, maxResults: Int = 5): List<String> {
+        if (input.length < 2) return emptyList()
+        val lower = input.lowercase()
+        val scored = mutableMapOf<String, Int>()
+
+        for (i in lower.indices) {
+            val neighbors = ADJACENT_KEYS[lower[i]] ?: continue
+            for (neighbor in neighbors) {
+                // 替換
+                val attempt = lower.replaceRange(i, i + 1, neighbor.toString())
+                if (isWord(attempt)) {
+                    scored[attempt] = maxOf(scored[attempt] ?: 0, frequencyOf(attempt) + 300)
+                }
+                // 插入鄰近鍵
+                val inserted = lower.substring(0, i) + neighbor + lower.substring(i)
+                if (isWord(inserted)) {
+                    scored[inserted] = maxOf(scored[inserted] ?: 0, frequencyOf(inserted) + 200)
+                }
+            }
+        }
+
+        return scored.entries
+            .sortedByDescending { it.value }
+            .take(maxResults)
+            .map { it.key }
+    }
+
     companion object {
         /** QWERTY 鍵盤鄰近鍵映射表（滑動輸入用） */
         private val ADJACENT_KEYS = mapOf(

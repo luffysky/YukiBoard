@@ -94,10 +94,22 @@ class EnglishInputEngine(context: Context? = null) : InputEngine {
         }
         // 1 個字母也給建議（高頻詞 top 5）
         var results = dictionary.suggest(prefix, if (prefix.length == 1) 5 else 9)
-        // 前綴匹配不到，嘗試自動更正
+        // 先試鄰近鍵容錯（快且準）
+        if (results.isEmpty() && prefix.length >= 2) {
+            results = dictionary.fuzzyCorrectWithAdjacency(prefix, 5)
+        }
+        // 再試完整編輯距離（慢但全面）
         if (results.isEmpty() && prefix.length >= 2) {
             results = dictionary.autocorrect(prefix, 5)
         }
         cachedCandidates = results
+    }
+
+    /**
+     * 不改變引擎狀態，只查詢英文前綴是否有候選詞（供 AUTO 模式評分用）。
+     */
+    fun getCandidatesForPrefix(prefix: String): List<String> {
+        if (prefix.isEmpty()) return emptyList()
+        return dictionary.suggest(prefix, 5)
     }
 }

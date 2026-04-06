@@ -371,7 +371,87 @@ class KoreanInputEngine : InputEngine {
         val current = composingText
         if (current.isEmpty()) return emptyList()
         // 前綴匹配詞庫
-        return KOREAN_DICTIONARY.filter { it.startsWith(current) && it != current }.take(8)
+        val exact = KOREAN_DICTIONARY.filter { it.startsWith(current) && it != current }.take(8)
+        if (exact.isNotEmpty()) return exact
+        // 查無結果 → Jamo 鄰近鍵容錯
+        return fuzzyCorrectKorean(current, 5)
+    }
+
+    // 두벌식 Jamo 鍵盤鄰近表
+    private val JAMO_ADJACENT: Map<Char, List<Char>> = mapOf(
+        'ㄱ' to listOf('ㄷ', 'ㅅ', 'ㅇ', 'ㄹ'),
+        'ㄴ' to listOf('ㅁ', 'ㅇ', 'ㅈ', 'ㄷ', 'ㅋ', 'ㅌ'),
+        'ㄷ' to listOf('ㅈ', 'ㄱ', 'ㄴ', 'ㅇ'),
+        'ㄹ' to listOf('ㅇ', 'ㅎ', 'ㄱ', 'ㅅ', 'ㅊ', 'ㅍ'),
+        'ㅁ' to listOf('ㄴ', 'ㅂ', 'ㅈ', 'ㅋ'),
+        'ㅂ' to listOf('ㅈ', 'ㅁ'),
+        'ㅅ' to listOf('ㄱ', 'ㅛ', 'ㄹ', 'ㅎ'),
+        'ㅇ' to listOf('ㄴ', 'ㄹ', 'ㄷ', 'ㄱ', 'ㅌ', 'ㅊ'),
+        'ㅈ' to listOf('ㅂ', 'ㄷ', 'ㅁ', 'ㄴ'),
+        'ㅊ' to listOf('ㅌ', 'ㅍ', 'ㅇ', 'ㄹ'),
+        'ㅋ' to listOf('ㅌ', 'ㅁ', 'ㄴ'),
+        'ㅌ' to listOf('ㅋ', 'ㅊ', 'ㄴ', 'ㅇ'),
+        'ㅍ' to listOf('ㅊ', 'ㅠ', 'ㄹ', 'ㅎ'),
+        'ㅎ' to listOf('ㄹ', 'ㅗ', 'ㅅ', 'ㅛ', 'ㅍ', 'ㅠ'),
+        'ㅏ' to listOf('ㅓ', 'ㅣ', 'ㅑ', 'ㅐ', 'ㅡ'),
+        'ㅐ' to listOf('ㅑ', 'ㅔ', 'ㅏ', 'ㅣ'),
+        'ㅑ' to listOf('ㅕ', 'ㅐ', 'ㅓ', 'ㅏ'),
+        'ㅓ' to listOf('ㅗ', 'ㅏ', 'ㅕ', 'ㅑ', 'ㅜ', 'ㅡ'),
+        'ㅔ' to listOf('ㅐ', 'ㅣ'),
+        'ㅕ' to listOf('ㅛ', 'ㅑ', 'ㅗ', 'ㅓ'),
+        'ㅗ' to listOf('ㅎ', 'ㅓ', 'ㅛ', 'ㅕ', 'ㅠ', 'ㅜ'),
+        'ㅛ' to listOf('ㅅ', 'ㅕ', 'ㅎ', 'ㅗ'),
+        'ㅜ' to listOf('ㅠ', 'ㅡ', 'ㅗ', 'ㅓ'),
+        'ㅠ' to listOf('ㅍ', 'ㅜ', 'ㅎ', 'ㅗ'),
+        'ㅡ' to listOf('ㅜ', 'ㅓ', 'ㅏ'),
+        'ㅣ' to listOf('ㅏ', 'ㅐ', 'ㅔ'),
+    )
+
+    private fun fuzzyCorrectKorean(input: String, maxResults: Int = 5): List<String> {
+        if (input.isEmpty()) return emptyList()
+        val results = mutableSetOf<String>()
+
+        for (charIdx in input.indices) {
+            val ch = input[charIdx]
+            if (ch < '\uAC00' || ch > '\uD7A3') continue
+
+            val code = ch - '\uAC00'
+            val chosungIdx = code / (JUNGSUNG_COUNT * JONGSUNG_COUNT)
+            val jungsungIdx = (code % (JUNGSUNG_COUNT * JONGSUNG_COUNT)) / JONGSUNG_COUNT
+            val jongsungIdx = code % JONGSUNG_COUNT
+
+            val chosung = CHOSUNG_TABLE[chosungIdx]
+            val jungsung = JUNGSUNG_TABLE[jungsungIdx]
+
+            // 替換初聲
+            JAMO_ADJACENT[chosung]?.forEach { altChosung ->
+                val altIdx = CHOSUNG_TABLE.indexOf(altChosung)
+                if (altIdx >= 0) {
+                    val altCode = altIdx * JUNGSUNG_COUNT * JONGSUNG_COUNT +
+                        jungsungIdx * JONGSUNG_COUNT + jongsungIdx
+                    val altChar = (HANGUL_BASE + altCode).toChar()
+                    val altWord = input.substring(0, charIdx) + altChar + input.substring(charIdx + 1)
+                    KOREAN_DICTIONARY.filter { it.startsWith(altWord) }.take(2)
+                        .forEach { results.add(it) }
+                }
+            }
+
+            // 替換中聲
+            JAMO_ADJACENT[jungsung]?.forEach { altJungsung ->
+                val altIdx = JUNGSUNG_TABLE.indexOf(altJungsung)
+                if (altIdx >= 0) {
+                    val altCode = chosungIdx * JUNGSUNG_COUNT * JONGSUNG_COUNT +
+                        altIdx * JONGSUNG_COUNT + jongsungIdx
+                    val altChar = (HANGUL_BASE + altCode).toChar()
+                    val altWord = input.substring(0, charIdx) + altChar + input.substring(charIdx + 1)
+                    KOREAN_DICTIONARY.filter { it.startsWith(altWord) }.take(2)
+                        .forEach { results.add(it) }
+                }
+            }
+            if (results.size >= maxResults) break
+        }
+
+        return results.toList().take(maxResults)
     }
 
     fun selectCandidateAt(index: Int): InputResult {

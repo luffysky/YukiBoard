@@ -28,6 +28,9 @@ class JapaneseInputEngine : InputEngine {
     /** Pending romaji characters that have not yet formed a complete kana. */
     private val romajiBuffer = StringBuilder()
 
+    /** Full romaji input history for fuzzy correction. */
+    private val romajiHistory = StringBuilder()
+
     /** Whether we are currently in kanji-conversion mode (space was pressed). */
     private var isConverting = false
 
@@ -66,6 +69,7 @@ class JapaneseInputEngine : InputEngine {
         val ch = char.lowercase()
         // Only process ASCII letters and a few special romaji-relevant chars
         if (ch.length == 1 && ch[0] in 'a'..'z') {
+            romajiHistory.append(ch)
             romajiBuffer.append(ch)
             processRomaji()
         } else {
@@ -113,6 +117,14 @@ class JapaneseInputEngine : InputEngine {
             val reading = kanaBuffer.toString()
             candidates = lookupCandidates(reading)
             if (candidates.isEmpty()) {
+                // Try fuzzy correction before giving up
+                val fuzzyCandidates = fuzzyLookupCandidates(romajiHistory.toString(), reading)
+                if (fuzzyCandidates.isNotEmpty()) {
+                    candidates = fuzzyCandidates
+                    candidateIndex = -1
+                    isConverting = true
+                    return InputResult.ComposingUpdated(composingText)
+                }
                 // No kanji found — commit the kana as-is
                 val text = if (katakanaMode) hiraganaToKatakana(reading) else reading
                 kanaBuffer.clear()
@@ -293,6 +305,7 @@ class JapaneseInputEngine : InputEngine {
     private fun resetState() {
         kanaBuffer.clear()
         romajiBuffer.clear()
+        romajiHistory.clear()
         isConverting = false
         candidates = emptyList()
         candidateIndex = -1
@@ -389,11 +402,195 @@ class JapaneseInputEngine : InputEngine {
         return results
     }
 
+    // ── Fuzzy Correction ──────────────────────────────────
+
+    /**
+     * 日文容錯查詢。
+     * 當 lookupCandidates(reading) 查無結果時呼叫。
+     *
+     * 策略一：羅馬字鄰近鍵替換 → 重新轉假名 → 查字典
+     * 策略二：已轉的假名做語音相似替換 → 查字典
+     * 策略三：截短最後一個音節重查
+     */
+    private fun fuzzyLookupCandidates(originalRomaji: String, reading: String): List<String> {
+        val results = mutableListOf<String>()
+        val seen = mutableSetOf<String>()
+
+        fun addIfNew(newCandidates: List<String>) {
+            newCandidates.forEach { if (seen.add(it)) results.add(it) }
+        }
+
+        // 策略一：羅馬字層容錯（鄰近鍵替換）
+        for (i in originalRomaji.indices) {
+            val ch = originalRomaji[i]
+            val neighbors = ROMAJI_ADJACENT[ch] ?: continue
+            for (neighbor in neighbors) {
+                val altRomaji = originalRomaji.substring(0, i) +
+                    neighbor + originalRomaji.substring(i + 1)
+                // 轉換成假名
+                val altKana = romajiToKana(altRomaji)
+                if (altKana.isNotEmpty() && altKana != reading) {
+                    addIfNew(lookupCandidates(altKana).take(3))
+                }
+            }
+            if (results.size >= 10) break
+        }
+
+        // 策略二：假名層容錯（語音相似）
+        var pos = 0
+        while (pos < reading.length && results.size < 15) {
+            val twoChar = if (pos + 1 < reading.length) reading.substring(pos, pos + 2) else null
+            val similarTwo = twoChar?.let { KANA_SIMILAR[it] }
+            if (similarTwo != null) {
+                for (alt in similarTwo) {
+                    val altReading = reading.substring(0, pos) + alt + reading.substring(pos + 2)
+                    addIfNew(lookupCandidates(altReading).take(3))
+                }
+                pos += 2
+                continue
+            }
+            val oneChar = reading[pos].toString()
+            val similar = KANA_SIMILAR[oneChar]
+            if (similar != null) {
+                for (alt in similar) {
+                    val altReading = reading.substring(0, pos) + alt + reading.substring(pos + 1)
+                    addIfNew(lookupCandidates(altReading).take(3))
+                }
+            }
+            pos++
+        }
+
+        // 策略三：截短最後一個音節重查
+        if (reading.length > 1) {
+            val shorter = reading.dropLast(1)
+            addIfNew(lookupCandidates(shorter).take(4))
+        }
+
+        return results.distinct()
+    }
+
+    /** Convert romaji string to hiragana without altering engine state. */
+    private fun romajiToKana(romaji: String): String {
+        val buf = StringBuilder()
+        val pending = StringBuilder()
+        for (c in romaji) {
+            pending.append(c)
+            // Try longest match first
+            var matched = false
+            for (len in minOf(pending.length, 4) downTo 1) {
+                val sub = pending.substring(pending.length - len)
+                val kana = ROMAJI_TO_KANA[sub]
+                if (kana != null) {
+                    // Remove matched portion from pending, add kana
+                    pending.delete(pending.length - len, pending.length)
+                    buf.append(pending).append(kana)
+                    pending.clear()
+                    matched = true
+                    break
+                }
+            }
+            // Handle double consonant → っ
+            if (!matched && pending.length >= 2) {
+                val last = pending[pending.length - 1]
+                val prev = pending[pending.length - 2]
+                if (last == prev && last != 'a' && last != 'i' && last != 'u' && last != 'e' && last != 'o' && last != 'n') {
+                    buf.append(pending.substring(0, pending.length - 2)).append("っ")
+                    pending.delete(0, pending.length - 1)
+                }
+            }
+        }
+        // Handle trailing 'n' → ん
+        if (pending.toString() == "n") {
+            buf.append("ん")
+            pending.clear()
+        }
+        buf.append(pending)
+        return buf.toString()
+    }
+
     // ════════════════════════════════════════════════════════
     //  STATIC DATA
     // ════════════════════════════════════════════════════════
 
     companion object {
+
+        // ── QWERTY Adjacency (for romaji fuzzy correction) ──
+        private val ROMAJI_ADJACENT: Map<Char, List<Char>> = mapOf(
+            'q' to listOf('w', 'a'),
+            'w' to listOf('q', 'e', 'a', 's'),
+            'e' to listOf('w', 'r', 's', 'd'),
+            'r' to listOf('e', 't', 'd', 'f'),
+            't' to listOf('r', 'y', 'f', 'g'),
+            'y' to listOf('t', 'u', 'g', 'h'),
+            'u' to listOf('y', 'i', 'h', 'j'),
+            'i' to listOf('u', 'o', 'j', 'k'),
+            'o' to listOf('i', 'p', 'k', 'l'),
+            'p' to listOf('o', 'l'),
+            'a' to listOf('q', 'w', 's', 'z'),
+            's' to listOf('a', 'w', 'e', 'd', 'z', 'x'),
+            'd' to listOf('s', 'e', 'r', 'f', 'x', 'c'),
+            'f' to listOf('d', 'r', 't', 'g', 'c', 'v'),
+            'g' to listOf('f', 't', 'y', 'h', 'v', 'b'),
+            'h' to listOf('g', 'y', 'u', 'j', 'b', 'n'),
+            'j' to listOf('h', 'u', 'i', 'k', 'n', 'm'),
+            'k' to listOf('j', 'i', 'o', 'l', 'm'),
+            'l' to listOf('k', 'o', 'p'),
+            'z' to listOf('a', 's', 'x'),
+            'x' to listOf('z', 's', 'd', 'c'),
+            'c' to listOf('x', 'd', 'f', 'v'),
+            'v' to listOf('c', 'f', 'g', 'b'),
+            'b' to listOf('v', 'g', 'h', 'n'),
+            'n' to listOf('b', 'h', 'j', 'm'),
+            'm' to listOf('n', 'j', 'k')
+        )
+
+        // ── Kana phonetic similarity (for kana-layer fuzzy) ──
+        private val KANA_SIMILAR: Map<String, List<String>> = mapOf(
+            "か" to listOf("が", "き", "こ"),
+            "が" to listOf("か", "ぎ", "ご"),
+            "き" to listOf("ぎ", "か", "く"),
+            "ぎ" to listOf("き", "が", "ぐ"),
+            "く" to listOf("ぐ", "き", "け"),
+            "ぐ" to listOf("く", "ぎ", "げ"),
+            "け" to listOf("げ", "く", "こ"),
+            "げ" to listOf("け", "ぐ", "ご"),
+            "こ" to listOf("ご", "か", "け"),
+            "ご" to listOf("こ", "が", "げ"),
+            "さ" to listOf("ざ", "し", "す"),
+            "ざ" to listOf("さ", "じ", "ず"),
+            "し" to listOf("じ", "さ", "す"),
+            "じ" to listOf("し", "ざ", "ず"),
+            "す" to listOf("ず", "し", "せ"),
+            "ず" to listOf("す", "じ", "ぜ"),
+            "せ" to listOf("ぜ", "す", "そ"),
+            "ぜ" to listOf("せ", "ず", "ぞ"),
+            "そ" to listOf("ぞ", "さ", "せ"),
+            "ぞ" to listOf("そ", "ざ", "ぜ"),
+            "た" to listOf("だ", "て", "と"),
+            "だ" to listOf("た", "で", "ど"),
+            "ち" to listOf("じ", "て", "つ"),
+            "つ" to listOf("づ", "ち", "て"),
+            "づ" to listOf("つ", "ど"),
+            "て" to listOf("で", "た", "と"),
+            "で" to listOf("て", "だ", "ど"),
+            "と" to listOf("ど", "た", "て"),
+            "ど" to listOf("と", "だ", "で"),
+            "は" to listOf("ば", "ぱ", "ひ"),
+            "ば" to listOf("は", "び", "ぱ"),
+            "ぱ" to listOf("は", "ば", "ぴ"),
+            "ひ" to listOf("び", "ぴ", "は"),
+            "び" to listOf("ひ", "ぱ", "ぎ"),
+            "ぴ" to listOf("ひ", "ぱ", "び"),
+            "ふ" to listOf("ぶ", "ぷ", "は"),
+            "ぶ" to listOf("ふ", "ぷ"),
+            "ぷ" to listOf("ふ", "ぶ"),
+            "へ" to listOf("べ", "ぺ"),
+            "べ" to listOf("へ", "ぺ"),
+            "ぺ" to listOf("へ", "べ"),
+            "ほ" to listOf("ぼ", "ぽ"),
+            "ぼ" to listOf("ほ", "ぽ"),
+            "ぽ" to listOf("ほ", "ぼ"),
+        )
 
         // ── Romaji → Hiragana Table ────────────────────────
 

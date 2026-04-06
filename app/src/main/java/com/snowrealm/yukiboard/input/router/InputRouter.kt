@@ -43,6 +43,31 @@ class InputRouter(private val context: Context) {
     var candidateSourceMap: Map<String, CandidateSource> = emptyMap()
         private set
 
+    // ─── AUTO 模式：雙重解釋緩衝 ───
+    val autoQwertyBuffer = StringBuilder()
+    val autoBopomofoBuffer = mutableListOf<String>()
+    var autoLastCommitWasEnglish = false; private set
+    var autoEnglishScore = 0; private set
+    var autoBopomofoScore = 0; private set
+
+    // 注音符號 → 對應 QWERTY 小寫字母（大千式標準配置）
+    private val BOPOMOFO_TO_QWERTY: Map<String, String> = mapOf(
+        "ㄆ" to "q", "ㄊ" to "w", "ㄍ" to "e", "ㄐ" to "r", "ㄔ" to "t",
+        "ㄗ" to "y", "ㄧ" to "u", "ㄛ" to "i", "ㄟ" to "o", "ㄣ" to "p",
+        "ㄇ" to "a", "ㄋ" to "s", "ㄎ" to "d", "ㄑ" to "f", "ㄕ" to "g",
+        "ㄘ" to "h", "ㄨ" to "j", "ㄜ" to "k", "ㄠ" to "l",
+        "ㄈ" to "z", "ㄌ" to "x", "ㄏ" to "c", "ㄒ" to "v", "ㄖ" to "b",
+        "ㄙ" to "n", "ㄩ" to "m",
+    )
+    private val QWERTY_TO_BOPOMOFO: Map<Char, String> = mapOf(
+        'q' to "ㄆ", 'w' to "ㄊ", 'e' to "ㄍ", 'r' to "ㄐ", 't' to "ㄔ",
+        'y' to "ㄗ", 'u' to "ㄧ", 'i' to "ㄛ", 'o' to "ㄟ", 'p' to "ㄣ",
+        'a' to "ㄇ", 's' to "ㄋ", 'd' to "ㄎ", 'f' to "ㄑ", 'g' to "ㄕ",
+        'h' to "ㄘ", 'j' to "ㄨ", 'k' to "ㄜ", 'l' to "ㄠ",
+        'z' to "ㄈ", 'x' to "ㄌ", 'c' to "ㄏ", 'v' to "ㄒ", 'b' to "ㄖ",
+        'n' to "ㄙ", 'm' to "ㄩ",
+    )
+
     private var currentMode: InputMode = InputMode.ENGLISH
     private var activeEngine: InputEngine = englishEngine
 
@@ -260,18 +285,108 @@ class InputRouter(private val context: Context) {
     // -------------------------------------------------------------------------
 
     private fun autoDetectAndSwitch(label: String) {
-        val char = label[0]
-        val targetMode = when {
-            char in '\u3105'..'\u312F' -> InputMode.BOPOMOFO
-            char in '\u3131'..'\u3163' -> InputMode.KOREAN  // 韓文 Jamo
-            char in '\u3041'..'\u309F' -> InputMode.JAPANESE // 平假名
-            char in '\u30A0'..'\u30FF' -> InputMode.JAPANESE // 片假名
-            char.isLetter()            -> InputMode.ENGLISH
-            else                       -> currentMode
+        val ch = label.firstOrNull() ?: return
+
+        // ── 非注音/英文的明確語言鍵 → 直接切 ──
+        if (ch in '\u3131'..'\u3163') { if (currentMode != InputMode.KOREAN) switchToClean(InputMode.KOREAN); return }
+        if (ch in '\u3041'..'\u30FF') { if (currentMode != InputMode.JAPANESE) switchToClean(InputMode.JAPANESE); return }
+
+        // ── 取得這個鍵的雙重解讀 ──
+        val isBopomofoKey = ch in '\u3105'..'\u312F' || ch in setOf('ˉ','ˊ','ˇ','ˋ','˙')
+        val qwertyChar = if (isBopomofoKey) {
+            BOPOMOFO_TO_QWERTY[label]?.firstOrNull()
+        } else if (ch.isLetter()) {
+            ch.lowercaseChar()
+        } else null
+
+        // 無法映射到英文的注音鍵（ㄅㄉㄅㄦ 等數字行或聲調鍵）→ 明確注音
+        if (qwertyChar == null && isBopomofoKey) {
+            if (currentMode != InputMode.BOPOMOFO) {
+                switchToClean(InputMode.BOPOMOFO)
+                // 把之前累積的注音 feed 回引擎
+                for (sym in autoBopomofoBuffer) bopomofoEngine.processChar(sym)
+            }
+            autoQwertyBuffer.clear()
+            autoBopomofoBuffer.clear()
+            return
         }
-        if (targetMode != currentMode) {
-            switchTo(targetMode)
+
+        // ── 累積雙重解讀 ──
+        if (qwertyChar != null) autoQwertyBuffer.append(qwertyChar)
+        if (isBopomofoKey) {
+            autoBopomofoBuffer.add(label)
+        } else if (qwertyChar != null) {
+            QWERTY_TO_BOPOMOFO[qwertyChar]?.let { autoBopomofoBuffer.add(it) }
         }
+
+        val englishSoFar = autoQwertyBuffer.toString()
+
+        // ── 評分邏輯 ──
+        var engScore = 0
+        var bopoScore = 0
+
+        // 訊號一：字典命中
+        if (englishSoFar.length >= 2) {
+            val engCands = (englishEngine as? EnglishInputEngine)?.getCandidatesForPrefix(englishSoFar) ?: emptyList()
+            if (engCands.isNotEmpty()) engScore += engCands.size.coerceAtMost(5) * 10 + 30
+        }
+        if (autoBopomofoBuffer.isNotEmpty()) {
+            val bopoCands = (bopomofoEngine as? ChewingInputEngine)?.getCandidatesForBopomofo(
+                autoBopomofoBuffer.joinToString("")
+            ) ?: emptyList()
+            if (bopoCands.isNotEmpty()) bopoScore += bopoCands.size.coerceAtMost(5) * 10 + 30
+        }
+
+        // 訊號二：上下文連續性
+        if (autoLastCommitWasEnglish) engScore += 20 else bopoScore += 20
+
+        // 訊號三：長度合理性
+        if (englishSoFar.length in 2..15) engScore += 10
+        if (autoBopomofoBuffer.size >= 2) bopoScore += 10
+
+        autoEnglishScore = engScore
+        autoBopomofoScore = bopoScore
+
+        // ── 決策：只有分數差距明顯時才切換 ──
+        val threshold = if (autoQwertyBuffer.length <= 2) 40 else 20
+
+        if (engScore - bopoScore >= threshold && currentMode != InputMode.ENGLISH) {
+            switchToClean(InputMode.ENGLISH)
+            // 把之前累積的英文鍵 feed 回引擎（不含當前這個鍵，當前鍵由 processInput 處理）
+            for (c in autoQwertyBuffer.toString().dropLast(1)) {
+                englishEngine.processChar(c.toString())
+            }
+        } else if (bopoScore - engScore >= threshold && currentMode != InputMode.BOPOMOFO) {
+            switchToClean(InputMode.BOPOMOFO)
+            for (sym in autoBopomofoBuffer.dropLast(1)) {
+                bopomofoEngine.processChar(sym)
+            }
+        }
+        // 分數接近 → 繼續收集更多按鍵再決定
+    }
+
+    /**
+     * AUTO 模式：取得雙語候選，根據分數排序。
+     * 優先語言的候選在前。
+     */
+    fun getAutoCombinedCandidates(): List<String> {
+        val engCands = (englishEngine as? EnglishInputEngine)
+            ?.getCandidatesForPrefix(autoQwertyBuffer.toString()) ?: emptyList()
+        val bopoCands = (bopomofoEngine as? ChewingInputEngine)
+            ?.getCandidatesForBopomofo(autoBopomofoBuffer.joinToString("")) ?: emptyList()
+        return if (autoEnglishScore >= autoBopomofoScore) {
+            (engCands + bopoCands).distinct().take(10)
+        } else {
+            (bopoCands + engCands).distinct().take(10)
+        }
+    }
+
+    /** 切換模式並清空引擎狀態 */
+    private fun switchToClean(mode: InputMode) {
+        activeEngine.reset()
+        candidateManager.clear()
+        currentMode = mode
+        activeEngine = engineForMode(mode)
     }
 
     private fun updateCandidates() {
@@ -450,6 +565,13 @@ class InputRouter(private val context: Context) {
     private fun onTextCommitted(text: String) {
         val trimmed = text.trim()
         if (trimmed.isBlank()) return
+
+        // AUTO 模式：commit 後重置雙重評分緩衝
+        autoQwertyBuffer.clear()
+        autoBopomofoBuffer.clear()
+        autoEnglishScore = 0
+        autoBopomofoScore = 0
+        autoLastCommitWasEnglish = trimmed.all { it.code < 128 }
 
         val hasCjk = trimmed.any { it.code in 0x4E00..0x9FFF || it.code in 0x3400..0x4DBF }
         val hasKana = trimmed.any { it.code in 0x3040..0x30FF }

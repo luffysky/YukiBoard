@@ -200,7 +200,40 @@ class PinyinInputEngine : InputEngine {
             }
         }
 
+        // QWERTY 鄰近鍵容錯（按到旁邊的鍵）
+        if (candidates.isEmpty() && pinyinBuffer.length >= 2) {
+            candidates.addAll(fuzzyCorrectWithAdjacency(pinyinBuffer.toString(), 5))
+        }
+
         currentCandidates = candidates.distinct().take(30)
+    }
+
+    // ── QWERTY 鄰近鍵容錯 ─────────────────────────────────────
+
+    private fun fuzzyCorrectWithAdjacency(input: String, maxResults: Int): List<String> {
+        val lower = input.lowercase()
+        val results = mutableListOf<String>()
+        val seen = mutableSetOf<String>()
+
+        for (i in lower.indices) {
+            val neighbors = PINYIN_ADJACENT[lower[i]] ?: continue
+            for (neighbor in neighbors) {
+                val attempt = lower.replaceRange(i, i + 1, neighbor.toString())
+                val altSyllables = segmentPinyin(attempt)
+                if (altSyllables.isEmpty()) continue
+                for (sy in altSyllables) {
+                    PINYIN_DICT[sy]?.forEach { ch ->
+                        if (seen.add(ch)) results.add(ch)
+                    }
+                }
+                val fullKey = altSyllables.joinToString("")
+                PHRASE_DICT[fullKey]?.forEach { phrase ->
+                    if (seen.add(phrase)) results.add(phrase)
+                }
+                if (results.size >= maxResults) return results.take(maxResults)
+            }
+        }
+        return results.take(maxResults)
     }
 
     // ── 模糊拼音 ─────────────────────────────────────────────
@@ -242,6 +275,24 @@ class PinyinInputEngine : InputEngine {
     // =====================================================================
 
     companion object {
+
+        private val PINYIN_ADJACENT: Map<Char, List<Char>> = mapOf(
+            'q' to listOf('w', 'a'),  'w' to listOf('q', 'e', 'a', 's'),
+            'e' to listOf('w', 'r', 's', 'd'),  'r' to listOf('e', 't', 'd', 'f'),
+            't' to listOf('r', 'y', 'f', 'g'),  'y' to listOf('t', 'u', 'g', 'h'),
+            'u' to listOf('y', 'i', 'h', 'j'),  'i' to listOf('u', 'o', 'j', 'k'),
+            'o' to listOf('i', 'p', 'k', 'l'),  'p' to listOf('o', 'l'),
+            'a' to listOf('q', 'w', 's', 'z'),  's' to listOf('a', 'w', 'e', 'd', 'z', 'x'),
+            'd' to listOf('s', 'e', 'r', 'f', 'x', 'c'),  'f' to listOf('d', 'r', 't', 'g', 'c', 'v'),
+            'g' to listOf('f', 't', 'y', 'h', 'v', 'b'),  'h' to listOf('g', 'y', 'u', 'j', 'b', 'n'),
+            'j' to listOf('h', 'u', 'i', 'k', 'n', 'm'),  'k' to listOf('j', 'i', 'o', 'l', 'm'),
+            'l' to listOf('k', 'o', 'p'),
+            'z' to listOf('a', 's', 'x'),  'x' to listOf('z', 's', 'd', 'c'),
+            'c' to listOf('x', 'd', 'f', 'v'),  'v' to listOf('c', 'f', 'g', 'b'),
+            'b' to listOf('v', 'g', 'h', 'n'),  'n' to listOf('b', 'h', 'j', 'm'),
+            'm' to listOf('n', 'j', 'k')
+        )
+
         /** 合法拼音音節表 */
         private val VALID_SYLLABLES = setOf(
             // 單韻母

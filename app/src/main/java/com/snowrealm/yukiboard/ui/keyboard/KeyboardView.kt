@@ -403,13 +403,21 @@ class KeyboardView(context: Context) : View(context) {
     // ─── 滑動停頓偵測 ───
     private var swipeDwellKey: KeyModel? = null
     private var swipeDwellStartMs = 0L
-    private val swipeDwellThresholdMs = 300L
+    private val swipeDwellThresholdMs = 180L  // 降到 180ms（速度偵測補充）
     private val swipeDwellHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val swipeDwellRunnable = Runnable {
-        swipeDwellKey?.let { onSwipeDwellConfirmed(it) }
+        swipeDwellKey?.let { confirmSwipeKey(it) }
+        swipeDwellKey = null
     }
     /** 滑動停頓確認回呼（音節確認） */
     var onSwipeSyllableConfirmed: ((String) -> Unit)? = null
+
+    // ─── 滑動速度感知停頓偵測 ───
+    private val swipeVelocityPoints = ArrayDeque<Pair<Long, PointF>>()
+    private val VELOCITY_WINDOW_MS = 80L
+    private val DWELL_VELOCITY_THRESHOLD = 300f  // px/s
+    private val confirmedSwipeKeys = mutableListOf<KeyModel>()
+    private var lastConfirmedKey: KeyModel? = null
 
     // ─── 滑動輸入解碼 ──────────────────────────────────────
     /** 滑動經過的按鍵序列（去連續重複） */
@@ -575,7 +583,12 @@ class KeyboardView(context: Context) : View(context) {
         isSwipingActive = false
         swipePoints.clear()
         swipeKeySequence.clear()
+        confirmedSwipeKeys.clear()
+        lastConfirmedKey = null
+        swipeVelocityPoints.clear()
         isSwipeGesture = false
+        swipeDwellHandler.removeCallbacks(swipeDwellRunnable)
+        swipeDwellKey = null
         handler.removeCallbacks(longPressRunnable)
         handler.removeCallbacks(deleteRepeatRunnable)
         invalidate()
@@ -1530,21 +1543,52 @@ class KeyboardView(context: Context) : View(context) {
 
     fun onSwipeMove(x: Float, y: Float) {
         if (!isSwipingActive) return
+
+        val now = System.currentTimeMillis()
+        val newPoint = PointF(x, y)
+
+        // 累積速度計算點
+        swipeVelocityPoints.addLast(now to newPoint)
+        while (swipeVelocityPoints.isNotEmpty() &&
+            now - swipeVelocityPoints.first().first > VELOCITY_WINDOW_MS) {
+            swipeVelocityPoints.removeFirst()
+        }
+
+        // 計算當前速度（px/s）
+        val currentVelocity = if (swipeVelocityPoints.size >= 2) {
+            val oldest = swipeVelocityPoints.first()
+            val newest = swipeVelocityPoints.last()
+            val dt = (newest.first - oldest.first).toFloat() / 1000f
+            val dx = newest.second.x - oldest.second.x
+            val dy = newest.second.y - oldest.second.y
+            val dist = Math.hypot(dx.toDouble(), dy.toDouble()).toFloat()
+            if (dt > 0) dist / dt else Float.MAX_VALUE
+        } else Float.MAX_VALUE
+
+        // 更新繪製路徑
         val last = swipePoints.lastOrNull()
         if (last == null || Math.hypot((x - last.x).toDouble(), (y - last.y).toDouble()) > 4.0 * density) {
-            swipePoints.add(PointF(x, y))
-            val currentKey = keyEntries.firstOrNull { it.touchRect.contains(x, y) }?.key
-            if (currentKey != null && currentKey != swipeHighlightKey) {
-                flashKey(currentKey)
-                // 停頓偵測：換了按鍵就重新計時
+            swipePoints.add(newPoint)
+            invalidate()
+        }
+
+        // 取得當前所在按鍵
+        val currentKey = keyEntries.firstOrNull { it.touchRect.contains(x, y) }?.key ?: return
+        if (currentKey.isSpecial) return
+
+        // 停頓偵測：速度低 + 換了按鍵 → 確認
+        if (currentKey != lastConfirmedKey) {
+            if (currentVelocity < DWELL_VELOCITY_THRESHOLD) {
+                confirmSwipeKey(currentKey)
+            } else {
+                // 速度還快，用 dwell timer 等待停頓
                 swipeDwellHandler.removeCallbacks(swipeDwellRunnable)
                 if (currentKey != swipeDwellKey) {
                     swipeDwellKey = currentKey
-                    swipeDwellStartMs = System.currentTimeMillis()
+                    swipeDwellStartMs = now
                     swipeDwellHandler.postDelayed(swipeDwellRunnable, swipeDwellThresholdMs)
                 }
             }
-            invalidate()
         }
     }
 
@@ -1553,6 +1597,17 @@ class KeyboardView(context: Context) : View(context) {
         isSwipingActive = false
         swipeDwellHandler.removeCallbacks(swipeDwellRunnable)
         swipeDwellKey = null
+
+        // 放手位置的按鍵也算確認點（最後一個鍵）
+        val lastPoint = swipePoints.lastOrNull()
+        if (lastPoint != null) {
+            val lastKey = keyEntries.firstOrNull {
+                it.touchRect.contains(lastPoint.x, lastPoint.y)
+            }?.key
+            if (lastKey != null && !lastKey.isSpecial && lastKey != lastConfirmedKey) {
+                confirmSwipeKey(lastKey)
+            }
+        }
         swipeFadeAnimator?.cancel()
         swipeFadeAnimator = android.animation.ValueAnimator.ofFloat(1f, 0f).apply {
             duration = 400
@@ -1569,6 +1624,18 @@ class KeyboardView(context: Context) : View(context) {
             })
             start()
         }
+    }
+
+    /** 滑動停頓確認：記錄這個鍵為使用者意圖 */
+    private fun confirmSwipeKey(key: KeyModel) {
+        if (key == lastConfirmedKey) return
+        lastConfirmedKey = key
+        confirmedSwipeKeys.add(key)
+        // 視覺 + 觸覺回饋
+        flashKey(key)
+        if (hapticEnabled) vibrateShort()
+        // 通知音節確認（供外部解碼）
+        onSwipeSyllableConfirmed?.invoke(key.label)
     }
 
     private fun flashKey(key: KeyModel) {
@@ -1787,6 +1854,9 @@ class KeyboardView(context: Context) : View(context) {
                 isLongPressTriggered = false
                 isSwipeGesture = false
                 swipeKeySequence.clear()
+                confirmedSwipeKeys.clear()
+                lastConfirmedKey = null
+                swipeVelocityPoints.clear()
                 swipeDownX = x
                 swipeDownY = y
                 val hit = keyEntries.firstOrNull { it.touchRect.contains(x, y) }
@@ -1800,6 +1870,8 @@ class KeyboardView(context: Context) : View(context) {
                     // 記錄滑動起始按鍵
                     if (swipeInputEnabled && !hit.key.isSpecial) {
                         swipeKeySequence.add(hit.key)
+                        confirmedSwipeKeys.add(hit.key)
+                        lastConfirmedKey = hit.key
                     }
                 }
                 // 滑動路徑起點
@@ -1925,16 +1997,19 @@ class KeyboardView(context: Context) : View(context) {
                     return true
                 }
 
-                // 滑動輸入：滑動結束，送出按鍵序列
-                if (isSwipeGesture && swipeKeySequence.size >= 2) {
-                    onSwipeInputListener?.invoke(swipeKeySequence.toList())
+                // 滑動輸入：滑動結束，送出停頓確認的按鍵序列
+                if (isSwipeGesture && confirmedSwipeKeys.size >= 2) {
+                    onSwipeInputListener?.invoke(confirmedSwipeKeys.toList())
+                    confirmedSwipeKeys.clear()
+                    lastConfirmedKey = null
                     swipeKeySequence.clear()
                     isSwipeGesture = false
-                    // 滑動路徑結束
                     onSwipeEnd()
                     performClick()
                     return true
                 }
+                confirmedSwipeKeys.clear()
+                lastConfirmedKey = null
                 swipeKeySequence.clear()
                 isSwipeGesture = false
 
@@ -1956,7 +2031,8 @@ class KeyboardView(context: Context) : View(context) {
                         if (index in allCandidates.indices) {
                             onCandidateSpeakListener?.invoke(allCandidates[index])
                             onCandidateSelectListener?.invoke(index)
-                            // 選字後保持展開，不關閉面板
+                            isCandidateExpanded = false
+                            expandScrollOffset = 0f
                             invalidate()
                             performClick()
                             return true
