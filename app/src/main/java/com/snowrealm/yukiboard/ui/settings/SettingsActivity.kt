@@ -2385,9 +2385,21 @@ class SettingsActivity : AppCompatActivity() {
                                     return@post
                                 }
 
-                                // 設定語言
-                                val langResult = rawTts?.setLanguage(java.util.Locale.TAIWAN)
-                                val info = "engine=$defaultEngine lang=$langResult vol=$vol/$maxVol"
+                                // 套用使用者選的語音音色
+                                val selectedVoiceName = prefs.ttsVoiceName
+                                val voiceApplied = if (selectedVoiceName.isNotEmpty()) {
+                                    val voice = rawTts?.voices?.firstOrNull { it.name == selectedVoiceName }
+                                    if (voice != null) {
+                                        rawTts?.voice = voice
+                                        true
+                                    } else false
+                                } else false
+                                // 沒選語音或找不到時 fallback 設定語言
+                                if (!voiceApplied) {
+                                    rawTts?.setLanguage(java.util.Locale.TAIWAN)
+                                }
+                                val voiceLabel = if (voiceApplied) selectedVoiceName.substringAfterLast("#").take(20) else "default"
+                                val info = "engine=$defaultEngine voice=$voiceLabel vol=$vol/$maxVol"
                                 android.widget.Toast.makeText(this@SettingsActivity, "TTS: $info", android.widget.Toast.LENGTH_LONG).show()
 
                                 if (vol == 0) {
