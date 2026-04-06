@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 89
-        versionName "0.9.23"
+        versionCode 90
+        versionName "0.9.24"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,6 +82,7 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
+                    "- feat: TTS 語音音色選擇器 — 列出裝置所有可用語音 + 試聽\n" +
                     "- fix: 雪凜角色不見修復 — bringToFront z-order + characterAnimEnabled 同步\n" +
                     "- fix: 按鍵上標/文字溢出裁切修復\n" +
                     "- fix: 候選字空白過濾\n" +
@@ -96,6 +97,7 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
+                    "- feat: TTS 語音音色選擇器 — 列出裝置所有可用語音 + 試聽\n" +
                     "- fix: 雪凜角色不見修復 — bringToFront z-order + characterAnimEnabled 同步\n" +
                     "- fix: 按鍵上標/文字溢出裁切修復\n" +
                     "- fix: 候選字空白過濾\n" +
