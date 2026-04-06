@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 72
-        versionName "0.9.6"
+        versionCode 73
+        versionName "0.9.7"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,8 +82,8 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- Insight 同步更新（社群貼圖/GIF/檔案預覽）\n" +
-                    "- 版本同步 bump"
+                    "- fix: ProGuard rules 補齊（修復 release build 閃退）\n" +
+                    "- keep: OkHttp/kotlinx-serialization/EncryptedPrefs/Filament"
             }
         }
         debug {
@@ -92,8 +92,8 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- Insight 同步更新（社群貼圖/GIF/檔案預覽）\n" +
-                    "- 版本同步 bump"
+                    "- fix: ProGuard rules 補齊（修復 release build 閃退）\n" +
+                    "- keep: OkHttp/kotlinx-serialization/EncryptedPrefs/Filament"
             }
         }
     }
