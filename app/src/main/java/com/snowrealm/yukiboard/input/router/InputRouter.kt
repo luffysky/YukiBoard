@@ -473,8 +473,14 @@ class InputRouter(private val context: Context) {
                 candidateManager.update(emptyList())
                 return
             }
+            // composing 為空 = 使用者已送出文字，清除所有候選（含歷史）
+            if (composing.isEmpty()) {
+                candidateSourceMap = emptyMap()
+                candidateManager.clear()
+                return
+            }
             if (raw.isEmpty()) {
-                // 只有歷史候選
+                // 有 composing 但引擎沒候選 → 只顯示歷史候選
                 for (h in candidateManager.historyCandidates) historySourceMap[h] = CandidateSource.HISTORY
                 candidateSourceMap = historySourceMap
                 candidateManager.update(emptyList())
@@ -566,6 +572,12 @@ class InputRouter(private val context: Context) {
         }
 
         // ─── 英文模式：統合多來源候選 + 統一排序 ───
+        // composing 為空 = 已送出文字，清除所有候選
+        if (composing.isEmpty() && raw.isEmpty()) {
+            candidateSourceMap = emptyMap()
+            candidateManager.clear()
+            return
+        }
         val scored = mutableMapOf<String, Float>()
         val sourceMap = mutableMapOf<String, CandidateSource>()
 
