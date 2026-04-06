@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 84
-        versionName "0.9.18"
+        versionCode 85
+        versionName "0.9.19"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,11 +82,11 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 候選字歷史累積（選字後前段候選保留，淡色顯示）\n" +
-                    "- feat: AUTO 智慧輸入法直接從鍵盤啟動（長按切換鍵）\n" +
-                    "- fix: AUTO 模式不再每次 commit 後跳回英文鍵盤\n" +
-                    "- fix: 數字/符號鍵重複輸入問題\n" +
-                    "- fix: 滑動輸入首鍵漏接 + 鄰近鍵加強糾錯"
+                    "- feat: 滑動多音節自動組合候選（如 ㄕㄨㄌㄜㄋㄧ → 輸了你）\n" +
+                    "- feat: 高頻字權重排序（了/的/是等常用字優先）\n" +
+                    "- feat: 候選字排序優化（整句預測→串聯接續→一般候選）\n" +
+                    "- feat: 統一詞庫調度（libchewing 詞庫合併 + 自動學詞）\n" +
+                    "- fix: 歷史候選字排在最前面 + 選歷史候選不漏注音"
             }
         }
         debug {
@@ -95,11 +95,11 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 候選字歷史累積（選字後前段候選保留，淡色顯示）\n" +
-                    "- feat: AUTO 智慧輸入法直接從鍵盤啟動（長按切換鍵）\n" +
-                    "- fix: AUTO 模式不再每次 commit 後跳回英文鍵盤\n" +
-                    "- fix: 數字/符號鍵重複輸入問題\n" +
-                    "- fix: 滑動輸入首鍵漏接 + 鄰近鍵加強糾錯"
+                    "- feat: 滑動多音節自動組合候選（如 ㄕㄨㄌㄜㄋㄧ → 輸了你）\n" +
+                    "- feat: 高頻字權重排序（了/的/是等常用字優先）\n" +
+                    "- feat: 候選字排序優化（整句預測→串聯接續→一般候選）\n" +
+                    "- feat: 統一詞庫調度（libchewing 詞庫合併 + 自動學詞）\n" +
+                    "- fix: 歷史候選字排在最前面 + 選歷史候選不漏注音"
             }
         }
     }

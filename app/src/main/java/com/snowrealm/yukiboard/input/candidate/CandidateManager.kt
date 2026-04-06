@@ -49,7 +49,9 @@ class CandidateManager {
         // 自動歸檔：如果有舊的當前段候選字，且新候選字跟舊的不同，
         // 把舊候選存入歷史（使用者持續打字不選字時，前段候選不會消失）
         if (currentCandidateCount > 0) {
-            val oldCurrent = _candidates.take(currentCandidateCount)
+            // 取出上一輪的「當前段」候選（在列表尾部，不是頭部）
+            val historyCount = _candidates.size - currentCandidateCount
+            val oldCurrent = if (historyCount >= 0) _candidates.drop(historyCount) else _candidates.toList()
             val isDifferent = newCandidates.isEmpty() || oldCurrent != newCandidates.take(oldCurrent.size)
             if (isDifferent) {
                 for (c in oldCurrent) {
@@ -64,11 +66,11 @@ class CandidateManager {
         }
 
         _candidates.clear()
-        // 歷史候選字排在前面（使用者最可能想回選的）
+        // 歷史候選字排最前面（前段打過的詞，使用者最可能回選）
         for (h in _historyCandidates) {
             if (h !in newCandidates) _candidates.add(h)
         }
-        // 當前段候選字排在後面
+        // 當前段候選字排後面
         _candidates.addAll(newCandidates)
         currentCandidateCount = newCandidates.size
         pageIndex = 0

@@ -28,6 +28,10 @@ class ChewingInputEngine(
     // 已選字但尚未 commit 的暫存（連續選字場景）
     private val selectedBuffer = StringBuilder()
 
+    /** 最近一次選字前的注音（供自動學詞記錄注音用） */
+    var lastComposingBopomofo: String = ""
+        private set
+
     // ─── 字典：注音拼音 → 漢字列表 ───
     private val dict: Map<String, List<String>> by lazy { loadDict() }
     // ─── 聲母簡拼詞庫：聲母序列 → 詞組列表 ───
@@ -301,6 +305,8 @@ class ChewingInputEngine(
         if (index !in currentCandidates.indices) return InputResult.Idle
 
         val selected = currentCandidates[index]
+        // 保存選字前的注音（供自動學詞用）
+        lastComposingBopomofo = bopomofoBuffer.toString()
         selectedBuffer.append(selected)
         bopomofoBuffer.clear()
         isSelectingCandidate = false

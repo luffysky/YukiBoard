@@ -509,6 +509,10 @@ class InputRouter(private val context: Context) {
                     // 串聯預測加分（上一字的接續候選）
                     val ngramScore = nextCharBoost[word]
                     if (ngramScore != null) score += ngramScore * 3
+                    // 個人詞庫加分（使用者學過的詞優先）
+                    if (smartInput.personalDictionary.isKnown(word)) score += 30
+                    // UserDictionary 加分
+                    if (userDict.contains(word)) score += 20
                     score
                 }.thenBy { raw.indexOf(it) })
 
@@ -706,6 +710,15 @@ class InputRouter(private val context: Context) {
             }
             if (trimmed.length > 1) {
                 smartInput.onWordCommitted(trimmed, currentAppPackage)
+            }
+            // 自動學詞：中文選字後記錄 word + bopomofo 到 UserDictionary
+            // 供下次注音查詢時優先顯示使用者打過的詞
+            if (hasCjk && activeEngine is ChewingInputEngine) {
+                val bopo = (activeEngine as ChewingInputEngine).lastComposingBopomofo
+                if (bopo.isNotEmpty() && trimmed.length >= 2) {
+                    userDict.addManual(trimmed, bopo)
+                }
+                userDict.learn(trimmed)
             }
         } else {
             val words = trimmed.split("\\s+".toRegex())
