@@ -171,9 +171,11 @@ class KeyboardView(context: Context) : View(context) {
     // -------------------------------------------------------------------------
     private var keyRows: List<List<KeyModel>> = KeyboardState.defaultQwertyRows()
     private var sideRows: List<List<KeyModel>> = emptyList()
-    private var candidates: List<String> = emptyList()
+    internal var candidates: List<String> = emptyList()
+        private set
     private var allCandidates: List<String> = emptyList()
-    private var candidateSourceMap: Map<String, CandidateSource> = emptyMap()
+    internal var candidateSourceMap: Map<String, CandidateSource> = emptyMap()
+        private set
     private var isSwipeCandidateMode: Boolean = false
     private var isCandidateExpanded: Boolean = false
     // 候選列橫向捲動

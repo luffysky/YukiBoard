@@ -346,6 +346,28 @@ class YukiBoardIMEService : InputMethodService() {
                 return@setOnCandidateSelectListener
             }
 
+            // AI 候選字是在 Service 層附加的，不在 InputRouter/引擎內
+            // 需要用 KeyboardView 的 candidates 列表取得實際文字
+            val displayedCandidates = keyboardView.candidates
+            val displayedText = displayedCandidates.getOrNull(index)
+            val sourceMap = keyboardView.candidateSourceMap
+            val isAICandidate = displayedText != null &&
+                sourceMap[displayedText] == com.snowrealm.yukiboard.input.router.CandidateSource.AI
+
+            if (isAICandidate && displayedText != null) {
+                // AI 候選字：直接 commit，不走引擎（引擎裡沒有這個候選）
+                val ic = currentInputConnection ?: return@setOnCandidateSelectListener
+                // 先清掉 composing
+                if (inputRouter.composingText.isNotEmpty()) {
+                    ic.finishComposingText()
+                }
+                inputRouter.reset()
+                applyInputResult(ic, InputResult.CommitText(displayedText))
+                keyboardView.updateComposingText("")
+                keyboardView.updateCandidates(emptyList())
+                return@setOnCandidateSelectListener
+            }
+
             val result = inputRouter.selectCandidate(index)
             // GIF/翻譯面板輸入模式：選字提交到面板而非目標 App
             val gpRef = gifPanel

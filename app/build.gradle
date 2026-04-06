@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 77
-        versionName "0.9.11"
+        versionCode 78
+        versionName "0.9.12"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,11 +82,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 防詐評分大改（組合模式+URL掃描+情境加分+委婉文案）\n" +
-                    "- fix: AI候選字移除✨改金色底色、英文候選fallback\n" +
-                    "- fix: 面板關閉後鍵盤恢復、VRM四方向光照、注音聲調排序\n" +
-                    "- fix: 滑行門檻12dp、Whisper靜音偵測+上下文prompt\n" +
-                    "- feat: 防詐/被動掃描/連結掃描 三開關"
+                    "- fix: AI候選字可正常點選（跳過引擎直接commit）\n" +
+                    "- fix: 防詐評分大改+URL掃描+委婉文案+三開關\n" +
+                    "- fix: 9項bug修復（VRM光照/注音排序/面板恢復等）"
             }
         }
         debug {
@@ -95,11 +93,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 防詐評分大改（組合模式+URL掃描+情境加分+委婉文案）\n" +
-                    "- fix: AI候選字移除✨改金色底色、英文候選fallback\n" +
-                    "- fix: 面板關閉後鍵盤恢復、VRM四方向光照、注音聲調排序\n" +
-                    "- fix: 滑行門檻12dp、Whisper靜音偵測+上下文prompt\n" +
-                    "- feat: 防詐/被動掃描/連結掃描 三開關"
+                    "- fix: AI候選字可正常點選（跳過引擎直接commit）\n" +
+                    "- fix: 防詐評分大改+URL掃描+委婉文案+三開關\n" +
+                    "- fix: 9項bug修復（VRM光照/注音排序/面板恢復等）"
             }
         }
     }
