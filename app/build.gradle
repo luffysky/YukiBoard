@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 71
-        versionName "0.9.5"
+        versionCode 72
+        versionName "0.9.6"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,8 +82,8 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 登入成功後 recreate 顯示已登入 UI\n" +
-                    "- debug: OAuthCallback + fetchMe 加 log 追蹤登入資料"
+                    "- Insight 同步更新（社群貼圖/GIF/檔案預覽）\n" +
+                    "- 版本同步 bump"
             }
         }
         debug {
@@ -92,8 +92,8 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 登入成功後 recreate 顯示已登入 UI\n" +
-                    "- debug: OAuthCallback + fetchMe 加 log 追蹤登入資料"
+                    "- Insight 同步更新（社群貼圖/GIF/檔案預覽）\n" +
+                    "- 版本同步 bump"
             }
         }
     }
