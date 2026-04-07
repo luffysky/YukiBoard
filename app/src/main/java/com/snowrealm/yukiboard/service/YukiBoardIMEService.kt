@@ -1832,10 +1832,16 @@ class YukiBoardIMEService : InputMethodService() {
                 w.attributes?.token = window?.window?.decorView?.windowToken
                 w.setType(android.view.WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG)
             }
+            // ADJUST_PAN 確保輸入框不被鍵盤遮擋（ADJUST_RESIZE 在 overlay 視窗中常失效）
             w.setSoftInputMode(
-                android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
+                android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN or
                 android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
             )
+            // 把 Dialog 放到螢幕上半部，留空間給系統鍵盤
+            w.setGravity(android.view.Gravity.TOP or android.view.Gravity.CENTER_HORIZONTAL)
+            val lp = w.attributes
+            lp.y = (48 * resources.displayMetrics.density).toInt()  // 頂部留 48dp
+            w.attributes = lp
         }
 
         dialog.setOnDismissListener {

@@ -264,8 +264,21 @@ class InputRouter(private val context: Context) {
             candidateManager.archiveCurrentAsHistory(displayedText)
         }
 
-        // 直接 commit 候選的共用邏輯（���史候選 / 整句預測 / 接續候選等不在引擎內的候選）
+        // 直接 commit 候選的共用邏輯（歷史候選 / 整句預測 / 接續候選等不在引擎內的候選）
         fun directCommit(text: String): InputResult {
+            val eng = activeEngine
+            if (eng is ChewingInputEngine) {
+                // 注音引擎有 selectedBuffer（已選字累積）
+                // 先把 selectedBuffer 內容一起 commit，避免前面已選的字消失
+                val pending = eng.composingText.takeIf { it.isNotEmpty() && it != text }
+                eng.reset()
+                candidateManager.clear()
+                val fullText = if (pending != null) pending + text else text
+                onTextCommitted(fullText)
+                smartInput.onCandidateHit()
+                updateCandidates()
+                return InputResult.CommitText(fullText)
+            }
             activeEngine.reset()
             candidateManager.clear()
             onTextCommitted(text)
@@ -274,11 +287,8 @@ class InputRouter(private val context: Context) {
             return InputResult.CommitText(text)
         }
 
-        // 歷史候選字 / 接續預測候選：不在引擎候選內 → 直接 commit
-        if (displayedText != null && candidateSourceMap[displayedText] in setOf(CandidateSource.HISTORY, CandidateSource.PREDICTION)) {
-            return directCommit(displayedText)
-        }
-
+        // 先讓引擎嘗試處理候選（引擎候選優先於 PREDICTION/HISTORY 標籤）
+        // 避免因 updateCandidates 排序/標記導致引擎候選被誤判為 PREDICTION
         val result = when (val eng = activeEngine) {
             is ChewingInputEngine -> {
                 val engineIndex = if (displayedText != null) eng.getCandidates().indexOf(displayedText).takeIf { it >= 0 } else null
@@ -489,7 +499,13 @@ class InputRouter(private val context: Context) {
     }
 
     private fun updateCandidates() {
-        val raw = activeEngine.getCandidates().filter { it.isNotBlank() }
+        // AUTO 模式：合併中英雙語候選
+        val raw = if (currentMode == InputMode.AUTO && autoQwertyBuffer.isNotEmpty()) {
+            val combined = getAutoCombinedCandidates()
+            if (combined.isNotEmpty()) combined else activeEngine.getCandidates().filter { it.isNotBlank() }
+        } else {
+            activeEngine.getCandidates().filter { it.isNotBlank() }
+        }
         val composing = activeEngine.composingText
 
         // 非英文模式：引擎候選 + 自適應字典排序（composing 有值才加整句預測）

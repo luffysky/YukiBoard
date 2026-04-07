@@ -61,6 +61,18 @@ class FraudOpenDataSync(private val context: Context) {
         /** 165 詐騙闢謠 (CSV) */
         private const val NPA_165_DEBUNK_URL =
             "https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/4F4DF9A5-DF4C-4EE8-A50D-869347D38D9E/resource/7AABA1C9-86CB-4FD7-B837-00FA1427CB5C/download"
+
+        /** MODA 額外端點 — CSV 格式 */
+        private const val MODA_CSV_URL =
+            "https://www-api.moda.gov.tw/OpenData/csv/22"
+
+        /** URLhaus — abuse.ch 惡意 URL 資料庫 (TXT, 每小時更新) */
+        private const val URLHAUS_URL =
+            "https://urlhaus.abuse.ch/downloads/text_online/"
+
+        /** CERT.PL — 釣魚域名清單 (TXT, 每日更新) */
+        private const val CERTPL_URL =
+            "https://hole.cert.pl/domains/domains.txt"
     }
 
     private val prefs: SharedPreferences =
@@ -143,6 +155,33 @@ class FraudOpenDataSync(private val context: Context) {
             Log.i(TAG, "165 Debunk: ${debunkDomains.size} domains")
         } catch (e: Exception) {
             Log.w(TAG, "165 Debunk fetch failed: ${e.message}")
+        }
+
+        // 5. MODA CSV 額外端點
+        try {
+            val modaCsvDomains = fetchTextUrlList(MODA_CSV_URL)
+            allDomains.addAll(modaCsvDomains)
+            Log.i(TAG, "MODA CSV: ${modaCsvDomains.size} domains")
+        } catch (e: Exception) {
+            Log.w(TAG, "MODA CSV fetch failed: ${e.message}")
+        }
+
+        // 6. URLhaus — abuse.ch 惡意 URL
+        try {
+            val urlhausDomains = fetchTextUrlList(URLHAUS_URL)
+            allDomains.addAll(urlhausDomains)
+            Log.i(TAG, "URLhaus: ${urlhausDomains.size} domains")
+        } catch (e: Exception) {
+            Log.w(TAG, "URLhaus fetch failed: ${e.message}")
+        }
+
+        // 7. CERT.PL 釣魚域名
+        try {
+            val certplDomains = fetchTextUrlList(CERTPL_URL)
+            allDomains.addAll(certplDomains)
+            Log.i(TAG, "CERT.PL: ${certplDomains.size} domains")
+        } catch (e: Exception) {
+            Log.w(TAG, "CERT.PL fetch failed: ${e.message}")
         }
 
         // 合併到本地
@@ -299,6 +338,43 @@ class FraudOpenDataSync(private val context: Context) {
         val urlRegex = Regex("""(?:https?://)?(?:www\.)?([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}""")
         urlRegex.findAll(body).forEach { match ->
             extractDomain(match.value)?.let { domains.add(it) }
+        }
+
+        return domains
+    }
+
+    /**
+     * 通用 TXT/CSV URL 清單擷取 — 適用 URLhaus、CERT.PL、MODA CSV 等逐行格式。
+     * 自動跳過註解行（# 開頭）和空行。
+     */
+    private fun fetchTextUrlList(url: String): Set<String> {
+        val request = Request.Builder().url(url).build()
+        val response = httpClient.newCall(request).execute()
+        if (!response.isSuccessful) return emptySet()
+
+        val domains = mutableSetOf<String>()
+        val body = response.body?.string() ?: return emptySet()
+
+        body.lines().forEach { line ->
+            val trimmed = line.trim()
+            if (trimmed.isEmpty() || trimmed.startsWith("#")) return@forEach
+            // URL 行
+            if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+                extractDomain(trimmed)?.let { domains.add(it) }
+            }
+            // 純域名行（CERT.PL 格式）
+            else if (trimmed.contains(".") && !trimmed.contains(" ") && trimmed.length < 100) {
+                extractDomain(trimmed)?.let { domains.add(it) }
+            }
+            // CSV 欄位
+            else if (trimmed.contains(",")) {
+                trimmed.split(",").forEach { field ->
+                    val clean = field.trim().trim('"', '\'')
+                    if (clean.contains(".") && !clean.contains(" ") && clean.length < 100) {
+                        extractDomain(clean)?.let { domains.add(it) }
+                    }
+                }
+            }
         }
 
         return domains

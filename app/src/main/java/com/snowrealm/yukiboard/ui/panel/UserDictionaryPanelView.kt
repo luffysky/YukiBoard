@@ -816,6 +816,14 @@ class UserDictionaryPanelView(context: Context) : View(context) {
                         @Suppress("DEPRECATION")
                         WindowManager.LayoutParams.TYPE_SYSTEM_ALERT
                     w.setType(type)
+                    w.setSoftInputMode(
+                        WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN or
+                        WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
+                    )
+                    w.setGravity(android.view.Gravity.TOP or android.view.Gravity.CENTER_HORIZONTAL)
+                    val lp = w.attributes
+                    lp.y = (48 * resources.displayMetrics.density).toInt()
+                    w.attributes = lp
                 }
                 dialog.show()
             } catch (e: Exception) {

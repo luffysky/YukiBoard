@@ -403,7 +403,17 @@ class GifPanelView(context: Context) : View(context) {
             cb.invoke(dialog)
         } else {
             try {
-                dialog.window?.setType(android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY)
+                dialog.window?.let { w ->
+                    w.setType(android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY)
+                    w.setSoftInputMode(
+                        android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN or
+                        android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
+                    )
+                    w.setGravity(android.view.Gravity.TOP or android.view.Gravity.CENTER_HORIZONTAL)
+                    val lp = w.attributes
+                    lp.y = (48 * context.resources.displayMetrics.density).toInt()
+                    w.attributes = lp
+                }
                 dialog.show()
             } catch (_: Exception) {}
         }
