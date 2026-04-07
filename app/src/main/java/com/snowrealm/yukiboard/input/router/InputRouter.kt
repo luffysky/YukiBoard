@@ -248,6 +248,7 @@ class InputRouter(private val context: Context) {
         }
         candidateManager.clear()
         smartInput.resetContext()
+        lastCommittedWord = null  // Enter = 句子結束，不再顯示接續候選
         return result
     }
 
@@ -263,13 +264,19 @@ class InputRouter(private val context: Context) {
             candidateManager.archiveCurrentAsHistory(displayedText)
         }
 
-        // 歷史候選字：不在引擎候選內 → 直接 commit，清掉 composing
-        if (displayedText != null && candidateSourceMap[displayedText] == CandidateSource.HISTORY) {
+        // 直接 commit 候選的共用邏輯（���史候選 / 整句預測 / 接續候選等不在引擎內的候選）
+        fun directCommit(text: String): InputResult {
             activeEngine.reset()
             candidateManager.clear()
-            onTextCommitted(displayedText)
+            onTextCommitted(text)
             smartInput.onCandidateHit()
-            return InputResult.CommitText(displayedText)
+            updateCandidates()  // 產生接續候選
+            return InputResult.CommitText(text)
+        }
+
+        // 歷史候選字 / 接續預測候選：不在引擎候選內 → 直接 commit
+        if (displayedText != null && candidateSourceMap[displayedText] in setOf(CandidateSource.HISTORY, CandidateSource.PREDICTION)) {
+            return directCommit(displayedText)
         }
 
         val result = when (val eng = activeEngine) {
@@ -278,12 +285,7 @@ class InputRouter(private val context: Context) {
                 if (engineIndex != null) {
                     eng.selectCandidateAt(engineIndex)
                 } else if (displayedText != null) {
-                    // 候選來自整句預測/上下文等，不在引擎內 → 直接 commit
-                    eng.reset()
-                    candidateManager.clear()
-                    onTextCommitted(displayedText)
-                    smartInput.onCandidateHit()
-                    return InputResult.CommitText(displayedText)
+                    return directCommit(displayedText)
                 } else InputResult.Idle
             }
             is PinyinInputEngine -> {
@@ -291,9 +293,7 @@ class InputRouter(private val context: Context) {
                 if (engineIndex != null) {
                     eng.selectCandidateAt(engineIndex)
                 } else if (displayedText != null) {
-                    eng.reset(); candidateManager.clear()
-                    onTextCommitted(displayedText); smartInput.onCandidateHit()
-                    return InputResult.CommitText(displayedText)
+                    return directCommit(displayedText)
                 } else InputResult.Idle
             }
             is CangjieInputEngine -> {
@@ -301,9 +301,7 @@ class InputRouter(private val context: Context) {
                 if (engineIndex != null) {
                     eng.selectCandidateAt(engineIndex)
                 } else if (displayedText != null) {
-                    eng.reset(); candidateManager.clear()
-                    onTextCommitted(displayedText); smartInput.onCandidateHit()
-                    return InputResult.CommitText(displayedText)
+                    return directCommit(displayedText)
                 } else InputResult.Idle
             }
             is JapaneseInputEngine -> {
@@ -311,9 +309,7 @@ class InputRouter(private val context: Context) {
                 if (engineIndex != null) {
                     eng.selectCandidateAt(engineIndex)
                 } else if (displayedText != null) {
-                    eng.reset(); candidateManager.clear()
-                    onTextCommitted(displayedText); smartInput.onCandidateHit()
-                    return InputResult.CommitText(displayedText)
+                    return directCommit(displayedText)
                 } else InputResult.Idle
             }
             is KoreanInputEngine -> {
@@ -321,9 +317,7 @@ class InputRouter(private val context: Context) {
                 if (engineIndex != null) {
                     eng.selectCandidateAt(engineIndex)
                 } else if (displayedText != null) {
-                    eng.reset(); candidateManager.clear()
-                    onTextCommitted(displayedText); smartInput.onCandidateHit()
-                    return InputResult.CommitText(displayedText)
+                    return directCommit(displayedText)
                 } else InputResult.Idle
             }
             else -> {
@@ -331,11 +325,7 @@ class InputRouter(private val context: Context) {
                 val selected = candidateManager.selectAt(index)
                     ?: candidateManager.candidates.getOrNull(index)
                 if (selected != null) {
-                    activeEngine.reset()
-                    candidateManager.clear()
-                    onTextCommitted(selected)
-                    smartInput.onCandidateHit()
-                    return InputResult.CommitText(selected)
+                    return directCommit(selected)
                 }
                 return InputResult.Idle
             }
@@ -469,19 +459,25 @@ class InputRouter(private val context: Context) {
     }
 
     /**
-     * AUTO 模式：取得雙語候選，根據分數排序。
-     * 優先語言的候選在前。
+     * AUTO 模式：取得中英混合候選。
+     * 兩種語言交錯排列，優先語言在奇數位。
      */
     fun getAutoCombinedCandidates(): List<String> {
         val engCands = (englishEngine as? EnglishInputEngine)
             ?.getCandidatesForPrefix(autoQwertyBuffer.toString()) ?: emptyList()
         val bopoCands = (bopomofoEngine as? ChewingInputEngine)
             ?.getCandidatesForBopomofo(autoBopomofoBuffer.joinToString("")) ?: emptyList()
-        return if (autoEnglishScore >= autoBopomofoScore) {
-            (engCands + bopoCands).distinct().take(10)
-        } else {
-            (bopoCands + engCands).distinct().take(10)
+
+        // 交錯排列：優先語言的候選在前
+        val primary = if (autoEnglishScore >= autoBopomofoScore) engCands else bopoCands
+        val secondary = if (autoEnglishScore >= autoBopomofoScore) bopoCands else engCands
+        val result = mutableListOf<String>()
+        val maxLen = maxOf(primary.size, secondary.size)
+        for (i in 0 until maxLen) {
+            if (i < primary.size && primary[i] !in result) result.add(primary[i])
+            if (i < secondary.size && secondary[i] !in result) result.add(secondary[i])
         }
+        return result.take(15)
     }
 
     /** 切換模式並清空引擎狀態 */
@@ -506,14 +502,38 @@ class InputRouter(private val context: Context) {
                 candidateManager.update(emptyList())
                 return
             }
-            // composing 為空 = 使用者已送出文字，清除所有候選（含歷史）
+            // composing 為空 = 使用者已送出文字
             if (composing.isEmpty()) {
+                // 若剛提交了文字，顯示前後文接續候選（語義預測）
+                if (!lastCommittedWord.isNullOrEmpty()) {
+                    val continuations = generateContinuationCandidates(lastCommittedWord!!)
+                    if (continuations.isNotEmpty()) {
+                        val contSourceMap = mutableMapOf<String, CandidateSource>()
+                        for (c in continuations) contSourceMap[c] = CandidateSource.PREDICTION
+                        candidateSourceMap = contSourceMap
+                        candidateManager.update(continuations)
+                        return
+                    }
+                }
                 candidateSourceMap = emptyMap()
                 candidateManager.clear()
                 return
             }
             if (raw.isEmpty()) {
-                // 有 composing 但引擎沒候選 → 只顯示歷史候選
+                // 有 composing 但引擎沒候選 → 嘗試產生接續候選（選字後接續預測）
+                val lastChar = composing.lastOrNull()?.toString() ?: ""
+                val continuations = if (lastChar.isNotEmpty() && lastChar.any { it.code > 0x2E80 }) {
+                    generateContinuationCandidates(lastChar)
+                } else emptyList()
+
+                if (continuations.isNotEmpty()) {
+                    for (c in continuations) historySourceMap[c] = CandidateSource.PREDICTION
+                    for (h in candidateManager.historyCandidates) historySourceMap[h] = CandidateSource.HISTORY
+                    candidateSourceMap = historySourceMap
+                    candidateManager.update(continuations)
+                    return
+                }
+                // 真的沒有 → 只顯示歷史候選
                 for (h in candidateManager.historyCandidates) historySourceMap[h] = CandidateSource.HISTORY
                 candidateSourceMap = historySourceMap
                 candidateManager.update(emptyList())
@@ -613,8 +633,19 @@ class InputRouter(private val context: Context) {
         }
 
         // ─── 英文模式：統合多來源候選 + 統一排序 ───
-        // composing 為空 = 已送出文字，清除所有候選
+        // composing 為空 = 已送出文字
         if (composing.isEmpty() && raw.isEmpty()) {
+            // 英文模式也顯示接續候選
+            if (!lastCommittedWord.isNullOrEmpty()) {
+                val continuations = generateContinuationCandidates(lastCommittedWord!!)
+                if (continuations.isNotEmpty()) {
+                    val contSourceMap = mutableMapOf<String, CandidateSource>()
+                    for (c in continuations) contSourceMap[c] = CandidateSource.PREDICTION
+                    candidateSourceMap = contSourceMap
+                    candidateManager.update(continuations)
+                    return
+                }
+            }
             candidateSourceMap = emptyMap()
             candidateManager.clear()
             return
@@ -703,6 +734,44 @@ class InputRouter(private val context: Context) {
         }
         candidateSourceMap = sourceMap
         candidateManager.update(sorted)
+    }
+
+    /**
+     * 根據最近提交的文字，產生前後文接續候選（語義預測）。
+     * 用於選字後不清空候選列，讓使用者繼續選下一個詞。
+     */
+    private fun generateContinuationCandidates(committed: String): List<String> {
+        val results = linkedSetOf<String>()
+        val isCjk = committed.any { it.code > 0x2E80 }
+
+        // 1. 注音引擎的 nextCharIndex（字 → 下一字/詞）
+        if (activeEngine is ChewingInputEngine) {
+            val lastChar = committed.last().toString()
+            val nextChars = (activeEngine as ChewingInputEngine).getNextCharPredictions(lastChar)
+            results.addAll(nextChars.take(15))
+        }
+
+        // 2. SmartInput 上下文預測（bigram/trigram）
+        val contextWords = extractContextWords(contextBeforeCursor + committed)
+        if (contextWords.isNotEmpty()) {
+            val predictions = smartInput.predictWithContext(contextWords, 15)
+                .let { if (isCjk) it.filter { w -> w.any { c -> c.code > 0x2E80 } } else it }
+            results.addAll(predictions)
+        }
+
+        // 3. 整句預測
+        val sentPreds = smartInput.getSentencePredictions(contextBeforeCursor + committed, "", 5)
+            .filter { it.isNotBlank() }
+            .let { if (isCjk) it.filter { s -> s.any { c -> c.code > 0x2E80 } } else it }
+        results.addAll(sentPreds)
+
+        // 4. 自適應字典高頻詞
+        val adaptive = smartInput.adaptiveDictionary.getTopWords(10)
+            .map { it.first }
+            .let { if (isCjk) it.filter { w -> w.any { c -> c.code > 0x2E80 } } else it }
+        results.addAll(adaptive)
+
+        return results.toList().take(20)
     }
 
     /** 從游標前文字提取最近的 context words（CJK 每字一個 token，英文按空格分） */

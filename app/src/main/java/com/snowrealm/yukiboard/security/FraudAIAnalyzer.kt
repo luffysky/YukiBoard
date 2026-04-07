@@ -32,6 +32,9 @@ class FraudAIAnalyzer(private val context: Context) {
     /** TFLite 本地模型（Layer 0） */
     var localModel: FraudLocalModel? = null
 
+    /** 政府公開防詐資料同步器 */
+    val openDataSync by lazy { FraudOpenDataSync(context) }
+
     // =========================================================================
     // 資料模型
     // =========================================================================
@@ -266,6 +269,12 @@ class FraudAIAnalyzer(private val context: Context) {
         val lower = url.lowercase()
         var score = 0
         val reasons = mutableListOf<String>()
+
+        // 0. 政府公開黑名單比對（MODA + 165 + OpenPhish）
+        if (openDataSync.isDomainBlocked(url)) {
+            score += 80
+            reasons.add("此網域已被政府列入詐騙黑名單")
+        }
 
         // 1. 短網址（高風險，因為隱藏真實目的地）
         for (domain in suspiciousShortDomains) {

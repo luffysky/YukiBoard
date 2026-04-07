@@ -22,6 +22,7 @@ class AndroidTtsEngine(context: Context, private val onInitDone: ((Boolean) -> U
     private var tts: TextToSpeech? = null
     private var pendingCallbacks = mutableMapOf<String, (() -> Unit)?>()
     private var selectedVoiceName: String? = null
+    private var hasCustomVoice = false  // 成功套用自訂語音後設為 true
 
     override var isReady: Boolean = false
         private set
@@ -111,7 +112,9 @@ class AndroidTtsEngine(context: Context, private val onInitDone: ((Boolean) -> U
     /** 依語音名稱設定語音 */
     fun setVoice(voiceName: String?) {
         selectedVoiceName = voiceName
-        if (!voiceName.isNullOrEmpty() && isReady) {
+        if (voiceName.isNullOrEmpty()) {
+            hasCustomVoice = false
+        } else if (isReady) {
             applyVoiceByName(voiceName)
         }
     }
@@ -122,11 +125,25 @@ class AndroidTtsEngine(context: Context, private val onInitDone: ((Boolean) -> U
             val voice = engine.voices?.firstOrNull { it.name == voiceName }
             if (voice != null) {
                 engine.voice = voice
+                hasCustomVoice = true
                 Log.i(tag, "Voice set: ${voice.name} (${voice.locale})")
             } else {
-                Log.w(tag, "Voice not found: $voiceName")
+                // 嘗試部分名稱匹配（不同 TTS 引擎可能有不同前綴）
+                val partial = engine.voices?.firstOrNull {
+                    it.name.contains(voiceName, ignoreCase = true) ||
+                    voiceName.contains(it.name, ignoreCase = true)
+                }
+                if (partial != null) {
+                    engine.voice = partial
+                    hasCustomVoice = true
+                    Log.i(tag, "Voice set (partial match): ${partial.name} (${partial.locale})")
+                } else {
+                    hasCustomVoice = false
+                    Log.w(tag, "Voice not found: $voiceName, available=${engine.voices?.size ?: 0}")
+                }
             }
         } catch (e: Exception) {
+            hasCustomVoice = false
             Log.e(tag, "setVoice failed: $voiceName", e)
         }
     }
@@ -148,7 +165,13 @@ class AndroidTtsEngine(context: Context, private val onInitDone: ((Boolean) -> U
         }
 
         // 設定語言（注意：setLanguage 會覆蓋已選語音，有自訂語音時跳過）
-        if (selectedVoiceName.isNullOrEmpty() || engine.voice == null) {
+        if (!selectedVoiceName.isNullOrEmpty() && hasCustomVoice) {
+            // 每次朗讀前重新確認語音（某些 TTS 引擎會在 setLanguage 後重置 voice）
+            if (engine.voice?.name != selectedVoiceName) {
+                applyVoiceByName(selectedVoiceName!!)
+            }
+            Log.i(tag, "speak: using custom voice=${engine.voice?.name}, text=${text.take(30)}")
+        } else {
             val javaLocale = locale?.let { parseLocale(it) } ?: detectLocale(text)
             val langResult = engine.setLanguage(javaLocale)
             if (langResult == TextToSpeech.LANG_MISSING_DATA || langResult == TextToSpeech.LANG_NOT_SUPPORTED) {
@@ -156,8 +179,6 @@ class AndroidTtsEngine(context: Context, private val onInitDone: ((Boolean) -> U
                 engine.setLanguage(Locale.getDefault())
             }
             Log.i(tag, "speak: locale=$javaLocale, langResult=$langResult, text=${text.take(30)}")
-        } else {
-            Log.i(tag, "speak: using custom voice=${selectedVoiceName}, text=${text.take(30)}")
         }
 
         // 設定語速

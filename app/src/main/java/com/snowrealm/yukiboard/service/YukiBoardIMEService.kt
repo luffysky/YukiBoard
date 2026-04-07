@@ -254,6 +254,9 @@ class YukiBoardIMEService : InputMethodService() {
         // TTS 語音輸出引擎
         initTtsEngine()
 
+        // 防詐 TFLite 模型初始化 + 自動更新
+        initFraudModel()
+
         // 懸浮面板回調：AI 結果插入輸入框
         clawResultFloatingPanel?.onInsertToInput = { text ->
             val ic = currentInputConnection
@@ -728,6 +731,58 @@ class YukiBoardIMEService : InputMethodService() {
         // 遊戲模式恢復
         if (isInGameMode) {
             gameLoop?.resume()
+        }
+    }
+
+    /**
+     * 初始化防詐 TFLite 模型 + 模型自動更新。
+     */
+    private fun initFraudModel() {
+        serviceScope.launch(Dispatchers.IO) {
+            try {
+                // 1. 初始化 TFLite 本地模型
+                val localModel = com.snowrealm.yukiboard.security.FraudLocalModel(applicationContext)
+                localModel.initialize()
+                if (localModel.isAvailable()) {
+                    fraudAnalyzer.localModel = localModel
+                    android.util.Log.i("YukiBoardIME", "Fraud TFLite model loaded")
+                }
+
+                // 2. 檢查 Supabase 是否有新版本（自動下載）
+                val supaUrl = com.snowrealm.yukiboard.BuildConfig.YUKIBOARD_SUPABASE_URL
+                val supaKey = com.snowrealm.yukiboard.BuildConfig.YUKIBOARD_SUPABASE_ANON_KEY
+                if (supaUrl.isNotBlank() && supaKey.isNotBlank()) {
+                    val mgr = com.snowrealm.yukiboard.security.FraudModelManager(applicationContext)
+                    val updated = mgr.checkAndUpdateIfNeeded(
+                        supaUrl, supaKey,
+                        com.snowrealm.yukiboard.BuildConfig.VERSION_CODE
+                    )
+                    if (updated) {
+                        // 模型已更新，重新載入
+                        localModel.release()
+                        val newModel = com.snowrealm.yukiboard.security.FraudLocalModel(applicationContext)
+                        newModel.initialize()
+                        if (newModel.isAvailable()) {
+                            fraudAnalyzer.localModel = newModel
+                            android.util.Log.i("YukiBoardIME", "Fraud model updated and reloaded")
+                        }
+                    }
+                }
+                // 3. 同步政府公開防詐資料（MODA + 165 + OpenPhish）
+                val openDataSync = fraudAnalyzer.openDataSync
+                if (openDataSync.needsSync()) {
+                    val count = openDataSync.sync()
+                    android.util.Log.i("YukiBoardIME", "Fraud open data synced: $count domains")
+
+                    // 上傳到 Supabase 供其他用戶使用
+                    if (supaUrl.isNotBlank() && supaKey.isNotBlank()) {
+                        openDataSync.uploadToSupabase(supaUrl, supaKey)
+                        openDataSync.downloadFromSupabase(supaUrl, supaKey)
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("YukiBoardIME", "Fraud model init: ${e.message}")
+            }
         }
     }
 
@@ -1758,17 +1813,44 @@ class YukiBoardIMEService : InputMethodService() {
     // =========================================================================
 
     /**
-     * 在 IME 視窗上顯示 AlertDialog（不需 SYSTEM_ALERT_WINDOW 權限）。
-     * 利用 InputMethodService 自身的 window token。
+     * 在 IME 上方顯示 AlertDialog。
+     *
+     * 核心問題：IME 自己就是鍵盤，TYPE_APPLICATION_ATTACHED_DIALOG 會被自己的鍵盤擋住。
+     * 解法：先 requestHideSelf 隱藏鍵盤，再用 TYPE_APPLICATION_OVERLAY 顯示 Dialog。
+     * 當使用者點擊 Dialog 的 EditText 時，系統會重新呼叫 IME 來服務該 EditText。
      */
     private fun showImeDialog(dialog: android.app.AlertDialog) {
+        // 先隱藏 IME 鍵盤，騰出螢幕空間
+        requestHideSelf(0)
+
         dialog.window?.let { w ->
-            w.attributes?.token = window?.window?.decorView?.windowToken
-            w.setType(android.view.WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG)
-            // 軟鍵盤自動彈出
-            w.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
+            if (android.provider.Settings.canDrawOverlays(this)) {
+                // 使用 Overlay 視窗 — 不被 IME 擋住
+                w.setType(android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY)
+            } else {
+                // Fallback: 用 IME token（可能被擋，但至少能顯示）
+                w.attributes?.token = window?.window?.decorView?.windowToken
+                w.setType(android.view.WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG)
+            }
+            w.setSoftInputMode(
+                android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
+                android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
+            )
         }
+
+        dialog.setOnDismissListener {
+            // Dialog 關閉後不需手動恢復鍵盤 — 使用者點輸入框時系統會自動呼叫 IME
+        }
+
         dialog.show()
+
+        // 提示使用者授權（僅顯示一次）
+        if (!android.provider.Settings.canDrawOverlays(this) && !prefs.overlayPermissionHintShown) {
+            prefs.overlayPermissionHintShown = true
+            keyboardView.post {
+                keyboardView.showToast("請前往設定開啟「顯示在其他應用程式上層」權限，對話框才能正常輸入")
+            }
+        }
     }
 
     // =========================================================================
@@ -2501,9 +2583,12 @@ class YukiBoardIMEService : InputMethodService() {
         // 候選列為空時，僅在開發者模式且有高信心預測時顯示提示
         val candidates = inputRouter.candidates.toMutableList()
 
-        // AUTO 模式：尚未決定語言時，補充雙語候選
-        if (inputRouter.inputMode == InputMode.AUTO && inputRouter.autoQwertyBuffer.isNotEmpty() && candidates.isEmpty()) {
-            candidates.addAll(inputRouter.getAutoCombinedCandidates())
+        // AUTO 模式：中英混合候選（永遠同時顯示兩種語言的候選）
+        if (inputRouter.inputMode == InputMode.AUTO && inputRouter.autoQwertyBuffer.isNotEmpty()) {
+            val bilingual = inputRouter.getAutoCombinedCandidates()
+            for (bc in bilingual) {
+                if (bc !in candidates) candidates.add(bc)
+            }
         }
         if (candidates.isEmpty() && inputRouter.composingText.isEmpty()) {
             val predictor = nextActionPredictor
