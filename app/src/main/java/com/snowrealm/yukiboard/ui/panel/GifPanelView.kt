@@ -456,6 +456,16 @@ class GifPanelView(context: Context) : View(context) {
         }
     }
 
+    /** 進入輸入模式（由 Service 在面板開啟時呼叫） */
+    fun enterInputMode() {
+        if (!isInputMode) {
+            isInputMode = true
+            inputBuffer.clear()
+            if (searchQuery.isNotEmpty()) inputBuffer.append(searchQuery)
+            invalidate()
+        }
+    }
+
     fun exitInputMode() {
         isInputMode = false
         invalidate()

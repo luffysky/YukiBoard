@@ -317,6 +317,17 @@ class YukiBoardIMEService : InputMethodService() {
         }
         // 長按注音/聲調直接輸出（不走 InputRouter）
         keyboardView.setOnRawCommitListener { text ->
+            // 面板輸入模式：長按選字也送到面板
+            val tpR = translatePanel
+            val gpR = gifPanel
+            val udpR = userDictPanel
+            val dpR = decryptPanel
+            when {
+                tpR != null && tpR.isInInputMode -> { tpR.onComposedTextInput(text); return@setOnRawCommitListener }
+                gpR != null && gpR.isInInputMode -> { gpR.onComposedTextInput(text); return@setOnRawCommitListener }
+                udpR != null && udpR.isInInputMode -> { udpR.onComposedTextInput(text); return@setOnRawCommitListener }
+                dpR != null && dpR.isInInputMode -> { dpR.onComposedTextInput(text); return@setOnRawCommitListener }
+            }
             val ic = currentInputConnection ?: return@setOnRawCommitListener
             // 先提交正在組合的注音
             val composing = inputRouter.composingText
@@ -344,15 +355,37 @@ class YukiBoardIMEService : InputMethodService() {
         }
         keyboardView.setOnCandidateSpeakListener { text -> onCandidateSpeak(text) }
         keyboardView.setOnCandidateSelectListener { index ->
+            // 面板輸入模式 helper：找到正在輸入的面板
+            fun activePanelInputTarget(): Any? {
+                translatePanel?.let { if (it.isInInputMode) return it }
+                gifPanel?.let { if (it.isInInputMode) return it }
+                userDictPanel?.let { if (it.isInInputMode) return it }
+                decryptPanel?.let { if (it.isInInputMode) return it }
+                return null
+            }
+            fun commitToPanel(target: Any, text: String) {
+                when (target) {
+                    is TranslatePanelView -> target.onComposedTextInput(text)
+                    is GifPanelView -> target.onComposedTextInput(text)
+                    is UserDictionaryPanelView -> target.onComposedTextInput(text)
+                    is DecryptPanelView -> target.onComposedTextInput(text)
+                }
+            }
+
             // 滑動輸入候選：直接 commit，不走 InputRouter
             if (swipeInputPending && index in swipeInputCandidates.indices) {
                 val text = swipeInputCandidates[index]
-                val ic = currentInputConnection
-                if (ic != null) {
-                    // F-6: 先清掉殘留的 composing 狀態
-                    ic.finishComposingText()
-                    inputRouter.reset()
-                    ic.commitText(text, 1)
+                val panelTarget = activePanelInputTarget()
+                if (panelTarget != null) {
+                    commitToPanel(panelTarget, text)
+                } else {
+                    val ic = currentInputConnection
+                    if (ic != null) {
+                        // F-6: 先清掉殘留的 composing 狀態
+                        ic.finishComposingText()
+                        inputRouter.reset()
+                        ic.commitText(text, 1)
+                    }
                 }
                 swipeInputPending = false
                 swipeInputCandidates = emptyList()
@@ -371,14 +404,21 @@ class YukiBoardIMEService : InputMethodService() {
                 sourceMap[displayedText] == com.snowrealm.yukiboard.input.router.CandidateSource.AI
 
             if (isAICandidate && displayedText != null) {
-                // AI 候選字：直接 commit，不走引擎（引擎裡沒有這個候選）
-                val ic = currentInputConnection ?: return@setOnCandidateSelectListener
-                // 先清掉 composing
-                if (inputRouter.composingText.isNotEmpty()) {
-                    ic.finishComposingText()
+                val panelTarget = activePanelInputTarget()
+                if (panelTarget != null) {
+                    // AI 候選字送到面板
+                    if (inputRouter.composingText.isNotEmpty()) inputRouter.reset()
+                    commitToPanel(panelTarget, displayedText)
+                } else {
+                    // AI 候選字：直接 commit，不走引擎（引擎裡沒有這個候選）
+                    val ic = currentInputConnection ?: return@setOnCandidateSelectListener
+                    // 先清掉 composing
+                    if (inputRouter.composingText.isNotEmpty()) {
+                        ic.finishComposingText()
+                    }
+                    inputRouter.reset()
+                    applyInputResult(ic, InputResult.CommitText(displayedText))
                 }
-                inputRouter.reset()
-                applyInputResult(ic, InputResult.CommitText(displayedText))
                 keyboardView.updateComposingText("")
                 keyboardView.updateCandidates(emptyList())
                 return@setOnCandidateSelectListener
@@ -1032,9 +1072,15 @@ class YukiBoardIMEService : InputMethodService() {
             keyboardView.updateComposingText("")
             keyboardView.updateCandidates(emptyList())
         }
-        // 離開面板輸入模式
+        // 離開面板輸入模式並清除所有引用
         translatePanel?.exitInputMode()
         gifPanel?.exitInputMode()
+        userDictPanel?.exitInputMode()
+        decryptPanel?.exitInputMode()
+        translatePanel = null
+        gifPanel = null
+        userDictPanel = null
+        decryptPanel = null
         panelContainer.removeAllViews()
         panelContainer.visibility = View.GONE
         topPanelContainer.removeAllViews()
@@ -1086,6 +1132,8 @@ class YukiBoardIMEService : InputMethodService() {
                     }
                 }
                 if (source.isNotEmpty()) p.sourceText = source
+                // 自動進入輸入模式（使用者不需先點輸入框就能直接打字）
+                p.enterInputMode()
                 p.onTranslatedSelected = { translated ->
                     currentInputConnection?.commitText(translated, 1)
                 }
@@ -1123,6 +1171,8 @@ class YukiBoardIMEService : InputMethodService() {
                         }
                     }
                 }
+                // 自動進入輸入模式
+                p.enterInputMode()
                 p
             }
             PanelType.STICKER -> {

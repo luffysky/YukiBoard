@@ -506,6 +506,18 @@ class TranslatePanelView(context: Context) : View(context) {
         invalidate()
     }
 
+    /** 進入輸入模式（由 Service 在面板開啟時呼叫，使用者可直接打字） */
+    fun enterInputMode() {
+        if (!isInputMode) {
+            isInputMode = true
+            inputBuffer.clear()
+            if (sourceText.isNotEmpty()) {
+                inputBuffer.append(sourceText)
+            }
+            invalidate()
+        }
+    }
+
     /** 退出輸入模式 */
     fun exitInputMode() {
         isInputMode = false
