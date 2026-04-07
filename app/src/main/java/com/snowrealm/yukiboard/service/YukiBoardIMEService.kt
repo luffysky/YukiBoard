@@ -148,6 +148,7 @@ class YukiBoardIMEService : InputMethodService() {
     private var btKeyboard: BluetoothHidKeyboard? = null
     private var wifiServer: WifiKeyboardServer? = null
     private var remotePanel: RemoteKeyboardPanelView? = null
+    private var userDictPanel: UserDictionaryPanelView? = null
 
     // 鍵盤尺寸調整 + 懸浮
     private var resizeHandle: KeyboardResizeHandle? = null
@@ -1173,6 +1174,7 @@ class YukiBoardIMEService : InputMethodService() {
                 val p = ClawPanelView(this)
                 p.theme = theme
                 p.clawClient = clawClient
+                p.prefs = prefs
                 p.setCurrentMode(
                     when (keyboardView.currentMode) {
                         KeyboardMode.DEVELOPER -> "developer"
@@ -1223,6 +1225,42 @@ class YukiBoardIMEService : InputMethodService() {
                 p.theme = theme
                 p.onInsertPhrase = { phrase ->
                     currentInputConnection?.commitText(phrase, 1)
+                }
+                p
+            }
+            PanelType.USER_DICT -> {
+                val p = UserDictionaryPanelView(this).also { userDictPanel = it }
+                p.theme = theme
+                p.userDictionary = com.snowrealm.yukiboard.input.dictionary.UserDictionary(this)
+                p.onExportRequest = { data ->
+                    try {
+                        val file = java.io.File(getExternalFilesDir(null), "yukiboard_user_dict.txt")
+                        file.writeText(data)
+                        android.widget.Toast.makeText(this, "已匯出至 ${file.absolutePath}", android.widget.Toast.LENGTH_LONG).show()
+                    } catch (e: Exception) {
+                        android.widget.Toast.makeText(this, "匯出失敗: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+                p.onImportRequest = {
+                    try {
+                        val file = java.io.File(getExternalFilesDir(null), "yukiboard_user_dict.txt")
+                        if (file.exists()) {
+                            val count = p.importEntries(file.readText())
+                            android.widget.Toast.makeText(this, "已匯入 $count 筆詞彙", android.widget.Toast.LENGTH_SHORT).show()
+                        } else {
+                            android.widget.Toast.makeText(this, "找不到匯入檔案：${file.absolutePath}", android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    } catch (e: Exception) {
+                        android.widget.Toast.makeText(this, "匯入失敗: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+                p
+            }
+            PanelType.DECRYPT -> {
+                val p = com.snowrealm.yukiboard.ui.panel.DecryptPanelView(this)
+                p.theme = theme
+                p.onEncryptedResult = { encrypted ->
+                    currentInputConnection?.commitText(encrypted, 1)
                 }
                 p
             }
@@ -2528,7 +2566,12 @@ class YukiBoardIMEService : InputMethodService() {
             if (prefs.secretMessageMode) {
                 val plaintext = ic.getTextBeforeCursor(2000, 0)?.toString() ?: ""
                 if (plaintext.isNotBlank() && secretMessageManager?.isEncryptedMessage(plaintext) != true) {
-                    val encrypted = secretMessageManager?.encrypt(plaintext)
+                    val password = prefs.secretMessagePassword
+                    val encrypted = if (password.isNotEmpty()) {
+                        secretMessageManager?.encryptWithPassword(plaintext, password)
+                    } else {
+                        secretMessageManager?.encrypt(plaintext)
+                    }
                     if (encrypted != null) {
                         ic.performContextMenuAction(android.R.id.selectAll)
                         ic.commitText(encrypted, 1)

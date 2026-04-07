@@ -163,6 +163,62 @@ class SettingsActivity : AppCompatActivity() {
             aiChildren += switchRow("被動防詐掃描", "打字時自動掃描上下文", prefs.aiFraudPassiveScan) { prefs.aiFraudPassiveScan = it }
             aiChildren += switchRow("連結風險掃描", "自動偵測可疑網址", prefs.aiFraudUrlScan) { prefs.aiFraudUrlScan = it }
 
+            // 防詐模型更新按鈕
+            run {
+                val modelManager = com.snowrealm.yukiboard.security.FraudModelManager(this)
+                val modelStatusText = TextView(this).apply {
+                    text = modelManager.getStatusSummary()
+                    textSize = 11f
+                    setTextColor(0xFF6688AA.toInt())
+                    setPadding(dp(8), dp(2), dp(8), dp(4))
+                }
+                aiChildren += modelStatusText
+
+                aiChildren += Button(this).apply {
+                    text = "防詐模型更新"
+                    setTextColor(0xFFFFFFFF.toInt())
+                    textSize = 13f
+                    background = GradientDrawable().apply {
+                        setColor(0xFFE25C4A.toInt())
+                        cornerRadius = dp(8).toFloat()
+                    }
+                    setPadding(dp(12), dp(8), dp(12), dp(8))
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { setMargins(dp(8), dp(4), 0, dp(4)) }
+                    setOnClickListener {
+                        isEnabled = false
+                        text = "檢查中..."
+                        val supabaseUrl = com.snowrealm.yukiboard.BuildConfig.YUKIBOARD_SUPABASE_URL
+                        val supabaseKey = com.snowrealm.yukiboard.BuildConfig.YUKIBOARD_SUPABASE_ANON_KEY
+                        val appVersionCode = com.snowrealm.yukiboard.BuildConfig.VERSION_CODE
+                        activityScope.launch {
+                            modelManager.manualUpdate(
+                                supabaseUrl = supabaseUrl,
+                                supabaseAnonKey = supabaseKey,
+                                appVersionCode = appVersionCode,
+                                callback = object : com.snowrealm.yukiboard.security.FraudModelManager.DownloadCallback {
+                                    override fun onProgress(percent: Int) {
+                                        launch(Dispatchers.Main) {
+                                            text = "更新中 $percent%..."
+                                        }
+                                    }
+                                    override fun onComplete(success: Boolean, message: String) {
+                                        launch(Dispatchers.Main) {
+                                            isEnabled = true
+                                            text = "防詐模型更新"
+                                            modelStatusText.text = modelManager.getStatusSummary()
+                                            Toast.makeText(this@SettingsActivity, message, Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
             // AI 設定按鈕
             aiChildren += Button(this).apply {
                 text = "AI 設定 / Provider"
@@ -252,6 +308,16 @@ class SettingsActivity : AppCompatActivity() {
         })
 
         // ═══════════════════════════════════════════════════════
+        // 5.5 剪貼簿
+        // ═══════════════════════════════════════════════════════
+        val clipboardChildren = mutableListOf<View>()
+        root.addView(cardGroup("剪貼簿", null, null, clipboardChildren) {
+            clipboardChildren += switchRow("加密功能", "允許加密剪貼簿項目（AES-256）", prefs.clipboardEncryptionEnabled) { prefs.clipboardEncryptionEnabled = it }
+            clipboardChildren += switchRow("敏感偵測", "自動偵測信用卡、身分證等敏感內容", prefs.clipboardAutoDetectSensitive) { prefs.clipboardAutoDetectSensitive = it }
+            clipboardChildren += switchRow("跨裝置同步", "透過 Insight 同步剪貼簿（需登入）", prefs.clipboardSyncEnabled) { prefs.clipboardSyncEnabled = it }
+        })
+
+        // ═══════════════════════════════════════════════════════
         // 6. 輸入行為 + 外觀
         // ═══════════════════════════════════════════════════════
         val inputChildren = mutableListOf<View>()
@@ -265,7 +331,50 @@ class SettingsActivity : AppCompatActivity() {
             inputChildren += switchRow("糾錯自我學習", "記住你接受/拒絕的校正，越改越聰明", prefs.correctionSelfLearn) { prefs.correctionSelfLearn = it }
             inputChildren += switchRow("Snippet 展開", "開發者模式：縮寫 + Tab 展開", prefs.snippetEnabled) { prefs.snippetEnabled = it }
 
-            inputChildren += switchRow("私房話模式", "AES 加密訊息（Enter 送出時加密）", prefs.secretMessageMode) { prefs.secretMessageMode = it }
+            inputChildren += switchRow("私房話模式", "AES-256 加密訊息（Enter 送出時加密）", prefs.secretMessageMode) { prefs.secretMessageMode = it }
+            // 悄悄話密碼設定
+            val pwdRow = LinearLayout(this@SettingsActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setPadding(0, dp(4), 0, dp(4))
+            }
+            pwdRow.addView(TextView(this@SettingsActivity).apply {
+                text = "悄悄話密碼"
+                textSize = 14f
+                setTextColor(0xFFE8F4FF.toInt())
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.4f)
+            })
+            val pwdBtn = TextView(this@SettingsActivity).apply {
+                text = if (prefs.secretMessagePassword.isEmpty()) "未設定（使用預設金鑰）" else "已設定 ●●●●"
+                textSize = 12f
+                setTextColor(0xFF9ECFFF.toInt())
+                setPadding(dp(10), dp(6), dp(10), dp(6))
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    setColor(0xFF1A2A3A.toInt())
+                    cornerRadius = dp(6).toFloat()
+                }
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.6f)
+            }
+            pwdBtn.setOnClickListener {
+                val input = android.widget.EditText(this@SettingsActivity).apply {
+                    hint = "輸入新密碼（留空=使用預設金鑰）"
+                    inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+                    setText(prefs.secretMessagePassword)
+                    setPadding(dp(12), dp(8), dp(12), dp(8))
+                }
+                android.app.AlertDialog.Builder(this@SettingsActivity, android.R.style.Theme_Material_Dialog_Alert)
+                    .setTitle("設定悄悄話密碼")
+                    .setMessage("雙方需要使用相同密碼才能加解密。\n留空則使用舊版預設金鑰。")
+                    .setView(input)
+                    .setPositiveButton("確定") { _, _ ->
+                        prefs.secretMessagePassword = input.text.toString()
+                        (it as TextView).text = if (prefs.secretMessagePassword.isEmpty()) "未設定（使用預設金鑰）" else "已設定 ●●●●"
+                    }
+                    .setNegativeButton("取消", null)
+                    .show()
+            }
+            pwdRow.addView(pwdBtn)
+            inputChildren += pwdRow
             inputChildren += switchRow("語氣偵測", "偵測打字語氣", prefs.toneDetection) { prefs.toneDetection = it }
             inputChildren += switchRow("懸浮面板", "啟用懸浮面板功能", prefs.floatingPanelEnabled) { prefs.floatingPanelEnabled = it }
             inputChildren += switchRow("遠端鍵盤", "藍牙/WiFi 遠端控制", prefs.remoteKeyboardEnabled) { prefs.remoteKeyboardEnabled = it }

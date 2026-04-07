@@ -15,6 +15,8 @@ enum class PanelType(val icon: String, val displayName: String) {
     CLAW("🐾", "Claw AI"),
     CALCULATOR("🧮", "計算機"),
     PHRASE("💬", "常用語"),
+    USER_DICT("📖", "詞庫"),
+    DECRYPT("🔐", "解密"),
     THEME("🎨", "主題"),
     SETTINGS("⚙", "設定")
 }

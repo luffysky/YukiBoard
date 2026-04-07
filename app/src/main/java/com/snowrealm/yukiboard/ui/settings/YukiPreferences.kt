@@ -38,6 +38,7 @@ class YukiPreferences(context: Context) {
     var aiFraudDetect: Boolean by BoolPref("ai_fraud_detect", true)
     var aiFraudPassiveScan: Boolean by BoolPref("ai_fraud_passive", true)  // 被動掃描（打字時自動偵測）
     var aiFraudUrlScan: Boolean by BoolPref("ai_fraud_url_scan", true)    // 連結風險掃描
+    var fraudReportConsent: Boolean by BoolPref("fraud_report_consent", false) // 匿名回報同意
 
     // ══════════════════════════════���════════════════════════���═══
     // 雪凜行為
@@ -88,6 +89,10 @@ class YukiPreferences(context: Context) {
     var autoCorrect: Boolean by BoolPref("auto_correct", true)
     var snippetEnabled: Boolean by BoolPref("snippet_enabled", true)
     var secretMessageMode: Boolean by BoolPref("secret_message", false)
+    /** 悄悄話密碼（空 = 使用舊版固定金鑰） */
+    var secretMessagePassword: String
+        get() = prefs.getString("secret_message_password", "") ?: ""
+        set(value) = prefs.edit().putString("secret_message_password", value).apply()
     var toneDetection: Boolean by BoolPref("tone_detection", true)
     var rawBopomofoMode: Boolean by BoolPref("raw_bopomofo", false)
     var swipeTrailEnabled: Boolean by BoolPref("swipe_trail", true)
@@ -132,6 +137,13 @@ class YukiPreferences(context: Context) {
     var adaptiveDict: Boolean by BoolPref("adaptive_dict", true)
     var phrasePredict: Boolean by BoolPref("phrase_predict", true)
     var habitTracking: Boolean by BoolPref("habit_tracking", true)
+
+    // ═══════════════════════════════════════════════════════════
+    // 剪貼簿
+    // ═══════════════════════════════════════════════════════════
+    var clipboardEncryptionEnabled: Boolean by BoolPref("clipboard_encryption", true)
+    var clipboardAutoDetectSensitive: Boolean by BoolPref("clipboard_auto_sensitive", true)
+    var clipboardSyncEnabled: Boolean by BoolPref("clipboard_sync", false)
 
     // ════════════════════════════���══════════════════════════════
     // 連線功能

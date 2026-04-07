@@ -76,6 +76,11 @@ class FraudRuleWeightManager(context: Context) {
         }
 
         editor.apply()
+
+        // 4. 個人化關鍵字學習（只在標記為詐騙時）
+        if (isFraud) {
+            learnNewKeywords(originalText, primaryType.name)
+        }
     }
 
     /** 取得個人化規則的額外分數（全類型加總） */
@@ -83,6 +88,63 @@ class FraudRuleWeightManager(context: Context) {
         return matchedTypes.sumOf { type ->
             prefs.getInt("weight_${type.name}", 0)
         }
+    }
+
+    /**
+     * 取得某關鍵字的調整後權重。
+     * @param keyword 關鍵字
+     * @param defaultWeight 該關鍵字在規則庫中的預設權重
+     * @return 調整後的最終權重（最低 1）
+     */
+    fun getAdjustedWeight(keyword: String, defaultWeight: Float): Float {
+        val adjustment = getKeywordAdjustment(keyword)
+        // 加上雲端同步的額外調整（如果有的話）
+        val syncAdj = prefs.getInt("sync_adj_$keyword", 0)
+        return (defaultWeight + adjustment + syncAdj).coerceAtLeast(1f)
+    }
+
+    /**
+     * 個人化關鍵字學習。
+     * 使用者標記為詐騙時，從文本中擷取潛在的新關鍵字（不在現有規則庫中的高頻詐騙用語）。
+     * 學到的關鍵字儲存在 personal_keywords_{fraudType} 裡。
+     */
+    fun learnNewKeywords(text: String, fraudType: String) {
+        // 分詞：取 2~6 字的 n-gram（中文沒有空白，用滑動視窗）
+        val candidates = mutableSetOf<String>()
+        val cleaned = text.replace(Regex("[\\s\\p{P}]"), "")
+        for (len in 2..6) {
+            for (i in 0..cleaned.length - len) {
+                candidates.add(cleaned.substring(i, i + len))
+            }
+        }
+
+        // 載入現有個人關鍵字
+        val key = "personal_keywords_$fraudType"
+        val existing = prefs.getString(key, "")?.split(",")?.filter { it.isNotBlank() }?.toMutableSet()
+            ?: mutableSetOf()
+
+        // 只保留出現在多次回饋中的新詞（至少 2 次標記同類型後才學習）
+        val typeStats = feedbackStore.getFeedbackStats(fraudType)
+        if (typeStats.first < 2) return  // 回饋次數不足，暫不學習
+
+        // 簡易篩選：只學 3~5 字的詞（太短太長都不精準）
+        val newKeywords = candidates.filter { it.length in 3..5 && it !in existing }
+            .take(5)  // 每次最多學 5 個
+
+        if (newKeywords.isNotEmpty()) {
+            existing.addAll(newKeywords)
+            // 限制個人關鍵字總數（避免無限膨脹）
+            val trimmed = existing.toList().takeLast(100)
+            prefs.edit().putString(key, trimmed.joinToString(",")).apply()
+        }
+    }
+
+    /**
+     * 取得某類型的個人化關鍵字列表。
+     */
+    fun getPersonalKeywords(fraudType: String): List<String> {
+        val key = "personal_keywords_$fraudType"
+        return prefs.getString(key, "")?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
     }
 
     /** 取得回饋統計 */

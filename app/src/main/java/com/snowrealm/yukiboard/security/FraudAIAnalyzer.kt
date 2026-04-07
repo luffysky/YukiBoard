@@ -8,22 +8,29 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.withContext
 
 /**
- * 防詐 AI 分析器 — A+B 混合架構。
+ * 防詐 AI 分析器 — 三層混合架構。
  *
- * A 層：本地規則引擎（< 1ms，零費用）
- *   - 關鍵字 / 正則比對 5 種詐騙類型
+ * Layer 0：TFLite 本地模型（50~80ms，離線，免費）
+ *   - bert-base-chinese fine-tuned 詐騙偵測
+ *   - 高信心度直接回傳，無需進一步分析
+ *
+ * Layer 1：本地規則引擎（< 1ms，零費用）
+ *   - 關鍵字 / 正則比對 8 種詐騙類型
  *   - 回傳風險分數 0~100 + 命中規則
  *
- * B 層：AI 深度分析（Gemini Flash / 其他 Provider）
+ * Layer 2：AI 深度分析（Gemini Flash / 其他 Provider）
  *   - 將對話格式化後送 AI 分析
  *   - 串流回傳分析結果
  *
- * 流程：先跑 A 層快速篩選 → 風險 ≥ 30 才呼叫 B 層深度分析
+ * 流程：先跑 Layer 0 → 信心不足跑 Layer 1 → 風險 ≥ 30 且線上可用才呼叫 Layer 2
  */
 class FraudAIAnalyzer(private val context: Context) {
 
     /** 動態權重管理器（個人化回饋調整） */
     val weightManager by lazy { FraudRuleWeightManager(context) }
+
+    /** TFLite 本地模型（Layer 0） */
+    var localModel: FraudLocalModel? = null
 
     // =========================================================================
     // 資料模型
@@ -476,15 +483,65 @@ class FraudAIAnalyzer(private val context: Context) {
     }
 
     /**
-     * 完整分析流程（A+B）。
-     * 先跑規則引擎，風險 ≥ 30 才呼叫 AI。
+     * 完整分析流程（三層架構）。
+     *
+     * Layer 0: TFLite 模型（高信心度 ≥ 0.85 直接回傳）
+     * Layer 1: 規則引擎
+     * Layer 2: AI 深度分析（風險 ≥ 30 且線上可用）
      */
     suspend fun analyze(
         text: String,
         clawClient: ClawClient?
     ): AnalysisResult {
+        // ── Layer 0: TFLite 本地模型 ──
+        val modelResult = localModel?.predict(text)
+        if (modelResult != null && modelResult.confidence >= 0.85f) {
+            // 高信心度：直接用模型結果建構 RuleResult
+            val ruleResult = RuleResult(
+                riskScore = (modelResult.fraudProbability * 100).toInt().coerceIn(0, 100),
+                matchedTypes = listOfNotNull(modelResult.fraudType),
+                matchedKeywords = listOf("[模型] ${modelResult.predictedLabel} (${String.format("%.1f%%", modelResult.confidence * 100)})"),
+                summary = when {
+                    modelResult.fraudProbability < 0.3f -> "模型判斷：目前看起來沒問題"
+                    modelResult.fraudProbability < 0.6f -> "模型偵測到一些可疑模式，留意一下"
+                    modelResult.fraudProbability < 0.8f -> "模型偵測到高風險模式，請謹慎判斷"
+                    else -> "模型偵測到極高風險！建議先暫停，可撥 165 諮詢"
+                }
+            )
+            return AnalysisResult(ruleResult = ruleResult)
+        }
+
+        // ── Layer 1: 規則引擎 ──
         val ruleResult = withContext(Dispatchers.Default) {
             analyzeByRules(text)
+        }
+
+        // 如果模型有結果但信心不足，合併模型分數到規則結果
+        if (modelResult != null && modelResult.fraudProbability > 0.3f) {
+            val modelBonus = (modelResult.fraudProbability * 20).toInt()
+            val enhancedResult = ruleResult.copy(
+                riskScore = (ruleResult.riskScore + modelBonus).coerceIn(0, 100),
+                matchedKeywords = ruleResult.matchedKeywords +
+                    "[模型] ${modelResult.predictedLabel} (${String.format("%.1f%%", modelResult.confidence * 100)})"
+            )
+
+            // 風險低且沒有 AI client → 只回傳增強結果
+            if (enhancedResult.riskScore < 30 || clawClient == null || !clawClient.isAvailable()) {
+                return AnalysisResult(ruleResult = enhancedResult)
+            }
+
+            // ── Layer 2: AI 深度分析 ──
+            val aiResult = StringBuilder()
+            try {
+                analyzeByAI(text, clawClient, enhancedResult).collect { chunk ->
+                    aiResult.append(chunk)
+                }
+            } catch (_: Exception) { }
+
+            return AnalysisResult(
+                ruleResult = enhancedResult,
+                aiAnalysis = aiResult.toString().ifBlank { null }
+            )
         }
 
         // 風險低且沒有 AI client → 只回傳規則結果
@@ -492,7 +549,7 @@ class FraudAIAnalyzer(private val context: Context) {
             return AnalysisResult(ruleResult = ruleResult)
         }
 
-        // 風險 ≥ 30 → 呼叫 AI 深度分析（非串流版，收集完整結果）
+        // ── Layer 2: AI 深度分析 ──
         val aiResult = StringBuilder()
         try {
             analyzeByAI(text, clawClient, ruleResult).collect { chunk ->

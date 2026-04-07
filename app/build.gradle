@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 92
-        versionName "0.9.26"
+        versionCode 93
+        versionName "0.9.27"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,14 +82,15 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: TTS 音色搜尋 — 可依語言/名稱即時過濾\n" +
-                    "- fix: 雪凜 VRM/Lottie 即時切換 — 設定頁切換後不再消失\n" +
-                    "- fix: VRM 初始化失敗自動 fallback 回 Lottie\n" +
-                    "- feat: 雪凜角色開關\n" +
-                    "- feat: TTS 語音音色選擇器 + 試聽\n" +
-                    "- feat: 按鍵文字透明度拉桿\n" +
-                    "- feat: 常用語面板擴充（11 分類 + 日韓英）\n" +
-                    "- feat: 日文漢字辭書 3000+"
+                    "- feat: 悄悄話解密面板 🔐 — 密碼制 AES-256 加解密\n" +
+                    "- feat: 剪貼簿強化 — 搜尋 + 分類標籤 + 加密 + 敏感偵測\n" +
+                    "- feat: 自訂辭彙面板 📖 — CRUD + 分類 + 匯出匯入\n" +
+                    "- feat: 防詐 AI 自我學習 + 匿名回報 + 雲端規則同步\n" +
+                    "- feat: 防詐 TFLite 本地模型推論 + 模型自動更新\n" +
+                    "- feat: 滑動 + 糾錯自我學習（越用越準確）\n" +
+                    "- feat: RIME 詞庫系統\n" +
+                    "- fix: AI 技能開關生效（全 18 項）\n" +
+                    "- fix: 雪凜 VRM/Lottie 即時切換"
             }
         }
         debug {
@@ -98,14 +99,15 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: TTS 音色搜尋 — 可依語言/名稱即時過濾\n" +
-                    "- fix: 雪凜 VRM/Lottie 即時切換 — 設定頁切換後不再消失\n" +
-                    "- fix: VRM 初始化失敗自動 fallback 回 Lottie\n" +
-                    "- feat: 雪凜角色開關\n" +
-                    "- feat: TTS 語音音色選擇器 + 試聽\n" +
-                    "- feat: 按鍵文字透明度拉桿\n" +
-                    "- feat: 常用語面板擴充（11 分類 + 日韓英）\n" +
-                    "- feat: 日文漢字辭書 3000+"
+                    "- feat: 悄悄話解密面板 🔐 — 密碼制 AES-256 加解密\n" +
+                    "- feat: 剪貼簿強化 — 搜尋 + 分類標籤 + 加密 + 敏感偵測\n" +
+                    "- feat: 自訂辭彙面板 📖 — CRUD + 分類 + 匯出匯入\n" +
+                    "- feat: 防詐 AI 自我學習 + 匿名回報 + 雲端規則同步\n" +
+                    "- feat: 防詐 TFLite 本地模型推論 + 模型自動更新\n" +
+                    "- feat: 滑動 + 糾錯自我學習（越用越準確）\n" +
+                    "- feat: RIME 詞庫系統\n" +
+                    "- fix: AI 技能開關生效（全 18 項）\n" +
+                    "- fix: 雪凜 VRM/Lottie 即時切換"
             }
         }
     }
@@ -169,6 +171,9 @@ dependencies {
 
     // MLKit 翻譯（離線模型）
     implementation 'com.google.mlkit:translate:17.0.3'
+
+    // TFLite（防詐本地模型推論）
+    implementation 'org.tensorflow:tensorflow-lite:2.14.0'
 
     // Filament 3D 渲染（VRM 角色）
     implementation 'com.google.android.filament:filament-android:1.51.6'

@@ -8,11 +8,15 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.Toast
 import com.snowrealm.yukiboard.claw.ClawClient
 import com.snowrealm.yukiboard.claw.ClawInput
 import com.snowrealm.yukiboard.claw.ClawOutput
+import com.snowrealm.yukiboard.security.FraudReportManager
+import com.snowrealm.yukiboard.security.FraudRuleSync
 import com.snowrealm.yukiboard.theme.KeyboardTheme
 import com.snowrealm.yukiboard.ui.keyboard.KeyboardMode
+import com.snowrealm.yukiboard.ui.settings.YukiPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -56,12 +60,17 @@ class ClawPanelView(context: Context) : LinearLayout(context) {
     /** 取得當前鍵盤模式 */
     var keyboardModeProvider: (() -> KeyboardMode)? = null
 
+    /** 偏好設定（由 IMEService 設定，用於個別 Skill 開關檢查） */
+    var prefs: YukiPreferences? = null
+
     var onSuggestionSelected: ((String) -> Unit)? = null
     var onClose: (() -> Unit)? = null
     var onLockTapped: (() -> Unit)? = null
 
     private val toolbarView: ClawToolbarView
     private val resultView: ClawResultCardView
+    private val fraudReportManager = FraudReportManager(context)
+    private val fraudRuleSync = FraudRuleSync(context)
 
     init {
         orientation = VERTICAL
@@ -86,8 +95,63 @@ class ClawPanelView(context: Context) : LinearLayout(context) {
         executeSkill(skillId)
     }
 
+    /** 檢查個別 Skill 的偏好開關，回傳 true = 該 Skill 已被使用者關閉 */
+    private fun isSkillDisabledByPref(skillId: String): Boolean {
+        val p = prefs ?: return false
+        return when (skillId) {
+            "ai_prediction"   -> !p.aiPrediction
+            "writer"          -> !p.aiWriter
+            "translate"       -> !p.aiTranslate
+            "cupid"           -> !p.aiCupid
+            "whisper"         -> !p.aiWhisper
+            "grammar_check"   -> !p.aiGrammarCheck
+            "tone_adjust"     -> !p.aiToneAdjust
+            "summarize"       -> !p.aiSummarize
+            "meme_text"       -> !p.aiMemeText
+            "emoji_translate" -> !p.aiEmojiTranslate
+            "quick_reply"     -> !p.aiQuickReply
+            "code_complete"   -> !p.aiCodeComplete
+            "regex_gen"       -> !p.aiRegexGen
+            "commit_message"  -> !p.aiCommitMessage
+            "yuki_chat"       -> !p.aiYukiChat
+            "mood_diary"      -> !p.aiMoodDiary
+            "weather"         -> !p.aiWeather
+            "fraud_detect"    -> !p.aiFraudDetect
+            else              -> false
+        }
+    }
+
+    /** Skill 中文名稱對應（用於 Toast） */
+    private fun skillDisplayName(skillId: String): String = when (skillId) {
+        "ai_prediction"   -> "AI 補字"
+        "writer"          -> "AI 寫手"
+        "translate"       -> "AI 翻譯"
+        "cupid"           -> "AI 情聖"
+        "whisper"         -> "語音輸入"
+        "grammar_check"   -> "AI 糾錯"
+        "tone_adjust"     -> "AI 語氣調整"
+        "summarize"       -> "AI 摘要"
+        "meme_text"       -> "AI 迷因"
+        "emoji_translate" -> "AI Emoji 翻譯"
+        "quick_reply"     -> "AI 快回"
+        "code_complete"   -> "AI 補碼"
+        "regex_gen"       -> "AI Regex"
+        "commit_message"  -> "AI Commit"
+        "yuki_chat"       -> "雪凜聊天"
+        "mood_diary"      -> "心情日記"
+        "weather"         -> "天氣"
+        "fraud_detect"    -> "防詐偵測"
+        else              -> skillId
+    }
+
     private fun executeSkill(skillId: String) {
         val client = clawClient
+
+        // 檢查個別 Skill 開關
+        if (isSkillDisabledByPref(skillId)) {
+            Toast.makeText(context, "${skillDisplayName(skillId)}功能已關閉", Toast.LENGTH_SHORT).show()
+            return
+        }
 
         // 防詐偵測不需要 AI key（本地規則引擎），其他 skill 需要
         if (skillId != "fraud_detect" && (client == null || !client.isAvailable())) {
@@ -171,6 +235,13 @@ class ClawPanelView(context: Context) : LinearLayout(context) {
     private suspend fun executeFraudDetect(text: String, client: ClawClient?) {
         val analyzer = com.snowrealm.yukiboard.security.FraudAIAnalyzer(context)
 
+        // L-4: 雲端規則同步（超過 24h 才觸發，不阻塞主流程）
+        if (fraudRuleSync.needsSync()) {
+            scope.launch(Dispatchers.IO) {
+                try { fraudRuleSync.sync() } catch (_: Exception) {}
+            }
+        }
+
         // A 層：本地規則引擎（< 1ms）
         val ruleResult = withContext(Dispatchers.Default) {
             analyzer.analyzeByRules(text)
@@ -219,10 +290,42 @@ class ClawPanelView(context: Context) : LinearLayout(context) {
             lastFraudResult = ruleResult
             lastFraudText = text
             resultView.showFraudFeedbackButtons { isFraud ->
+                // 本地自學習
                 analyzer.weightManager.processFeedback(isFraud, ruleResult, text)
                 val response = if (isFraud) "記住了，下次會更注意！" else "好的，誤判了抱歉～"
                 resultView.showResults(listOf(finalText.toString() + "\n\n雪凜：$response"))
                 resultView.hideFraudFeedbackButtons()
+
+                // 匿名回報（L-3）
+                val primaryType = ruleResult.matchedTypes.firstOrNull()
+                    ?: com.snowrealm.yukiboard.security.FraudAIAnalyzer.FraudType.UNKNOWN
+                if (fraudReportManager.hasConsent()) {
+                    // 已同意 → 直接上傳
+                    scope.launch {
+                        fraudReportManager.report(
+                            text = text,
+                            fraudType = primaryType,
+                            matchedKeywords = ruleResult.matchedKeywords,
+                            isFraud = isFraud,
+                            ruleScore = ruleResult.riskScore
+                        )
+                    }
+                } else {
+                    // 首次 → 詢問同意
+                    fraudReportManager.showConsentDialog(context) { consented ->
+                        if (consented) {
+                            scope.launch {
+                                fraudReportManager.report(
+                                    text = text,
+                                    fraudType = primaryType,
+                                    matchedKeywords = ruleResult.matchedKeywords,
+                                    isFraud = isFraud,
+                                    ruleScore = ruleResult.riskScore
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
