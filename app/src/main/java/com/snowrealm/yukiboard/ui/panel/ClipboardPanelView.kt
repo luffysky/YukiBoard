@@ -10,8 +10,6 @@ import android.graphics.RectF
 import android.graphics.Shader
 import android.os.Handler
 import android.os.Looper
-import android.text.Editable
-import android.text.TextWatcher
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -47,7 +45,7 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
     private val handler = Handler(Looper.getMainLooper())
 
     // ═══ Child views ═══
-    private val searchEdit: EditText
+    private val searchBar: TextView
     private val tagRow: HorizontalScrollView
     private val canvasView: ClipboardCanvasView
 
@@ -61,6 +59,9 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
         }
 
     var onClipSelected: ((String) -> Unit)? = null
+
+    /** 由 Service 提供的 Dialog 顯示回呼（IME 內部 View 無法直接使用 EditText） */
+    var onShowDialog: ((android.app.AlertDialog) -> Unit)? = null
 
     private var clipHistory = mutableListOf<ClipItem>()
     private var filteredItems = listOf<ClipItem>()
@@ -89,18 +90,17 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
         }
 
-        // 1. Search bar
-        searchEdit = EditText(context).apply {
-            hint = "\uD83D\uDD0D \u641C\u5C0B\u526A\u8CBC\u7C3F..."  // 🔍 搜尋剪貼簿...
+        // 1. Search bar (TextView — 點擊彈出搜尋 Dialog)
+        searchBar = TextView(context).apply {
+            text = "\uD83D\uDD0D 搜尋剪貼簿..."
             textSize = 13f
-            setTextColor(0xFFE0E0E0.toInt())
-            setHintTextColor(0xFF808080.toInt())
+            setTextColor(0xFF808080.toInt())
             background = android.graphics.drawable.GradientDrawable().apply {
                 setColor(0xFF1A2540.toInt())
                 cornerRadius = 8f * density
                 setStroke((1f * density).toInt(), 0xFF2A3A5A.toInt())
             }
-            setPadding((10 * density).toInt(), (6 * density).toInt(), (10 * density).toInt(), (6 * density).toInt())
+            setPadding((10 * density).toInt(), (8 * density).toInt(), (10 * density).toInt(), (8 * density).toInt())
             setSingleLine()
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -109,15 +109,8 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
                 setMargins((8 * density).toInt(), (6 * density).toInt(), (8 * density).toInt(), (2 * density).toInt())
             }
         }
-        searchEdit.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: Editable?) {
-                searchQuery = s?.toString()?.trim() ?: ""
-                applyFilters()
-            }
-        })
-        root.addView(searchEdit)
+        searchBar.setOnClickListener { showSearchDialog() }
+        root.addView(searchBar)
 
         // 2. Tag filter row
         tagRow = buildTagRow()
@@ -369,12 +362,55 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
     }
 
     private fun updateSearchTheme() {
-        val bg = searchEdit.background as? android.graphics.drawable.GradientDrawable
+        val bg = searchBar.background as? android.graphics.drawable.GradientDrawable
         bg?.setColor(theme.effectivePanelBackground())
     }
 
     private fun updateTagRowTheme() {
         // Tag chips use dark theme colors which work with most themes
+    }
+
+    private fun showSearchDialog() {
+        val input = EditText(context).apply {
+            hint = "輸入關鍵字"
+            setText(searchQuery)
+            textSize = 15f
+            setPadding((20 * density).toInt(), (12 * density).toInt(), (20 * density).toInt(), (12 * density).toInt())
+        }
+        val dialog = android.app.AlertDialog.Builder(context, android.app.AlertDialog.THEME_DEVICE_DEFAULT_DARK)
+            .setTitle("搜尋剪貼簿")
+            .setView(input)
+            .setPositiveButton("搜尋") { _, _ ->
+                searchQuery = input.text.toString().trim()
+                applyFilters()
+                updateSearchBarDisplay()
+            }
+            .setNeutralButton("清除") { _, _ ->
+                searchQuery = ""
+                applyFilters()
+                updateSearchBarDisplay()
+            }
+            .setNegativeButton("取消", null)
+            .create()
+        val cb = onShowDialog
+        if (cb != null) {
+            cb.invoke(dialog)
+        } else {
+            try {
+                dialog.window?.setType(android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY)
+                dialog.show()
+            } catch (_: Exception) {}
+        }
+    }
+
+    private fun updateSearchBarDisplay() {
+        if (searchQuery.isEmpty()) {
+            searchBar.text = "\uD83D\uDD0D 搜尋剪貼簿..."
+            searchBar.setTextColor(0xFF808080.toInt())
+        } else {
+            searchBar.text = "\uD83D\uDD0D $searchQuery  \u2715"
+            searchBar.setTextColor(0xFFE0E0E0.toInt())
+        }
     }
 
     // ═══ Context menu (long press) ═══

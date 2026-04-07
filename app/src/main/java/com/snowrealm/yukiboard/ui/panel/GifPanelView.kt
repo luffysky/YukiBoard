@@ -57,6 +57,9 @@ class GifPanelView(context: Context) : View(context) {
     /** 選擇 GIF 回呼 — 外部透過 InputConnection.commitContent 插入 */
     var onGifSelected: ((GifItem) -> Unit)? = null
 
+    /** 由 Service 提供的 Dialog 顯示回呼（IME 內部 Canvas View 無法用 EditText） */
+    var onShowDialog: ((android.app.AlertDialog) -> Unit)? = null
+
     private var searchQuery = ""
     private var gifResults = listOf<GifItem>()
     private var isLoading = false
@@ -329,17 +332,13 @@ class GifPanelView(context: Context) : View(context) {
                             inputBuffer.clear()
                             searchQuery = ""
                             gifResults = emptyList()
+                            isInputMode = false
                             invalidate()
                             performClick()
                             return true
                         }
-                        // 進入輸入模式
-                        if (!isInputMode) {
-                            isInputMode = true
-                            inputBuffer.clear()
-                            if (searchQuery.isNotEmpty()) inputBuffer.append(searchQuery)
-                            invalidate()
-                        }
+                        // 彈出搜尋 Dialog（取代 canvas 輸入模式）
+                        showSearchDialog()
                         performClick()
                         return true
                     }
@@ -375,6 +374,39 @@ class GifPanelView(context: Context) : View(context) {
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         scope.cancel()
+    }
+
+    // ── 搜尋 Dialog ──
+
+    private fun showSearchDialog() {
+        val input = android.widget.EditText(context).apply {
+            hint = "輸入 GIF 搜尋關鍵字"
+            setText(searchQuery)
+            textSize = 15f
+            val dp = context.resources.displayMetrics.density
+            setPadding((20 * dp).toInt(), (12 * dp).toInt(), (20 * dp).toInt(), (12 * dp).toInt())
+        }
+        val dialog = android.app.AlertDialog.Builder(context, android.app.AlertDialog.THEME_DEVICE_DEFAULT_DARK)
+            .setTitle("搜尋 GIF")
+            .setView(input)
+            .setPositiveButton("搜尋") { _, _ ->
+                val q = input.text.toString().trim()
+                if (q.isNotEmpty()) {
+                    isInputMode = false
+                    search(q)
+                }
+            }
+            .setNegativeButton("取消", null)
+            .create()
+        val cb = onShowDialog
+        if (cb != null) {
+            cb.invoke(dialog)
+        } else {
+            try {
+                dialog.window?.setType(android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY)
+                dialog.show()
+            } catch (_: Exception) {}
+        }
     }
 
     // ─────��───────── 鍵盤輸入 API ───────────────

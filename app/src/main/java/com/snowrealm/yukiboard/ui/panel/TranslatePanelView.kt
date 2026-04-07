@@ -54,6 +54,9 @@ class TranslatePanelView(context: Context) : View(context) {
     private var isInputMode = false
     private val inputBuffer = StringBuilder()
 
+    /** 由 Service 提供的 Dialog 顯示回呼 */
+    var onShowDialog: ((android.app.AlertDialog) -> Unit)? = null
+
     /** 點擊翻譯結果時回呼 */
     var onTranslatedSelected: ((String) -> Unit)? = null
 
@@ -392,18 +395,22 @@ class TranslatePanelView(context: Context) : View(context) {
                 return true
             }
 
-            // 點擊來源輸入框 → 進入手動輸入模式
+            // 點擊來源輸入框 → 彈出輸入 Dialog 或進入手動輸入模式
             if (sourceRect.contains(event.x, event.y)) {
                 // 先檢查是否點了清除按鈕
                 if (!clearRect.isEmpty && clearRect.contains(event.x, event.y)) {
                     inputBuffer.clear()
                     sourceText = ""
                     translatedText = ""
+                    isInputMode = false
                     invalidate()
                     performClick()
                     return true
                 }
-                if (!isInputMode) {
+                // 優先用 Dialog（可正常編輯）
+                if (onShowDialog != null) {
+                    showSourceInputDialog()
+                } else if (!isInputMode) {
                     isInputMode = true
                     inputBuffer.clear()
                     if (sourceText.isNotEmpty()) {
@@ -507,6 +514,30 @@ class TranslatePanelView(context: Context) : View(context) {
         composingHint = ""
         onRequestInputMode?.invoke(false)
         invalidate()
+    }
+
+    private fun showSourceInputDialog() {
+        val input = android.widget.EditText(context).apply {
+            hint = "輸入要翻譯的文字"
+            setText(sourceText)
+            textSize = 15f
+            setPadding(
+                (20 * density).toInt(), (12 * density).toInt(),
+                (20 * density).toInt(), (12 * density).toInt()
+            )
+        }
+        val dialog = android.app.AlertDialog.Builder(context, android.app.AlertDialog.THEME_DEVICE_DEFAULT_DARK)
+            .setTitle("輸入翻譯來源")
+            .setView(input)
+            .setPositiveButton("翻譯") { _, _ ->
+                val text = input.text.toString().trim()
+                if (text.isNotEmpty()) {
+                    sourceText = text  // setter triggers translate()
+                }
+            }
+            .setNegativeButton("取消", null)
+            .create()
+        onShowDialog?.invoke(dialog)
     }
 
     private data class LangOption(val code: String, val display: String)

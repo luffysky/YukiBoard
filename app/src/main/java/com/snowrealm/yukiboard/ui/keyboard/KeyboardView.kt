@@ -1459,17 +1459,10 @@ class KeyboardView(context: Context) : View(context) {
         val idx = altPopupHoveredIndex
         if (idx in altPopupChars.indices) {
             val ch = altPopupChars[idx]
-            val originKey = altPopupOriginKey
-            // 如果原始按鍵是注音/聲調，altChar 全部直接 raw commit（英文/數字/符號）
-            val isOriginBopomofo = originKey != null && originKey.label.length == 1 &&
-                    isBopomofoOrTone(originKey.label[0])
-            if (isOriginBopomofo) {
-                onRawCommitListener?.invoke(ch)
-            } else {
-                val output = if ((isShifted || isCapsLock) && ch.length == 1) ch.uppercase() else ch
-                onKeyPressListener?.invoke(ch[0].code, output)
-                autoUnshift()
-            }
+            // 長按選字一律直接 raw commit，不經 InputRouter / 自動糾錯
+            val output = if ((isShifted || isCapsLock) && ch.length == 1) ch.uppercase() else ch
+            onRawCommitListener?.invoke(output)
+            autoUnshift()
         }
         dismissAltPopup()
     }

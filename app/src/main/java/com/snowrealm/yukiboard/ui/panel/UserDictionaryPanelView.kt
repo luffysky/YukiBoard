@@ -76,6 +76,8 @@ class UserDictionaryPanelView(context: Context) : View(context) {
     var onExportRequest: ((String) -> Unit)? = null
     /** 匯入回呼 */
     var onImportRequest: (() -> Unit)? = null
+    /** 由 Service 提供的 Dialog 顯示回呼（IME 內部 View 無法直接彈 Dialog） */
+    var onShowDialog: ((AlertDialog) -> Unit)? = null
 
     // ── 資料 ──
     private var allEntries = listOf<Triple<String, String, String>>() // word, bopomofo, category
@@ -801,15 +803,25 @@ class UserDictionaryPanelView(context: Context) : View(context) {
     // =========================================================================
 
     private fun showImeDialog(dialog: AlertDialog) {
-        dialog.window?.let { w ->
-            val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            else
-                @Suppress("DEPRECATION")
-                WindowManager.LayoutParams.TYPE_SYSTEM_ALERT
-            w.setType(type)
+        val cb = onShowDialog
+        if (cb != null) {
+            cb.invoke(dialog)
+        } else {
+            // fallback: try TYPE_APPLICATION_OVERLAY (needs SYSTEM_ALERT_WINDOW)
+            try {
+                dialog.window?.let { w ->
+                    val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                    else
+                        @Suppress("DEPRECATION")
+                        WindowManager.LayoutParams.TYPE_SYSTEM_ALERT
+                    w.setType(type)
+                }
+                dialog.show()
+            } catch (e: Exception) {
+                android.util.Log.e("UserDictPanel", "Cannot show dialog: ${e.message}")
+            }
         }
-        dialog.show()
     }
 
     private fun ellipsize(text: String, paint: Paint, maxWidth: Float): String {

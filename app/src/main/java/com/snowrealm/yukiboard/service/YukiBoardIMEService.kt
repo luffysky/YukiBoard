@@ -999,6 +999,7 @@ class YukiBoardIMEService : InputMethodService() {
             PanelType.CLIPBOARD -> {
                 val p = ClipboardPanelView(this).also { clipboardPanel = it }
                 p.theme = theme
+                p.onShowDialog = { dialog -> showImeDialog(dialog) }
                 p.captureCurrentClip()
                 p.onClipSelected = { text ->
                     currentInputConnection?.commitText(text, 1)
@@ -1008,6 +1009,7 @@ class YukiBoardIMEService : InputMethodService() {
             PanelType.TRANSLATE -> {
                 val p = TranslatePanelView(this).also { translatePanel = it }
                 p.theme = theme
+                p.onShowDialog = { dialog -> showImeDialog(dialog) }
                 // 嘗試從選取文字 → 游標前方 → 游標後方擷取
                 val ic = currentInputConnection
                 val selected = ic?.getSelectedText(0)?.toString()?.trim() ?: ""
@@ -1045,6 +1047,7 @@ class YukiBoardIMEService : InputMethodService() {
             PanelType.GIF -> {
                 val p = GifPanelView(this).also { gifPanel = it }
                 p.theme = theme
+                p.onShowDialog = { dialog -> showImeDialog(dialog) }
                 p.onGifSelected = { gif ->
                     commitImageContent(gif.fullUrl)
                 }
@@ -1238,6 +1241,7 @@ class YukiBoardIMEService : InputMethodService() {
                 val p = UserDictionaryPanelView(this).also { userDictPanel = it }
                 p.theme = theme
                 p.userDictionary = com.snowrealm.yukiboard.input.dictionary.UserDictionary(this)
+                p.onShowDialog = { dialog -> showImeDialog(dialog) }
                 p.onExportRequest = { data ->
                     try {
                         val file = java.io.File(getExternalFilesDir(null), "yukiboard_user_dict.txt")
@@ -1267,6 +1271,31 @@ class YukiBoardIMEService : InputMethodService() {
                 p.theme = theme
                 p.onEncryptedResult = { encrypted ->
                     currentInputConnection?.commitText(encrypted, 1)
+                }
+                p.onShowInputDialog = { title, hint, currentValue, isPassword, onResult ->
+                    val dp = resources.displayMetrics.density
+                    val input = android.widget.EditText(this).apply {
+                        setHint(hint)
+                        setText(currentValue)
+                        textSize = 15f
+                        if (isPassword) {
+                            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                                android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+                        }
+                        setPadding(
+                            (20 * dp).toInt(), (12 * dp).toInt(),
+                            (20 * dp).toInt(), (12 * dp).toInt()
+                        )
+                    }
+                    val dialog = android.app.AlertDialog.Builder(this, android.app.AlertDialog.THEME_DEVICE_DEFAULT_DARK)
+                        .setTitle(title)
+                        .setView(input)
+                        .setPositiveButton("確定") { _, _ ->
+                            onResult(input.text.toString())
+                        }
+                        .setNegativeButton("取消", null)
+                        .create()
+                    showImeDialog(dialog)
                 }
                 p
             }
@@ -1722,6 +1751,24 @@ class YukiBoardIMEService : InputMethodService() {
                 gravity = Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM
             }
         }
+    }
+
+    // =========================================================================
+    // IME Dialog 輔助（面板用）
+    // =========================================================================
+
+    /**
+     * 在 IME 視窗上顯示 AlertDialog（不需 SYSTEM_ALERT_WINDOW 權限）。
+     * 利用 InputMethodService 自身的 window token。
+     */
+    private fun showImeDialog(dialog: android.app.AlertDialog) {
+        dialog.window?.let { w ->
+            w.attributes?.token = window?.window?.decorView?.windowToken
+            w.setType(android.view.WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG)
+            // 軟鍵盤自動彈出
+            w.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
+        }
+        dialog.show()
     }
 
     // =========================================================================
@@ -2378,12 +2425,31 @@ class YukiBoardIMEService : InputMethodService() {
             KeyboardView.KEYCODE_TOGGLE_KANA -> {
                 val eng = inputRouter.getActiveEngine()
                 if (eng is com.snowrealm.yukiboard.input.engine.JapaneseInputEngine) {
-                    eng.toggleKatakana()
-                    // 切換 50 音佈局（平假名 ⇔ 片假名）
-                    KeyboardState.isKatakanaMode = eng.katakanaMode
+                    // 三模式循環：平假名 → 片假名 → 羅馬拼音 → 平假名
+                    when {
+                        KeyboardState.isRomajiMode -> {
+                            // romaji → hiragana
+                            KeyboardState.isRomajiMode = false
+                            KeyboardState.isKatakanaMode = false
+                            if (eng.katakanaMode) eng.toggleKatakana()
+                            keyboardView.showToast("平仮名モード")
+                        }
+                        !KeyboardState.isKatakanaMode -> {
+                            // hiragana → katakana
+                            if (!eng.katakanaMode) eng.toggleKatakana()
+                            KeyboardState.isKatakanaMode = true
+                            keyboardView.showToast("片仮名モード")
+                        }
+                        else -> {
+                            // katakana → romaji
+                            KeyboardState.isKatakanaMode = false
+                            KeyboardState.isRomajiMode = true
+                            if (eng.katakanaMode) eng.toggleKatakana()
+                            keyboardView.showToast("ローマ字モード")
+                        }
+                    }
                     keyboardView.updateKeyRows(KeyboardState.japaneseRows())
                     keyboardView.updateComposingText(inputRouter.composingText)
-                    keyboardView.showToast(if (eng.katakanaMode) "片仮名モード" else "平仮名モード")
                 }
             }
 
@@ -2547,11 +2613,15 @@ class YukiBoardIMEService : InputMethodService() {
             }
             else -> ic.deleteSurroundingText(1, 0)
         }
+        keyboardView.updateComposingText(inputRouter.composingText)
+        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
     }
 
     private fun handleEnter(ic: InputConnection) {
         val result = inputRouter.processEnter()
         applyInputResult(ic, result)
+        keyboardView.updateComposingText(inputRouter.composingText)
+        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
 
         // Enter = 句子結束 → 學習整句模式
         val sentence = sentenceBuffer.toString().trim()
@@ -2612,6 +2682,9 @@ class YukiBoardIMEService : InputMethodService() {
             }
         }
         applyInputResult(ic, inputRouter.processSpace())
+        // 更新候選列（日文漢字轉換、注音選字等需要此更新）
+        keyboardView.updateComposingText(inputRouter.composingText)
+        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
     }
 
     private fun handleSwitchLang() {

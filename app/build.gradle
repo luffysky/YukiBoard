@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 94
-        versionName "0.9.28"
+        versionCode 95
+        versionName "0.9.29"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,14 +82,11 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: TTS 音色選擇真正生效（setLanguage 不再覆蓋自訂語音）\n" +
-                    "- fix: 設定頁切換音色後 IME 即時同步\n" +
-                    "- feat: 悄悄話解密面板 🔐 + 密碼制加密\n" +
-                    "- feat: 剪貼簿強化（搜尋 + 分類 + 加密 + 敏感偵測）\n" +
-                    "- feat: 自訂辭彙面板（CRUD + 8 分類）\n" +
-                    "- feat: 防詐 AI 完整鏈路（學習 + 回報 + 規則同步 + TFLite）\n" +
-                    "- feat: 滑動/糾錯自我學習 + RIME 詞庫\n" +
-                    "- fix: AI 技能開關全部生效"
+                    "- fix: 面板輸入框全面改用 Dialog（詞庫/剪貼簿/GIF/翻譯/解密）\n" +
+                    "- fix: 長按選字不再被自動糾錯覆蓋\n" +
+                    "- fix: 日語候選列（Space/Delete/Enter 後正常顯示漢字候選）\n" +
+                    "- feat: 日語羅馬拼音 QWERTY 佈局（カナ鍵三模式循環）\n" +
+                    "- fix: 設定頁移除自訂詞彙（已移至功能面板）"
             }
         }
         debug {
@@ -98,14 +95,11 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: TTS 音色選擇真正生效（setLanguage 不再覆蓋自訂語音）\n" +
-                    "- fix: 設定頁切換音色後 IME 即時同步\n" +
-                    "- feat: 悄悄話解密面板 🔐 + 密碼制加密\n" +
-                    "- feat: 剪貼簿強化（搜尋 + 分類 + 加密 + 敏感偵測）\n" +
-                    "- feat: 自訂辭彙面板（CRUD + 8 分類）\n" +
-                    "- feat: 防詐 AI 完整鏈路（學習 + 回報 + 規則同步 + TFLite）\n" +
-                    "- feat: 滑動/糾錯自我學習 + RIME 詞庫\n" +
-                    "- fix: AI 技能開關全部生效"
+                    "- fix: 面板輸入框全面改用 Dialog（詞庫/剪貼簿/GIF/翻譯/解密）\n" +
+                    "- fix: 長按選字不再被自動糾錯覆蓋\n" +
+                    "- fix: 日語候選列（Space/Delete/Enter 後正常顯示漢字候選）\n" +
+                    "- feat: 日語羅馬拼音 QWERTY 佈局（カナ鍵三模式循環）\n" +
+                    "- fix: 設定頁移除自訂詞彙（已移至功能面板）"
             }
         }
     }

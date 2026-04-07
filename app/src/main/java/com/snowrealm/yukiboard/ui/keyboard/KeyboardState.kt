@@ -662,9 +662,14 @@ data class KeyboardState(
         // =================================================================
         /** 是否顯示片假名（由 KeyboardView toggle） */
         var isKatakanaMode = false
+        /** 是否顯示羅馬拼音 QWERTY 佈局 */
+        var isRomajiMode = false
 
-        fun japaneseRows(): List<List<KeyModel>> =
-            if (isKatakanaMode) japaneseKatakanaRows() else japaneseHiraganaRows()
+        fun japaneseRows(): List<List<KeyModel>> = when {
+            isRomajiMode -> japaneseRomajiRows()
+            isKatakanaMode -> japaneseKatakanaRows()
+            else -> japaneseHiraganaRows()
+        }
 
         /** 五十音平假名佈局 */
         fun japaneseHiraganaRows(): List<List<KeyModel>> = listOf(
@@ -809,6 +814,36 @@ data class KeyboardState(
             listOf(
                 KeyModel.special("?123", KeyboardView.KEYCODE_SWITCH_NUMBERS, widthWeight = 1.0f),
                 KeyModel.special("かな", KeyboardView.KEYCODE_TOGGLE_KANA, widthWeight = 1.0f),
+                KeyModel.special("切換", KeyboardView.KEYCODE_SWITCH_LANG, widthWeight = 0.8f),
+                KeyModel.special(" ", KeyboardView.KEYCODE_SPACE, widthWeight = 3.5f),
+                KeyModel.special("、", KeyboardView.KEYCODE_COMMA, altChars = listOf("，", "「", "」")),
+                KeyModel.special("↵", KeyboardView.KEYCODE_ENTER, widthWeight = 1.2f)
+            )
+        )
+
+        /** 日文羅馬拼音 QWERTY 佈局（輸入 romaji → 引擎自動轉換為假名/漢字） */
+        fun japaneseRomajiRows(): List<List<KeyModel>> = listOf(
+            listOf(
+                KeyModel.char("q"), KeyModel.char("w"), KeyModel.char("e"),
+                KeyModel.char("r"), KeyModel.char("t"), KeyModel.char("y"),
+                KeyModel.char("u"), KeyModel.char("i"), KeyModel.char("o"),
+                KeyModel.char("p")
+            ),
+            listOf(
+                KeyModel.char("a"), KeyModel.char("s"), KeyModel.char("d"),
+                KeyModel.char("f"), KeyModel.char("g"), KeyModel.char("h"),
+                KeyModel.char("j"), KeyModel.char("k"), KeyModel.char("l")
+            ),
+            listOf(
+                KeyModel.special("⇧", KeyboardView.KEYCODE_SHIFT, widthWeight = 1.2f),
+                KeyModel.char("z"), KeyModel.char("x"), KeyModel.char("c"),
+                KeyModel.char("v"), KeyModel.char("b"), KeyModel.char("n"),
+                KeyModel.char("m"),
+                KeyModel.special("⌫", KeyboardView.KEYCODE_DELETE, widthWeight = 1.2f)
+            ),
+            listOf(
+                KeyModel.special("?123", KeyboardView.KEYCODE_SWITCH_NUMBERS, widthWeight = 1.0f),
+                KeyModel.special("あ", KeyboardView.KEYCODE_TOGGLE_KANA, widthWeight = 1.0f),
                 KeyModel.special("切換", KeyboardView.KEYCODE_SWITCH_LANG, widthWeight = 0.8f),
                 KeyModel.special(" ", KeyboardView.KEYCODE_SPACE, widthWeight = 3.5f),
                 KeyModel.special("、", KeyboardView.KEYCODE_COMMA, altChars = listOf("，", "「", "」")),
