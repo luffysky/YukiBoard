@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 97
-        versionName "0.9.31"
+        versionCode 98
+        versionName "0.9.32"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,11 +82,10 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: Noto Sans CJK 完整字體 — 罕用字不再顯示 □\n" +
-                    "- fix: 面板搬到鍵盤上方（詞庫/解密/剪貼簿不再被遮擋）\n" +
-                    "- fix: GIF/翻譯搜尋框改 inputMode（不再彈 Dialog）\n" +
-                    "- fix: 面板按鍵不再自動關閉\n" +
-                    "- fix: 候選字 □ 方塊過濾 (Paint.hasGlyph)"
+                    "- fix: 翻譯/GIF 面板打字不再跑到 App 輸入框\n" +
+                    "- fix: 面板開啟自動進入輸入模式（不需先點輸入框）\n" +
+                    "- fix: 長按選字 + 滑動/AI 候選正確送到面板\n" +
+                    "- fix: 切換面板時正確清除舊面板狀態"
             }
         }
         debug {
@@ -95,11 +94,10 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: Noto Sans CJK 完整字體 — 罕用字不再顯示 □\n" +
-                    "- fix: 面板搬到鍵盤上方（詞庫/解密/剪貼簿不再被遮擋）\n" +
-                    "- fix: GIF/翻譯搜尋框改 inputMode（不再彈 Dialog）\n" +
-                    "- fix: 面板按鍵不再自動關閉\n" +
-                    "- fix: 候選字 □ 方塊過濾 (Paint.hasGlyph)"
+                    "- fix: 翻譯/GIF 面板打字不再跑到 App 輸入框\n" +
+                    "- fix: 面板開啟自動進入輸入模式（不需先點輸入框）\n" +
+                    "- fix: 長按選字 + 滑動/AI 候選正確送到面板\n" +
+                    "- fix: 切換面板時正確清除舊面板狀態"
             }
         }
     }
