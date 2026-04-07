@@ -332,7 +332,7 @@ class FraudModelManager(private val context: Context) {
         } else if (isModelInstalled) {
             "使用內建模型"
         } else {
-            "模型未安裝"
+            "模型未安裝（使用規則引擎偵測，點擊上方按鈕下載 AI 模型）"
         }
     }
 }

@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 93
-        versionName "0.9.27"
+        versionCode 94
+        versionName "0.9.28"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,15 +82,14 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 悄悄話解密面板 🔐 — 密碼制 AES-256 加解密\n" +
-                    "- feat: 剪貼簿強化 — 搜尋 + 分類標籤 + 加密 + 敏感偵測\n" +
-                    "- feat: 自訂辭彙面板 📖 — CRUD + 分類 + 匯出匯入\n" +
-                    "- feat: 防詐 AI 自我學習 + 匿名回報 + 雲端規則同步\n" +
-                    "- feat: 防詐 TFLite 本地模型推論 + 模型自動更新\n" +
-                    "- feat: 滑動 + 糾錯自我學習（越用越準確）\n" +
-                    "- feat: RIME 詞庫系統\n" +
-                    "- fix: AI 技能開關生效（全 18 項）\n" +
-                    "- fix: 雪凜 VRM/Lottie 即時切換"
+                    "- fix: TTS 音色選擇真正生效（setLanguage 不再覆蓋自訂語音）\n" +
+                    "- fix: 設定頁切換音色後 IME 即時同步\n" +
+                    "- feat: 悄悄話解密面板 🔐 + 密碼制加密\n" +
+                    "- feat: 剪貼簿強化（搜尋 + 分類 + 加密 + 敏感偵測）\n" +
+                    "- feat: 自訂辭彙面板（CRUD + 8 分類）\n" +
+                    "- feat: 防詐 AI 完整鏈路（學習 + 回報 + 規則同步 + TFLite）\n" +
+                    "- feat: 滑動/糾錯自我學習 + RIME 詞庫\n" +
+                    "- fix: AI 技能開關全部生效"
             }
         }
         debug {
@@ -99,15 +98,14 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 悄悄話解密面板 🔐 — 密碼制 AES-256 加解密\n" +
-                    "- feat: 剪貼簿強化 — 搜尋 + 分類標籤 + 加密 + 敏感偵測\n" +
-                    "- feat: 自訂辭彙面板 📖 — CRUD + 分類 + 匯出匯入\n" +
-                    "- feat: 防詐 AI 自我學習 + 匿名回報 + 雲端規則同步\n" +
-                    "- feat: 防詐 TFLite 本地模型推論 + 模型自動更新\n" +
-                    "- feat: 滑動 + 糾錯自我學習（越用越準確）\n" +
-                    "- feat: RIME 詞庫系統\n" +
-                    "- fix: AI 技能開關生效（全 18 項）\n" +
-                    "- fix: 雪凜 VRM/Lottie 即時切換"
+                    "- fix: TTS 音色選擇真正生效（setLanguage 不再覆蓋自訂語音）\n" +
+                    "- fix: 設定頁切換音色後 IME 即時同步\n" +
+                    "- feat: 悄悄話解密面板 🔐 + 密碼制加密\n" +
+                    "- feat: 剪貼簿強化（搜尋 + 分類 + 加密 + 敏感偵測）\n" +
+                    "- feat: 自訂辭彙面板（CRUD + 8 分類）\n" +
+                    "- feat: 防詐 AI 完整鏈路（學習 + 回報 + 規則同步 + TFLite）\n" +
+                    "- feat: 滑動/糾錯自我學習 + RIME 詞庫\n" +
+                    "- fix: AI 技能開關全部生效"
             }
         }
     }

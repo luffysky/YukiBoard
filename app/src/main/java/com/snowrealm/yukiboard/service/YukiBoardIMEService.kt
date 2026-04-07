@@ -677,6 +677,12 @@ class YukiBoardIMEService : InputMethodService() {
             }
         }
 
+        // 同步 TTS 語音音色（設定頁可能已更改）
+        (ttsEngine as? com.snowrealm.yukiboard.speech.AndroidTtsEngine)?.let { engine ->
+            val savedVoice = prefs.ttsVoiceName
+            engine.setVoice(savedVoice.takeIf { it.isNotEmpty() })
+        }
+
         // 透明鍵盤模式
         applyTransparentMode()
 

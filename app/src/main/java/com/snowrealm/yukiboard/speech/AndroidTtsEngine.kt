@@ -147,14 +147,18 @@ class AndroidTtsEngine(context: Context, private val onInitDone: ((Boolean) -> U
             return
         }
 
-        // 設定語言
-        val javaLocale = locale?.let { parseLocale(it) } ?: detectLocale(text)
-        val langResult = engine.setLanguage(javaLocale)
-        if (langResult == TextToSpeech.LANG_MISSING_DATA || langResult == TextToSpeech.LANG_NOT_SUPPORTED) {
-            Log.w(tag, "Language not supported: $javaLocale (result=$langResult), falling back to default")
-            engine.setLanguage(Locale.getDefault())
+        // 設定語言（注意：setLanguage 會覆蓋已選語音，有自訂語音時跳過）
+        if (selectedVoiceName.isNullOrEmpty() || engine.voice == null) {
+            val javaLocale = locale?.let { parseLocale(it) } ?: detectLocale(text)
+            val langResult = engine.setLanguage(javaLocale)
+            if (langResult == TextToSpeech.LANG_MISSING_DATA || langResult == TextToSpeech.LANG_NOT_SUPPORTED) {
+                Log.w(tag, "Language not supported: $javaLocale (result=$langResult), falling back to default")
+                engine.setLanguage(Locale.getDefault())
+            }
+            Log.i(tag, "speak: locale=$javaLocale, langResult=$langResult, text=${text.take(30)}")
+        } else {
+            Log.i(tag, "speak: using custom voice=${selectedVoiceName}, text=${text.take(30)}")
         }
-        Log.i(tag, "speak: locale=$javaLocale, langResult=$langResult, text=${text.take(30)}")
 
         // 設定語速
         engine.setSpeechRate(speed.coerceIn(0.25f, 4.0f))
