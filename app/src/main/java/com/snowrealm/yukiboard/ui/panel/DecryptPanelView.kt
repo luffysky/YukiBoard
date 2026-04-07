@@ -43,6 +43,12 @@ class DecryptPanelView(context: Context) : View(context) {
     private var statusIsError = false
     private var isEncryptResult = false  // true=加密結果 false=解密結果
 
+    // ── canvas 輸入模式 ──
+    private var isInputMode = false
+    private var activeField = ""  // "password" or "cipher"
+    private val inputBuffer = StringBuilder()
+    private var composingHint = ""
+
     // ── Paints ──
     private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -171,15 +177,16 @@ class DecryptPanelView(context: Context) : View(context) {
                               label: String, value: String, btnId: String, valueColor: Int): Float {
         val cardH = 52f * density
         val rect = RectF(pad, startY, w - pad, startY + cardH)
+        val isFocused = isInputMode && activeField == btnId
 
-        cardPaint.color = 0xFF1A2A3A.toInt()
+        cardPaint.color = if (isFocused) 0xFF1E3A5A.toInt() else 0xFF1A2A3A.toInt()
         canvas.drawRoundRect(rect, 8f * density, 8f * density, cardPaint)
 
-        // 邊框
+        // 邊框（聚焦時高亮）
         val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            strokeWidth = 1f * density
-            color = 0xFF334455.toInt()
+            strokeWidth = if (isFocused) 1.5f * density else 1f * density
+            color = if (isFocused) 0xFF9ECFFF.toInt() else 0xFF334455.toInt()
         }
         canvas.drawRoundRect(rect, 8f * density, 8f * density, borderPaint)
 
@@ -188,10 +195,21 @@ class DecryptPanelView(context: Context) : View(context) {
         fieldPaint.color = 0xFF9ECFFF.toInt()
         canvas.drawText(label, pad + 12f * density, startY + 16f * density, fieldPaint)
 
-        // 值
+        // 值（聚焦時顯示 inputBuffer）
         fieldPaint.textSize = 14f * density
-        fieldPaint.color = valueColor
-        canvas.drawText(value, pad + 12f * density, startY + 38f * density, fieldPaint)
+        if (isFocused) {
+            val displayText = if (btnId == "password") {
+                if (inputBuffer.isEmpty()) "輸入密碼..." else "●".repeat(inputBuffer.length)
+            } else {
+                val buf = if (composingHint.isNotEmpty()) inputBuffer.toString() + composingHint else inputBuffer.toString()
+                if (buf.isEmpty()) "輸入文字..." else buf.take(60)
+            }
+            fieldPaint.color = if (inputBuffer.isEmpty()) 0xFF556677.toInt() else 0xFFE8F4FF.toInt()
+            canvas.drawText(displayText, pad + 12f * density, startY + 38f * density, fieldPaint)
+        } else {
+            fieldPaint.color = valueColor
+            canvas.drawText(value, pad + 12f * density, startY + 38f * density, fieldPaint)
+        }
 
         buttons.add(BtnArea(rect, btnId))
         return startY + cardH + 8f * density
@@ -268,26 +286,31 @@ class DecryptPanelView(context: Context) : View(context) {
     private fun handleClick(id: String) {
         when (id) {
             "password" -> {
-                onShowInputDialog?.invoke("設定密碼", "輸入約定密碼", password, true) { pwd ->
-                    password = pwd
-                    invalidate()
-                }
+                // 進入密碼輸入模式
+                isInputMode = true
+                activeField = "password"
+                inputBuffer.clear()
+                if (password.isNotEmpty()) inputBuffer.append(password)
+                composingHint = ""
+                invalidate()
             }
             "cipher" -> {
-                // 先嘗試從剪貼簿貼上
+                // 先嘗試從剪貼簿貼上密文
                 val clip = (context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager)
                     ?.primaryClip?.getItemAt(0)?.text?.toString()
                 if (!clip.isNullOrEmpty() && secretManager.isEncryptedMessage(clip)) {
                     cipherText = clip
                     setStatus("已從剪貼簿貼上加密訊息", false)
+                    invalidate()
                 } else {
-                    // 沒有密文，彈出輸入框
-                    onShowInputDialog?.invoke("輸入訊息", "貼上加密訊息，或輸入要加密的明文", cipherText, false) { text ->
-                        cipherText = text
-                        invalidate()
-                    }
+                    // 進入密文輸入模式
+                    isInputMode = true
+                    activeField = "cipher"
+                    inputBuffer.clear()
+                    if (cipherText.isNotEmpty()) inputBuffer.append(cipherText)
+                    composingHint = ""
+                    invalidate()
                 }
-                invalidate()
             }
             "paste" -> {
                 val clip = (context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager)
@@ -351,6 +374,68 @@ class DecryptPanelView(context: Context) : View(context) {
     private fun setStatus(msg: String, error: Boolean) {
         statusMsg = msg
         statusIsError = error
+        invalidate()
+    }
+
+    // =========================================================================
+    // 鍵盤輸入 API（canvas inputMode）
+    // =========================================================================
+
+    val isInInputMode: Boolean get() = isInputMode
+
+    private fun commitFieldValue() {
+        when (activeField) {
+            "password" -> password = inputBuffer.toString()
+            "cipher" -> cipherText = inputBuffer.toString()
+        }
+    }
+
+    fun onCharInput(text: String) {
+        if (!isInputMode) return
+        inputBuffer.append(text)
+        commitFieldValue()
+        invalidate()
+    }
+
+    fun onDeleteInput() {
+        if (!isInputMode || inputBuffer.isEmpty()) return
+        inputBuffer.deleteCharAt(inputBuffer.lastIndex)
+        commitFieldValue()
+        invalidate()
+    }
+
+    fun onSpaceInput() {
+        if (!isInputMode) return
+        inputBuffer.append(' ')
+        commitFieldValue()
+        invalidate()
+    }
+
+    fun onEnterInput() {
+        if (!isInputMode) return
+        commitFieldValue()
+        isInputMode = false
+        composingHint = ""
+        invalidate()
+    }
+
+    fun exitInputMode() {
+        if (isInputMode) commitFieldValue()
+        isInputMode = false
+        composingHint = ""
+        invalidate()
+    }
+
+    fun onComposedTextInput(text: String) {
+        if (!isInputMode) return
+        inputBuffer.append(text)
+        composingHint = ""
+        commitFieldValue()
+        invalidate()
+    }
+
+    fun updateComposingHint(hint: String) {
+        composingHint = hint
         invalidate()
     }
 }

@@ -112,6 +112,10 @@ class UserDictionaryPanelView(context: Context) : View(context) {
 
     // ── 搜尋模式 ──
     private var isSearchMode = false
+    // ── canvas 輸入模式（鍵盤直接輸入到搜尋框） ──
+    private var isInputMode = false
+    private val inputBuffer = StringBuilder()
+    private var composingHint = ""
 
     // ── 尺寸 ──
     private val headerH = 42f * density
@@ -250,8 +254,18 @@ class UserDictionaryPanelView(context: Context) : View(context) {
     // =========================================================================
     private fun drawSearchBar(canvas: Canvas, top: Float) {
         val barRect = RectF(padding, top + 4 * density, width - padding, top + searchBarH - 4 * density)
-        cardPaint.color = CARD_COLOR
+        cardPaint.color = if (isInputMode) (ACCENT_COLOR and 0x00FFFFFF) or 0x22000000 else CARD_COLOR
         canvas.drawRoundRect(barRect, cardR, cardR, cardPaint)
+
+        // 聚焦邊框
+        if (isInputMode) {
+            val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = 1.5f * density
+                color = ACCENT_COLOR
+            }
+            canvas.drawRoundRect(barRect, cardR, cardR, borderPaint)
+        }
 
         iconPaint.textSize = 12f * density
         iconPaint.color = DIM_TEXT
@@ -259,9 +273,14 @@ class UserDictionaryPanelView(context: Context) : View(context) {
 
         textPaint.textSize = 12f * density
         textPaint.textAlign = Paint.Align.LEFT
-        if (searchQuery.isNotEmpty()) {
+
+        val displayText = if (isInputMode) {
+            if (composingHint.isNotEmpty()) inputBuffer.toString() + composingHint else inputBuffer.toString()
+        } else searchQuery
+
+        if (displayText.isNotEmpty()) {
             textPaint.color = TEXT_COLOR
-            canvas.drawText(searchQuery, barRect.left + 30 * density, barRect.centerY() + 4 * density, textPaint)
+            canvas.drawText(displayText, barRect.left + 30 * density, barRect.centerY() + 4 * density, textPaint)
 
             val clearSize = 22f * density
             clearSearchRect = RectF(
@@ -273,7 +292,7 @@ class UserDictionaryPanelView(context: Context) : View(context) {
             canvas.drawText("✕", clearSearchRect.centerX(), clearSearchRect.centerY() + 4 * density, iconPaint)
         } else {
             textPaint.color = DIM_TEXT
-            canvas.drawText("搜尋詞彙或注音...", barRect.left + 30 * density, barRect.centerY() + 4 * density, textPaint)
+            canvas.drawText(if (isInputMode) "輸入搜尋關鍵字..." else "搜尋詞彙或注音...", barRect.left + 30 * density, barRect.centerY() + 4 * density, textPaint)
             clearSearchRect = RectF()
         }
     }
@@ -534,11 +553,16 @@ class UserDictionaryPanelView(context: Context) : View(context) {
                 if (searchBtnRect.contains(event.x, event.y)) {
                     if (isSearchMode) {
                         isSearchMode = false
+                        isInputMode = false
+                        inputBuffer.clear()
+                        composingHint = ""
                         searchQuery = ""
                         applyFilter()
                     } else {
                         isSearchMode = true
-                        showSearchDialog()
+                        isInputMode = true
+                        inputBuffer.clear()
+                        if (searchQuery.isNotEmpty()) inputBuffer.append(searchQuery)
                     }
                     scrollY = 0f
                     invalidate()
@@ -560,6 +584,8 @@ class UserDictionaryPanelView(context: Context) : View(context) {
 
                 // Search bar
                 if (isSearchMode && clearSearchRect.contains(event.x, event.y)) {
+                    inputBuffer.clear()
+                    composingHint = ""
                     searchQuery = ""
                     applyFilter()
                     invalidate()
@@ -570,7 +596,13 @@ class UserDictionaryPanelView(context: Context) : View(context) {
                     val searchTop = headerH
                     val barRect = RectF(padding, searchTop, width - padding, searchTop + searchBarH)
                     if (barRect.contains(event.x, event.y)) {
-                        showSearchDialog()
+                        // 進入 inputMode
+                        if (!isInputMode) {
+                            isInputMode = true
+                            inputBuffer.clear()
+                            if (searchQuery.isNotEmpty()) inputBuffer.append(searchQuery)
+                            invalidate()
+                        }
                         performClick()
                         return true
                     }
@@ -837,5 +869,63 @@ class UserDictionaryPanelView(context: Context) : View(context) {
         var end = text.length
         while (end > 0 && paint.measureText(text, 0, end) + paint.measureText("...") > maxWidth) end--
         return text.substring(0, end) + "..."
+    }
+
+    // =========================================================================
+    // 鍵盤輸入 API（canvas inputMode，與 GIF/翻譯面板同介面）
+    // =========================================================================
+
+    val isInInputMode: Boolean get() = isInputMode
+
+    fun onCharInput(text: String) {
+        if (!isInputMode) return
+        inputBuffer.append(text)
+        searchQuery = inputBuffer.toString()
+        applyFilter()
+        invalidate()
+    }
+
+    fun onDeleteInput() {
+        if (!isInputMode || inputBuffer.isEmpty()) return
+        inputBuffer.deleteCharAt(inputBuffer.lastIndex)
+        searchQuery = inputBuffer.toString()
+        applyFilter()
+        invalidate()
+    }
+
+    fun onSpaceInput() {
+        if (!isInputMode) return
+        inputBuffer.append(' ')
+        searchQuery = inputBuffer.toString()
+        applyFilter()
+        invalidate()
+    }
+
+    fun onEnterInput() {
+        if (!isInputMode) return
+        isInputMode = false
+        searchQuery = inputBuffer.toString()
+        applyFilter()
+        invalidate()
+    }
+
+    fun exitInputMode() {
+        isInputMode = false
+        composingHint = ""
+        invalidate()
+    }
+
+    fun onComposedTextInput(text: String) {
+        if (!isInputMode) return
+        inputBuffer.append(text)
+        composingHint = ""
+        searchQuery = inputBuffer.toString()
+        applyFilter()
+        invalidate()
+    }
+
+    fun updateComposingHint(hint: String) {
+        composingHint = hint
+        invalidate()
     }
 }

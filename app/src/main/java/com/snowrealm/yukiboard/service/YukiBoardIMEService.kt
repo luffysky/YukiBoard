@@ -149,6 +149,7 @@ class YukiBoardIMEService : InputMethodService() {
     private var wifiServer: WifiKeyboardServer? = null
     private var remotePanel: RemoteKeyboardPanelView? = null
     private var userDictPanel: UserDictionaryPanelView? = null
+    private var decryptPanel: com.snowrealm.yukiboard.ui.panel.DecryptPanelView? = null
 
     // 鍵盤尺寸調整 + 懸浮
     private var resizeHandle: KeyboardResizeHandle? = null
@@ -384,13 +385,19 @@ class YukiBoardIMEService : InputMethodService() {
             }
 
             val result = inputRouter.selectCandidate(index)
-            // GIF/翻譯面板輸入模式：選字提交到面板而非目標 App
+            // 面板輸入模式：選字提交到面板而非目標 App
             val gpRef = gifPanel
             val tpRef = translatePanel
+            val udpRef = userDictPanel
+            val dpRef = decryptPanel
             if (gpRef != null && gpRef.isInInputMode && result is InputResult.CommitText) {
                 gpRef.onComposedTextInput(result.text)
             } else if (tpRef != null && tpRef.isInInputMode && result is InputResult.CommitText) {
                 tpRef.onComposedTextInput(result.text)
+            } else if (udpRef != null && udpRef.isInInputMode && result is InputResult.CommitText) {
+                udpRef.onComposedTextInput(result.text)
+            } else if (dpRef != null && dpRef.isInInputMode && result is InputResult.CommitText) {
+                dpRef.onComposedTextInput(result.text)
             } else {
                 val ic = currentInputConnection ?: return@setOnCandidateSelectListener
                 applyInputResult(ic, result)
@@ -1322,35 +1329,10 @@ class YukiBoardIMEService : InputMethodService() {
                 p
             }
             PanelType.DECRYPT -> {
-                val p = com.snowrealm.yukiboard.ui.panel.DecryptPanelView(this)
+                val p = com.snowrealm.yukiboard.ui.panel.DecryptPanelView(this).also { decryptPanel = it }
                 p.theme = theme
                 p.onEncryptedResult = { encrypted ->
                     currentInputConnection?.commitText(encrypted, 1)
-                }
-                p.onShowInputDialog = { title, hint, currentValue, isPassword, onResult ->
-                    val dp = resources.displayMetrics.density
-                    val input = android.widget.EditText(this).apply {
-                        setHint(hint)
-                        setText(currentValue)
-                        textSize = 15f
-                        if (isPassword) {
-                            inputType = android.text.InputType.TYPE_CLASS_TEXT or
-                                android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
-                        }
-                        setPadding(
-                            (20 * dp).toInt(), (12 * dp).toInt(),
-                            (20 * dp).toInt(), (12 * dp).toInt()
-                        )
-                    }
-                    val dialog = android.app.AlertDialog.Builder(this, android.app.AlertDialog.THEME_DEVICE_DEFAULT_DARK)
-                        .setTitle(title)
-                        .setView(input)
-                        .setPositiveButton("確定") { _, _ ->
-                            onResult(input.text.toString())
-                        }
-                        .setNegativeButton("取消", null)
-                        .create()
-                    showImeDialog(dialog)
                 }
                 p
             }
@@ -1381,8 +1363,12 @@ class YukiBoardIMEService : InputMethodService() {
         // 離開面板輸入模式並清除引用，避免已移除面板繼續攔截按鍵
         translatePanel?.exitInputMode()
         gifPanel?.exitInputMode()
+        userDictPanel?.exitInputMode()
+        decryptPanel?.exitInputMode()
         translatePanel = null
         gifPanel = null
+        userDictPanel = null
+        decryptPanel = null
         activePanel = null
         toolbarView.activePanel = null
         panelContainer.removeAllViews()
@@ -2426,6 +2412,94 @@ class YukiBoardIMEService : InputMethodService() {
                     } else {
                         gp.onCharInput(label)
                     }
+                }
+            }
+            return
+        }
+
+        // 使用者詞庫面板輸入模式：攔截鍵盤輸入到搜尋框
+        val udp = userDictPanel
+        if (udp != null && udp.isInInputMode) {
+            val isCjk = inputRouter.inputMode != InputMode.ENGLISH
+            when (keyCode) {
+                KeyboardView.KEYCODE_DELETE -> {
+                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
+                        inputRouter.processDelete()
+                        keyboardView.updateComposingText(inputRouter.composingText)
+                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
+                    } else udp.onDeleteInput()
+                }
+                KeyboardView.KEYCODE_ENTER -> {
+                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
+                        udp.onComposedTextInput(inputRouter.composingText)
+                        inputRouter.reset()
+                        keyboardView.updateComposingText("")
+                        keyboardView.updateCandidates(emptyList())
+                    }
+                    udp.onEnterInput()
+                }
+                KeyboardView.KEYCODE_SPACE -> {
+                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
+                        val result = inputRouter.processSpace()
+                        if (result is InputResult.CommitText) udp.onComposedTextInput(result.text)
+                        keyboardView.updateComposingText(inputRouter.composingText)
+                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
+                    } else udp.onSpaceInput()
+                }
+                KeyboardView.KEYCODE_SWITCH_LANG -> handleSwitchLang()
+                KeyboardView.KEYCODE_SHIFT, KeyboardView.KEYCODE_CTRL -> { }
+                else -> if (label.isNotEmpty() && keyCode >= 0) {
+                    if (isCjk) {
+                        val result = inputRouter.processInput(label)
+                        if (result is InputResult.CommitText) udp.onComposedTextInput(result.text)
+                        keyboardView.updateComposingText(inputRouter.composingText)
+                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
+                        udp.updateComposingHint(inputRouter.composingText)
+                    } else udp.onCharInput(label)
+                }
+            }
+            return
+        }
+
+        // 解密面板輸入模式：攔截鍵盤輸入到密碼/密文欄
+        val dp = decryptPanel
+        if (dp != null && dp.isInInputMode) {
+            val isCjk = inputRouter.inputMode != InputMode.ENGLISH
+            when (keyCode) {
+                KeyboardView.KEYCODE_DELETE -> {
+                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
+                        inputRouter.processDelete()
+                        keyboardView.updateComposingText(inputRouter.composingText)
+                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
+                    } else dp.onDeleteInput()
+                }
+                KeyboardView.KEYCODE_ENTER -> {
+                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
+                        dp.onComposedTextInput(inputRouter.composingText)
+                        inputRouter.reset()
+                        keyboardView.updateComposingText("")
+                        keyboardView.updateCandidates(emptyList())
+                    }
+                    dp.onEnterInput()
+                }
+                KeyboardView.KEYCODE_SPACE -> {
+                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
+                        val result = inputRouter.processSpace()
+                        if (result is InputResult.CommitText) dp.onComposedTextInput(result.text)
+                        keyboardView.updateComposingText(inputRouter.composingText)
+                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
+                    } else dp.onSpaceInput()
+                }
+                KeyboardView.KEYCODE_SWITCH_LANG -> handleSwitchLang()
+                KeyboardView.KEYCODE_SHIFT, KeyboardView.KEYCODE_CTRL -> { }
+                else -> if (label.isNotEmpty() && keyCode >= 0) {
+                    if (isCjk) {
+                        val result = inputRouter.processInput(label)
+                        if (result is InputResult.CommitText) dp.onComposedTextInput(result.text)
+                        keyboardView.updateComposingText(inputRouter.composingText)
+                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
+                        dp.updateComposingHint(inputRouter.composingText)
+                    } else dp.onCharInput(label)
                 }
             }
             return
