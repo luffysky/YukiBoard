@@ -49,6 +49,9 @@ class YukiSpeechBubble(context: Context) : View(context) {
     private val cornerRadius = 8f * density
     private val paddingH = 14f * density
     private val paddingV = 8f * density
+    /** 最大寬度（螢幕寬度的 70%） */
+    private val maxBubbleW = (context.resources.displayMetrics.widthPixels * 0.7f)
+    private var wrappedLines: List<String> = emptyList()
 
     init {
         visibility = GONE
@@ -69,6 +72,7 @@ class YukiSpeechBubble(context: Context) : View(context) {
     /** 顯示泡泡，自動定位到 anchorView 上方，並用 TTS 朗讀 */
     fun show(message: String, anchorView: View) {
         text = message
+        wrappedLines = emptyList()  // 重新計算
         isVisible = true
         visibility = VISIBLE
         alpha = 1f
@@ -94,9 +98,13 @@ class YukiSpeechBubble(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         if (!isVisible || text.isEmpty()) return
 
-        val textWidth = textPaint.measureText(text)
-        val bubbleW = textWidth + paddingH * 2
-        val bubbleH = textPaint.textSize + paddingV * 2
+        val lineH = textPaint.textSize * 1.3f
+        val maxTextW = maxBubbleW - paddingH * 2
+        if (wrappedLines.isEmpty()) wrappedLines = wrapText(text, textPaint, maxTextW)
+
+        val contentW = wrappedLines.maxOfOrNull { textPaint.measureText(it) } ?: 0f
+        val bubbleW = (contentW + paddingH * 2).coerceAtMost(maxBubbleW)
+        val bubbleH = paddingV * 2 + wrappedLines.size * lineH
 
         val left = (width - bubbleW) / 2f
         val top = 0f
@@ -117,16 +125,42 @@ class YukiSpeechBubble(context: Context) : View(context) {
         canvas.drawPath(tailPath, bgPaint)
         canvas.drawPath(tailPath, borderPaint)
 
-        // 文字
-        val textY = bubbleRect.centerY() + textPaint.textSize / 3f
-        canvas.drawText(text, width / 2f, textY, textPaint)
+        // 文字（多行）
+        textPaint.textAlign = Paint.Align.CENTER
+        val cx = width / 2f
+        var y = bubbleRect.top + paddingV + textPaint.textSize
+        for (line in wrappedLines) {
+            canvas.drawText(line, cx, y, textPaint)
+            y += lineH
+        }
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val textWidth = textPaint.measureText(text)
-        val w = (textWidth + paddingH * 2 + 20 * density).toInt()
-        val h = (textPaint.textSize + paddingV * 2 + 12 * density).toInt()
+        val maxTextW = maxBubbleW - paddingH * 2
+        wrappedLines = wrapText(text, textPaint, maxTextW)
+        val contentW = wrappedLines.maxOfOrNull { textPaint.measureText(it) } ?: 0f
+        val lineH = textPaint.textSize * 1.3f
+        val w = (contentW + paddingH * 2 + 20 * density).toInt().coerceAtMost(maxBubbleW.toInt())
+        val h = (paddingV * 2 + wrappedLines.size * lineH + 12 * density).toInt()
         setMeasuredDimension(w, h)
+    }
+
+    private fun wrapText(text: String, paint: Paint, maxWidth: Float): List<String> {
+        if (text.isEmpty()) return listOf("")
+        if (paint.measureText(text) <= maxWidth) return listOf(text)
+        val lines = mutableListOf<String>()
+        var remaining = text
+        while (remaining.isNotEmpty()) {
+            val count = paint.breakText(remaining, true, maxWidth, null)
+            if (count <= 0) break
+            lines.add(remaining.substring(0, count))
+            remaining = remaining.substring(count)
+            if (lines.size >= 4) {
+                if (remaining.isNotEmpty()) lines[lines.size - 1] = lines.last().dropLast(1) + "..."
+                break
+            }
+        }
+        return lines.ifEmpty { listOf(text.take(20) + "...") }
     }
 
     private fun positionAbove(anchor: View) {
@@ -139,7 +173,9 @@ class YukiSpeechBubble(context: Context) : View(context) {
         val x = anchorLoc[0] - parentLoc[0] + anchor.width / 2 - measuredWidth / 2
         val y = anchorLoc[1] - parentLoc[1] - measuredHeight - (4 * density).toInt()
 
-        translationX = x.toFloat().coerceAtLeast(0f)
+        // 確保泡泡不超出父容器邊界
+        val maxX = (parent.width - measuredWidth).coerceAtLeast(0)
+        translationX = x.toFloat().coerceIn(0f, maxX.toFloat())
         translationY = y.toFloat().coerceAtLeast(0f)
     }
 

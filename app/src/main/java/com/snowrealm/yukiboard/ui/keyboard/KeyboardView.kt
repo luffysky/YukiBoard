@@ -1377,16 +1377,19 @@ class KeyboardView(context: Context) : View(context) {
                 useLabelPaint.color = if (ctrlHint != null) theme.candidateSelectedColorInt else effectiveLabelColor
                 val textY = rect.top + (rect.height() + useLabelPaint.textSize) / 2f - useLabelPaint.descent()
                 val labelWidth = useLabelPaint.measureText(displayLabel)
-                if (labelWidth > rect.width()) {
-                    canvas.save()
-                    canvas.clipRect(rect)
-                    canvas.drawText(displayLabel, rect.centerX(), textY, useLabelPaint)
-                    canvas.restore()
+                if (labelWidth > rect.width() - 2 * density) {
+                    // 文字太寬：縮小字號直到能放下
+                    val origSize = useLabelPaint.textSize
+                    val scale = (rect.width() - 2 * density) / labelWidth
+                    useLabelPaint.textSize = origSize * scale.coerceAtLeast(0.5f)
+                    val scaledTextY = rect.top + (rect.height() + useLabelPaint.textSize) / 2f - useLabelPaint.descent()
+                    canvas.drawText(displayLabel, rect.centerX(), scaledTextY, useLabelPaint)
+                    useLabelPaint.textSize = origSize
                 } else {
                     canvas.drawText(displayLabel, rect.centerX(), textY, useLabelPaint)
                 }
 
-                // Alt hint：右上角顯示第一個長按字元（clipping 防止溢出）
+                // Alt hint：右上角顯示第一個長按字元（縮小而非裁切）
                 if (key.altChars.isNotEmpty()) {
                     altHintPaint.color = (effectiveLabelColor and 0x00FFFFFF) or 0x80000000.toInt()
                     val hint = key.altChars.first()
@@ -1395,11 +1398,10 @@ class KeyboardView(context: Context) : View(context) {
                     if (hintWidth <= availW) {
                         canvas.drawText(hint, rect.right - 3f * density, rect.top + altHintPaint.textSize + 1f * density, altHintPaint)
                     } else {
-                        // 文字太寬：用 clipRect 裁切
-                        canvas.save()
-                        canvas.clipRect(rect)
+                        val origSize = altHintPaint.textSize
+                        altHintPaint.textSize = origSize * (availW / hintWidth).coerceAtLeast(0.5f)
                         canvas.drawText(hint, rect.right - 3f * density, rect.top + altHintPaint.textSize + 1f * density, altHintPaint)
-                        canvas.restore()
+                        altHintPaint.textSize = origSize
                     }
                 }
 
