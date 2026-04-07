@@ -82,11 +82,12 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 面板輸入框全面改用 Dialog（詞庫/剪貼簿/GIF/翻譯/解密）\n" +
-                    "- fix: 長按選字不再被自動糾錯覆蓋\n" +
-                    "- fix: 日語候選列（Space/Delete/Enter 後正常顯示漢字候選）\n" +
-                    "- feat: 日語羅馬拼音 QWERTY 佈局（カナ鍵三模式循環）\n" +
-                    "- fix: 設定頁移除自訂詞彙（已移至功能面板）"
+                    "- feat: 防詐 TFLite 模型 v1 (9類偵測) + OTA 自動更新\n" +
+                    "- feat: 政府公開防詐資料整合 (MODA/165/OpenPhish 即時同步)\n" +
+                    "- fix: 選詞後接續候選 (bigram/trigram 預測)\n" +
+                    "- fix: AUTO 模式中英混合候選\n" +
+                    "- fix: TTS 語音選擇真正生效\n" +
+                    "- fix: IME dialog 輸入框被鍵盤遮擋"
             }
         }
         debug {
@@ -95,11 +96,12 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 面板輸入框全面改用 Dialog（詞庫/剪貼簿/GIF/翻譯/解密）\n" +
-                    "- fix: 長按選字不再被自動糾錯覆蓋\n" +
-                    "- fix: 日語候選列（Space/Delete/Enter 後正常顯示漢字候選）\n" +
-                    "- feat: 日語羅馬拼音 QWERTY 佈局（カナ鍵三模式循環）\n" +
-                    "- fix: 設定頁移除自訂詞彙（已移至功能面板）"
+                    "- feat: 防詐 TFLite 模型 v1 (9類偵測) + OTA 自動更新\n" +
+                    "- feat: 政府公開防詐資料整合 (MODA/165/OpenPhish 即時同步)\n" +
+                    "- fix: 選詞後接續候選 (bigram/trigram 預測)\n" +
+                    "- fix: AUTO 模式中英混合候選\n" +
+                    "- fix: TTS 語音選擇真正生效\n" +
+                    "- fix: IME dialog 輸入框被鍵盤遮擋"
             }
         }
     }
