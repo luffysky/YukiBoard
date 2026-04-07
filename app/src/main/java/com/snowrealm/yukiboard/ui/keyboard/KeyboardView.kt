@@ -253,10 +253,21 @@ class KeyboardView(context: Context) : View(context) {
     private val candidatePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
         textSize = 15f * density
+        // Noto Sans CJK 完整版：涵蓋 CJK Extension A~F，避免罕用字顯示 □
+        try {
+            typeface = android.graphics.Typeface.createFromAsset(
+                context.assets, "fonts/NotoSansCJKtc-Regular.otf"
+            )
+        } catch (_: Exception) {}
     }
     private val composingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.LEFT
         textSize = 14f * density
+        try {
+            typeface = android.graphics.Typeface.createFromAsset(
+                context.assets, "fonts/NotoSansCJKtc-Regular.otf"
+            )
+        } catch (_: Exception) {}
         color = Color.CYAN
     }
     private val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {

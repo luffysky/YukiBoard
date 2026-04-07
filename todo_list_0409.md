@@ -2,7 +2,7 @@
 
 > 整合 todo-list-0405 + 總任務包 + 滑動輸入任務包 + Games_add + Games_bug
 > ~~刪除線~~ = 已完成 / ✅ = 已完成
-> 版本：**v0.9.22**（versionCode 88）
+> 版本：**v0.9.30**（versionCode 96）
 
 ---
 
@@ -182,6 +182,26 @@
 - ✅ **注音選字殘留修復** — 非引擎候選直接 commit + engine.reset()
 - ✅ **移除「直打注音」設定** — 功能已整合至鍵盤
 - ✅ **全專案掃描** — 掃出 2 關鍵 + 10 中等問題，加入待辦
+
+### v0.9.22 — GIF/翻譯面板 backspace 修復 + 待辦更新
+- ✅ **GIF 面板 Backspace 修復** — GifPanelView 搜尋框 backspace 正確刪字
+- ✅ **翻譯面板 Backspace 修復** — TranslatePanelView 同修
+- ✅ **待辦清單更新** — 加入掃描問題 + 悄悄話解密面板規劃
+
+### v0.9.23 — 日文漢字辭書擴充
+- ✅ **ja_kanji_dict 擴充至 ~300 讀音** — 常用漢字追加 + build 修正
+
+### v0.9.24 — 背景選圖改用系統相簿
+- ✅ **ACTION_GET_CONTENT** — 背景選圖片/影片改用系統內建相簿（取代 ACTION_PICK）
+
+### v0.9.30 — AI Proxy 動態金鑰 + 防詐開源資料擴充 + Bug 修復 + n8n 自動化
+- ✅ **AI Proxy 動態 API Key** — Insight Engine ai-proxy 4 函數改接 DB 金鑰（AES-256-GCM）+ env fallback + 5 分鐘快取
+- ✅ **防詐開源資料擴充** — 新增 MODA CSV / URLhaus / CERT.PL 三來源（共 7 來源）
+- ✅ **n8n 自動化工作流** — 建立 6 個 n8n workflow（防詐同步/AI 健康檢查/使用量統計/邀請碼到期/詞庫同步/貼圖主題同步）
+- ✅ **Dialog 被鍵盤遮擋修復** — GIF/翻譯/詞庫/解密面板 Dialog 改 SOFT_INPUT_ADJUST_PAN + Gravity.TOP + 48dp margin
+- ✅ **AUTO 模式雙語候選字修復** — updateCandidates() 在 AUTO 模式呼叫 getAutoCombinedCandidates() 取中英混合候選
+- ✅ **候選字選取後組字延續修復** — directCommit 保留 ChewingEngine selectedBuffer + 移除 PREDICTION/HISTORY 攔截
+- ✅ **Firebase App Distribution v0.9.30 (96)** — 推送至 testers 群組
 
 ---
 
@@ -931,7 +951,7 @@ Phase 3：上架準備
 
 ## 備註
 
-- 版本號：**v0.9.22**（versionCode 88）
+- 版本號：**v0.9.30**（versionCode 96）
 - deploy 指令：`bash scripts/deploy.sh "更新說明"` 或 `./gradlew appDistributionUploadDebug`
 - Firebase App Distribution 測��群��：`testers`
 - google-services.json 已在 .gitignore

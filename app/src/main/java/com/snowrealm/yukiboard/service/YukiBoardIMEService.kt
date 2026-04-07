@@ -1357,8 +1357,10 @@ class YukiBoardIMEService : InputMethodService() {
             else -> return
         }
 
-        // 翻譯/GIF 面板放在鍵盤上方（不擋鍵盤，可同時打字）
+        // 需要輸入的面板放在鍵盤上方（不擋鍵盤，可同時打字）
         val isTopPanel = panel == PanelType.TRANSLATE || panel == PanelType.GIF
+                || panel == PanelType.USER_DICT || panel == PanelType.DECRYPT
+                || panel == PanelType.CLIPBOARD
         if (isTopPanel) {
             topPanelContainer.addView(panelView)
             topPanelContainer.visibility = View.VISIBLE
@@ -2429,9 +2431,14 @@ class YukiBoardIMEService : InputMethodService() {
             return
         }
 
-        // 面板開啟中但使用者按了鍵盤按鍵 → 先關閉面板回到正常輸入
+        // 面板開啟中但使用者按了鍵盤按鍵 → 需要輸入的面板保持開啟，其他面板關閉
         if (activePanel != null) {
-            closePanel()
+            val keepOpen = activePanel == PanelType.TRANSLATE || activePanel == PanelType.GIF
+                    || activePanel == PanelType.USER_DICT || activePanel == PanelType.DECRYPT
+                    || activePanel == PanelType.CLIPBOARD
+            if (!keepOpen) {
+                closePanel()
+            }
         }
 
         val ic: InputConnection = currentInputConnection ?: return

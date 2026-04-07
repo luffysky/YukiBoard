@@ -94,5 +94,75 @@
 
 ---
 
-> 下次繼續：2026-04-09（禮拜四）
-> 優先項目：自訂辭彙 CRUD 面板、悄悄話解密面板
+> ~~下次繼續：2026-04-09（禮拜四）~~
+> ~~優先項目：自訂辭彙 CRUD 面板、悄悄話解密面板~~
+
+---
+
+## 下午場（v0.9.22→v0.9.30, versionCode 88→96）
+
+### 12. Insight Engine AI Proxy 動態金鑰
+- `ai-proxy/route.ts` 4 個 API 呼叫函數改接動態 `apiKey` 參數
+- 新增 `getApiKey()` — 查詢 Supabase `platform_ai_models` 表取加密金鑰（AES-256-GCM）
+- 新增 `getCachedApiKey()` — 5 分鐘記憶體快取，避免每次請求都查 DB
+- fallback 機制：DB 無資料時自動降級使用環境變數
+- 修復 502：部署版本仍用舊的全域常數，推送新版後恢復
+
+### 13. n8n 自動化工作流（6 個）
+- `tools/n8n_create_all_workflows.js` 建立 6 個 workflow 於 n8n.snowrealm.pet
+- **防詐資料同步** — 每日 3:00 呼叫 FraudOpenDataSync API
+- **AI 模型健康檢查** — 每 6 小時檢查 5 平台 API 可用性
+- **使用量統計報表** — 每週一 9:00 彙總 token 用量
+- **邀請碼到期提醒** — 每日檢查即將過期邀請碼
+- **詞庫同步更新** — 每週日 2:00 同步開源詞庫
+- **貼圖/主題包同步** — 每日 4:00 同步新資源
+
+### 14. 防詐開源資料擴充（4→7 來源）
+- FraudOpenDataSync.kt 新增 3 個資料來源：
+  - **MODA CSV** — 數位發展部公開詐騙網址 CSV
+  - **URLhaus** — abuse.ch 惡意 URL 資料庫
+  - **CERT.PL** — 波蘭 CERT 釣魚網域清單
+- 新增 `fetchTextUrlList()` — 通用 TXT/CSV/domain-per-line 格式解析器
+
+### 15. Dialog 被鍵盤遮擋修復
+- 問題：面板 Dialog 使用 SOFT_INPUT_ADJUST_RESIZE，overlay window 下無效
+- 修復：改為 SOFT_INPUT_ADJUST_PAN + Gravity.TOP + 48dp top margin
+- 影響：GifPanelView / TranslatePanelView / ClipboardPanelView / UserDictionaryPanelView / YukiBoardIMEService.showImeDialog()
+
+### 16. AUTO 模式雙語候選字修復
+- 問題：AUTO 模式 updateCandidates() 只用 activeEngine 候選，無中英混合
+- 修復：AUTO 模式偵測到 autoQwertyBuffer 時呼叫 `getAutoCombinedCandidates()`
+- 效果：打字同時顯示中文注音候選 + 英文 QWERTY 候選
+
+### 17. 候選字選取後組字延續修復
+- 問題 A：PREDICTION/HISTORY 攔截過早，引擎候選被 directCommit 而非走 selectCandidateAt
+- 修復 A：移除早期 CandidateSource 攔截，讓引擎優先處理
+- 問題 B：directCommit 時 ChewingEngine 的 selectedBuffer 被 reset 清除
+- 修復 B：directCommit 先讀取 composingText，reset 後將 pending + text 合併提交
+
+### 18. Firebase App Distribution 部署
+- v0.9.30 (96) release build 成功上傳
+- testers 群組已收到更新通知
+
+---
+
+### 下午場修改的檔案
+
+| 檔案 | 變更 |
+|------|------|
+| `insight-engine/.../ai-proxy/route.ts` | 動態 API Key + getApiKey/getCachedApiKey |
+| `tools/n8n_create_all_workflows.js` | 新增：6 個 n8n workflow 建立腳本 |
+| `security/FraudOpenDataSync.kt` | +3 開源來源 + fetchTextUrlList() |
+| `service/YukiBoardIMEService.kt` | showImeDialog() ADJUST_PAN + Gravity.TOP |
+| `input/router/InputRouter.kt` | AUTO 雙語候選 + selectCandidate 修復 + directCommit 組字延續 |
+| `ui/panel/GifPanelView.kt` | Dialog ADJUST_PAN 修復 |
+| `ui/panel/ClipboardPanelView.kt` | Dialog ADJUST_PAN 修復 |
+| `ui/panel/UserDictionaryPanelView.kt` | Dialog ADJUST_PAN 修復 |
+| `todo_list_0409.md` | 版號更新 v0.9.30 (96) + v0.9.22~v0.9.30 記錄 |
+| `app/build.gradle` | versionCode 96, versionName 0.9.30 |
+
+---
+
+### 待處理
+- ⚠️ `platform_ai_models` 表尚未在 Supabase 建立（404，AI Proxy 目前走 env fallback）
+- 💡 Insight Engine n8n 可進一步擴展（社群監控、圖片審核等）

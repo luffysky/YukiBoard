@@ -407,10 +407,8 @@ class TranslatePanelView(context: Context) : View(context) {
                     performClick()
                     return true
                 }
-                // 優先用 Dialog（可正常編輯）
-                if (onShowDialog != null) {
-                    showSourceInputDialog()
-                } else if (!isInputMode) {
+                // 直接進入 canvas 輸入模式（鍵盤輸入送到面板）
+                if (!isInputMode) {
                     isInputMode = true
                     inputBuffer.clear()
                     if (sourceText.isNotEmpty()) {

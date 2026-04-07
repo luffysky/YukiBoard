@@ -498,13 +498,32 @@ class InputRouter(private val context: Context) {
         activeEngine = engineForMode(mode)
     }
 
+    /** 用 Noto Sans CJK + Paint.hasGlyph() 判斷候選字是否能渲染（避免 □ 方塊） */
+    private val glyphCheckPaint = android.graphics.Paint().apply {
+        // 使用 Noto Sans CJK 完整版字體做判斷（涵蓋 Extension A~F）
+        try {
+            typeface = android.graphics.Typeface.createFromAsset(
+                context.assets, "fonts/NotoSansCJKtc-Regular.otf"
+            )
+        } catch (_: Exception) {}
+    }
+    private fun isRenderable(text: String): Boolean {
+        if (text.isBlank()) return false
+        for (ch in text) {
+            if (ch.isISOControl()) return false
+            if (!glyphCheckPaint.hasGlyph(ch.toString())) return false
+        }
+        return true
+    }
+
     private fun updateCandidates() {
         // AUTO 模式：合併中英雙語候選
         val raw = if (currentMode == InputMode.AUTO && autoQwertyBuffer.isNotEmpty()) {
             val combined = getAutoCombinedCandidates()
-            if (combined.isNotEmpty()) combined else activeEngine.getCandidates().filter { it.isNotBlank() }
+            if (combined.isNotEmpty()) combined.filter { isRenderable(it) }
+            else activeEngine.getCandidates().filter { isRenderable(it) }
         } else {
-            activeEngine.getCandidates().filter { it.isNotBlank() }
+            activeEngine.getCandidates().filter { isRenderable(it) }
         }
         val composing = activeEngine.composingText
 
@@ -787,7 +806,7 @@ class InputRouter(private val context: Context) {
             .let { if (isCjk) it.filter { w -> w.any { c -> c.code > 0x2E80 } } else it }
         results.addAll(adaptive)
 
-        return results.toList().take(20)
+        return results.filter { isRenderable(it) }.take(20)
     }
 
     /** 從游標前文字提取最近的 context words（CJK 每字一個 token，英文按空格分） */

@@ -337,8 +337,15 @@ class GifPanelView(context: Context) : View(context) {
                             performClick()
                             return true
                         }
-                        // 彈出搜尋 Dialog（取代 canvas 輸入模式）
-                        showSearchDialog()
+                        // 進入 canvas 輸入模式（鍵盤直接輸入到搜尋框）
+                        if (!isInputMode) {
+                            isInputMode = true
+                            inputBuffer.clear()
+                            if (searchQuery.isNotEmpty()) {
+                                inputBuffer.append(searchQuery)
+                            }
+                            invalidate()
+                        }
                         performClick()
                         return true
                     }
