@@ -223,7 +223,7 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
         val item = clipHistory[index]
         if (!item.encrypted || item.encryptedData == null) return
         // Decrypt text back for display
-        val plain = encryptHelper.decrypt(item.encryptedData!!)
+        val plain = item.encryptedData?.let { encryptHelper.decrypt(it) }
         if (plain != null) {
             item.text = plain  // Restore plaintext temporarily for display
             revealedItems.add(index)

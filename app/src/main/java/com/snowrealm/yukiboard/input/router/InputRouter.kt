@@ -452,18 +452,19 @@ class InputRouter(private val context: Context) {
         if (engScore - bopoScore >= threshold && activeEngine !is EnglishInputEngine) {
             // 切到英文引擎（保持 currentMode = AUTO）
             activeEngine.reset()
-            candidateManager.clear()
+            // 不要先 clear，先切引擎並取得新候選
             activeEngine = englishEngine
             for (c in autoQwertyBuffer.toString().dropLast(1)) {
                 englishEngine.processChar(c.toString())
             }
+            updateCandidates()
         } else if (bopoScore - engScore >= threshold && activeEngine !is ChewingInputEngine) {
             activeEngine.reset()
-            candidateManager.clear()
             activeEngine = bopomofoEngine
             for (sym in autoBopomofoBuffer.dropLast(1)) {
                 bopomofoEngine.processChar(sym)
             }
+            updateCandidates()
         }
         // 分數接近 → 繼續收集更多按鍵再決定
     }
@@ -540,8 +541,9 @@ class InputRouter(private val context: Context) {
             // composing 為空 = 使用者已送出文字
             if (composing.isEmpty()) {
                 // 若剛提交了文字，顯示前後文接續候選（語義預測）
-                if (!lastCommittedWord.isNullOrEmpty()) {
-                    val continuations = generateContinuationCandidates(lastCommittedWord!!)
+                val committedWord = lastCommittedWord
+                if (!committedWord.isNullOrEmpty()) {
+                    val continuations = generateContinuationCandidates(committedWord)
                     if (continuations.isNotEmpty()) {
                         val contSourceMap = mutableMapOf<String, CandidateSource>()
                         for (c in continuations) contSourceMap[c] = CandidateSource.PREDICTION
@@ -597,8 +599,9 @@ class InputRouter(private val context: Context) {
                 } else emptyMap()
 
                 // 中文上下文串聯預測：上一字 → 下一字
-                val nextCharBoost = if (activeEngine is ChewingInputEngine && !lastCommittedWord.isNullOrEmpty()) {
-                    val predictions = (activeEngine as ChewingInputEngine).getNextCharPredictions(lastCommittedWord!!)
+                val lastWord = lastCommittedWord
+                val nextCharBoost = if (activeEngine is ChewingInputEngine && !lastWord.isNullOrEmpty()) {
+                    val predictions = (activeEngine as? ChewingInputEngine)?.getNextCharPredictions(lastWord) ?: emptyList()
                     predictions.withIndex().associate { (i, w) -> w to (15f - i * 0.5f).coerceAtLeast(1f) }
                 } else emptyMap()
 
@@ -671,8 +674,9 @@ class InputRouter(private val context: Context) {
         // composing 為空 = 已送出文字
         if (composing.isEmpty() && raw.isEmpty()) {
             // 英文模式也顯示接續候選
-            if (!lastCommittedWord.isNullOrEmpty()) {
-                val continuations = generateContinuationCandidates(lastCommittedWord!!)
+            val committedWordEn = lastCommittedWord
+            if (!committedWordEn.isNullOrEmpty()) {
+                val continuations = generateContinuationCandidates(committedWordEn)
                 if (continuations.isNotEmpty()) {
                     val contSourceMap = mutableMapOf<String, CandidateSource>()
                     for (c in continuations) contSourceMap[c] = CandidateSource.PREDICTION

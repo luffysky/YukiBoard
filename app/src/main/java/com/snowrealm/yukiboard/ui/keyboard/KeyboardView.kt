@@ -1275,7 +1275,9 @@ class KeyboardView(context: Context) : View(context) {
 
             row.forEach { key ->
                 val keyWidth = unitWidth * key.widthWeight
-                val touchRect = RectF(x, top, x + keyWidth, top + rh)
+                // 第一排往上延伸，確保候選列邊界附近的觸碰也能命中按鍵
+                val touchTop = if (rowIndex == 0) 0f else top
+                val touchRect = RectF(x, touchTop, x + keyWidth, top + rh)
 
                 // 個別按鍵尺寸倍率
                 val keyId = if (key.code != 0) key.code.toString() else key.label
@@ -1888,7 +1890,9 @@ class KeyboardView(context: Context) : View(context) {
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 // 候選列觸控（含展開箭頭）
-                if (y < candidateBarHeight && candidates.isNotEmpty()) {
+                // 候選列攔截只在中間區域生效（不含最底部 8dp，讓給第一排按鍵上緣）
+                val candidateHitZone = candidateBarHeight - 8f * density
+                if (y < candidateHitZone && candidates.isNotEmpty()) {
                     candidateLastTouchX = x
                     candidateDownX = x
                     candidateIsDragging = false

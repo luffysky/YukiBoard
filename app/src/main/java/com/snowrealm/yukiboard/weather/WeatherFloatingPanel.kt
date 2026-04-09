@@ -102,9 +102,16 @@ class WeatherFloatingPanel(
 
     private fun loadWeather() {
         scope.launch {
-            val data = weatherManager.fetchWeather()
-            if (data != null) bindWeatherData(data)
-            else showNoData()
+            try {
+                val data = weatherManager.fetchWeather()
+                if (data != null) bindWeatherData(data)
+                else showNoData()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.w("WeatherPanel", "Fetch failed: ${e.message}")
+                showNoData()
+            }
         }
     }
 

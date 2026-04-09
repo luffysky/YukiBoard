@@ -326,8 +326,8 @@ class PhrasePanelView(context: Context) : View(context) {
                         return true
                     }
                 }
-                if (!isDragging && pressedPhrase != null) {
-                    onInsertPhrase?.invoke(pressedPhrase!!)
+                pressedPhrase?.takeIf { !isDragging }?.let { phrase ->
+                    onInsertPhrase?.invoke(phrase)
                     performClick()
                 }
                 pressedPhrase = null

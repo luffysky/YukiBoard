@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 98
-        versionName "0.9.32"
+        versionCode 99
+        versionName "0.9.33"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,10 +82,12 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 翻譯/GIF 面板打字不再跑到 App 輸入框\n" +
-                    "- fix: 面板開啟自動進入輸入模式（不需先點輸入框）\n" +
-                    "- fix: 長按選字 + 滑動/AI 候選正確送到面板\n" +
-                    "- fix: 切換面板時正確清除舊面板狀態"
+                    "- fix: 最上排按鍵觸控區域延伸，候選列不再攔截第一排\n" +
+                    "- fix: ClipboardPanel encryptedData 空值崩潰\n" +
+                    "- fix: InputRouter lastCommittedWord 空值崩潰（3處）\n" +
+                    "- fix: AUTO 模式切換引擎候選字不再閃爍消失\n" +
+                    "- fix: 詞庫面板 null 安全改善\n" +
+                    "- fix: 天氣面板 coroutine 加 try-catch 防崩潰"
             }
         }
         debug {
@@ -94,10 +96,12 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 翻譯/GIF 面板打字不再跑到 App 輸入框\n" +
-                    "- fix: 面板開啟自動進入輸入模式（不需先點輸入框）\n" +
-                    "- fix: 長按選字 + 滑動/AI 候選正確送到面板\n" +
-                    "- fix: 切換面板時正確清除舊面板狀態"
+                    "- fix: 最上排按鍵觸控區域延伸，候選列不再攔截第一排\n" +
+                    "- fix: ClipboardPanel encryptedData 空值崩潰\n" +
+                    "- fix: InputRouter lastCommittedWord 空值崩潰（3處）\n" +
+                    "- fix: AUTO 模式切換引擎候選字不再閃爍消失\n" +
+                    "- fix: 詞庫面板 null 安全改善\n" +
+                    "- fix: 天氣面板 coroutine 加 try-catch 防崩潰"
             }
         }
     }
