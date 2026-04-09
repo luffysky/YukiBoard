@@ -22,11 +22,6 @@ class ToolbarView(context: Context) : View(context) {
     private val density = context.resources.displayMetrics.density
     private val barHeight = (40 * density).toInt()
 
-    init {
-        setWillNotDraw(false)
-        updateBackground()
-    }
-
     // 繪製元素
     private val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
@@ -105,6 +100,11 @@ class ToolbarView(context: Context) : View(context) {
         } else {
             setBackgroundColor(theme.effectiveToolbarColor())
         }
+    }
+
+    init {
+        setWillNotDraw(false)
+        updateBackground()
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
