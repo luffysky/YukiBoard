@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 103
-        versionName "0.9.37"
+        versionCode 104
+        versionName "0.9.38"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,13 +82,8 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 6 項崩潰防護（safe cast + null guard + bounds check）\n" +
-                    "- fix: 7 款遊戲 onGameEvent 接線補齊\n" +
-                    "- fix: 9 處 coroutine try-catch（翻譯/GIF/防詐/貼圖）\n" +
-                    "- fix: 12 處執行緒安全（@Volatile + ConcurrentHashMap）\n" +
-                    "- fix: 8 處記憶體洩漏（具名 Runnable + callback 清除）\n" +
-                    "- fix: 12 處邏輯修正（indexOf guard + 空 catch 加 Log）\n" +
-                    "- fix: 功能列透明模式可見性修復"
+                    "- fix: 功能列不可見（鍵盤高度未扣除 toolbar 開銷導致 IME 裁切）\n" +
+                    "- fix: 候選字重複提交（注音 directCommit + finishComposingText 雙重 commit）"
             }
         }
         debug {
@@ -97,13 +92,8 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 6 項崩潰防護（safe cast + null guard + bounds check）\n" +
-                    "- fix: 7 款遊戲 onGameEvent 接線補齊\n" +
-                    "- fix: 9 處 coroutine try-catch（翻譯/GIF/防詐/貼圖）\n" +
-                    "- fix: 12 處執行緒安全（@Volatile + ConcurrentHashMap）\n" +
-                    "- fix: 8 處記憶體洩漏（具名 Runnable + callback 清除）\n" +
-                    "- fix: 12 處邏輯修正（indexOf guard + 空 catch 加 Log）\n" +
-                    "- fix: 功能列透明模式可見性修復"
+                    "- fix: 功能列不可見（鍵盤高度未扣除 toolbar 開銷導致 IME 裁切）\n" +
+                    "- fix: 候選字重複提交（注音 directCommit + finishComposingText 雙重 commit）"
             }
         }
     }

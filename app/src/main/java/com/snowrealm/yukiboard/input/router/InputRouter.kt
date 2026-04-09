@@ -270,15 +270,14 @@ class InputRouter(private val context: Context) {
             val eng = activeEngine
             if (eng is ChewingInputEngine) {
                 // 注音引擎有 selectedBuffer（已選字累積）
-                // 先把 selectedBuffer 內容一起 commit，避免前面已選的字消失
-                val pending = eng.composingText.takeIf { it.isNotEmpty() && it != text }
+                // pending 文字已在 IC composing buffer 中，applyInputResult 的
+                // finishComposingText() 會自動 commit，這裡只回傳新選的文字
                 eng.reset()
                 candidateManager.clear()
-                val fullText = if (pending != null) pending + text else text
-                onTextCommitted(fullText)
+                onTextCommitted(text)
                 smartInput.onCandidateHit()
                 updateCandidates()
-                return InputResult.CommitText(fullText)
+                return InputResult.CommitText(text)
             }
             activeEngine.reset()
             candidateManager.clear()
