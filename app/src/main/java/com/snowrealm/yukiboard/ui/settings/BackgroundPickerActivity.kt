@@ -3,7 +3,9 @@ package com.snowrealm.yukiboard.ui.settings
 import android.app.Activity
 import android.content.Intent
 import android.media.MediaMetadataRetriever
+import android.net.Uri
 import android.os.Bundle
+import android.provider.MediaStore
 import android.widget.Toast
 import com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView
 
@@ -25,44 +27,33 @@ class BackgroundPickerActivity : Activity() {
         super.onCreate(savedInstanceState)
 
         val type = intent.getStringExtra(EXTRA_PICK_TYPE) ?: "image"
-        val mimeType = if (type == "video") "video/*" else "image/*"
 
-        // 改用 ACTION_GET_CONTENT，讓相簿 App 可以出現
-        val getContentIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
-            this.type = mimeType
-            addCategory(Intent.CATEGORY_OPENABLE)
-            putExtra(Intent.EXTRA_LOCAL_ONLY, true)
-        }
-
-        // 同時提供 ACTION_PICK 作為替代（部分手機需要）
+        // 優先用系統內建相簿（ACTION_PICK + MediaStore）
         val pickIntent = Intent(Intent.ACTION_PICK).apply {
-            this.type = mimeType
-        }
-
-        // 用 Chooser 讓使用者選擇相簿或檔案管理器
-        val chooser = Intent.createChooser(
-            getContentIntent,
-            if (type == "video") "選擇影片背景" else "選擇圖片背景"
-        ).apply {
-            putExtra(Intent.EXTRA_INITIAL_INTENTS, arrayOf(pickIntent))
+            data = if (type == "video") {
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            } else {
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            }
         }
 
         try {
             @Suppress("DEPRECATION")
-            startActivityForResult(chooser, RC_PICK)
+            startActivityForResult(pickIntent, RC_PICK)
         } catch (_: Exception) {
-            // fallback：直接用檔案管理器
+            // fallback：ACTION_GET_CONTENT
+            val mimeType = if (type == "video") "video/*" else "image/*"
             try {
                 @Suppress("DEPRECATION")
                 startActivityForResult(
-                    Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                        addCategory(Intent.CATEGORY_OPENABLE)
+                    Intent(Intent.ACTION_GET_CONTENT).apply {
                         this.type = mimeType
+                        addCategory(Intent.CATEGORY_OPENABLE)
                     },
                     RC_PICK
                 )
             } catch (_: Exception) {
-                Toast.makeText(this, "無法開啟選擇器", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "無法開啟相簿", Toast.LENGTH_SHORT).show()
                 finish()
             }
         }
@@ -82,6 +73,11 @@ class BackgroundPickerActivity : Activity() {
             return
         }
 
+        saveBackground(uri)
+        finish()
+    }
+
+    private fun saveBackground(uri: Uri) {
         val prefs = YukiPreferences(this)
         val bgDir = KeyboardBackgroundView.getBackgroundDir(this)
         bgDir.listFiles()?.forEach { it.delete() }
@@ -122,8 +118,6 @@ class BackgroundPickerActivity : Activity() {
         } catch (e: Exception) {
             Toast.makeText(this, "背景設定失敗: ${e.message}", Toast.LENGTH_SHORT).show()
         }
-
-        finish()
     }
 
     private fun validateVideoFile(file: java.io.File) {

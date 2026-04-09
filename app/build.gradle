@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 109
-        versionName "0.9.43"
+        versionCode 110
+        versionName "0.9.44"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,10 +82,10 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
+                    "- fix: 選圖片/影片改用系統內建相簿（不再跳檔案瀏覽器）\n" +
                     "- feat: 手寫辨識面板（ML Kit Digital Ink）\n" +
                     "- feat: 支援繁中/英/日/混合四種手寫語言\n" +
-                    "- feat: 停筆 1.2s 自動辨識 + 候選字列\n" +
-                    "- feat: 語言模型首次使用自動下載"
+                    "- feat: 停筆 1.2s 自動辨識 + 候選字列"
             }
         }
         debug {
@@ -94,10 +94,10 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
+                    "- fix: 選圖片/影片改用系統內建相簿（不再跳檔案瀏覽器）\n" +
                     "- feat: 手寫辨識面板（ML Kit Digital Ink）\n" +
                     "- feat: 支援繁中/英/日/混合四種手寫語言\n" +
-                    "- feat: 停筆 1.2s 自動辨識 + 候選字列\n" +
-                    "- feat: 語言模型首次使用自動下載"
+                    "- feat: 停筆 1.2s 自動辨識 + 候選字列"
             }
         }
     }
