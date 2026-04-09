@@ -391,6 +391,20 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
         try { mp.release() } catch (_: Exception) { }
     }
 
+    fun pause() {
+        mediaPlayer?.let { mp ->
+            if (mp.isPlaying) mp.pause()
+        }
+    }
+
+    fun resume() {
+        mediaPlayer?.let { mp ->
+            if (!mp.isPlaying) {
+                try { mp.start() } catch (_: Exception) {}
+            }
+        }
+    }
+
     fun destroy() {
         bgScope.cancel()
         clearBackground()

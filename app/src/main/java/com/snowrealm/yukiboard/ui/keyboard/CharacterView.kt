@@ -175,6 +175,20 @@ class CharacterView @JvmOverloads constructor(
     // 遊走動畫
     // =========================================================================
 
+    fun pauseAnimation() {
+        vrmView?.stopRendering()
+        lottieView?.pauseAnimation()
+        wanderEnabled = false
+        stopWandering()
+    }
+
+    fun resumeAnimation() {
+        vrmView?.startRendering()
+        lottieView?.resumeAnimation()
+        wanderEnabled = true
+        post { startWandering() }
+    }
+
     private fun startWandering() {
         if (!wanderEnabled) return
         wanderToNext()

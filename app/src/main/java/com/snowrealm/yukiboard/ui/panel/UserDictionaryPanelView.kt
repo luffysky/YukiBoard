@@ -22,7 +22,7 @@ import com.snowrealm.yukiboard.theme.KeyboardTheme
  * - 底部匯出/匯入按鈕
  * - 暗色主題：bg 0xFF0D1B2A, cards 0xFF1A2A3A, text 0xFFE8F4FF, accent 0xFF9ECFFF
  */
-class UserDictionaryPanelView(context: Context) : View(context) {
+class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarget {
 
     private val density = resources.displayMetrics.density
 
@@ -875,9 +875,9 @@ class UserDictionaryPanelView(context: Context) : View(context) {
     // 鍵盤輸入 API（canvas inputMode，與 GIF/翻譯面板同介面）
     // =========================================================================
 
-    val isInInputMode: Boolean get() = isInputMode
+    override val isInInputMode: Boolean get() = isInputMode
 
-    fun onCharInput(text: String) {
+    override fun onCharInput(text: String) {
         if (!isInputMode) return
         inputBuffer.append(text)
         searchQuery = inputBuffer.toString()
@@ -885,7 +885,7 @@ class UserDictionaryPanelView(context: Context) : View(context) {
         invalidate()
     }
 
-    fun onDeleteInput() {
+    override fun onDeleteInput() {
         if (!isInputMode || inputBuffer.isEmpty()) return
         inputBuffer.deleteCharAt(inputBuffer.lastIndex)
         searchQuery = inputBuffer.toString()
@@ -893,7 +893,7 @@ class UserDictionaryPanelView(context: Context) : View(context) {
         invalidate()
     }
 
-    fun onSpaceInput() {
+    override fun onSpaceInput() {
         if (!isInputMode) return
         inputBuffer.append(' ')
         searchQuery = inputBuffer.toString()
@@ -901,7 +901,7 @@ class UserDictionaryPanelView(context: Context) : View(context) {
         invalidate()
     }
 
-    fun onEnterInput() {
+    override fun onEnterInput() {
         if (!isInputMode) return
         isInputMode = false
         searchQuery = inputBuffer.toString()
@@ -909,13 +909,20 @@ class UserDictionaryPanelView(context: Context) : View(context) {
         invalidate()
     }
 
-    fun exitInputMode() {
+    override fun enterInputMode() {
+        isInputMode = true
+        inputBuffer.clear()
+        composingHint = ""
+        invalidate()
+    }
+
+    override fun exitInputMode() {
         isInputMode = false
         composingHint = ""
         invalidate()
     }
 
-    fun onComposedTextInput(text: String) {
+    override fun onComposedTextInput(text: String) {
         if (!isInputMode) return
         inputBuffer.append(text)
         composingHint = ""
@@ -924,7 +931,7 @@ class UserDictionaryPanelView(context: Context) : View(context) {
         invalidate()
     }
 
-    fun updateComposingHint(hint: String) {
+    override fun updateComposingHint(hint: String) {
         composingHint = hint
         invalidate()
     }

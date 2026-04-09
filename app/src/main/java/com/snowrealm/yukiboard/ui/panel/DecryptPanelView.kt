@@ -21,7 +21,7 @@ import com.snowrealm.yukiboard.yuki.SecretMessageManager
  * 3. 點「解密」/「加密」→ 顯示結果
  * 4. 點「複製結果」→ 複製到剪貼簿
  */
-class DecryptPanelView(context: Context) : View(context) {
+class DecryptPanelView(context: Context) : View(context), PanelInputTarget {
 
     private val density = resources.displayMetrics.density
     private val secretManager = SecretMessageManager()
@@ -381,7 +381,7 @@ class DecryptPanelView(context: Context) : View(context) {
     // 鍵盤輸入 API（canvas inputMode）
     // =========================================================================
 
-    val isInInputMode: Boolean get() = isInputMode
+    override val isInInputMode: Boolean get() = isInputMode
 
     private fun commitFieldValue() {
         when (activeField) {
@@ -390,28 +390,28 @@ class DecryptPanelView(context: Context) : View(context) {
         }
     }
 
-    fun onCharInput(text: String) {
+    override fun onCharInput(text: String) {
         if (!isInputMode) return
         inputBuffer.append(text)
         commitFieldValue()
         invalidate()
     }
 
-    fun onDeleteInput() {
+    override fun onDeleteInput() {
         if (!isInputMode || inputBuffer.isEmpty()) return
         inputBuffer.deleteCharAt(inputBuffer.lastIndex)
         commitFieldValue()
         invalidate()
     }
 
-    fun onSpaceInput() {
+    override fun onSpaceInput() {
         if (!isInputMode) return
         inputBuffer.append(' ')
         commitFieldValue()
         invalidate()
     }
 
-    fun onEnterInput() {
+    override fun onEnterInput() {
         if (!isInputMode) return
         commitFieldValue()
         isInputMode = false
@@ -419,14 +419,23 @@ class DecryptPanelView(context: Context) : View(context) {
         invalidate()
     }
 
-    fun exitInputMode() {
+    override fun enterInputMode() {
+        isInputMode = true
+        activeField = "password"
+        inputBuffer.clear()
+        if (password.isNotEmpty()) inputBuffer.append(password)
+        composingHint = ""
+        invalidate()
+    }
+
+    override fun exitInputMode() {
         if (isInputMode) commitFieldValue()
         isInputMode = false
         composingHint = ""
         invalidate()
     }
 
-    fun onComposedTextInput(text: String) {
+    override fun onComposedTextInput(text: String) {
         if (!isInputMode) return
         inputBuffer.append(text)
         composingHint = ""
@@ -434,7 +443,7 @@ class DecryptPanelView(context: Context) : View(context) {
         invalidate()
     }
 
-    fun updateComposingHint(hint: String) {
+    override fun updateComposingHint(hint: String) {
         composingHint = hint
         invalidate()
     }

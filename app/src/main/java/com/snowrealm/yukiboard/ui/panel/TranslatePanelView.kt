@@ -19,7 +19,7 @@ import com.snowrealm.yukiboard.theme.KeyboardTheme
  * 翻譯引擎由外部注入（TranslationProvider 介面），
  * 可接 MLKit、Google Translate API、或離線模型。
  */
-class TranslatePanelView(context: Context) : View(context) {
+class TranslatePanelView(context: Context) : View(context), PanelInputTarget {
 
     private val density = context.resources.displayMetrics.density
     private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -460,31 +460,31 @@ class TranslatePanelView(context: Context) : View(context) {
     // ─────────────── 手動輸入 API ���──────────────
 
     /** 是否處於翻譯輸入模式 */
-    val isInInputMode: Boolean get() = isInputMode
+    override val isInInputMode: Boolean get() = isInputMode
 
     /** 接收鍵盤字元輸入 */
-    fun onCharInput(text: String) {
+    override fun onCharInput(text: String) {
         if (!isInputMode) return
         inputBuffer.append(text)
         invalidate()
     }
 
     /** 接收退格 */
-    fun onDeleteInput() {
+    override fun onDeleteInput() {
         if (!isInputMode || inputBuffer.isEmpty()) return
         inputBuffer.deleteCharAt(inputBuffer.lastIndex)
         invalidate()
     }
 
     /** 接收空白鍵 — 加空格 */
-    fun onSpaceInput() {
+    override fun onSpaceInput() {
         if (!isInputMode) return
         inputBuffer.append(' ')
         invalidate()
     }
 
     /** 接收 Enter — 觸發翻譯 */
-    fun onEnterInput() {
+    override fun onEnterInput() {
         if (!isInputMode) return
         if (inputBuffer.isNotEmpty()) {
             sourceText = inputBuffer.toString()
@@ -493,7 +493,7 @@ class TranslatePanelView(context: Context) : View(context) {
     }
 
     /** 接收 CJK 組字完成的文字（注音選字後） */
-    fun onComposedTextInput(text: String) {
+    override fun onComposedTextInput(text: String) {
         if (!isInputMode) return
         inputBuffer.append(text)
         composingHint = ""
@@ -501,13 +501,13 @@ class TranslatePanelView(context: Context) : View(context) {
     }
 
     /** 更新 CJK 組字提示（注音輸入中） */
-    fun updateComposingHint(hint: String) {
+    override fun updateComposingHint(hint: String) {
         composingHint = hint
         invalidate()
     }
 
     /** 進入輸入模式（由 Service 在面板開啟時呼叫，使用者可直接打字） */
-    fun enterInputMode() {
+    override fun enterInputMode() {
         if (!isInputMode) {
             isInputMode = true
             inputBuffer.clear()
@@ -519,7 +519,7 @@ class TranslatePanelView(context: Context) : View(context) {
     }
 
     /** 退出輸入模式 */
-    fun exitInputMode() {
+    override fun exitInputMode() {
         isInputMode = false
         composingHint = ""
         onRequestInputMode?.invoke(false)

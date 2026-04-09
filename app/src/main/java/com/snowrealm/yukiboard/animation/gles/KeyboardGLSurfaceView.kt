@@ -45,7 +45,11 @@ class KeyboardGLSurfaceView @JvmOverloads constructor(
 
     /** 動態調整流光整體透明度（0.0 = 關閉，1.0 = 全亮） */
     fun setFlowAlpha(alpha: Float) {
+        val wasZero = renderer.alpha <= 0.01f
         renderer.alpha = alpha.coerceIn(0f, 1f)
+        if (wasZero && alpha > 0.01f) {
+            synchronized(this) { (this as Object).notifyAll() }
+        }
     }
 
     /** 動態調整流光顏色（ARGB Int） */
@@ -94,28 +98,35 @@ class KeyboardGLSurfaceView @JvmOverloads constructor(
 
         renderThread = Thread({
             initEGL()
-            renderer.onSurfaceCreated(null, null)
-            renderer.onSurfaceChanged(null, surfaceWidth, surfaceHeight)
+            try {
+                renderer.onSurfaceCreated(null, null)
+                renderer.onSurfaceChanged(null, surfaceWidth, surfaceHeight)
 
-            while (running) {
-                // alpha 為 0（功能關閉）時降低到 2fps 節能
-                if (renderer.alpha <= 0.01f) {
-                    try { Thread.sleep(500) } catch (_: InterruptedException) { break }
-                    continue
+                loop@ while (running) {
+                    // alpha 為 0（功能關閉）時完全暫停渲染，等待外部喚醒
+                    if (renderer.alpha <= 0.01f) {
+                        var interrupted = false
+                        synchronized(this@KeyboardGLSurfaceView) {
+                            try { (this@KeyboardGLSurfaceView as Object).wait(2000) }
+                            catch (_: InterruptedException) { interrupted = true }
+                        }
+                        if (interrupted) break
+                        continue
+                    }
+
+                    val w = surfaceWidth
+                    val h = surfaceHeight
+                    GLES20.glViewport(0, 0, w, h)
+                    renderer.onSurfaceChanged(null, w, h)
+                    renderer.onDrawFrame(null)
+
+                    if (!EGL14.eglSwapBuffers(eglDisplay, eglSurface)) break
+
+                    try { Thread.sleep(16) } catch (_: InterruptedException) { break }
                 }
-
-                val w = surfaceWidth
-                val h = surfaceHeight
-                GLES20.glViewport(0, 0, w, h)
-                renderer.onSurfaceChanged(null, w, h)
-                renderer.onDrawFrame(null)
-
-                if (!EGL14.eglSwapBuffers(eglDisplay, eglSurface)) break
-
-                try { Thread.sleep(16) } catch (_: InterruptedException) { break }
+            } finally {
+                releaseEGL()
             }
-
-            releaseEGL()
         }, "FlowLightGL").also { it.start() }
     }
 

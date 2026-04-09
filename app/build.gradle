@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 100
-        versionName "0.9.34"
+        versionCode 101
+        versionName "0.9.35"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,12 +82,12 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 全專案 !! 強制解包崩潰修復（11處）\n" +
-                    "- fix: ZCoinManager topUp/syncBalance 加 @Synchronized 防競態\n" +
-                    "- fix: KeyboardView/IMEService onDetach/onDestroy 補清理\n" +
-                    "- fix: VoiceOverlay/CharacterView/IMEService 具名 Runnable 防洩漏\n" +
-                    "- fix: OAuthCallback coroutine 加 try-catch\n" +
-                    "- fix: SettingsActivity 匿名 CoroutineScope 改 activityScope"
+                    "- fix: 面板 inputMode 全路徑攔截（翻譯/GIF/解密/詞庫）\n" +
+                    "- fix: PanelInputTarget 統一介面 + 相簿選擇器改 ACTION_GET_CONTENT\n" +
+                    "- opt: 影片背景 pause/resume + 角色動畫暫停/恢復\n" +
+                    "- opt: GL 流光 wait/notify 省電 + 貼圖延遲同步\n" +
+                    "- opt: KeyboardView 候選字區域局部重繪\n" +
+                    "- opt: VRM idle 降至 15fps + 影片解析度/時長提示"
             }
         }
         debug {
@@ -96,12 +96,12 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 全專案 !! 強制解包崩潰修復（11處）\n" +
-                    "- fix: ZCoinManager topUp/syncBalance 加 @Synchronized 防競態\n" +
-                    "- fix: KeyboardView/IMEService onDetach/onDestroy 補清理\n" +
-                    "- fix: VoiceOverlay/CharacterView/IMEService 具名 Runnable 防洩漏\n" +
-                    "- fix: OAuthCallback coroutine 加 try-catch\n" +
-                    "- fix: SettingsActivity 匿名 CoroutineScope 改 activityScope"
+                    "- fix: 面板 inputMode 全路徑攔截（翻譯/GIF/解密/詞庫）\n" +
+                    "- fix: PanelInputTarget 統一介面 + 相簿選擇器改 ACTION_GET_CONTENT\n" +
+                    "- opt: 影片背景 pause/resume + 角色動畫暫停/恢復\n" +
+                    "- opt: GL 流光 wait/notify 省電 + 貼圖延遲同步\n" +
+                    "- opt: KeyboardView 候選字區域局部重繪\n" +
+                    "- opt: VRM idle 降至 15fps + 影片解析度/時長提示"
             }
         }
     }

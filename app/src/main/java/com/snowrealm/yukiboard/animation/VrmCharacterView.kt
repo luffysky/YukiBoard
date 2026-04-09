@@ -129,7 +129,6 @@ class VrmCharacterView @JvmOverloads constructor(
     private val frameCallback = object : Choreographer.FrameCallback {
         override fun doFrame(frameTimeNanos: Long) {
             if (isDestroyed) return
-            choreographer?.postFrameCallback(this)
 
             val dt = if (lastFrameTimeNanos == 0L) 1f / 60f
                      else (frameTimeNanos - lastFrameTimeNanos) / 1_000_000_000f
@@ -137,7 +136,22 @@ class VrmCharacterView @JvmOverloads constructor(
 
             update(dt)
             render()
+
+            // 有動畫時維持 60fps；無動畫時降到 ~15fps 節省電量
+            if (hasActiveAnimation()) {
+                choreographer?.postFrameCallback(this)
+            } else {
+                postDelayed({ choreographer?.postFrameCallback(this) }, 64)
+            }
         }
+    }
+
+    private fun hasActiveAnimation(): Boolean {
+        return isAnimating ||
+            isBlinking ||
+            proceduralAction != null ||
+            targetExpressionWeights.any { it.value > 0.01f } ||
+            currentExpressionWeights.any { it.value > 0.01f }
     }
 
     init {
@@ -643,11 +657,11 @@ class VrmCharacterView @JvmOverloads constructor(
         needsRender = true
     }
 
-    private fun startRendering() {
+    internal fun startRendering() {
         choreographer?.postFrameCallback(frameCallback)
     }
 
-    private fun stopRendering() {
+    internal fun stopRendering() {
         choreographer?.removeFrameCallback(frameCallback)
     }
 

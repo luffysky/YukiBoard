@@ -2,6 +2,7 @@ package com.snowrealm.yukiboard.ui.settings
 
 import android.app.Activity
 import android.content.Intent
+import android.media.MediaMetadataRetriever
 import android.os.Bundle
 import android.widget.Toast
 import com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView
@@ -26,16 +27,44 @@ class BackgroundPickerActivity : Activity() {
         val type = intent.getStringExtra(EXTRA_PICK_TYPE) ?: "image"
         val mimeType = if (type == "video") "video/*" else "image/*"
 
-        val pickIntent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+        // 改用 ACTION_GET_CONTENT，讓相簿 App 可以出現
+        val getContentIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
+            this.type = mimeType
             addCategory(Intent.CATEGORY_OPENABLE)
+            putExtra(Intent.EXTRA_LOCAL_ONLY, true)
+        }
+
+        // 同時提供 ACTION_PICK 作為替代（部分手機需要）
+        val pickIntent = Intent(Intent.ACTION_PICK).apply {
             this.type = mimeType
         }
+
+        // 用 Chooser 讓使用者選擇相簿或檔案管理器
+        val chooser = Intent.createChooser(
+            getContentIntent,
+            if (type == "video") "選擇影片背景" else "選擇圖片背景"
+        ).apply {
+            putExtra(Intent.EXTRA_INITIAL_INTENTS, arrayOf(pickIntent))
+        }
+
         try {
             @Suppress("DEPRECATION")
-            startActivityForResult(pickIntent, RC_PICK)
+            startActivityForResult(chooser, RC_PICK)
         } catch (_: Exception) {
-            Toast.makeText(this, "無法開啟檔案選擇器", Toast.LENGTH_SHORT).show()
-            finish()
+            // fallback：直接用檔案管理器
+            try {
+                @Suppress("DEPRECATION")
+                startActivityForResult(
+                    Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        this.type = mimeType
+                    },
+                    RC_PICK
+                )
+            } catch (_: Exception) {
+                Toast.makeText(this, "無法開啟選擇器", Toast.LENGTH_SHORT).show()
+                finish()
+            }
         }
     }
 
@@ -85,11 +114,43 @@ class BackgroundPickerActivity : Activity() {
             intent.setPackage(packageName)
             sendBroadcast(intent)
 
-            Toast.makeText(this, "背景已設定", Toast.LENGTH_SHORT).show()
+            if (pickType == "video") {
+                validateVideoFile(dest)
+            } else {
+                Toast.makeText(this, "背景已設定", Toast.LENGTH_SHORT).show()
+            }
         } catch (e: Exception) {
             Toast.makeText(this, "背景設定失敗: ${e.message}", Toast.LENGTH_SHORT).show()
         }
 
         finish()
+    }
+
+    private fun validateVideoFile(file: java.io.File) {
+        val retriever = MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(file.absolutePath)
+            val w = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
+            val h = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
+            val durationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0
+
+            val warnings = mutableListOf<String>()
+            if (w > 1280 || h > 720) {
+                warnings.add("解析度較高（${w}x${h}），建議 720p 以下")
+            }
+            if (durationMs > 60_000) {
+                warnings.add("影片超過 60 秒，建議使用較短的循環片段")
+            }
+
+            if (warnings.isNotEmpty()) {
+                Toast.makeText(this, "影片背景已設定\n⚠ ${warnings.joinToString("\n⚠ ")}", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(this, "影片背景已設定", Toast.LENGTH_SHORT).show()
+            }
+        } catch (_: Exception) {
+            Toast.makeText(this, "影片背景已設定", Toast.LENGTH_SHORT).show()
+        } finally {
+            retriever.release()
+        }
     }
 }

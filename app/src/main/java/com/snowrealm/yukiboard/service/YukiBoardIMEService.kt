@@ -156,6 +156,8 @@ class YukiBoardIMEService : InputMethodService() {
     private var floatingWrapper: FloatingKeyboardWrapper? = null
     private var isFloatingMode = false
 
+    private var stickerSyncDone = false
+
     // 遊戲相關
     private val showGameMenuRunnable = Runnable { showGameMenu() }
     private var gameMenuView: GameMenuView? = null
@@ -226,7 +228,7 @@ class YukiBoardIMEService : InputMethodService() {
 
         // 貼圖同步 + 下載管理
         stickerRepository = com.snowrealm.yukiboard.sticker.StickerRepository(applicationContext)
-        stickerRepository?.syncInBackground()
+        // syncInBackground() 延遲到第一次開貼圖面板再呼叫
         stickerDownloadManager = com.snowrealm.yukiboard.sticker.StickerPackDownloadManager(applicationContext)
 
         // Claw AI（自動從 BuildConfig 匯入 API key）
@@ -713,6 +715,10 @@ class YukiBoardIMEService : InputMethodService() {
         if (prefs.gyroscopeCursorEnabled) gyroController.register()
 
         glSurfaceView?.onResume()
+        backgroundView?.resume()
+        if (prefs.characterAnimEnabled) {
+            characterView?.resumeAnimation()
+        }
 
         // 同步角色動畫顯示偏好（設定頁可能已更改）
         characterView?.visibility = if (prefs.characterAnimEnabled) View.VISIBLE else View.GONE
@@ -894,6 +900,8 @@ class YukiBoardIMEService : InputMethodService() {
         manualModeOverride = false
 
         glSurfaceView?.onPause()
+        backgroundView?.pause()
+        characterView?.pauseAnimation()
 
         // ��習累積句子
         val sentence = sentenceBuffer.toString().trim()
@@ -1185,6 +1193,10 @@ class YukiBoardIMEService : InputMethodService() {
                 p.theme = theme
                 p.repository = stickerRepository
                 p.downloadManager = stickerDownloadManager
+                if (!stickerSyncDone) {
+                    stickerRepository?.syncInBackground()
+                    stickerSyncDone = true
+                }
                 p.onStickerSelected = { stickerText ->
                     if (stickerText.startsWith("[STICKER]:")) {
                         val url = stickerText.removePrefix("[STICKER]:")
@@ -1381,6 +1393,7 @@ class YukiBoardIMEService : InputMethodService() {
                         android.widget.Toast.makeText(this, "匯入失敗: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
                     }
                 }
+                p.enterInputMode()
                 p
             }
             PanelType.DECRYPT -> {
@@ -1389,6 +1402,7 @@ class YukiBoardIMEService : InputMethodService() {
                 p.onEncryptedResult = { encrypted ->
                     currentInputConnection?.commitText(encrypted, 1)
                 }
+                p.enterInputMode()
                 p
             }
             else -> return

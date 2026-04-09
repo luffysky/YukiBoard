@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
  * 使用 GifImageCache 非同步載入預覽 Bitmap，
  * 載入完成後自動 invalidate 更新畫面。
  */
-class GifPanelView(context: Context) : View(context) {
+class GifPanelView(context: Context) : View(context), PanelInputTarget {
 
     private val density = context.resources.displayMetrics.density
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -428,27 +428,27 @@ class GifPanelView(context: Context) : View(context) {
 
     // ─────��───────── 鍵盤輸入 API ───────────────
 
-    val isInInputMode: Boolean get() = isInputMode
+    override val isInInputMode: Boolean get() = isInputMode
 
-    fun onCharInput(text: String) {
+    override fun onCharInput(text: String) {
         if (!isInputMode) return
         inputBuffer.append(text)
         invalidate()
     }
 
-    fun onDeleteInput() {
+    override fun onDeleteInput() {
         if (!isInputMode || inputBuffer.isEmpty()) return
         inputBuffer.deleteCharAt(inputBuffer.lastIndex)
         invalidate()
     }
 
-    fun onSpaceInput() {
+    override fun onSpaceInput() {
         if (!isInputMode) return
         inputBuffer.append(' ')
         invalidate()
     }
 
-    fun onEnterInput() {
+    override fun onEnterInput() {
         if (!isInputMode) return
         if (inputBuffer.isNotEmpty()) {
             isInputMode = false
@@ -457,7 +457,7 @@ class GifPanelView(context: Context) : View(context) {
     }
 
     /** 進入輸入模式（由 Service 在面板開啟時呼叫） */
-    fun enterInputMode() {
+    override fun enterInputMode() {
         if (!isInputMode) {
             isInputMode = true
             inputBuffer.clear()
@@ -466,13 +466,13 @@ class GifPanelView(context: Context) : View(context) {
         }
     }
 
-    fun exitInputMode() {
+    override fun exitInputMode() {
         isInputMode = false
         invalidate()
     }
 
     /** 接收來自 InputRouter 的組字提交文字（中文等 CJK 輸入） */
-    fun onComposedTextInput(text: String) {
+    override fun onComposedTextInput(text: String) {
         if (!isInputMode) return
         inputBuffer.append(text)
         composingHint = ""
@@ -480,7 +480,7 @@ class GifPanelView(context: Context) : View(context) {
     }
 
     /** 更新 CJK 組字中的提示文字（尚未提交） */
-    fun updateComposingHint(hint: String) {
+    override fun updateComposingHint(hint: String) {
         composingHint = hint
         invalidate()
     }

@@ -611,7 +611,7 @@ class KeyboardView(context: Context) : View(context) {
     fun updateComposingText(text: String) {
         if (composingText == text) return
         composingText = text
-        invalidate()
+        invalidateCandidateBar()
     }
 
     fun updateCandidates(list: List<String>, sourceMap: Map<String, CandidateSource> = emptyMap()) {
@@ -627,7 +627,13 @@ class KeyboardView(context: Context) : View(context) {
             isCandidateExpanded = false
             expandScrollOffset = 0f
         }
-        invalidate()
+        invalidateCandidateBar()
+    }
+
+    /** 只重繪候選字列區域，避免整個鍵盤 invalidate */
+    private fun invalidateCandidateBar() {
+        @Suppress("DEPRECATION")
+        invalidate(0, 0, width, candidateBarHeight.toInt())
     }
 
     /** 標記當前候選字為滑動輸入結果（淡紫色 + ≈ 前綴） */
