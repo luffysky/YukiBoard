@@ -1975,6 +1975,7 @@ class YukiBoardIMEService : InputMethodService() {
             toolbarView.setTransparent(true)
         } else {
             w.setBackgroundDrawable(null) // 還原系統預設
+            rootContainer.setBackgroundColor(0xFF111827.toInt()) // 明確還原背景
             toolbarView.setTransparent(false)
         }
     }

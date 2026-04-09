@@ -101,11 +101,10 @@ class ToolbarView(context: Context) : View(context) {
     }
 
     override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
+        // 不呼叫 super.onDraw — 硬體加速 + clipChildren=false 下會穿透
 
         // 背景
         if (isTransparent) {
-            // 注意：不可使用 PorterDuff.Mode.CLEAR，硬體加速下會穿透整個 View
             bgPaint.color = 0x88000000.toInt()  // 半透明黑底，確保圖示可見
         } else {
             bgPaint.color = theme.effectiveToolbarColor()
