@@ -3043,7 +3043,7 @@ class YukiBoardIMEService : InputMethodService() {
                 }
 
                 ic.beginBatchEdit()
-                ic.finishComposingText()
+                ic.setComposingText("", 1)  // 清空 composing 但不 commit，避免重複輸出
                 ic.commitText(result.text, 1)
                 ic.endBatchEdit()
                 characterView?.playHappy()

@@ -22,6 +22,11 @@ class ToolbarView(context: Context) : View(context) {
     private val density = context.resources.displayMetrics.density
     private val barHeight = (40 * density).toInt()
 
+    init {
+        // 告訴 Android 這個 View 需要 onDraw（沒有 background drawable 時預設不繪製）
+        setWillNotDraw(false)
+    }
+
     // 繪製元素
     private val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
