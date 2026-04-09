@@ -23,8 +23,8 @@ class ToolbarView(context: Context) : View(context) {
     private val barHeight = (40 * density).toInt()
 
     init {
-        // 告訴 Android 這個 View 需要 onDraw（沒有 background drawable 時預設不繪製）
         setWillNotDraw(false)
+        updateBackground()
     }
 
     // 繪製元素
@@ -78,7 +78,7 @@ class ToolbarView(context: Context) : View(context) {
     private var activeAnimProgress = mutableMapOf<PanelType, Float>() // 0→1 展開
 
     var theme: KeyboardTheme = KeyboardTheme.default()
-        set(value) { field = value; invalidate() }
+        set(value) { field = value; updateBackground(); invalidate() }
 
     var activePanel: PanelType? = null
         set(value) {
@@ -95,7 +95,16 @@ class ToolbarView(context: Context) : View(context) {
     private var isTransparent = false
     fun setTransparent(transparent: Boolean) {
         isTransparent = transparent
+        updateBackground()
         invalidate()
+    }
+
+    private fun updateBackground() {
+        if (isTransparent) {
+            setBackgroundColor(0x88000000.toInt())
+        } else {
+            setBackgroundColor(theme.effectiveToolbarColor())
+        }
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -106,15 +115,7 @@ class ToolbarView(context: Context) : View(context) {
     }
 
     override fun onDraw(canvas: Canvas) {
-        // 不呼叫 super.onDraw — 硬體加速 + clipChildren=false 下會穿透
-
-        // 背景
-        if (isTransparent) {
-            bgPaint.color = 0x88000000.toInt()  // 半透明黑底，確保圖示可見
-        } else {
-            bgPaint.color = theme.effectiveToolbarColor()
-        }
-        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
+        // 背景由 setBackgroundColor 處理，這裡只畫 icon 和按鈕
 
         // 計算按鈕佈局（含捲動偏移）
         btnRects.clear()
