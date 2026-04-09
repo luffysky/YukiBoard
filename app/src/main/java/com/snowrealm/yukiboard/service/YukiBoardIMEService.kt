@@ -1872,15 +1872,12 @@ class YukiBoardIMEService : InputMethodService() {
         val isLandscape = resources.configuration.orientation ==
                 android.content.res.Configuration.ORIENTATION_LANDSCAPE
         val screenH = resources.displayMetrics.heightPixels
-        // 扣除 toolbar(40dp) + resizeHandle(12dp) + bottomSpacer(8dp) 的固定開銷
-        val density = resources.displayMetrics.density
-        val overhead = (40 + 12 + 8) * density
         return if (isLandscape) {
             // 橫向：螢幕高度較小，使用較高比例（至少 0.55，最多 0.75）
             val landscapeRatio = (prefs.keyboardHeightRatio * 1.6f).coerceIn(0.55f, 0.75f)
-            ((screenH * landscapeRatio) - overhead).toInt().coerceAtLeast((100 * density).toInt())
+            (screenH * landscapeRatio).toInt()
         } else {
-            ((screenH * prefs.keyboardHeightRatio) - overhead).toInt().coerceAtLeast((100 * density).toInt())
+            (screenH * prefs.keyboardHeightRatio).toInt()
         }
     }
 
