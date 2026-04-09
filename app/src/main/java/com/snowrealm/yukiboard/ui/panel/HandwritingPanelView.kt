@@ -11,16 +11,22 @@ import com.snowrealm.yukiboard.input.handwriting.StrokeCollector
 import com.snowrealm.yukiboard.theme.KeyboardTheme
 
 /**
- * 手寫辨識面板 — Canvas 手寫 + 候選列 + 語言切換。
+ * 手寫辨識面板 — Canvas 手寫 + 候選列 + 語言切換 + 模型管理。
+ *
+ * PR1: 基礎手寫辨識
+ * PR2: 撤銷筆畫 + 連續手寫 + 壓感粗細
+ * PR3: 語言模型管理（下載/刪除）
  *
  * 佈局（由上至下）：
- * ┌────────────────────────────────────────────┐
- * │ [中] [英] [日] [混合]     [清除] [⌫] [↩]  │  ← 控制列
- * ├────────────────────────────────────────────┤
- * │ 候選: [你] [休] [体] [妳] [您]             │  ← 候選列
- * ├────────────────────────────────────────────┤
- * │         ✍ 手寫區域 (Canvas)                │
- * └────────────────────────────────────────────┘
+ * ┌──────────────────────────────────────────────────┐
+ * │ [中] [英] [日] [混合]  [⚙] [↶] [清除] [⌫] [↩] │ ← 控制列
+ * ├──────────────────────────────────────────────────┤
+ * │ 候選: [你] [休] [体] [妳] [您]                   │ ← 候選列
+ * ├──────────────────────────────────────────────────┤
+ * │         ✍ 手寫區域 (Canvas)                      │
+ * ├──────────────────────────────────────────────────┤
+ * │  模型管理（展開時）：[繁中 ✓] [英文 ✓] [日文 ↓]  │
+ * └──────────────────────────────────────────────────┘
  */
 class HandwritingPanelView(
     context: Context,
@@ -46,6 +52,7 @@ class HandwritingPanelView(
     private val controlBarRect = RectF()
     private val candidateBarRect = RectF()
     private val writingAreaRect = RectF()
+    private val modelBarRect = RectF()
 
     // 控制列按鈕
     private data class BtnInfo(val rect: RectF = RectF(), val label: String, val tag: String)
@@ -59,11 +66,25 @@ class HandwritingPanelView(
     // ── 筆跡 ──
     private var strokeCollector = StrokeCollector()
     private val drawPaths = mutableListOf<Path>()
+    private val drawWidths = mutableListOf<Float>()   // 每筆的平均粗細
     private var currentPath: Path? = null
+    private var currentPressureSum = 0f
+    private var currentPressureCount = 0
 
     // ── 自動辨識計時 ──
-    private val autoRecognizeDelay = 1200L  // 1.2s 無筆畫後自動辨識
+    private val autoRecognizeDelay = 1200L
     private val autoRecognizeRunnable = Runnable { doRecognize() }
+
+    // ── 連續手寫：辨識後自動送出第一候選 + 清畫布 ──
+    private var continuousMode = true
+    private val autoCommitDelay = 2500L  // 辨識後 2.5s 無新筆畫自動送出
+    private val autoCommitRunnable = Runnable { autoCommitFirst() }
+
+    // ── 模型管理 ──
+    private var showModelManager = false
+    private var modelStatus = mapOf<String, Boolean>()  // tag → downloaded
+    private val modelBtnRects = mutableListOf<BtnInfo>()
+    private var downloadingTag: String? = null
 
     // ── 繪製 Paint ──
     private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -94,10 +115,16 @@ class HandwritingPanelView(
     // ── 按壓狀態 ──
     private var pressedBtn: String? = null
 
+    // ── 壓感設定 ──
+    private val minStrokeWidth = 2.5f * density
+    private val maxStrokeWidth = 7f * density
+    private val defaultStrokeWidth = 4f * density
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec).let { if (it > 0) it else resources.displayMetrics.widthPixels }
-        val h = (260 * density).toInt()
-        setMeasuredDimension(w, h)
+        val baseH = 260 * density
+        val modelH = if (showModelManager) 44 * density else 0f
+        setMeasuredDimension(w, (baseH + modelH).toInt())
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -109,59 +136,84 @@ class HandwritingPanelView(
         val pad = 6 * density
         val controlH = 38 * density
         val candidateH = 36 * density
+        val modelH = if (showModelManager) 44 * density else 0f
 
-        // 控制列
         controlBarRect.set(0f, 0f, w, controlH)
-
-        // 候選列
         candidateBarRect.set(0f, controlH, w, controlH + candidateH)
 
-        // 手寫區域
-        writingAreaRect.set(pad, controlH + candidateH + pad, w - pad, h - pad)
+        val writingTop = controlH + candidateH + pad
+        val writingBottom = h - pad - modelH
+        writingAreaRect.set(pad, writingTop, w - pad, writingBottom)
+
+        // 模型管理列
+        if (showModelManager) {
+            modelBarRect.set(0f, h - modelH, w, h)
+            layoutModelButtons(w, modelBarRect)
+        }
 
         // 語言按鈕（左側）
         langButtons.clear()
-        val btnW = 44 * density
-        val btnH = 30 * density
+        val btnW = 40 * density
+        val btnH = 28 * density
         val btnY = (controlH - btnH) / 2f
         langOptions.forEachIndexed { i, lang ->
-            val x = pad + i * (btnW + 4 * density)
+            val x = pad + i * (btnW + 3 * density)
             langButtons.add(BtnInfo(RectF(x, btnY, x + btnW, btnY + btnH), lang.label, lang.tag))
         }
 
-        // 操作按鈕（右側）
-        val actions = listOf("清除" to "clear", "⌫" to "backspace", "↩" to "confirm")
+        // 操作按鈕（右側）：⚙ ↶ 清除 ⌫ ↩
+        val actions = listOf("⚙" to "model_mgr", "↶" to "undo", "清除" to "clear", "⌫" to "backspace", "↩" to "confirm")
         actionButtons.clear()
-        val aBtnW = 44 * density
+        val aBtnW = 38 * density
         actions.forEachIndexed { i, (label, tag) ->
-            val x = w - pad - (actions.size - i) * (aBtnW + 4 * density)
+            val x = w - pad - (actions.size - i) * (aBtnW + 3 * density)
             actionButtons.add(BtnInfo(RectF(x, btnY, x + aBtnW, btnY + btnH), label, tag))
+        }
+    }
+
+    private fun layoutModelButtons(w: Float, barRect: RectF) {
+        modelBtnRects.clear()
+        val pad = 8 * density
+        val btnH = 30 * density
+        val btnY = barRect.top + (barRect.height() - btnH) / 2f
+        var x = pad
+
+        HandwritingEngine.SUPPORTED_LANGUAGES.forEach { (tag, name) ->
+            val downloaded = modelStatus[tag] == true
+            val isDownloading = downloadingTag == tag
+            val label = when {
+                isDownloading -> "$name ⏳"
+                downloaded -> "$name ✓"
+                else -> "$name ↓"
+            }
+            val tw = textPaint.apply { textSize = 13 * density }.measureText(label)
+            val btnW = tw + 24 * density
+            modelBtnRects.add(BtnInfo(RectF(x, btnY, x + btnW, btnY + btnH), label, tag))
+            x += btnW + 6 * density
         }
     }
 
     override fun onDraw(canvas: Canvas) {
         val w = width.toFloat()
 
-        // ── 背景 ──
+        // 背景
         bgPaint.color = theme.backgroundColorInt
         canvas.drawRect(0f, 0f, w, height.toFloat(), bgPaint)
 
-        // ── 控制列 ──
         drawControlBar(canvas)
-
-        // ── 候選列 ──
         drawCandidateBar(canvas)
-
-        // ── 手寫區域 ──
         drawWritingArea(canvas)
+
+        if (showModelManager) {
+            drawModelBar(canvas)
+        }
     }
 
     private fun drawControlBar(canvas: Canvas) {
-        // 背景
         bgPaint.color = adjustAlpha(theme.keyColorInt, 180)
         canvas.drawRect(controlBarRect, bgPaint)
 
-        val textSize = 14 * density
+        val textSize = 13 * density
         textPaint.textSize = textSize
         val fm = textPaint.fontMetrics
 
@@ -178,50 +230,53 @@ class HandwritingPanelView(
             canvas.drawRoundRect(btn.rect, 6 * density, 6 * density, btnPaint)
 
             textPaint.color = if (isSelected || isPressed) 0xFFFFFFFF.toInt() else theme.keyLabelColorInt
-            val cx = btn.rect.centerX()
-            val cy = btn.rect.centerY() - (fm.top + fm.bottom) / 2f
-            canvas.drawText(btn.label, cx, cy, textPaint)
+            canvas.drawText(btn.label, btn.rect.centerX(),
+                btn.rect.centerY() - (fm.top + fm.bottom) / 2f, textPaint)
         }
 
         // 操作按鈕
         actionButtons.forEach { btn ->
             val isPressed = pressedBtn == btn.tag
+            val undoDisabled = btn.tag == "undo" && drawPaths.isEmpty()
+            val modelMgrActive = btn.tag == "model_mgr" && showModelManager
+
             btnPaint.color = when {
                 isPressed -> 0xFF3A7BD5.toInt()
                 btn.tag == "confirm" -> 0xFF4CAF50.toInt()
+                modelMgrActive -> 0xFF4A90E2.toInt()
+                undoDisabled -> adjustAlpha(theme.keyColorInt, 60)
                 else -> adjustAlpha(theme.keyColorInt, 120)
             }
             canvas.drawRoundRect(btn.rect, 6 * density, 6 * density, btnPaint)
 
-            textPaint.color = if (btn.tag == "confirm" || isPressed) 0xFFFFFFFF.toInt() else theme.keyLabelColorInt
-            val cx = btn.rect.centerX()
-            val cy = btn.rect.centerY() - (fm.top + fm.bottom) / 2f
-            canvas.drawText(btn.label, cx, cy, textPaint)
+            textPaint.color = when {
+                btn.tag == "confirm" || isPressed || modelMgrActive -> 0xFFFFFFFF.toInt()
+                undoDisabled -> adjustAlpha(theme.keyLabelColorInt, 60)
+                else -> theme.keyLabelColorInt
+            }
+            canvas.drawText(btn.label, btn.rect.centerX(),
+                btn.rect.centerY() - (fm.top + fm.bottom) / 2f, textPaint)
         }
     }
 
     private fun drawCandidateBar(canvas: Canvas) {
-        // 背景
         bgPaint.color = adjustAlpha(theme.backgroundColorInt, 220)
         canvas.drawRect(candidateBarRect, bgPaint)
 
-        // 底部分隔線
         gridPaint.color = adjustAlpha(theme.keyLabelColorInt, 40)
         canvas.drawLine(candidateBarRect.left, candidateBarRect.bottom,
             candidateBarRect.right, candidateBarRect.bottom, gridPaint)
 
         if (candidates.isEmpty()) {
-            // 提示文字
             textPaint.textSize = 13 * density
             textPaint.color = adjustAlpha(theme.keyLabelColorInt, 100)
-            val cx = candidateBarRect.centerX()
-            val cy = candidateBarRect.centerY() - (textPaint.fontMetrics.top + textPaint.fontMetrics.bottom) / 2f
-            canvas.drawText("在下方區域手寫...", cx, cy, textPaint)
+            val hint = if (continuousMode) "連續手寫模式 — 在下方書寫" else "在下方區域手寫..."
+            canvas.drawText(hint, candidateBarRect.centerX(),
+                candidateBarRect.centerY() - (textPaint.fontMetrics.top + textPaint.fontMetrics.bottom) / 2f, textPaint)
             candidateRects.clear()
             return
         }
 
-        // 候選字
         candidateRects.clear()
         textPaint.textSize = 16 * density
         textPaint.color = theme.keyLabelColorInt
@@ -229,27 +284,30 @@ class HandwritingPanelView(
         val pad = 12 * density
         var x = candidateBarRect.left + pad
 
-        candidates.forEach { text ->
+        candidates.forEachIndexed { i, text ->
             val tw = textPaint.measureText(text)
             val btnW = tw + 20 * density
             val rect = RectF(x, candidateBarRect.top + 3 * density, x + btnW, candidateBarRect.bottom - 3 * density)
             candidateRects.add(rect)
 
-            // 背景
-            btnPaint.color = adjustAlpha(theme.keyColorInt, 160)
+            // 第一個候選字高亮（連續模式下會自動送出）
+            btnPaint.color = if (i == 0 && continuousMode) {
+                adjustAlpha(0xFF4A90E2.toInt(), 180)
+            } else {
+                adjustAlpha(theme.keyColorInt, 160)
+            }
             canvas.drawRoundRect(rect, 4 * density, 4 * density, btnPaint)
 
-            // 文字
-            val cy = rect.centerY() - (fm.top + fm.bottom) / 2f
-            canvas.drawText(text, rect.centerX(), cy, textPaint)
+            textPaint.color = if (i == 0 && continuousMode) 0xFFFFFFFF.toInt() else theme.keyLabelColorInt
+            canvas.drawText(text, rect.centerX(),
+                rect.centerY() - (fm.top + fm.bottom) / 2f, textPaint)
 
             x += btnW + 6 * density
-            if (x > candidateBarRect.right - pad) return@forEach
+            if (x > candidateBarRect.right - pad) return@forEachIndexed
         }
     }
 
     private fun drawWritingArea(canvas: Canvas) {
-        // 手寫區域背景
         bgPaint.color = adjustAlpha(theme.keyColorInt, 60)
         canvas.drawRoundRect(writingAreaRect, 8 * density, 8 * density, bgPaint)
 
@@ -263,19 +321,69 @@ class HandwritingPanelView(
         canvas.drawLine(writingAreaRect.left + 8 * density, cy, writingAreaRect.right - 8 * density, cy, gridPaint)
         gridPaint.pathEffect = null
 
-        // 已完成筆畫
+        // 已完成筆畫（壓感粗細）
         strokePaint.color = theme.keyLabelColorInt
-        strokePaint.strokeWidth = 4 * density
-        drawPaths.forEach { canvas.drawPath(it, strokePaint) }
+        drawPaths.forEachIndexed { i, path ->
+            strokePaint.strokeWidth = if (i < drawWidths.size) drawWidths[i] else defaultStrokeWidth
+            canvas.drawPath(path, strokePaint)
+        }
 
         // 當前筆畫
-        currentPath?.let { canvas.drawPath(it, strokePaint) }
+        currentPath?.let {
+            strokePaint.strokeWidth = getCurrentStrokeWidth()
+            canvas.drawPath(it, strokePaint)
+        }
 
-        // 無筆畫時的提示
+        // 無筆畫提示
         if (drawPaths.isEmpty() && currentPath == null) {
             textPaint.textSize = 20 * density
             textPaint.color = adjustAlpha(theme.keyLabelColorInt, 50)
             canvas.drawText("✍", cx, cy + 8 * density, textPaint)
+        }
+
+        // 筆畫計數（右下角小字）
+        if (drawPaths.isNotEmpty()) {
+            textPaint.textSize = 10 * density
+            textPaint.color = adjustAlpha(theme.keyLabelColorInt, 60)
+            textPaint.textAlign = Paint.Align.RIGHT
+            canvas.drawText("${drawPaths.size} 筆",
+                writingAreaRect.right - 8 * density,
+                writingAreaRect.bottom - 6 * density, textPaint)
+            textPaint.textAlign = Paint.Align.CENTER
+        }
+    }
+
+    private fun drawModelBar(canvas: Canvas) {
+        bgPaint.color = adjustAlpha(theme.keyColorInt, 200)
+        canvas.drawRect(modelBarRect, bgPaint)
+
+        // 頂部分隔線
+        gridPaint.color = adjustAlpha(theme.keyLabelColorInt, 40)
+        canvas.drawLine(modelBarRect.left, modelBarRect.top,
+            modelBarRect.right, modelBarRect.top, gridPaint)
+
+        textPaint.textSize = 13 * density
+        val fm = textPaint.fontMetrics
+
+        modelBtnRects.forEach { btn ->
+            val isPressed = pressedBtn == "model_${btn.tag}"
+            val downloaded = modelStatus[btn.tag] == true
+            val isDownloading = downloadingTag == btn.tag
+
+            btnPaint.color = when {
+                isPressed -> 0xFF3A7BD5.toInt()
+                isDownloading -> 0xFFFFA726.toInt()
+                downloaded -> 0xFF4CAF50.toInt()
+                else -> adjustAlpha(theme.keyColorInt, 120)
+            }
+            canvas.drawRoundRect(btn.rect, 6 * density, 6 * density, btnPaint)
+
+            textPaint.color = when {
+                downloaded || isDownloading || isPressed -> 0xFFFFFFFF.toInt()
+                else -> theme.keyLabelColorInt
+            }
+            canvas.drawText(btn.label, btn.rect.centerX(),
+                btn.rect.centerY() - (fm.top + fm.bottom) / 2f, textPaint)
         }
     }
 
@@ -288,16 +396,21 @@ class HandwritingPanelView(
                 // 控制列按鈕
                 langButtons.forEach { btn ->
                     if (btn.rect.contains(x, y)) {
-                        pressedBtn = btn.tag
-                        invalidate()
-                        return true
+                        pressedBtn = btn.tag; invalidate(); return true
                     }
                 }
                 actionButtons.forEach { btn ->
                     if (btn.rect.contains(x, y)) {
-                        pressedBtn = btn.tag
-                        invalidate()
-                        return true
+                        pressedBtn = btn.tag; invalidate(); return true
+                    }
+                }
+
+                // 模型管理列
+                if (showModelManager) {
+                    modelBtnRects.forEach { btn ->
+                        if (btn.rect.contains(x, y)) {
+                            pressedBtn = "model_${btn.tag}"; invalidate(); return true
+                        }
                     }
                 }
 
@@ -305,7 +418,7 @@ class HandwritingPanelView(
                 candidateRects.forEachIndexed { i, rect ->
                     if (rect.contains(x, y) && i < candidates.size) {
                         onCandidateSelected?.invoke(candidates[i])
-                        clearWritingArea()
+                        clearForContinuous()
                         return true
                     }
                 }
@@ -313,49 +426,58 @@ class HandwritingPanelView(
                 // 手寫區域
                 if (writingAreaRect.contains(x, y)) {
                     handler.removeCallbacks(autoRecognizeRunnable)
+                    handler.removeCallbacks(autoCommitRunnable)
                     strokeCollector.startStroke(event)
                     currentPath = Path().apply { moveTo(x, y) }
+                    currentPressureSum = event.pressure
+                    currentPressureCount = 1
                     invalidate()
                     return true
                 }
             }
 
             MotionEvent.ACTION_MOVE -> {
-                if (currentPath != null && writingAreaRect.contains(x, y)) {
+                if (currentPath != null) {
+                    // 限制在手寫區域內
+                    val clampX = x.coerceIn(writingAreaRect.left, writingAreaRect.right)
+                    val clampY = y.coerceIn(writingAreaRect.top, writingAreaRect.bottom)
                     strokeCollector.addPoint(event)
-                    currentPath?.lineTo(x, y)
+                    currentPath?.lineTo(clampX, clampY)
+                    // 累計壓力值
+                    currentPressureSum += event.pressure
+                    currentPressureCount++
                     invalidate()
                     return true
                 }
             }
 
             MotionEvent.ACTION_UP -> {
-                // 按鈕處理
+                // 按鈕
                 if (pressedBtn != null) {
                     handleButtonUp(pressedBtn!!, x, y)
-                    pressedBtn = null
-                    invalidate()
-                    return true
+                    pressedBtn = null; invalidate(); return true
                 }
 
                 // 完成筆畫
                 if (currentPath != null) {
                     strokeCollector.finishStroke(event)
                     drawPaths.add(currentPath!!)
+                    drawWidths.add(getCurrentStrokeWidth())
                     currentPath = null
+                    currentPressureSum = 0f
+                    currentPressureCount = 0
                     invalidate()
 
-                    // 啟動自動辨識計時
+                    // 自動辨識計時
                     handler.removeCallbacks(autoRecognizeRunnable)
+                    handler.removeCallbacks(autoCommitRunnable)
                     handler.postDelayed(autoRecognizeRunnable, autoRecognizeDelay)
                     return true
                 }
             }
 
             MotionEvent.ACTION_CANCEL -> {
-                pressedBtn = null
-                currentPath = null
-                invalidate()
+                pressedBtn = null; currentPath = null; invalidate()
             }
         }
         return true
@@ -375,10 +497,11 @@ class HandwritingPanelView(
         actionButtons.forEach { btn ->
             if (btn.tag == tag && btn.rect.contains(x, y)) {
                 when (tag) {
+                    "model_mgr" -> toggleModelManager()
+                    "undo" -> undoLastStroke()
                     "clear" -> clearWritingArea()
                     "backspace" -> onBackspace?.invoke()
                     "confirm" -> {
-                        // 若有候選字，先送出第一個
                         if (candidates.isNotEmpty()) {
                             onCandidateSelected?.invoke(candidates[0])
                         }
@@ -389,12 +512,140 @@ class HandwritingPanelView(
                 return
             }
         }
+
+        // 模型管理按鈕
+        if (showModelManager && tag.startsWith("model_")) {
+            val langTag = tag.removePrefix("model_")
+            modelBtnRects.forEach { btn ->
+                if (btn.tag == langTag && btn.rect.contains(x, y)) {
+                    handleModelButton(langTag)
+                    return
+                }
+            }
+        }
     }
+
+    // ── PR2: 撤銷筆畫 ──
+
+    private fun undoLastStroke() {
+        if (drawPaths.isEmpty()) return
+
+        drawPaths.removeAt(drawPaths.lastIndex)
+        if (drawWidths.isNotEmpty()) drawWidths.removeAt(drawWidths.lastIndex)
+        strokeCollector.undoLastStroke()
+
+        // 有筆畫就重新辨識，沒有就清候選
+        handler.removeCallbacks(autoRecognizeRunnable)
+        handler.removeCallbacks(autoCommitRunnable)
+        if (drawPaths.isNotEmpty()) {
+            handler.postDelayed(autoRecognizeRunnable, 600L)
+        } else {
+            candidates = emptyList()
+            candidateRects.clear()
+        }
+        invalidate()
+    }
+
+    // ── PR2: 連續手寫 ──
+
+    /** 辨識結果回來後，若為連續模式，啟動自動送出計時 */
+    private fun onRecognitionResult(results: List<String>) {
+        candidates = results
+        invalidate()
+
+        if (continuousMode && results.isNotEmpty()) {
+            handler.removeCallbacks(autoCommitRunnable)
+            handler.postDelayed(autoCommitRunnable, autoCommitDelay)
+        }
+    }
+
+    private fun autoCommitFirst() {
+        if (candidates.isNotEmpty()) {
+            onCandidateSelected?.invoke(candidates[0])
+            clearForContinuous()
+        }
+    }
+
+    /** 連續模式清除：清畫布但不清引擎狀態 */
+    private fun clearForContinuous() {
+        handler.removeCallbacks(autoRecognizeRunnable)
+        handler.removeCallbacks(autoCommitRunnable)
+        drawPaths.clear()
+        drawWidths.clear()
+        currentPath = null
+        candidates = emptyList()
+        candidateRects.clear()
+        strokeCollector = strokeCollector.newCollector()
+        invalidate()
+    }
+
+    // ── PR2: 壓感 ──
+
+    private fun getCurrentStrokeWidth(): Float {
+        if (currentPressureCount == 0) return defaultStrokeWidth
+        val avgPressure = currentPressureSum / currentPressureCount
+        // pressure 0~1 → 對應 minWidth~maxWidth
+        return (minStrokeWidth + avgPressure * (maxStrokeWidth - minStrokeWidth))
+            .coerceIn(minStrokeWidth, maxStrokeWidth)
+    }
+
+    // ── PR3: 模型管理 ──
+
+    private fun toggleModelManager() {
+        showModelManager = !showModelManager
+        if (showModelManager) {
+            engine.checkAllModelStatus { status ->
+                handler.post {
+                    modelStatus = status
+                    requestLayout()
+                    invalidate()
+                }
+            }
+        } else {
+            requestLayout()
+            invalidate()
+        }
+    }
+
+    private fun handleModelButton(langTag: String) {
+        if (downloadingTag != null) return  // 一次只下載一個
+
+        val downloaded = modelStatus[langTag] == true
+        if (downloaded) {
+            // 已下載 → 刪除
+            engine.deleteModel(langTag) { success ->
+                handler.post {
+                    if (success) {
+                        modelStatus = modelStatus.toMutableMap().apply { put(langTag, false) }
+                    }
+                    layoutRegions(width.toFloat(), height.toFloat())
+                    invalidate()
+                }
+            }
+        } else {
+            // 未下載 → 下載
+            downloadingTag = langTag
+            layoutRegions(width.toFloat(), height.toFloat())
+            invalidate()
+
+            engine.downloadModel(langTag) { success ->
+                handler.post {
+                    downloadingTag = null
+                    if (success) {
+                        modelStatus = modelStatus.toMutableMap().apply { put(langTag, true) }
+                    }
+                    layoutRegions(width.toFloat(), height.toFloat())
+                    invalidate()
+                }
+            }
+        }
+    }
+
+    // ── 辨識 ──
 
     private fun applyLanguageSelection() {
         val option = langOptions[selectedLangIndex]
         if (option.tag == "mixed") {
-            // 混合模式：啟用繁中 + 英文
             engine.setLanguages(listOf("zh-Hani-TW", "en-US"))
         } else {
             engine.setLanguages(listOf(option.tag))
@@ -407,14 +658,10 @@ class HandwritingPanelView(
 
         val ink = strokeCollector.buildInk()
         engine.recognize(ink) { results ->
-            handler.post {
-                candidates = results
-                invalidate()
-            }
+            handler.post { onRecognitionResult(results) }
         }
     }
 
-    /** 手動觸發辨識 */
     fun triggerRecognize() {
         handler.removeCallbacks(autoRecognizeRunnable)
         doRecognize()
@@ -422,7 +669,9 @@ class HandwritingPanelView(
 
     private fun clearWritingArea() {
         handler.removeCallbacks(autoRecognizeRunnable)
+        handler.removeCallbacks(autoCommitRunnable)
         drawPaths.clear()
+        drawWidths.clear()
         currentPath = null
         candidates = emptyList()
         candidateRects.clear()
@@ -430,7 +679,6 @@ class HandwritingPanelView(
         invalidate()
     }
 
-    /** 確保預設模型已下載 */
     fun ensureReady(callback: (Boolean) -> Unit) {
         engine.ensureDefaultModel(callback)
     }
@@ -438,6 +686,7 @@ class HandwritingPanelView(
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         handler.removeCallbacks(autoRecognizeRunnable)
+        handler.removeCallbacks(autoCommitRunnable)
     }
 
     private fun adjustAlpha(color: Int, alpha: Int): Int {

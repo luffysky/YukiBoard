@@ -190,6 +190,46 @@ class HandwritingEngine(private val context: Context) {
 
     fun getDownloadedLanguages(): List<String> = downloadedModels.toList()
 
+    /** 刪除已下載的語言模型 */
+    fun deleteModel(languageTag: String, callback: (Boolean) -> Unit) {
+        val modelId = getModelIdentifier(languageTag) ?: run {
+            callback(false)
+            return
+        }
+        val model = DigitalInkRecognitionModel.builder(modelId).build()
+
+        // 先關閉 recognizer
+        recognizers.remove(languageTag)?.close()
+
+        modelManager.deleteDownloadedModel(model)
+            .addOnSuccessListener {
+                Log.d(TAG, "Model deleted: $languageTag")
+                downloadedModels.remove(languageTag)
+                callback(true)
+            }
+            .addOnFailureListener { e ->
+                Log.w(TAG, "Model delete failed: $languageTag", e)
+                callback(false)
+            }
+    }
+
+    /** 批次檢查所有支援語言的下載狀態，回傳 Map<languageTag, isDownloaded> */
+    fun checkAllModelStatus(callback: (Map<String, Boolean>) -> Unit) {
+        val result = mutableMapOf<String, Boolean>()
+        var remaining = SUPPORTED_LANGUAGES.size
+
+        SUPPORTED_LANGUAGES.forEach { (tag, _) ->
+            isModelDownloaded(tag) { downloaded ->
+                synchronized(result) {
+                    result[tag] = downloaded
+                    if (downloaded) downloadedModels.add(tag)
+                    remaining--
+                    if (remaining == 0) callback(result)
+                }
+            }
+        }
+    }
+
     private fun getOrCreateRecognizer(languageTag: String): DigitalInkRecognizer? {
         recognizers[languageTag]?.let { return it }
 

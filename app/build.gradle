@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 110
-        versionName "0.9.44"
+        versionCode 111
+        versionName "0.9.45"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,10 +82,10 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 選圖片/影片改用系統內建相簿（不再跳檔案瀏覽器）\n" +
-                    "- feat: 手寫辨識面板（ML Kit Digital Ink）\n" +
-                    "- feat: 支援繁中/英/日/混合四種手寫語言\n" +
-                    "- feat: 停筆 1.2s 自動辨識 + 候選字列"
+                    "- feat: 手寫撤銷筆畫（↶ undo）\n" +
+                    "- feat: 連續手寫模式 — 辨識後 2.5s 自動送出 + 清畫布\n" +
+                    "- feat: 壓感筆畫粗細（壓力感應 2.5~7dp）\n" +
+                    "- feat: 語言模型管理（⚙ 按鈕展開下載/刪除模型）"
             }
         }
         debug {
@@ -94,10 +94,10 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 選圖片/影片改用系統內建相簿（不再跳檔案瀏覽器）\n" +
-                    "- feat: 手寫辨識面板（ML Kit Digital Ink）\n" +
-                    "- feat: 支援繁中/英/日/混合四種手寫語言\n" +
-                    "- feat: 停筆 1.2s 自動辨識 + 候選字列"
+                    "- feat: 手寫撤銷筆畫（↶ undo）\n" +
+                    "- feat: 連續手寫模式 — 辨識後 2.5s 自動送出 + 清畫布\n" +
+                    "- feat: 壓感筆畫粗細（壓力感應 2.5~7dp）\n" +
+                    "- feat: 語言模型管理（⚙ 按鈕展開下載/刪除模型）"
             }
         }
     }

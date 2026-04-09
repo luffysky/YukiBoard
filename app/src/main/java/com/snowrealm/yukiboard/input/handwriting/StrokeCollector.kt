@@ -11,14 +11,17 @@ import com.google.mlkit.vision.digitalink.Ink
  * - ACTION_MOVE → addPoint()
  * - ACTION_UP   → finishStroke()
  * - 辨識完 → reset()
+ *
+ * 支援 undo：每筆 Stroke 獨立儲存，可回退最後一筆。
  */
 class StrokeCollector {
 
-    private val inkBuilder = Ink.builder()
+    // 保留所有已完成的 stroke，供 undo 及重建 Ink
+    private val completedStrokes = mutableListOf<Ink.Stroke>()
     private var strokeBuilder: Ink.Stroke.Builder? = null
-    private var _hasStrokes = false
 
-    val hasStrokes: Boolean get() = _hasStrokes
+    val hasStrokes: Boolean get() = completedStrokes.isNotEmpty()
+    val strokeCount: Int get() = completedStrokes.size
 
     fun startStroke(event: MotionEvent) {
         strokeBuilder = Ink.Stroke.builder().also {
@@ -30,27 +33,36 @@ class StrokeCollector {
         strokeBuilder?.addPoint(Ink.Point.create(event.x, event.y, event.eventTime))
     }
 
+    /** 加入點（含壓力值，用於計算筆畫粗細） */
+    fun addPoint(x: Float, y: Float, time: Long) {
+        strokeBuilder?.addPoint(Ink.Point.create(x, y, time))
+    }
+
     fun finishStroke(event: MotionEvent) {
         val builder = strokeBuilder ?: return
         builder.addPoint(Ink.Point.create(event.x, event.y, event.eventTime))
-        inkBuilder.addStroke(builder.build())
+        completedStrokes.add(builder.build())
         strokeBuilder = null
-        _hasStrokes = true
+    }
+
+    /** 撤銷最後一筆，回傳是否還有筆畫 */
+    fun undoLastStroke(): Boolean {
+        if (completedStrokes.isNotEmpty()) {
+            completedStrokes.removeAt(completedStrokes.lastIndex)
+        }
+        return completedStrokes.isNotEmpty()
     }
 
     fun buildInk(): Ink {
-        return inkBuilder.build()
+        val builder = Ink.builder()
+        completedStrokes.forEach { builder.addStroke(it) }
+        return builder.build()
     }
 
     fun reset() {
-        // Ink.Builder 沒有 clear 方法，需要重建
-        // 用反射或重新 assign 都不行，直接用新 instance
-        _hasStrokes = false
+        completedStrokes.clear()
         strokeBuilder = null
     }
 
-    /**
-     * 重建一個乾淨的 collector（因為 Ink.Builder 不可重用）。
-     */
     fun newCollector(): StrokeCollector = StrokeCollector()
 }
