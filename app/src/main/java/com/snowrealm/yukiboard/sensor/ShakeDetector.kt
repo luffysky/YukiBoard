@@ -18,8 +18,8 @@ class ShakeDetector(context: Context) : SensorEventListener {
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private val accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
 
-    private var onShakeListener: (() -> Unit)? = null
-    private var enabled = false
+    @Volatile private var onShakeListener: (() -> Unit)? = null
+    @Volatile private var enabled = false
 
     // 偵測參數
     private val shakeThresholdGravity = 2.5f

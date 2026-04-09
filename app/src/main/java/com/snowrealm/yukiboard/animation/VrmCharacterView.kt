@@ -126,6 +126,9 @@ class VrmCharacterView @JvmOverloads constructor(
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
+    // 具名 Runnable — 低 fps 重新排程（可被 removeCallbacks 清除）
+    private var lowFpsRearmRunnable: Runnable? = null
+
     private val frameCallback = object : Choreographer.FrameCallback {
         override fun doFrame(frameTimeNanos: Long) {
             if (isDestroyed) return
@@ -141,7 +144,11 @@ class VrmCharacterView @JvmOverloads constructor(
             if (hasActiveAnimation()) {
                 choreographer?.postFrameCallback(this)
             } else {
-                postDelayed({ choreographer?.postFrameCallback(this) }, 64)
+                val rearm = lowFpsRearmRunnable ?: Runnable {
+                    if (!isDestroyed) choreographer?.postFrameCallback(this)
+                }.also { lowFpsRearmRunnable = it }
+                removeCallbacks(rearm)
+                postDelayed(rearm, 64)
             }
         }
     }
@@ -667,6 +674,7 @@ class VrmCharacterView @JvmOverloads constructor(
 
     fun destroy() {
         isDestroyed = true
+        lowFpsRearmRunnable?.let { removeCallbacks(it) }
         stopRendering()
         scope.cancel()
 

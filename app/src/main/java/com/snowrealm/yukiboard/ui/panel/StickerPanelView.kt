@@ -485,6 +485,13 @@ class StickerPanelView(context: Context) : View(context) {
         scope.cancel()
     }
 
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        repository?.onPacksUpdated = null
+        downloadManager?.onProgressUpdated = null
+        downloadManager?.onAllCompleted = null
+    }
+
     companion object {
         private val CHAR_KEYWORDS = listOf("雪凜", "yuki", "角色", "character", "animal", "動物")
         private val SEASON_KEYWORDS = listOf("節日", "seasonal", "春", "夏", "秋", "冬", "新年", "聖誕", "halloween", "christmas", "spring", "summer", "autumn", "winter")

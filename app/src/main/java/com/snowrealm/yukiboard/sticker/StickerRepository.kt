@@ -46,13 +46,16 @@ class StickerRepository(context: Context) {
                     saveCachedPacks(remote)
                     // 預載封面圖
                     launch(Dispatchers.IO) {
-                        remote.forEach { pack ->
-                            if (pack.coverUrl.isNotEmpty()) {
-                                imageCache.getBitmap(pack.coverUrl)
+                        try {
+                            remote.forEach { pack ->
+                                if (pack.coverUrl.isNotEmpty()) {
+                                    imageCache.getBitmap(pack.coverUrl)
+                                }
+                                // 預載前幾張貼圖
+                                pack.stickers.take(8).forEach { imageCache.getBitmap(it.url) }
                             }
-                            // 預載前幾張貼圖
-                            pack.stickers.take(8).forEach { imageCache.getBitmap(it.url) }
-                        }
+                        } catch (e: kotlin.coroutines.cancellation.CancellationException) { throw e }
+                        catch (e: Exception) { android.util.Log.w("Sticker", "Prefetch failed: ${e.message}") }
                     }
                     onPacksUpdated?.invoke()
                 }
@@ -67,6 +70,7 @@ class StickerRepository(context: Context) {
 
     fun destroy() {
         scope.cancel()
+        onPacksUpdated = null
     }
 
     // ── 本地 JSON 快取 ──

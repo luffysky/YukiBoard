@@ -113,7 +113,7 @@ class GeminiProvider(private val apiKey: String) : AIProvider {
                                 if (!text.isNullOrEmpty()) emit(text)
                             }
                         }
-                    } catch (_: Exception) {}
+                    } catch (e: Exception) { android.util.Log.w("Gemini", "SSE parse error: ${e.message}") }
                 }
                 line = reader.readLine()
             }

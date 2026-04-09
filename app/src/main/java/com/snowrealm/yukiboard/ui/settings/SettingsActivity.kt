@@ -194,26 +194,34 @@ class SettingsActivity : AppCompatActivity() {
                         val supabaseKey = com.snowrealm.yukiboard.BuildConfig.YUKIBOARD_SUPABASE_ANON_KEY
                         val appVersionCode = com.snowrealm.yukiboard.BuildConfig.VERSION_CODE
                         activityScope.launch {
-                            modelManager.manualUpdate(
-                                supabaseUrl = supabaseUrl,
-                                supabaseAnonKey = supabaseKey,
-                                appVersionCode = appVersionCode,
-                                callback = object : com.snowrealm.yukiboard.security.FraudModelManager.DownloadCallback {
-                                    override fun onProgress(percent: Int) {
-                                        launch(Dispatchers.Main) {
-                                            text = "更新中 $percent%..."
+                            try {
+                                modelManager.manualUpdate(
+                                    supabaseUrl = supabaseUrl,
+                                    supabaseAnonKey = supabaseKey,
+                                    appVersionCode = appVersionCode,
+                                    callback = object : com.snowrealm.yukiboard.security.FraudModelManager.DownloadCallback {
+                                        override fun onProgress(percent: Int) {
+                                            launch(Dispatchers.Main) {
+                                                text = "更新中 $percent%..."
+                                            }
+                                        }
+                                        override fun onComplete(success: Boolean, message: String) {
+                                            launch(Dispatchers.Main) {
+                                                isEnabled = true
+                                                text = "防詐模型更新"
+                                                modelStatusText.text = modelManager.getStatusSummary()
+                                                Toast.makeText(this@SettingsActivity, message, Toast.LENGTH_SHORT).show()
+                                            }
                                         }
                                     }
-                                    override fun onComplete(success: Boolean, message: String) {
-                                        launch(Dispatchers.Main) {
-                                            isEnabled = true
-                                            text = "防詐模型更新"
-                                            modelStatusText.text = modelManager.getStatusSummary()
-                                            Toast.makeText(this@SettingsActivity, message, Toast.LENGTH_SHORT).show()
-                                        }
-                                    }
+                                )
+                            } catch (e: kotlin.coroutines.cancellation.CancellationException) { throw e }
+                            catch (e: Exception) {
+                                kotlinx.coroutines.withContext(Dispatchers.Main) {
+                                    isEnabled = true
+                                    text = "檢查失敗"
                                 }
-                            )
+                            }
                         }
                     }
                 }
@@ -2282,11 +2290,11 @@ class SettingsActivity : AppCompatActivity() {
                         val item = filteredItems.getOrNull(position) ?: return@setOnItemClickListener
                         if (item.second == null) {
                             prefs.ttsVoiceName = ""
-                            (btn as TextView).text = "系統預設"
+                            (btn as? TextView)?.text = "系統預設"
                         } else {
-                            val selected = item.second!!
+                            val selected = item.second ?: return@setOnItemClickListener
                             prefs.ttsVoiceName = selected.name
-                            (btn as TextView).text = item.first.take(35)
+                            (btn as? TextView)?.text = item.first.take(35)
 
                             // 試聽選中的語音
                             val tmpEngine = btn.tag as? android.speech.tts.TextToSpeech
@@ -2387,12 +2395,12 @@ class SettingsActivity : AppCompatActivity() {
                 // 先存 EditText 當前值（避免焦點未離開時 prefs 還沒更新）
                 prefs.googleCloudTtsApiKey = keyInput.text.toString().trim()
                 btn.isEnabled = false
-                (btn as TextView).text = "⏳ 初始化中..."
+                (btn as? TextView)?.text = "⏳ 初始化中..."
 
                 val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
                 val resetBtn = {
                     btn.isEnabled = true
-                    (btn as TextView).text = "▶ 測試語音輸出"
+                    (btn as? TextView)?.text = "▶ 測試語音輸出"
                 }
 
                 when (prefs.ttsEngineType) {
@@ -2403,7 +2411,7 @@ class SettingsActivity : AppCompatActivity() {
                             resetBtn()
                             return@setOnClickListener
                         }
-                        (btn as TextView).text = "🔊 呼叫 Google Cloud..."
+                        (btn as? TextView)?.text = "🔊 呼叫 Google Cloud..."
                         android.widget.Toast.makeText(this@SettingsActivity, "API Key: ${key.take(10)}... 呼叫中", android.widget.Toast.LENGTH_SHORT).show()
                         val engine = com.snowrealm.yukiboard.speech.GoogleCloudTtsEngine(key)
                         engine.speak(testText, null, prefs.ttsSpeed) {
@@ -2412,7 +2420,7 @@ class SettingsActivity : AppCompatActivity() {
                                 if (err != null) {
                                     android.widget.Toast.makeText(this@SettingsActivity,
                                         "Google TTS 失敗：$err", android.widget.Toast.LENGTH_LONG).show()
-                                    (btn as TextView).text = "❌ $err"
+                                    (btn as? TextView)?.text = "❌ $err"
                                 }
                                 engine.destroy()
                                 // 5 秒後重置按鈕（讓使用者看到錯誤）
@@ -2460,7 +2468,7 @@ class SettingsActivity : AppCompatActivity() {
                                     audioMgr.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, maxVol / 2, android.media.AudioManager.FLAG_SHOW_UI)
                                 }
 
-                                (btn as TextView).text = "🔊 播放中... ($info)"
+                                (btn as? TextView)?.text = "🔊 播放中... ($info)"
                                 rawTts?.setSpeechRate(prefs.ttsSpeed)
                                 val speakResult = rawTts?.speak(testText, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "test_utterance")
                                 android.util.Log.i("TTS_TEST", "speakResult=$speakResult $info")

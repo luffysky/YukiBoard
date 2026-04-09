@@ -161,6 +161,7 @@ class InputRouter(private val context: Context) {
     fun toggleLanguage() {
         if (enabledModes.size <= 1) return
         val currentIndex = enabledModes.indexOf(currentMode)
+        if (currentIndex < 0) return
         val nextIndex = (currentIndex + 1) % enabledModes.size
         switchTo(enabledModes[nextIndex])
     }
@@ -506,7 +507,7 @@ class InputRouter(private val context: Context) {
             typeface = android.graphics.Typeface.createFromAsset(
                 context.assets, "fonts/NotoSansCJKtc-Regular.otf"
             )
-        } catch (_: Exception) {}
+        } catch (e: Exception) { android.util.Log.w("InputRouter", "Font load failed: ${e.message}") }
     }
     private fun isRenderable(text: String): Boolean {
         if (text.isBlank()) return false

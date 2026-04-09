@@ -91,8 +91,8 @@ class BluetoothHidKeyboard(context: Context) : RemoteKeyboardService {
     private val btManager = appContext.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
     private val btAdapter: BluetoothAdapter? = btManager?.adapter
 
-    private var hidDevice: BluetoothHidDevice? = null
-    private var hostDevice: BluetoothDevice? = null
+    @Volatile private var hidDevice: BluetoothHidDevice? = null
+    @Volatile private var hostDevice: BluetoothDevice? = null
     private var stateListener: ((ConnectionState) -> Unit)? = null
     private var remoteKeyListener: ((RemoteKeyEvent) -> Unit)? = null
     private var remoteTextListener: ((String) -> Unit)? = null

@@ -409,7 +409,7 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
                     w.attributes = lp
                 }
                 dialog.show()
-            } catch (_: Exception) {}
+            } catch (e: Exception) { android.util.Log.w("Clipboard", "Crypto operation failed: ${e.message}") }
         }
     }
 
@@ -708,6 +708,7 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
 
             pinnedItems.forEachIndexed { i, item ->
                 val globalIdx = clipHistory.indexOf(item)
+                if (globalIdx < 0) return@forEachIndexed
                 val left = padding + i * (cardW + gap) + pinnedScrollX
                 val right = left + cardW
                 if (right < 0 || left > width) return@forEachIndexed
@@ -755,6 +756,7 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
 
             items.forEachIndexed { i, item ->
                 val globalIdx = clipHistory.indexOf(item)
+                if (globalIdx < 0) return@forEachIndexed
                 val y = top + 4 * density + i * (itemH + itemGap) - scrollY
 
                 if (y + itemH < top || y > height) return@forEachIndexed

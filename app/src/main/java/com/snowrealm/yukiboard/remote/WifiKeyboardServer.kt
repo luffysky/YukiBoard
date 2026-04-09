@@ -51,14 +51,14 @@ class WifiKeyboardServer(context: Context) : RemoteKeyboardService {
     private var serverThread: Thread? = null
     private val clients = CopyOnWriteArrayList<WebSocketClient>()
 
-    private var stateListener: ((ConnectionState) -> Unit)? = null
-    private var remoteKeyListener: ((RemoteKeyEvent) -> Unit)? = null
-    private var remoteTextListener: ((String) -> Unit)? = null
+    @Volatile private var stateListener: ((ConnectionState) -> Unit)? = null
+    @Volatile private var remoteKeyListener: ((RemoteKeyEvent) -> Unit)? = null
+    @Volatile private var remoteTextListener: ((String) -> Unit)? = null
 
     var port: Int = DEFAULT_PORT
 
     /** 4 位連線 PIN — 顯示在面板，WebSocket 握手時驗證 */
-    var connectionPin: String = generatePin()
+    @Volatile var connectionPin: String = generatePin()
         private set
 
     override var connectionState: ConnectionState = ConnectionState.IDLE

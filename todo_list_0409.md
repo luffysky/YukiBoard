@@ -205,6 +205,77 @@
 
 ---
 
+## 🔧 v7 Bug 掃描修復（v0.9.36 → v0.9.37）
+
+> 49 項 bug 掃描結果，按嚴重度排序實作
+> 詳細說明見 YukiBoard_v7_BugScan_Tasks.md
+
+### 第一批：🔴 崩潰風險（C1-C6）
+- ~~[x] **C1** ClipboardEncryptionHelper `as` → `as?` 安全轉型~~
+- ~~[x] **C2** EmotionStickerEngine `!!` → `?: return null`~~
+- ~~[x] **C3** SettingsActivity `item.second!!` → `?: return`~~
+- ~~[x] **C4** KeyboardGLSurfaceView `configs[0]!!` → `?: return`~~
+- ~~[x] **C5** MusicTypingGame rows<3 guard~~
+- ~~[x] **C6** RhythmGame `firstOrNull` / `lastOrNull`~~
+
+### 第二批：🔴 功能缺失（F1-F2）
+- ~~[x] **F1** 7 款遊戲 `onGameEvent` 接線補齊~~
+- ~~[x] **F2** 詞庫匯入/匯出 Toast 包 `Handler(mainLooper)`~~
+
+### 第三批：🟡 Coroutine 安全（CR1-CR9）
+- ~~[x] **CR1** 翻譯 engine launch try-catch~~
+- ~~[x] **CR2** GIF search launch try-catch~~
+- ~~[x] **CR3** RIME 字典 init try-catch~~
+- ~~[x] **CR4** chewing warmUp try-catch~~
+- ~~[x] **CR5** 被動防詐 launch try-catch~~
+- ~~[x] **CR6** GifPanelView preview load try-catch + loadingUrls.remove~~
+- ~~[x] **CR7** StickerRepository prefetch try-catch~~
+- ~~[x] **CR8** StickerPackDownloadManager downloadAllPacks try-catch~~
+- ~~[x] **CR9** SettingsActivity modelManager.manualUpdate try-catch~~
+
+### 第四批：🟡 執行緒安全（T1-T12）
+- ~~[x] **T1** FlowLightRenderer `@Volatile` alpha/colorR/G/B~~
+- ~~[x] **T2** KeyboardGLSurfaceView `@Volatile` surfaceWidth/Height~~
+- ~~[x] **T3** KeyboardGLSurfaceView `@Synchronized` startRenderThread~~
+- ~~[x] **T4** ShakeDetector `@Volatile` onShakeListener/enabled~~
+- ~~[x] **T5** GyroscopeCursorController `@Volatile` active/enabled~~
+- ~~[x] **T6** WhisperSpeechEngine `@Volatile` isListening + `@Synchronized` releaseAudioRecord~~
+- ~~[x] **T7** FasterWhisperSpeechEngine 同上~~
+- ~~[x] **T8** AndroidTtsEngine pendingCallbacks → ConcurrentHashMap~~
+- ~~[x] **T9** AdaptiveDictionary entries → ConcurrentHashMap~~
+- ~~[x] **T10** PersonalDictionary entries → ConcurrentHashMap~~
+- ~~[x] **T11** BluetoothHidKeyboard `@Volatile` hidDevice/hostDevice~~
+- ~~[x] **T12** WifiKeyboardServer `@Volatile` stateListener/connectionPin~~
+
+### 第五批：🟡 記憶體洩漏（M1-M8）
+- ~~[x] **M1** StickerPanelView scope cancel 呼叫（onDetachedFromWindow）~~
+- ~~[x] **M2** StickerPanelView onDetachedFromWindow 清 callback~~
+- ~~[x] **M3** StickerRepository destroy 置 null~~
+- ~~[x] **M4** StickerPackDownloadManager destroy 置 null~~
+- ~~[x] **M5** VrmCharacterAnimation 具名 Runnable~~
+- ~~[x] **M6** VrmCharacterView 具名 Runnable~~
+- ~~[x] **M7** IMEService fraud-detect 具名 Runnable~~
+- ~~[x] **M8** SettingsActivity MediaPlayer 保底釋放（已有 stopVideoPreview）~~
+
+### 第六批：🟢 邏輯/顯示（L1-L12）
+- ~~[x] **L1** ClipboardPanelView indexOf -1 guard~~
+- ~~[x] **L2** InputRouter indexOf -1 guard~~
+- ~~[x] **L3** IMEService indexOfChild -1 guard~~
+- ~~[x] **L4** GameKeyboardView 除以零 guard~~
+- ~~[x] **L5** GeminiProvider SSE 空 catch 加 Log~~
+- ~~[x] **L6** GroqProvider SSE 空 catch 加 Log~~
+- ~~[x] **L7** SnowRealmProvider SSE 空 catch 加 Log~~
+- ~~[x] **L8** FraudAIAnalyzer 空 catch 加 Log~~
+- ~~[x] **L9** ClipboardPanelView 加解密空 catch 加 Log~~
+- ~~[x] **L10** YukiPreferences write 空 catch 加 Log~~
+- ~~[x] **L11** SettingsActivity `(btn as TextView)` → `(btn as? TextView)`~~
+- ~~[x] **L12** InputRouter 字體載入空 catch 加 Log~~
+
+### 額外修復
+- ~~[x] **ToolbarView 透明模式可見性** — 透明背景 alpha 0x22→0x88，確保功能列在自訂背景下可見~~
+
+---
+
 ## 當前版本待實作（v0.5.5+）
 
 ### 批次 A — 滑動輸入 + RIME 詞庫（8 步）

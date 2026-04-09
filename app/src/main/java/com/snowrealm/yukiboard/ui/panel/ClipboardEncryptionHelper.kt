@@ -53,7 +53,9 @@ class ClipboardEncryptionHelper(context: Context) {
     private fun getKey(): SecretKey {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
         keyStore.load(null)
-        return (keyStore.getEntry(KEYSTORE_ALIAS, null) as KeyStore.SecretKeyEntry).secretKey
+        val entry = keyStore.getEntry(KEYSTORE_ALIAS, null) as? KeyStore.SecretKeyEntry
+            ?: throw IllegalStateException("KeyStore entry is not SecretKeyEntry")
+        return entry.secretKey
     }
 
     /**

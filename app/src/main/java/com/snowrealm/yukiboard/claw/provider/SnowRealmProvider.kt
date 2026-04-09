@@ -123,7 +123,7 @@ class SnowRealmProvider(private val context: Context) : AIProvider {
                         obj["tokens_used"]?.jsonPrimitive?.content?.toIntOrNull()?.let {
                             totalTokens += it
                         }
-                    } catch (_: Exception) {}
+                    } catch (e: Exception) { android.util.Log.w("SnowRealm", "SSE parse error: ${e.message}") }
                 }
             }
         } finally {

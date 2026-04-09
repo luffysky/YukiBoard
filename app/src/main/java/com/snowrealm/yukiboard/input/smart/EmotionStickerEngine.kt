@@ -45,7 +45,7 @@ class EmotionStickerEngine {
 
         if (scores.isEmpty()) return EmotionResult(Emotion.NEUTRAL, 0f)
 
-        val best = scores.maxByOrNull { it.value }!!
+        val best = scores.maxByOrNull { it.value } ?: return EmotionResult(Emotion.NEUTRAL, 0f)
         val confidence = (best.value / 5f).coerceIn(0f, 1f)
         return EmotionResult(best.key, confidence)
     }

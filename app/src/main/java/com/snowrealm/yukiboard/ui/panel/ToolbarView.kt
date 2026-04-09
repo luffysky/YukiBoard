@@ -106,7 +106,7 @@ class ToolbarView(context: Context) : View(context) {
         // 背景
         if (isTransparent) {
             canvas.drawColor(android.graphics.Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
-            bgPaint.color = 0x22000000
+            bgPaint.color = 0x88000000.toInt()  // 半透明黑底，確保圖示可見
         } else {
             bgPaint.color = theme.effectiveToolbarColor()
         }

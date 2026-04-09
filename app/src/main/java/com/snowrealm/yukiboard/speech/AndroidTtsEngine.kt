@@ -20,7 +20,7 @@ class AndroidTtsEngine(context: Context, private val onInitDone: ((Boolean) -> U
 
     private val tag = "AndroidTtsEngine"
     private var tts: TextToSpeech? = null
-    private var pendingCallbacks = mutableMapOf<String, (() -> Unit)?>()
+    private val pendingCallbacks = java.util.concurrent.ConcurrentHashMap<String, (() -> Unit)?>()
     private var selectedVoiceName: String? = null
     private var hasCustomVoice = false  // 成功套用自訂語音後設為 true
 

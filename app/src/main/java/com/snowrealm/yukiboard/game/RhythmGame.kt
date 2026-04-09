@@ -71,10 +71,11 @@ class RhythmGame(context: Context) : GameLogic {
         noteIndex = 0
 
         // 選擇譜面
-        songNotes = builtInSongs[0].map { (col, time) ->
+        val song = builtInSongs.firstOrNull() ?: return
+        songNotes = song.map { (col, time) ->
             Pair(col.coerceIn(0, cols - 1), time)
         }
-        songDurationMs = songNotes.last().second + 3000L
+        songDurationMs = songNotes.lastOrNull()?.second?.plus(3000L) ?: 30000L
 
         clearGrid()
         status = GameStatus.PLAYING

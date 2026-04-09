@@ -274,10 +274,16 @@ class GifPanelView(context: Context) : View(context), PanelInputTarget {
         if (url in loadedBitmaps || url in loadingUrls) return
         loadingUrls.add(url)
         scope.launch {
-            val bmp = imageCache.getPreviewBitmap(url)
-            loadedBitmaps[url] = bmp
-            loadingUrls.remove(url)
-            post { invalidate() }
+            try {
+                val bmp = imageCache.getPreviewBitmap(url)
+                loadedBitmaps[url] = bmp
+                loadingUrls.remove(url)
+                post { invalidate() }
+            } catch (e: kotlin.coroutines.cancellation.CancellationException) { throw e }
+            catch (e: Exception) {
+                loadingUrls.remove(url)
+                android.util.Log.w("GifPanel", "Preview load failed: ${e.message}")
+            }
         }
     }
 

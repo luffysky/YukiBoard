@@ -245,7 +245,7 @@ class YukiPreferences(context: Context) {
                     )
                 }
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) { android.util.Log.e("Prefs", "Write failed: ${e.message}") }
         return result
     }
 

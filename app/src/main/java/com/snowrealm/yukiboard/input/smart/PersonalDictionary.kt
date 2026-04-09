@@ -19,7 +19,7 @@ class PersonalDictionary(private val context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("yukiboard_personal_dict", Context.MODE_PRIVATE)
 
-    private val entries = mutableMapOf<String, PersonalWord>()
+    private val entries = java.util.concurrent.ConcurrentHashMap<String, PersonalWord>()
 
     init { loadAll() }
 

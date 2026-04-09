@@ -33,8 +33,8 @@ class KeyboardGLSurfaceView @JvmOverloads constructor(
 
     @Volatile private var renderThread: Thread? = null
     @Volatile private var running = false
-    private var surfaceWidth = 0
-    private var surfaceHeight = 0
+    @Volatile private var surfaceWidth = 0
+    @Volatile private var surfaceHeight = 0
 
     init {
         isClickable = false
@@ -92,6 +92,7 @@ class KeyboardGLSurfaceView @JvmOverloads constructor(
 
     // ─── GL 渲染執行緒 ──────────────────────────────────────────────────
 
+    @Synchronized
     private fun startRenderThread() {
         if (running) return
         running = true
@@ -155,7 +156,10 @@ class KeyboardGLSurfaceView @JvmOverloads constructor(
         val configs = arrayOfNulls<EGLConfig>(1)
         val numConfigs = IntArray(1)
         EGL14.eglChooseConfig(eglDisplay, attribList, 0, configs, 0, 1, numConfigs, 0)
-        eglConfig = configs[0]!!
+        eglConfig = configs[0] ?: run {
+            android.util.Log.e("FlowLightGL", "No EGL config found")
+            return
+        }
 
         val contextAttribs = intArrayOf(
             EGL14.EGL_CONTEXT_CLIENT_VERSION, 2,

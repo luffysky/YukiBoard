@@ -70,10 +70,13 @@ class StickerPackDownloadManager(context: Context) {
     /** 下載所有貼圖包 */
     fun downloadAllPacks() {
         scope.launch {
-            // 先同步貼圖包清單
-            repo.syncInBackground()
-            delay(500) // 等同步完成
-            repo.packs.forEach { downloadPack(it) }
+            try {
+                // 先同步貼圖包清單
+                repo.syncInBackground()
+                delay(500) // 等同步完成
+                repo.packs.forEach { downloadPack(it) }
+            } catch (e: kotlin.coroutines.cancellation.CancellationException) { throw e }
+            catch (e: Exception) { android.util.Log.w("StickerDL", "Download failed: ${e.message}") }
         }
     }
 
@@ -90,6 +93,8 @@ class StickerPackDownloadManager(context: Context) {
 
     fun destroy() {
         scope.cancel()
+        onProgressUpdated = null
+        onAllCompleted = null
     }
 
     private fun updateProgress(packId: String, downloaded: Int, total: Int) {

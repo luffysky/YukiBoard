@@ -45,6 +45,7 @@ class MusicTypingGame(context: Context) : GameLogic {
     }
 
     override fun start() {
+        if (rows < 3) return  // 遊戲需要至少 3 行才能運作
         scoreManager.reset()
         timeLeftMs = 30_000L
         combo = 0; noteIndex = 0

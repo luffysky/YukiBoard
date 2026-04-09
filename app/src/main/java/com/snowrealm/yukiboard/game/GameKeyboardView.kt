@@ -173,6 +173,7 @@ class GameKeyboardView(context: Context) : View(context) {
         val totalUnits = keyRows.maxOfOrNull { row ->
             row.sumOf { it.widthWeight.toDouble() }.toFloat()
         } ?: 10f
+        if (totalUnits <= 0f) return
 
         keyRows.forEachIndexed { rowIndex, row ->
             val top = hudHeight + rowIndex * rowHeight

@@ -26,12 +26,12 @@ class FlowLightRenderer : GLSurfaceView.Renderer {
     private var aPositionLoc: Int = -1
     private var aTexCoordLoc: Int = -1
 
-    // 由外部控制
-    var alpha: Float = 0.25f  // 水波紋整體透明度
+    // 由外部控制（主執行緒寫、GL 渲染緒讀）
+    @Volatile var alpha: Float = 0.25f  // 水波紋整體透明度
     private var aspect: Float = 1.0f  // 寬高比
-    private var colorR: Float = 0.9f
-    private var colorG: Float = 0.95f
-    private var colorB: Float = 1.0f
+    @Volatile private var colorR: Float = 0.9f
+    @Volatile private var colorG: Float = 0.95f
+    @Volatile private var colorB: Float = 1.0f
 
     /** 設定流光顏色（ARGB Int） */
     fun setFlowColor(colorInt: Int) {

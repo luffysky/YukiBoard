@@ -545,7 +545,7 @@ class FraudAIAnalyzer(private val context: Context) {
                 analyzeByAI(text, clawClient, enhancedResult).collect { chunk ->
                     aiResult.append(chunk)
                 }
-            } catch (_: Exception) { }
+            } catch (e: Exception) { android.util.Log.w("FraudAI", "AI analysis failed: ${e.message}") }
 
             return AnalysisResult(
                 ruleResult = enhancedResult,

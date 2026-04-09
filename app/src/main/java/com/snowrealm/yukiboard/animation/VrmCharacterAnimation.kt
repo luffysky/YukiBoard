@@ -15,6 +15,9 @@ package com.snowrealm.yukiboard.animation
  */
 class VrmCharacterAnimation(private val view: VrmCharacterView) : CharacterAnimation {
 
+    // 用於 postDelayed 的具名 Runnable（可被 removeCallbacks 清除）
+    private var pendingOnEnd: Runnable? = null
+
     // 鍵盤事件 → 表情 + 動作配置
     private data class ReactionConfig(
         val expression: String?,
@@ -96,12 +99,13 @@ class VrmCharacterAnimation(private val view: VrmCharacterView) : CharacterAnima
         } else {
             // 無動畫，僅切表情，延遲後回呼
             if (onEnd != null) {
-                view.postDelayed({
+                pendingOnEnd?.let { view.removeCallbacks(it) }
+                pendingOnEnd = Runnable {
                     view.clearExpressions()
                     view.transitionExpression("neutral", 0.85f)
                     view.setRandomIdleEnabled(true)
                     onEnd()
-                }, 1000)
+                }.also { view.postDelayed(it, 1000) }
             } else {
                 view.setRandomIdleEnabled(true)
             }
@@ -109,6 +113,8 @@ class VrmCharacterAnimation(private val view: VrmCharacterView) : CharacterAnima
     }
 
     override fun stop() {
+        pendingOnEnd?.let { view.removeCallbacks(it) }
+        pendingOnEnd = null
         view.stopAnimation()
         view.clearExpressions()
         view.setRandomIdleEnabled(false)

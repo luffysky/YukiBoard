@@ -102,7 +102,7 @@ class GroqProvider(private val apiKey: String) : AIProvider {
                             val content = delta?.get("content")?.jsonPrimitive?.content
                             if (!content.isNullOrEmpty()) emit(content)
                         }
-                    } catch (_: Exception) {}
+                    } catch (e: Exception) { android.util.Log.w("Groq", "SSE parse error: ${e.message}") }
                 }
                 line = reader.readLine()
             }

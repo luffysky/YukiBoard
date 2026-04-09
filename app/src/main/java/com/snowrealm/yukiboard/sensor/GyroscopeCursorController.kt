@@ -25,8 +25,8 @@ class GyroscopeCursorController(context: Context) : SensorEventListener {
     private val handler = Handler(Looper.getMainLooper())
 
     private var onCursorMoveListener: ((direction: CursorDirection) -> Unit)? = null
-    private var active = false
-    private var enabled = false
+    @Volatile private var active = false
+    @Volatile private var enabled = false
 
     /** 靈敏度（越高越敏感）1.0 = 預設 */
     var sensitivity: Float = 1.5f

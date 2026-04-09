@@ -28,7 +28,7 @@ class FasterWhisperSpeechEngine(
 
     private val tag = "FasterWhisper"
 
-    override var isListening: Boolean = false
+    @Volatile override var isListening: Boolean = false
         private set
 
     /** 外部可設定上下文文字，提升辨識準確度 */
@@ -177,6 +177,7 @@ class FasterWhisperSpeechEngine(
 
     // ─────────────── 內部方法 ───────────────
 
+    @Synchronized
     private fun releaseAudioRecord() {
         try { audioRecord?.stop() } catch (_: Exception) {}
         audioRecord?.release()

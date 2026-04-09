@@ -80,6 +80,9 @@ class YukiBoardIMEService : InputMethodService() {
     private val fraudAnalyzer by lazy { com.snowrealm.yukiboard.security.FraudAIAnalyzer(this) }
     private var lastFraudScanText: String? = null  // 避免重複掃描同一段文字
     private var fraudScanCommitCount = 0  // 每 N 次提交重新掃描
+    private val fraudDetectRunnable = Runnable {
+        (panelContainer.getChildAt(0) as? ClawPanelView)?.triggerSkill("fraud_detect")
+    }
 
     // 面板
     private var activePanel: PanelType? = null
@@ -178,7 +181,11 @@ class YukiBoardIMEService : InputMethodService() {
         // RIME 詞庫初始化（IO thread）
         if (prefs.rimeDictEnabled) {
             rimeDictionary = com.snowrealm.yukiboard.input.dictionary.RimeDictionary(applicationContext)
-            serviceScope.launch { rimeDictionary?.init() }
+            serviceScope.launch {
+                try { rimeDictionary?.init() }
+                catch (e: kotlin.coroutines.cancellation.CancellationException) { throw e }
+                catch (e: Exception) { android.util.Log.w("IME", "RIME init failed: ${e.message}") }
+            }
         }
 
         // 套用使用者選擇的輸入法
@@ -193,7 +200,9 @@ class YukiBoardIMEService : InputMethodService() {
 
         // 預���注音索引（IO 執行緒，避免首次按鍵凍結 UI）
         serviceScope.launch(Dispatchers.IO) {
-            inputRouter.warmUpChewing()
+            try { inputRouter.warmUpChewing() }
+            catch (e: kotlin.coroutines.cancellation.CancellationException) { throw e }
+            catch (e: Exception) { android.util.Log.w("IME", "Chewing warmup failed: ${e.message}") }
         }
 
         shakeDetector = ShakeDetector(applicationContext)
@@ -864,7 +873,8 @@ class YukiBoardIMEService : InputMethodService() {
         lastFraudScanText = textBefore
 
         serviceScope.launch(Dispatchers.Default) {
-            val result = fraudAnalyzer.analyzeByRules(textBefore)
+            try {
+                val result = fraudAnalyzer.analyzeByRules(textBefore)
             // URL 獨立掃描（即使整體風險 < 30，有可疑連結也要警告）
             val urlRisks = fraudAnalyzer.scanUrls(textBefore).filter { it.score >= 20 }
             val effectiveScore = maxOf(result.riskScore, urlRisks.maxOfOrNull { it.score } ?: 0)
@@ -887,10 +897,8 @@ class YukiBoardIMEService : InputMethodService() {
                             bubble.hideNow()
                             showPanel(PanelType.CLAW)
                             // 延遲一點讓面板建好再觸發 skill
-                            charAnchor.postDelayed({
-                                (panelContainer.getChildAt(0) as? ClawPanelView)
-                                    ?.triggerSkill("fraud_detect")
-                            }, 300)
+                            charAnchor.removeCallbacks(fraudDetectRunnable)
+                            charAnchor.postDelayed(fraudDetectRunnable, 300)
                         }
                         bubble.show(warning, charAnchor)
                     }
@@ -898,6 +906,8 @@ class YukiBoardIMEService : InputMethodService() {
                     characterView?.playReaction("surprised")
                 }
             }
+            } catch (e: kotlin.coroutines.cancellation.CancellationException) { throw e }
+            catch (e: Exception) { android.util.Log.w("Fraud", "Passive scan failed: ${e.message}") }
         }
     }
 
@@ -1171,8 +1181,13 @@ class YukiBoardIMEService : InputMethodService() {
                 if (engine != null) {
                     p.translationProvider = { src, fromLang, toLang, callback ->
                         serviceScope.launch {
-                            val result = engine.translate(src, fromLang, toLang)
-                            callback(result)
+                            try {
+                                val result = engine.translate(src, fromLang, toLang)
+                                callback(result)
+                            } catch (e: kotlin.coroutines.cancellation.CancellationException) { throw e }
+                            catch (e: Exception) {
+                                callback("翻譯失敗: ${e.message}")
+                            }
                         }
                     }
                 }
@@ -1189,9 +1204,14 @@ class YukiBoardIMEService : InputMethodService() {
                 if (gifClient != null && gifClient.isAvailable()) {
                     p.onSearch = { query, callback ->
                         serviceScope.launch {
-                            val results = if (query.isBlank()) gifClient.fetchTrending()
-                                          else gifClient.search(query)
-                            callback(results)
+                            try {
+                                val results = if (query.isBlank()) gifClient.fetchTrending()
+                                              else gifClient.search(query)
+                                callback(results)
+                            } catch (e: kotlin.coroutines.cancellation.CancellationException) { throw e }
+                            catch (e: Exception) {
+                                callback(emptyList())
+                            }
                         }
                     }
                 }
@@ -1386,9 +1406,13 @@ class YukiBoardIMEService : InputMethodService() {
                     try {
                         val file = java.io.File(getExternalFilesDir(null), "yukiboard_user_dict.txt")
                         file.writeText(data)
-                        android.widget.Toast.makeText(this, "已匯出至 ${file.absolutePath}", android.widget.Toast.LENGTH_LONG).show()
+                        android.os.Handler(android.os.Looper.getMainLooper()).post {
+                            android.widget.Toast.makeText(this, "已匯出至 ${file.absolutePath}", android.widget.Toast.LENGTH_LONG).show()
+                        }
                     } catch (e: Exception) {
-                        android.widget.Toast.makeText(this, "匯出失敗: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                        android.os.Handler(android.os.Looper.getMainLooper()).post {
+                            android.widget.Toast.makeText(this, "匯出失敗: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
                 p.onImportRequest = {
@@ -1396,12 +1420,18 @@ class YukiBoardIMEService : InputMethodService() {
                         val file = java.io.File(getExternalFilesDir(null), "yukiboard_user_dict.txt")
                         if (file.exists()) {
                             val count = p.importEntries(file.readText())
-                            android.widget.Toast.makeText(this, "已匯入 $count 筆詞彙", android.widget.Toast.LENGTH_SHORT).show()
+                            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                android.widget.Toast.makeText(this, "已匯入 $count 筆詞彙", android.widget.Toast.LENGTH_SHORT).show()
+                            }
                         } else {
-                            android.widget.Toast.makeText(this, "找不到匯入檔案：${file.absolutePath}", android.widget.Toast.LENGTH_LONG).show()
+                            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                android.widget.Toast.makeText(this, "找不到匯入檔案：${file.absolutePath}", android.widget.Toast.LENGTH_LONG).show()
+                            }
                         }
                     } catch (e: Exception) {
-                        android.widget.Toast.makeText(this, "匯入失敗: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                        android.os.Handler(android.os.Looper.getMainLooper()).post {
+                            android.widget.Toast.makeText(this, "匯入失敗: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
                 p.enterInputMode()
@@ -1527,6 +1557,7 @@ class YukiBoardIMEService : InputMethodService() {
 
         // 插入到 rootContainer，位於 toolbarView 之後、keyboardContainer 之前
         val toolbarIndex = rootContainer.indexOfChild(toolbarView)
+        if (toolbarIndex < 0) return
         rootContainer.addView(bar, toolbarIndex + 1, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
@@ -2259,6 +2290,13 @@ class YukiBoardIMEService : InputMethodService() {
             is TypingRaceGame -> game.onGameEvent = callback
             is RandomChallengeGame -> game.onGameEvent = callback
             is VoiceGame -> game.onGameEvent = callback
+            is WordleGame -> game.onGameEvent = callback
+            is WordChainGame -> game.onGameEvent = callback
+            is CrosswordGame -> game.onGameEvent = callback
+            is MusicTypingGame -> game.onGameEvent = callback
+            is YukiHouseGame -> game.onGameEvent = callback
+            is TypingFarmGame -> game.onGameEvent = callback
+            is SpeedTypingBattleGame -> game.onGameEvent = callback
         }
     }
 

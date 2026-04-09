@@ -20,7 +20,7 @@ class AdaptiveDictionary(context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("yukiboard_adaptive_dict", Context.MODE_PRIVATE)
 
-    private val entries = mutableMapOf<String, WordEntry>()
+    private val entries = java.util.concurrent.ConcurrentHashMap<String, WordEntry>()
 
     init { loadAll() }
 

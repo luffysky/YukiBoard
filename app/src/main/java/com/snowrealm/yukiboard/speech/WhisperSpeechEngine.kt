@@ -22,7 +22,7 @@ class WhisperSpeechEngine(
     private val model: String = "whisper-1"
 ) : SpeechInputEngine {
 
-    override var isListening: Boolean = false
+    @Volatile override var isListening: Boolean = false
         private set
 
     private var audioRecord: AudioRecord? = null
@@ -173,6 +173,7 @@ class WhisperSpeechEngine(
 
     // ─────────────── 內部方法 ───────────────
 
+    @Synchronized
     private fun releaseAudioRecord() {
         try {
             audioRecord?.stop()
