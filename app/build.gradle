@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 112
-        versionName "0.9.46"
+        versionCode 113
+        versionName "0.9.47"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,9 +82,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 面板收回後自訂背景消失（closePanel 恢復背景狀態）\n" +
-                    "- fix: 切換 App 再回來候選字殘留（onStartInputView 清候選）\n" +
-                    "- feat: 手寫撤銷/連續/壓感 + 語言模型管理"
+                    "- fix: 色碼/換算面板加入工具列（不再只能長按觸發）\n" +
+                    "- fix: RIME 詞庫 DB 重新生成（98,760 條）\n" +
+                    "- chore: Supabase 邀請碼 + 特權欄位 migration 已推送"
             }
         }
         debug {
@@ -93,9 +93,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 面板收回後自訂背景消失（closePanel 恢復背景狀態）\n" +
-                    "- fix: 切換 App 再回來候選字殘留（onStartInputView 清候選）\n" +
-                    "- feat: 手寫撤銷/連續/壓感 + 語言模型管理"
+                    "- fix: 色碼/換算面板加入工具列（不再只能長按觸發）\n" +
+                    "- fix: RIME 詞庫 DB 重新生成（98,760 條）\n" +
+                    "- chore: Supabase 邀請碼 + 特權欄位 migration 已推送"
             }
         }
     }
@@ -134,7 +134,9 @@ tasks.register('convertRimeDict') {
             dictsDir.listFiles()?.any { it.name.endsWith('.yaml') }
     }
 
-    inputs.dir(dictsDir)
+    if (dictsDir.exists()) {
+        inputs.dir(dictsDir)
+    }
     outputs.file(outputDb)
 
     doLast {
@@ -149,9 +151,8 @@ tasks.register('convertRimeDict') {
         }
     }
 }
-tasks.matching { it.name.startsWith('merge') && it.name.contains('Assets') }.configureEach {
-    dependsOn 'convertRimeDict'
-}
+// convertRimeDict 改為手動執行（./gradlew convertRimeDict）
+// 自動依賴會造成 lint/build implicit dependency 問題
 
 dependencies {
     // AndroidX Core

@@ -41,7 +41,7 @@ class ToolbarView(context: Context) : View(context) {
     private val groups: List<List<PanelType>> = listOf(
         listOf(PanelType.CLAW, PanelType.VOICE, PanelType.TRANSLATE, PanelType.HANDWRITING),        // AI 工具
         listOf(PanelType.EMOJI, PanelType.KAOMOJI, PanelType.STICKER, PanelType.GIF), // 內容
-        listOf(PanelType.CLIPBOARD, PanelType.CALCULATOR, PanelType.PHRASE, PanelType.USER_DICT, PanelType.DECRYPT, PanelType.REMOTE, PanelType.THEME, PanelType.SETTINGS), // 系統
+        listOf(PanelType.CLIPBOARD, PanelType.CALCULATOR, PanelType.PHRASE, PanelType.USER_DICT, PanelType.DECRYPT, PanelType.COLOR_PICKER, PanelType.UNIT_CONVERTER, PanelType.REMOTE, PanelType.THEME, PanelType.SETTINGS), // 系統
     )
     private val flatPanels = groups.flatten()
 
