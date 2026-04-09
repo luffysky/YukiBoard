@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 107
-        versionName "0.9.41"
+        versionCode 108
+        versionName "0.9.42"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,15 +82,10 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 單手模式（左手/右手）— 長按⚙切換，邊欄按鈕換向/還原\n" +
-                    "- feat: 鍵盤即時透明度浮動滑桿 — 長按🎨叫出（背景/按鍵/文字）\n" +
-                    "- feat: 色碼選擇器面板 — HSV 取色 + HEX/RGB/HSL + 最近色\n" +
-                    "- feat: 單位換算面板 — 長度/重量/溫度/面積 + 台灣單位\n" +
-                    "- feat: 候選列貼圖情緒推薦提示\n" +
-                    "- feat: Gemini Nano 本地離線 AI 供應商\n" +
-                    "- feat: 工具列長按支援（主題透明度/單手切換）\n" +
-                    "- fix: 選候選字後前面已選字消失\n" +
-                    "- fix: 按鍵反應遲鈍"
+                    "- fix: 懸浮鍵盤重寫 — 真正浮動（65%螢幕空間自由拖曳）\n" +
+                    "- feat: 懸浮球模式 — 按●縮成雪花球，點球展開回鍵盤\n" +
+                    "- feat: 懸浮鍵盤 resize — 右下角拖曳/↔按鈕調整寬度\n" +
+                    "- feat: onComputeInsets 浮動模式不推移 App 畫面"
             }
         }
         debug {
@@ -99,15 +94,10 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 單手模式（左手/右手）— 長按⚙切換，邊欄按鈕換向/還原\n" +
-                    "- feat: 鍵盤即時透明度浮動滑桿 — 長按🎨叫出（背景/按鍵/文字）\n" +
-                    "- feat: 色碼選擇器面板 — HSV 取色 + HEX/RGB/HSL + 最近色\n" +
-                    "- feat: 單位換算面板 — 長度/重量/溫度/面積 + 台灣單位\n" +
-                    "- feat: 候選列貼圖情緒推薦提示\n" +
-                    "- feat: Gemini Nano 本地離線 AI 供應商\n" +
-                    "- feat: 工具列長按支援（主題透明度/單手切換）\n" +
-                    "- fix: 選候選字後前面已選字消失\n" +
-                    "- fix: 按鍵反應遲鈍"
+                    "- fix: 懸浮鍵盤重寫 — 真正浮動（65%螢幕空間自由拖曳）\n" +
+                    "- feat: 懸浮球模式 — 按●縮成雪花球，點球展開回鍵盤\n" +
+                    "- feat: 懸浮鍵盤 resize — 右下角拖曳/↔按鈕調整寬度\n" +
+                    "- feat: onComputeInsets 浮動模式不推移 App 畫面"
             }
         }
     }

@@ -52,12 +52,21 @@ class FloatingKeyboardWrapper(context: Context) : FrameLayout(context) {
     /** 關閉懸浮模式回呼 */
     var onClose: (() -> Unit)? = null
 
+    /** 調整大小回呼 (deltaWidth) */
+    var onResize: ((Int) -> Unit)? = null
+
+    /** 縮成懸浮球回呼 */
+    var onMinimize: (() -> Unit)? = null
+
     private var isDragging = false
+    private var isResizing = false
     private var lastTouchX = 0f
     private var lastTouchY = 0f
 
     private val dragBarRect = RectF()
     private val dockBtnRect = RectF()
+    private val resizeBtnRect = RectF()
+    private val minimizeBtnRect = RectF()
     private val closeBtnRect = RectF()
 
     override fun onDraw(canvas: Canvas) {
@@ -79,16 +88,38 @@ class FloatingKeyboardWrapper(context: Context) : FrameLayout(context) {
         bgPaint.color = theme.candidateBarColorInt
         canvas.drawRect(0f, actionTop, width.toFloat(), height.toFloat(), bgPaint)
 
-        val btnW = width / 3f
+        val btnW = width / 4f
         // 固定按鈕
         dockBtnRect.set(0f, actionTop, btnW, height.toFloat())
         actionPaint.color = theme.candidateTextColorInt
-        canvas.drawText("📌 固定", dockBtnRect.centerX(), dockBtnRect.centerY() + actionPaint.textSize / 3f, actionPaint)
+        canvas.drawText("📌", dockBtnRect.centerX(), dockBtnRect.centerY() + actionPaint.textSize / 3f, actionPaint)
+
+        // 調整大小按鈕
+        resizeBtnRect.set(btnW, actionTop, btnW * 2, height.toFloat())
+        actionPaint.color = theme.candidateTextColorInt
+        canvas.drawText("↔", resizeBtnRect.centerX(), resizeBtnRect.centerY() + actionPaint.textSize / 3f, actionPaint)
+
+        // 縮小（懸浮球）按鈕
+        minimizeBtnRect.set(btnW * 2, actionTop, btnW * 3, height.toFloat())
+        actionPaint.color = 0xFF7FD8FF.toInt()
+        canvas.drawText("●", minimizeBtnRect.centerX(), minimizeBtnRect.centerY() + actionPaint.textSize / 3f, actionPaint)
 
         // 關閉按鈕
-        closeBtnRect.set(btnW * 2, actionTop, width.toFloat(), height.toFloat())
+        closeBtnRect.set(btnW * 3, actionTop, width.toFloat(), height.toFloat())
         actionPaint.color = 0xFFFF6B6B.toInt()
-        canvas.drawText("✕ 關閉", closeBtnRect.centerX(), closeBtnRect.centerY() + actionPaint.textSize / 3f, actionPaint)
+        canvas.drawText("✕", closeBtnRect.centerX(), closeBtnRect.centerY() + actionPaint.textSize / 3f, actionPaint)
+
+        // 右下角 resize 手柄
+        val gripSize = 14f * density
+        val gx = width - gripSize - 4f * density
+        val gy = height - gripSize - 2f * density
+        dragPaint.color = theme.candidateTextColorInt
+        dragPaint.alpha = 120
+        for (i in 0..2) {
+            val off = i * 4f * density
+            canvas.drawLine(gx + off, gy + gripSize, gx + gripSize, gy + off, dragPaint)
+        }
+        dragPaint.alpha = 255
     }
 
     override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
@@ -102,14 +133,24 @@ class FloatingKeyboardWrapper(context: Context) : FrameLayout(context) {
         if (event.y > actionTop) {
             return true
         }
+        // 攔截右下角 resize 手柄
+        val gripZone = 24f * density
+        if (event.x > width - gripZone && event.y > height - gripZone) {
+            return true
+        }
         return false
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
-                // 判斷按在哪個區域
-                if (event.y < dragBarHeight) {
+                val gripZone = 24f * density
+                if (event.x > width - gripZone && event.y > height - gripZone) {
+                    // 右下角 resize 拖曳
+                    isResizing = true
+                    lastTouchX = event.rawX
+                    lastTouchY = event.rawY
+                } else if (event.y < dragBarHeight) {
                     isDragging = true
                     lastTouchX = event.rawX
                     lastTouchY = event.rawY
@@ -124,6 +165,11 @@ class FloatingKeyboardWrapper(context: Context) : FrameLayout(context) {
                     onDragMove?.invoke(dx, dy)
                     lastTouchX = event.rawX
                     lastTouchY = event.rawY
+                } else if (isResizing) {
+                    val dx = (event.rawX - lastTouchX).toInt()
+                    lastTouchX = event.rawX
+                    lastTouchY = event.rawY
+                    onResize?.invoke(dx)
                 }
                 return true
             }
@@ -134,14 +180,26 @@ class FloatingKeyboardWrapper(context: Context) : FrameLayout(context) {
                     performClick()
                     return true
                 }
+                if (isResizing) {
+                    isResizing = false
+                    performClick()
+                    return true
+                }
 
                 // 底部按鈕
                 val actionTop = (height - actionBarHeight).toFloat()
                 if (event.y > actionTop) {
-                    if (dockBtnRect.contains(event.x, event.y)) {
-                        onToggleDock?.invoke()
-                    } else if (closeBtnRect.contains(event.x, event.y)) {
-                        onClose?.invoke()
+                    when {
+                        dockBtnRect.contains(event.x, event.y) -> onToggleDock?.invoke()
+                        resizeBtnRect.contains(event.x, event.y) -> {
+                            // 切換 80% ↔ 100% 寬度
+                            val screenW = resources.displayMetrics.widthPixels
+                            val currentW = (layoutParams as? FrameLayout.LayoutParams)?.width ?: screenW
+                            val targetW = if (currentW < screenW * 0.9f) screenW else (screenW * 0.8f).toInt()
+                            onResize?.invoke(targetW - currentW)
+                        }
+                        minimizeBtnRect.contains(event.x, event.y) -> onMinimize?.invoke()
+                        closeBtnRect.contains(event.x, event.y) -> onClose?.invoke()
                     }
                     performClick()
                     return true
@@ -150,6 +208,7 @@ class FloatingKeyboardWrapper(context: Context) : FrameLayout(context) {
             }
             MotionEvent.ACTION_CANCEL -> {
                 isDragging = false
+                isResizing = false
                 invalidate()
                 return true
             }

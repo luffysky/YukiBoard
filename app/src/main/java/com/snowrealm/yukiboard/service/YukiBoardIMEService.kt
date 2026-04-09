@@ -34,6 +34,7 @@ import com.snowrealm.yukiboard.theme.ThemeManager
 import com.snowrealm.yukiboard.ui.keyboard.KeyModel
 import com.snowrealm.yukiboard.ui.keyboard.RadialLanguageMenu
 import com.snowrealm.yukiboard.ui.keyboard.CharacterView
+import com.snowrealm.yukiboard.ui.keyboard.FloatingBallView
 import com.snowrealm.yukiboard.ui.keyboard.FloatingKeyboardWrapper
 import com.snowrealm.yukiboard.ui.keyboard.KeyboardMode
 import com.snowrealm.yukiboard.ui.keyboard.KeyboardResizeHandle
@@ -63,6 +64,8 @@ class YukiBoardIMEService : InputMethodService() {
     private lateinit var keyboardContainer: FrameLayout
     private var panelControlBar: View? = null
     private var transparencyOverlay: View? = null
+    private var floatingBall: FloatingBallView? = null
+    private var floatingOuterFrame: FrameLayout? = null
     private var isPanelBehindKeyboard = false
     private lateinit var keyboardView: KeyboardView
     private lateinit var inputRouter: InputRouter
@@ -2191,19 +2194,35 @@ class YukiBoardIMEService : InputMethodService() {
 
         // 寬度調整
         val screenW = resources.displayMetrics.widthPixels
+        val screenH = resources.displayMetrics.heightPixels
         val kbWidth = (screenW * prefs.keyboardWidthRatio).toInt()
-        val wrapperParams = FrameLayout.LayoutParams(kbWidth, FrameLayout.LayoutParams.WRAP_CONTENT).apply {
-            gravity = Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM
+
+        // outerFrame 佔螢幕 65% 高度，背景透明 → 鍵盤可自由上下移動
+        val outerFrame = FrameLayout(this).apply {
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            // 點擊空白區域不攔截（讓觸控穿透到下面的 App）
+            isClickable = false
+            isFocusable = false
         }
-        val outerFrame = FrameLayout(this)
+        val outerH = (screenH * 0.65f).toInt()
+
+        // 預設位置：底部居中
+        val wrapperParams = FrameLayout.LayoutParams(kbWidth, FrameLayout.LayoutParams.WRAP_CONTENT)
+        if (prefs.floatingX >= 0) {
+            wrapperParams.gravity = Gravity.NO_GRAVITY
+            wrapperParams.leftMargin = prefs.floatingX
+            wrapperParams.topMargin = prefs.floatingY
+        } else {
+            wrapperParams.gravity = Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM
+        }
         outerFrame.addView(wrapper, wrapperParams)
 
-        // 拖動回呼
+        // 拖動回呼：自由移動，限制在 outerFrame 範圍內
         wrapper.onDragMove = { dx, dy ->
             val lp = wrapper.layoutParams as FrameLayout.LayoutParams
-            lp.leftMargin += dx.toInt()
-            lp.topMargin += dy.toInt()
-            lp.gravity = Gravity.NO_GRAVITY  // 解除 gravity 才能自由移動
+            lp.gravity = Gravity.NO_GRAVITY
+            lp.leftMargin = (lp.leftMargin + dx.toInt()).coerceIn(0, screenW - kbWidth)
+            lp.topMargin = (lp.topMargin + dy.toInt()).coerceIn(0, outerH - dragBarH - actionBarH)
             wrapper.layoutParams = lp
             prefs.floatingX = lp.leftMargin
             prefs.floatingY = lp.topMargin
@@ -2211,23 +2230,119 @@ class YukiBoardIMEService : InputMethodService() {
 
         wrapper.onToggleDock = {
             prefs.floatingModeEnabled = false
-            // 需要重建 InputView
+            prefs.floatingX = -1
+            prefs.floatingY = -1
             setInputView(onCreateInputView())
         }
 
         wrapper.onClose = {
             prefs.floatingModeEnabled = false
-            setInputView(onCreateInputView())
+            requestHideSelf(0)
         }
 
-        // 恢復上次位置
-        if (prefs.floatingX >= 0) {
-            wrapperParams.gravity = Gravity.NO_GRAVITY
-            wrapperParams.leftMargin = prefs.floatingX
-            wrapperParams.topMargin = prefs.floatingY
+        // 調整大小回呼
+        val minW = (screenW * 0.5f).toInt()
+        val maxW = screenW
+        wrapper.onResize = { deltaWidth ->
+            val lp = wrapper.layoutParams as FrameLayout.LayoutParams
+            val newW = (lp.width + deltaWidth).coerceIn(minW, maxW)
+            lp.width = newW
+            // 確保不超出右側邊界
+            if (lp.leftMargin + newW > screenW) {
+                lp.leftMargin = screenW - newW
+            }
+            wrapper.layoutParams = lp
+            prefs.keyboardWidthRatio = newW.toFloat() / screenW
         }
+
+        // 縮小成懸浮球
+        wrapper.onMinimize = {
+            minimizeToFloatingBall()
+        }
+
+        // outerFrame 固定高度 → IME 視窗會變大，給懸浮鍵盤移動空間
+        outerFrame.layoutParams = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, outerH
+        )
+        floatingOuterFrame = outerFrame
 
         return outerFrame
+    }
+
+    /** 懸浮鍵盤 → 懸浮球 */
+    private fun minimizeToFloatingBall() {
+        val outer = floatingOuterFrame ?: return
+        val wrapper = floatingWrapper ?: return
+
+        // 記住 wrapper 目前位置，球出現在同位置
+        val wlp = wrapper.layoutParams as? FrameLayout.LayoutParams
+        val ballX = wlp?.leftMargin ?: 0
+        val ballY = wlp?.topMargin ?: 0
+
+        // 隱藏 wrapper
+        wrapper.visibility = View.GONE
+
+        // 建立懸浮球
+        val ball = FloatingBallView(this).also { floatingBall = it }
+        ball.theme = ThemeManager.getInstance(this).currentTheme
+
+        val screenW = resources.displayMetrics.widthPixels
+        val outerH = outer.layoutParams?.height ?: (resources.displayMetrics.heightPixels * 0.65f).toInt()
+        val ballLp = FrameLayout.LayoutParams(ball.ballSize, ball.ballSize).apply {
+            gravity = Gravity.NO_GRAVITY
+            leftMargin = (ballX + (wlp?.width ?: 0) / 2 - ball.ballSize / 2)
+                .coerceIn(0, screenW - ball.ballSize)
+            topMargin = ballY.coerceIn(0, outerH - ball.ballSize)
+        }
+        outer.addView(ball, ballLp)
+
+        // 球拖動
+        ball.onDragMove = { dx, dy ->
+            val lp = ball.layoutParams as FrameLayout.LayoutParams
+            lp.leftMargin = (lp.leftMargin + dx.toInt()).coerceIn(0, screenW - ball.ballSize)
+            lp.topMargin = (lp.topMargin + dy.toInt()).coerceIn(0, outerH - ball.ballSize)
+            ball.layoutParams = lp
+        }
+
+        // 球點擊展開
+        ball.onExpand = {
+            expandFromFloatingBall()
+        }
+    }
+
+    /** 懸浮球 → 懸浮鍵盤 */
+    private fun expandFromFloatingBall() {
+        val outer = floatingOuterFrame ?: return
+        val ball = floatingBall ?: return
+        val wrapper = floatingWrapper ?: return
+
+        // 把 wrapper 移到球的位置附近
+        val ballLp = ball.layoutParams as? FrameLayout.LayoutParams
+        if (ballLp != null) {
+            val wlp = wrapper.layoutParams as? FrameLayout.LayoutParams
+            if (wlp != null) {
+                wlp.gravity = Gravity.NO_GRAVITY
+                wlp.leftMargin = ballLp.leftMargin
+                wlp.topMargin = ballLp.topMargin
+                wrapper.layoutParams = wlp
+                prefs.floatingX = wlp.leftMargin
+                prefs.floatingY = wlp.topMargin
+            }
+        }
+
+        // 移除球，顯示 wrapper
+        outer.removeView(ball)
+        floatingBall = null
+        wrapper.visibility = View.VISIBLE
+    }
+
+    override fun onComputeInsets(outInsets: Insets) {
+        super.onComputeInsets(outInsets)
+        if (isFloatingMode) {
+            // 懸浮模式：告訴系統不要推移 App 畫面，讓鍵盤浮在上面
+            outInsets.contentTopInsets = outInsets.visibleTopInsets
+            outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_FRAME
+        }
     }
 
     // =========================================================================
