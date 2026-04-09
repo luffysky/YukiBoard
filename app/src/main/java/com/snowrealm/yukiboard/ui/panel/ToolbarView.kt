@@ -73,7 +73,7 @@ class ToolbarView(context: Context) : View(context) {
     private var activeAnimProgress = mutableMapOf<PanelType, Float>() // 0→1 展開
 
     var theme: KeyboardTheme = KeyboardTheme.default()
-        set(value) { field = value; updateBackground(); invalidate() }
+        set(value) { field = value; invalidate() }
 
     var activePanel: PanelType? = null
         set(value) {
@@ -90,21 +90,7 @@ class ToolbarView(context: Context) : View(context) {
     private var isTransparent = false
     fun setTransparent(transparent: Boolean) {
         isTransparent = transparent
-        updateBackground()
         invalidate()
-    }
-
-    private fun updateBackground() {
-        if (isTransparent) {
-            setBackgroundColor(0x88000000.toInt())
-        } else {
-            setBackgroundColor(theme.effectiveToolbarColor())
-        }
-    }
-
-    init {
-        setWillNotDraw(false)
-        updateBackground()
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -115,7 +101,16 @@ class ToolbarView(context: Context) : View(context) {
     }
 
     override fun onDraw(canvas: Canvas) {
-        // 背景由 setBackgroundColor 處理，這裡只畫 icon 和按鈕
+        super.onDraw(canvas)
+
+        // 背景
+        if (isTransparent) {
+            canvas.drawColor(android.graphics.Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
+            bgPaint.color = 0x22000000
+        } else {
+            bgPaint.color = theme.effectiveToolbarColor()
+        }
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
 
         // 計算按鈕佈局（含捲動偏移）
         btnRects.clear()

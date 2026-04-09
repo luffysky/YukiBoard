@@ -284,8 +284,8 @@ class YukiBoardIMEService : InputMethodService() {
         // 垂直佈局：工具列 → 面板容器 → 鍵盤容器
         rootContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            clipChildren = false
-            clipToPadding = false
+            // 注意：不可設 clipChildren=false，否則 KeyboardView.drawBackground()
+            // 的 PorterDuff.Mode.CLEAR 會穿過 keyboardContainer 清掉 toolbar 內容
         }
 
         // 高度調整把手
@@ -1975,7 +1975,6 @@ class YukiBoardIMEService : InputMethodService() {
             toolbarView.setTransparent(true)
         } else {
             w.setBackgroundDrawable(null) // 還原系統預設
-            rootContainer.setBackgroundColor(0xFF111827.toInt()) // 明確還原背景
             toolbarView.setTransparent(false)
         }
     }
