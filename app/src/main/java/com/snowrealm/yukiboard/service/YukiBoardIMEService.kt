@@ -158,6 +158,10 @@ class YukiBoardIMEService : InputMethodService() {
     private var userDictPanel: UserDictionaryPanelView? = null
     private var decryptPanel: com.snowrealm.yukiboard.ui.panel.DecryptPanelView? = null
 
+    // 手寫辨識
+    private var handwritingEngine: com.snowrealm.yukiboard.input.handwriting.HandwritingEngine? = null
+    private var handwritingPanel: HandwritingPanelView? = null
+
     // 鍵盤尺寸調整 + 懸浮
     private var resizeHandle: KeyboardResizeHandle? = null
     private var floatingWrapper: FloatingKeyboardWrapper? = null
@@ -998,6 +1002,7 @@ class YukiBoardIMEService : InputMethodService() {
         weatherFloatingPanel?.dismiss()
         clawResultFloatingPanel?.dismiss()
         glSurfaceView?.onPause()
+        handwritingEngine?.close()
         serviceScope.cancel()
     }
 
@@ -1485,6 +1490,29 @@ class YukiBoardIMEService : InputMethodService() {
                 }
                 p
             }
+            PanelType.HANDWRITING -> {
+                if (handwritingEngine == null) {
+                    handwritingEngine = com.snowrealm.yukiboard.input.handwriting.HandwritingEngine(this).also { it.init() }
+                }
+                val p = HandwritingPanelView(this, handwritingEngine!!).also { handwritingPanel = it }
+                p.theme = theme
+                p.onCandidateSelected = { text ->
+                    currentInputConnection?.commitText(text, 1)
+                }
+                p.onBackspace = {
+                    currentInputConnection?.deleteSurroundingText(1, 0)
+                }
+                p.onConfirm = {
+                    sendDefaultEditorAction(true)
+                }
+                // 確保預設模型已下載
+                p.ensureReady { ready ->
+                    if (!ready) {
+                        android.widget.Toast.makeText(this, "手寫模型下載中…", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+                p
+            }
             else -> return
         }
 
@@ -1518,6 +1546,7 @@ class YukiBoardIMEService : InputMethodService() {
         gifPanel = null
         userDictPanel = null
         decryptPanel = null
+        handwritingPanel = null
         activePanel = null
         toolbarView.activePanel = null
         panelContainer.removeAllViews()

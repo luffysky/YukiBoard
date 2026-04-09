@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 108
-        versionName "0.9.42"
+        versionCode 109
+        versionName "0.9.43"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,10 +82,10 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 懸浮鍵盤重寫 — 真正浮動（65%螢幕空間自由拖曳）\n" +
-                    "- feat: 懸浮球模式 — 按●縮成雪花球，點球展開回鍵盤\n" +
-                    "- feat: 懸浮鍵盤 resize — 右下角拖曳/↔按鈕調整寬度\n" +
-                    "- feat: onComputeInsets 浮動模式不推移 App 畫面"
+                    "- feat: 手寫辨識面板（ML Kit Digital Ink）\n" +
+                    "- feat: 支援繁中/英/日/混合四種手寫語言\n" +
+                    "- feat: 停筆 1.2s 自動辨識 + 候選字列\n" +
+                    "- feat: 語言模型首次使用自動下載"
             }
         }
         debug {
@@ -94,10 +94,10 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 懸浮鍵盤重寫 — 真正浮動（65%螢幕空間自由拖曳）\n" +
-                    "- feat: 懸浮球模式 — 按●縮成雪花球，點球展開回鍵盤\n" +
-                    "- feat: 懸浮鍵盤 resize — 右下角拖曳/↔按鈕調整寬度\n" +
-                    "- feat: onComputeInsets 浮動模式不推移 App 畫面"
+                    "- feat: 手寫辨識面板（ML Kit Digital Ink）\n" +
+                    "- feat: 支援繁中/英/日/混合四種手寫語言\n" +
+                    "- feat: 停筆 1.2s 自動辨識 + 候選字列\n" +
+                    "- feat: 語言模型首次使用自動下載"
             }
         }
     }
@@ -192,6 +192,9 @@ dependencies {
 
     // MLKit 翻譯（離線模型）
     implementation 'com.google.mlkit:translate:17.0.3'
+
+    // MLKit Digital Ink Recognition（手寫辨識）
+    implementation 'com.google.mlkit:digital-ink-recognition:18.1.0'
 
     // TFLite（防詐本地模型推論）
     implementation 'org.tensorflow:tensorflow-lite:2.14.0'

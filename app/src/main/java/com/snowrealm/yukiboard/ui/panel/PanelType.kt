@@ -19,6 +19,7 @@ enum class PanelType(val icon: String, val displayName: String) {
     DECRYPT("🔐", "解密"),
     COLOR_PICKER("🎯", "色碼"),
     UNIT_CONVERTER("📏", "換算"),
+    HANDWRITING("✍", "手寫"),
     THEME("🎨", "主題"),
     SETTINGS("⚙", "設定")
 }
