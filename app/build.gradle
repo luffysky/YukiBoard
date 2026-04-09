@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 111
-        versionName "0.9.45"
+        versionCode 112
+        versionName "0.9.46"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,10 +82,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 手寫撤銷筆畫（↶ undo）\n" +
-                    "- feat: 連續手寫模式 — 辨識後 2.5s 自動送出 + 清畫布\n" +
-                    "- feat: 壓感筆畫粗細（壓力感應 2.5~7dp）\n" +
-                    "- feat: 語言模型管理（⚙ 按鈕展開下載/刪除模型）"
+                    "- fix: 面板收回後自訂背景消失（closePanel 恢復背景狀態）\n" +
+                    "- fix: 切換 App 再回來候選字殘留（onStartInputView 清候選）\n" +
+                    "- feat: 手寫撤銷/連續/壓感 + 語言模型管理"
             }
         }
         debug {
@@ -94,10 +93,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 手寫撤銷筆畫（↶ undo）\n" +
-                    "- feat: 連續手寫模式 — 辨識後 2.5s 自動送出 + 清畫布\n" +
-                    "- feat: 壓感筆畫粗細（壓力感應 2.5~7dp）\n" +
-                    "- feat: 語言模型管理（⚙ 按鈕展開下載/刪除模型）"
+                    "- fix: 面板收回後自訂背景消失（closePanel 恢復背景狀態）\n" +
+                    "- fix: 切換 App 再回來候選字殘留（onStartInputView 清候選）\n" +
+                    "- feat: 手寫撤銷/連續/壓感 + 語言模型管理"
             }
         }
     }

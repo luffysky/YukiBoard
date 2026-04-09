@@ -703,6 +703,8 @@ class YukiBoardIMEService : InputMethodService() {
             ic.endBatchEdit()
         }
         inputRouter.reset()
+        keyboardView.updateCandidates(emptyList())
+        keyboardView.updateComposingText("")
 
         // 重新套用鍵盤高度（設定頁可能已修改 / 螢幕旋轉）
         val kbHeight = calculateKeyboardHeight()
@@ -1568,6 +1570,12 @@ class YukiBoardIMEService : InputMethodService() {
         keyboardView.isEnabled = true
         keyboardView.requestFocus()
         keyboardView.resetTouchState()
+        // 恢復自訂背景（面板操作可能影響 z-order）
+        val bgHas = backgroundView?.reloadFromStorage() ?: false
+        val useCustomBg = prefs.useCustomBackground && bgHas
+        val glassKeys = useCustomBg || prefs.transparentKeyboard
+        keyboardView.hasCustomBackground = glassKeys
+        keyboardView.invalidate()
     }
 
     /**
