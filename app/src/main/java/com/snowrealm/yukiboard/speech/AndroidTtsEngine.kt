@@ -75,8 +75,9 @@ class AndroidTtsEngine(context: Context, private val onInitDone: ((Boolean) -> U
                         .build()
                 )
                 // 套用已選語音
-                if (!selectedVoiceName.isNullOrEmpty()) {
-                    applyVoiceByName(selectedVoiceName!!)
+                val voiceName = selectedVoiceName
+                if (!voiceName.isNullOrEmpty()) {
+                    applyVoiceByName(voiceName)
                 }
                 Log.i(tag, "TTS initialized, engine=${tts?.defaultEngine}, voices=${getAvailableVoices().size}")
             } else {
@@ -165,10 +166,11 @@ class AndroidTtsEngine(context: Context, private val onInitDone: ((Boolean) -> U
         }
 
         // 設定語言（注意：setLanguage 會覆蓋已選語音，有自訂語音時跳過）
-        if (!selectedVoiceName.isNullOrEmpty() && hasCustomVoice) {
+        val currentVoiceName = selectedVoiceName
+        if (!currentVoiceName.isNullOrEmpty() && hasCustomVoice) {
             // 每次朗讀前重新確認語音（某些 TTS 引擎會在 setLanguage 後重置 voice）
-            if (engine.voice?.name != selectedVoiceName) {
-                applyVoiceByName(selectedVoiceName!!)
+            if (engine.voice?.name != currentVoiceName) {
+                applyVoiceByName(currentVoiceName)
             }
             Log.i(tag, "speak: using custom voice=${engine.voice?.name}, text=${text.take(30)}")
         } else {

@@ -112,7 +112,7 @@ class CalculatorPanelView(context: Context) : View(context) {
         if (operand1 != null && operator != null) {
             displayPaint.textSize = 12f * density
             displayPaint.alpha = 150
-            val expr = formatNumber(operand1!!) + " $operator"
+            val expr = (operand1?.let { formatNumber(it) } ?: "0") + " $operator"
             canvas.drawText(expr, w - gap * 3, displayRect.top + 14f * density, displayPaint)
             displayPaint.alpha = 255
         }

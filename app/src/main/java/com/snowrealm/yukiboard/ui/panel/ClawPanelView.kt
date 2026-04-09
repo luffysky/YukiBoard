@@ -196,8 +196,9 @@ class ClawPanelView(context: Context) : LinearLayout(context) {
                 val accumulated = StringBuilder()
                 var hasStream = false
 
+                val c = client ?: run { resultView.showError("AI 未連線"); return@launch }
                 withContext(Dispatchers.IO) {
-                    client!!.streamSkill(prompt, systemPrompt)
+                    c.streamSkill(prompt, systemPrompt)
                 }.collect { chunk ->
                     hasStream = true
                     accumulated.append(chunk)
@@ -217,7 +218,7 @@ class ClawPanelView(context: Context) : LinearLayout(context) {
                 } else {
                     // 串流不可用 → fallback 到一次性執行
                     val output = withContext(Dispatchers.IO) {
-                        client!!.executeSkill(skillId, input)
+                        c.executeSkill(skillId, input)
                     }
                     resultView.showResults(output.suggestions)
                 }

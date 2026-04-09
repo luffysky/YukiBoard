@@ -130,6 +130,8 @@ class VoiceRecognitionOverlay(context: Context) : View(context) {
 
     private var typewriterAnimator: ValueAnimator? = null
 
+    private val autoDismissRunnable = Runnable { dismiss() }
+
     private val countdownRunnable = object : Runnable {
         override fun run() {
             if (countdownSeconds > 0) {
@@ -223,7 +225,8 @@ class VoiceRecognitionOverlay(context: Context) : View(context) {
         waveAnimator.cancel()
         invalidate()
         // 3 秒後自動關閉
-        postDelayed({ dismiss() }, 3000)
+        removeCallbacks(autoDismissRunnable)
+        postDelayed(autoDismissRunnable, 3000)
     }
 
     fun dismiss() {
@@ -614,5 +617,6 @@ class VoiceRecognitionOverlay(context: Context) : View(context) {
         breathAnimator.cancel()
         typewriterAnimator?.cancel()
         removeCallbacks(countdownRunnable)
+        removeCallbacks(autoDismissRunnable)
     }
 }

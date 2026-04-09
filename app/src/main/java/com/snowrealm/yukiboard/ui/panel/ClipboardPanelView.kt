@@ -898,7 +898,7 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
                             handleLongPress(downX, downY)
                         }
                     }
-                    handler.postDelayed(longPressRunnable!!, longPressTimeout)
+                    longPressRunnable?.let { handler.postDelayed(it, longPressTimeout) }
                     return true
                 }
                 MotionEvent.ACTION_MOVE -> {

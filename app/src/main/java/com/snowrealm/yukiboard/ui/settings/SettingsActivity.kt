@@ -1899,7 +1899,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun testFasterWhisperConnection(serverUrl: String, statusView: TextView) {
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+        activityScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val client = okhttp3.OkHttpClient.Builder()
                     .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)

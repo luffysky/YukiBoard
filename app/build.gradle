@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 99
-        versionName "0.9.33"
+        versionCode 100
+        versionName "0.9.34"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,12 +82,12 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 最上排按鍵觸控區域延伸，候選列不再攔截第一排\n" +
-                    "- fix: ClipboardPanel encryptedData 空值崩潰\n" +
-                    "- fix: InputRouter lastCommittedWord 空值崩潰（3處）\n" +
-                    "- fix: AUTO 模式切換引擎候選字不再閃爍消失\n" +
-                    "- fix: 詞庫面板 null 安全改善\n" +
-                    "- fix: 天氣面板 coroutine 加 try-catch 防崩潰"
+                    "- fix: 全專案 !! 強制解包崩潰修復（11處）\n" +
+                    "- fix: ZCoinManager topUp/syncBalance 加 @Synchronized 防競態\n" +
+                    "- fix: KeyboardView/IMEService onDetach/onDestroy 補清理\n" +
+                    "- fix: VoiceOverlay/CharacterView/IMEService 具名 Runnable 防洩漏\n" +
+                    "- fix: OAuthCallback coroutine 加 try-catch\n" +
+                    "- fix: SettingsActivity 匿名 CoroutineScope 改 activityScope"
             }
         }
         debug {
@@ -96,12 +96,12 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 最上排按鍵觸控區域延伸，候選列不再攔截第一排\n" +
-                    "- fix: ClipboardPanel encryptedData 空值崩潰\n" +
-                    "- fix: InputRouter lastCommittedWord 空值崩潰（3處）\n" +
-                    "- fix: AUTO 模式切換引擎候選字不再閃爍消失\n" +
-                    "- fix: 詞庫面板 null 安全改善\n" +
-                    "- fix: 天氣面板 coroutine 加 try-catch 防崩潰"
+                    "- fix: 全專案 !! 強制解包崩潰修復（11處）\n" +
+                    "- fix: ZCoinManager topUp/syncBalance 加 @Synchronized 防競態\n" +
+                    "- fix: KeyboardView/IMEService onDetach/onDestroy 補清理\n" +
+                    "- fix: VoiceOverlay/CharacterView/IMEService 具名 Runnable 防洩漏\n" +
+                    "- fix: OAuthCallback coroutine 加 try-catch\n" +
+                    "- fix: SettingsActivity 匿名 CoroutineScope 改 activityScope"
             }
         }
     }

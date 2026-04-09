@@ -157,6 +157,7 @@ class YukiBoardIMEService : InputMethodService() {
     private var isFloatingMode = false
 
     // 遊戲相關
+    private val showGameMenuRunnable = Runnable { showGameMenu() }
     private var gameMenuView: GameMenuView? = null
     private var gameKeyboardView: GameKeyboardView? = null
     private var gameLoop: GameLoopRunner? = null
@@ -246,8 +247,8 @@ class YukiBoardIMEService : InputMethodService() {
         val weatherMgr = com.snowrealm.yukiboard.weather.WeatherManager(applicationContext)
         weatherFloatingPanel = com.snowrealm.yukiboard.weather.WeatherFloatingPanel(applicationContext, weatherMgr)
         clawResultFloatingPanel = com.snowrealm.yukiboard.ui.floating.ClawResultFloatingPanel(applicationContext)
-        floatingPanelManager?.registerPanel(weatherFloatingPanel!!)
-        floatingPanelManager?.registerPanel(clawResultFloatingPanel!!)
+        weatherFloatingPanel?.let { floatingPanelManager?.registerPanel(it) }
+        clawResultFloatingPanel?.let { floatingPanelManager?.registerPanel(it) }
 
         // 下一步動作預測
         nextActionPredictor = com.snowrealm.yukiboard.input.predict.RuleBasedPredictor()
@@ -941,6 +942,10 @@ class YukiBoardIMEService : InputMethodService() {
         backgroundView?.destroy()
         translateEngine?.close()
         rimeDictionary?.close()
+        floatingPanelManager?.dismissAll()
+        weatherFloatingPanel?.dismiss()
+        clawResultFloatingPanel?.dismiss()
+        glSurfaceView?.onPause()
         serviceScope.cancel()
     }
 
@@ -2261,13 +2266,15 @@ class YukiBoardIMEService : InputMethodService() {
                 val isNewHighScore = game.scoreManager.saveHighScoreIfNeeded(game.gameMode)
                 gkv.hudText = if (isNewHighScore) "新紀錄! ${game.scoreManager.currentScore}" else "遊戲結束"
                 characterView?.playGameOver()
-                gkv.postDelayed({ showGameMenu() }, 3000)
+                gkv.removeCallbacks(showGameMenuRunnable)
+                gkv.postDelayed(showGameMenuRunnable, 3000)
             }
             GameEvent.VICTORY -> {
                 game.scoreManager.saveHighScoreIfNeeded(game.gameMode)
                 gkv.hudText = "勝利! ${game.scoreManager.currentScore} 分"
                 characterView?.playVictory()
-                gkv.postDelayed({ showGameMenu() }, 3000)
+                gkv.removeCallbacks(showGameMenuRunnable)
+                gkv.postDelayed(showGameMenuRunnable, 3000)
             }
         }
     }

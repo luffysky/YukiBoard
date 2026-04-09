@@ -42,17 +42,24 @@ class OAuthCallbackActivity : AppCompatActivity() {
 
         Log.d("OAuthCallback", "Token received: ${token.take(20)}...")
         scope.launch {
-            val me = authClient.fetchMe()
-            Log.d("OAuthCallback", "fetchMe result: ${me?.displayName}, role=${me?.role}, tenant=${me?.tenantId}")
-            Log.d("OAuthCallback", "isLoggedIn=${authClient.isLoggedIn}, currentUser=${authClient.currentUser}")
-            withContext(Dispatchers.Main) {
-                // 回到 LoginActivity 並通知成功
-                val loginIntent = Intent(this@OAuthCallbackActivity, LoginActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                    putExtra("oauth_success", true)
+            try {
+                val me = authClient.fetchMe()
+                Log.d("OAuthCallback", "fetchMe result: ${me?.displayName}, role=${me?.role}, tenant=${me?.tenantId}")
+                Log.d("OAuthCallback", "isLoggedIn=${authClient.isLoggedIn}, currentUser=${authClient.currentUser}")
+                withContext(Dispatchers.Main) {
+                    // 回到 LoginActivity 並通知成功
+                    val loginIntent = Intent(this@OAuthCallbackActivity, LoginActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                        putExtra("oauth_success", true)
+                    }
+                    startActivity(loginIntent)
+                    finish()
                 }
-                startActivity(loginIntent)
-                finish()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("OAuthCallback", "fetchMe failed: ${e.message}")
+                withContext(Dispatchers.Main) { finish() }
             }
         }
     }

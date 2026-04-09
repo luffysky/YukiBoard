@@ -58,6 +58,7 @@ class ZCoinManager(context: Context) {
     }
 
     /** 儲值 Z幣（藍新金流回調後呼叫） */
+    @Synchronized
     fun topUp(amount: Int, orderId: String) {
         if (amount <= 0) return
         balance += amount
@@ -70,6 +71,7 @@ class ZCoinManager(context: Context) {
     }
 
     /** 從伺服器同步餘額 */
+    @Synchronized
     fun syncBalance(serverBalance: Int) {
         balance = serverBalance
     }

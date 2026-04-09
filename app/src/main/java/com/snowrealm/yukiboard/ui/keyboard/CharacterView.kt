@@ -57,6 +57,7 @@ class CharacterView @JvmOverloads constructor(
 
     private var isIdling = false
     private var wanderAnimator: ObjectAnimator? = null
+    private val wanderRunnable = Runnable { wanderToNext() }
     private var wanderEnabled = true
     private var animationProfile = AnimationProfile()
     private var keystrokeCount = 0
@@ -154,6 +155,7 @@ class CharacterView @JvmOverloads constructor(
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
+        removeCallbacks(wanderRunnable)
         stopWandering()
         if (renderMode == RenderMode.VRM) {
             vrmView?.destroy()
@@ -223,7 +225,7 @@ class CharacterView @JvmOverloads constructor(
             addListener(object : android.animation.AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: android.animation.Animator) {
                     if (wanderEnabled) {
-                        postDelayed({ wanderToNext() }, 1500L + Random.nextLong(2500L))
+                        postDelayed(wanderRunnable, 1500L + Random.nextLong(2500L))
                     }
                 }
             })

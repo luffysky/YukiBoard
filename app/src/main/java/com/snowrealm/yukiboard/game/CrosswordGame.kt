@@ -97,7 +97,7 @@ class CrosswordGame(context: Context) : GameLogic {
             return
         }
         currentPuzzle = puzzles[currentQuestion]
-        val word = currentPuzzle!!.word
+        val word = currentPuzzle?.word ?: return
         // 隨機遮 1~2 個字
         val count = if (currentQuestion < 5) 1 else 2
         missingIndices = (0 until word.length).shuffled().take(count).sorted()

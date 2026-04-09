@@ -2217,6 +2217,7 @@ class KeyboardView(context: Context) : View(context) {
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         swipeDwellHandler.removeCallbacks(swipeDwellRunnable)
+        handler.removeCallbacksAndMessages(null)
     }
 
     override fun performClick(): Boolean {
