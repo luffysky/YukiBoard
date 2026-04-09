@@ -58,6 +58,7 @@ class CharacterView @JvmOverloads constructor(
     private var isIdling = false
     private var wanderAnimator: ObjectAnimator? = null
     private val wanderRunnable = Runnable { wanderToNext() }
+    private val playIdleRunnable = Runnable { playIdle() }
     private var wanderEnabled = true
     private var animationProfile = AnimationProfile()
     private var keystrokeCount = 0
@@ -117,7 +118,8 @@ class CharacterView @JvmOverloads constructor(
             vv.loadModelFromAsset(assetPath)
 
             // VRM 載入後自動 playIdle
-            vv.postDelayed({ playIdle() }, 2000)
+            vv.removeCallbacks(playIdleRunnable)
+            vv.postDelayed(playIdleRunnable, 2000)
         } catch (e: Throwable) {
             // VRM/Filament 初始化失敗（含 native lib 缺失），fallback 回 Lottie
             Log.e("CharacterView", "VRM init failed, fallback to Lottie: ${e.javaClass.simpleName}: ${e.message}", e)
@@ -132,6 +134,7 @@ class CharacterView @JvmOverloads constructor(
 
     private fun cleanupCurrentMode() {
         stopWandering()
+        vrmView?.removeCallbacks(playIdleRunnable)
         when (renderMode) {
             RenderMode.LOTTIE -> {
                 lottieView?.let { removeView(it) }

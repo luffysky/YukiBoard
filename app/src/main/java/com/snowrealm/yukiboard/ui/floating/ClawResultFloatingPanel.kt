@@ -146,10 +146,17 @@ class ClawResultFloatingPanel(
     private fun playTypewriterEffect(text: String) {
         scope.coroutineContext.cancelChildren()
         scope.launch {
-            resultText?.text = ""
-            for (i in text.indices) {
-                resultText?.text = text.substring(0, i + 1)
-                delay(25)
+            try {
+                resultText?.text = ""
+                for (i in text.indices) {
+                    if (!isActive) break
+                    resultText?.text = text.substring(0, i + 1)
+                    delay(25)
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                resultText?.text = text
             }
         }
     }

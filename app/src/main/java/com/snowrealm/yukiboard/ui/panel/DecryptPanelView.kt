@@ -71,6 +71,12 @@ class DecryptPanelView(context: Context) : View(context), PanelInputTarget {
     private var isDragging = false
     private var contentHeight = 0f
 
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val w = MeasureSpec.getSize(widthMeasureSpec)
+        val maxH = (260 * resources.displayMetrics.density).toInt()
+        setMeasuredDimension(w, maxH)
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         buttons.clear()
@@ -108,7 +114,7 @@ class DecryptPanelView(context: Context) : View(context), PanelInputTarget {
             "cipher", if (cipherText.isEmpty()) 0xFF556677.toInt() else 0xFFE8F4FF.toInt())
 
         // ── 按鈕列 ──
-        val btnH = 36f * density
+        val btnH = 32f * density
         val btnGap = 8f * density
         val btnW = (w - pad * 2 - btnGap * 2) / 3f
 
@@ -175,7 +181,7 @@ class DecryptPanelView(context: Context) : View(context), PanelInputTarget {
 
     private fun drawFieldCard(canvas: Canvas, startY: Float, pad: Float, w: Float,
                               label: String, value: String, btnId: String, valueColor: Int): Float {
-        val cardH = 52f * density
+        val cardH = 44f * density
         val rect = RectF(pad, startY, w - pad, startY + cardH)
         val isFocused = isInputMode && activeField == btnId
 
@@ -272,9 +278,7 @@ class DecryptPanelView(context: Context) : View(context), PanelInputTarget {
                 return true
             }
             MotionEvent.ACTION_UP -> {
-                if (!isDragging && pressedBtn != null) {
-                    handleClick(pressedBtn!!)
-                }
+                pressedBtn?.takeIf { !isDragging }?.let { handleClick(it) }
                 pressedBtn = null
                 invalidate()
                 return true

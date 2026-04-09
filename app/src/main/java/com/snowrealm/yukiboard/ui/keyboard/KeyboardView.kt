@@ -185,6 +185,20 @@ class KeyboardView(context: Context) : View(context) {
     private var candidateIsDragging = false
     private var candidateTouchActive = false
     // 候選字���度快取（每次 draw 時更新）
+    // 候選字長按放大鏡
+    private var candidateLongPressIndex = -1
+    private var candidateLongPressActive = false
+    private var candidateLongPressX = 0f
+    private val CANDIDATE_LONG_PRESS_DELAY = 400L
+    private val candidateLongPressRunnable = Runnable {
+        val idx = hitTestCandidateIndex(candidateLongPressX)
+        if (idx >= 0 && idx < candidates.size) {
+            candidateLongPressIndex = idx
+            candidateLongPressActive = true
+            if (hapticEnabled) vibrateShort()
+            invalidate()
+        }
+    }
     private var candWidthsCache: List<Float> = emptyList()
     private var candFixedLeftCache = 0f
     private var candGapCache = 0f
@@ -345,26 +359,30 @@ class KeyboardView(context: Context) : View(context) {
         }
     }
 
+    private var pendingToastClear: Runnable? = null
+
     fun showToast(msg: String) {
         modeToastText = msg
         modeToastEndTime = System.currentTimeMillis() + modeToastDuration
         invalidate()
-        handler.postDelayed({
+        pendingToastClear?.let { handler.removeCallbacks(it) }
+        pendingToastClear = Runnable {
             if (modeToastText == msg) {
                 modeToastText = null
                 invalidate()
             }
-        }, modeToastDuration)
+        }.also { handler.postDelayed(it, modeToastDuration) }
     }
 
     private fun showModeToast(mode: KeyboardMode) {
         modeToastText = "${mode.icon} ${mode.displayName}"
         modeToastEndTime = System.currentTimeMillis() + modeToastDuration
         invalidate()
-        handler.postDelayed({
+        pendingToastClear?.let { handler.removeCallbacks(it) }
+        pendingToastClear = Runnable {
             modeToastText = null
             invalidate()
-        }, modeToastDuration)
+        }.also { handler.postDelayed(it, modeToastDuration) }
     }
 
     // -------------------------------------------------------------------------
@@ -594,6 +612,7 @@ class KeyboardView(context: Context) : View(context) {
         candidateTouchActive = false
         candidateIsDragging = false
         pressedKey = null
+        isLongPressTriggered = false
         isSwipingActive = false
         swipePoints.clear()
         swipeKeySequence.clear()
@@ -886,6 +905,11 @@ class KeyboardView(context: Context) : View(context) {
 
         // 長按 alt-char overlay（最頂層）
         drawAltPopupOverlay(canvas)
+
+        // 候選字長按放大鏡
+        if (candidateLongPressActive && candidateLongPressIndex >= 0) {
+            drawCandidateMagnifier(canvas, candidateLongPressIndex)
+        }
     }
 
     private var bgGradient: LinearGradient? = null
@@ -1143,6 +1167,44 @@ class KeyboardView(context: Context) : View(context) {
         }
     }
 
+    private fun drawCandidateMagnifier(canvas: Canvas, index: Int) {
+        val text = candidates.getOrNull(index) ?: return
+        val bubbleW = 80f * density
+        val bubbleH = 48f * density
+        val cornerR = 10f * density
+
+        var accum = candFixedLeftCache - candidateScrollX
+        for (i in 0 until index) accum += (candWidthsCache.getOrNull(i) ?: 0f) + candGapCache
+        val candCx = accum + (candWidthsCache.getOrNull(index) ?: 0f) / 2f
+        val bubbleLeft = (candCx - bubbleW / 2f).coerceIn(0f, width - bubbleW)
+        val bubbleTop = -bubbleH - 8f * density
+
+        val bgPaintM = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = theme.keyColorInt }
+        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = theme.candidateSelectedColorInt
+            style = Paint.Style.STROKE
+            strokeWidth = 1.5f * density
+        }
+        val rect = RectF(bubbleLeft, bubbleTop, bubbleLeft + bubbleW, bubbleTop + bubbleH)
+        canvas.drawRoundRect(rect, cornerR, cornerR, bgPaintM)
+        canvas.drawRoundRect(rect, cornerR, cornerR, borderPaint)
+
+        val magnifyPaint = Paint(candidatePaint).apply {
+            textSize = 22f * density
+            textAlign = Paint.Align.CENTER
+            color = theme.candidateSelectedColorInt
+            isFakeBoldText = true
+        }
+        canvas.drawText(text, rect.centerX(), rect.centerY() + magnifyPaint.textSize * 0.35f, magnifyPaint)
+
+        val tail = Path()
+        tail.moveTo(rect.centerX() - 6f * density, rect.bottom)
+        tail.lineTo(rect.centerX(), rect.bottom + 6f * density)
+        tail.lineTo(rect.centerX() + 6f * density, rect.bottom)
+        tail.close()
+        canvas.drawPath(tail, bgPaintM)
+    }
+
     /**
      * 根據螢幕觸控 x 座標算出對應的候選字 index。
      * 使用與 drawCandidateBar 相同的 width 計算邏輯，避免座標系不匹配。
@@ -1282,7 +1344,10 @@ class KeyboardView(context: Context) : View(context) {
             row.forEach { key ->
                 val keyWidth = unitWidth * key.widthWeight
                 // 第一排往上延伸，確保候選列邊界附近的觸碰也能命中按鍵
-                val touchTop = if (rowIndex == 0) 0f else top
+                val touchTop = when (rowIndex) {
+                    0 -> 0f
+                    else -> top - rh * 0.3f
+                }
                 val touchRect = RectF(x, touchTop, x + keyWidth, top + rh)
 
                 // 個別按鍵尺寸倍率
@@ -1903,6 +1968,8 @@ class KeyboardView(context: Context) : View(context) {
                     candidateDownX = x
                     candidateIsDragging = false
                     candidateTouchActive = true
+                    candidateLongPressX = x
+                    handler.postDelayed(candidateLongPressRunnable, CANDIDATE_LONG_PRESS_DELAY)
                     return true
                 }
                 candidateTouchActive = false
@@ -1924,7 +1991,7 @@ class KeyboardView(context: Context) : View(context) {
                 var hit = keyEntries.firstOrNull { it.touchRect.contains(x, y) }
                 // 精確命中失敗時，找最近的按鍵（擴大觸控範圍，改善首鍵捕捉）
                 if (hit == null && y >= candidateBarHeight) {
-                    val expandPx = 8f * density
+                    val expandPx = 16f * density
                     hit = keyEntries.firstOrNull {
                         val r = it.touchRect
                         x >= r.left - expandPx && x <= r.right + expandPx &&
@@ -1972,6 +2039,7 @@ class KeyboardView(context: Context) : View(context) {
                 }
                 // 候選列橫向捲動
                 if (candidateTouchActive && candidates.isNotEmpty()) {
+                    handler.removeCallbacks(candidateLongPressRunnable)
                     val dx = candidateLastTouchX - x
                     if (!candidateIsDragging && Math.abs(dx) > 8 * density) {
                         candidateIsDragging = true
@@ -2044,6 +2112,7 @@ class KeyboardView(context: Context) : View(context) {
                 handler.removeCallbacks(longPressRunnable)
                 handler.removeCallbacks(deleteRepeatRunnable)
                 pressedKey = null
+                isLongPressTriggered = false
                 if (isSpaceLongPressed) {
                     isSpaceLongPressed = false
                     onSpaceLongPressListener?.invoke(false)
@@ -2136,7 +2205,17 @@ class KeyboardView(context: Context) : View(context) {
 
                 // 候選列觸控選字（支援點擊 + 滑動釋放選字）
                 if (candidateTouchActive && candidates.isNotEmpty()) {
+                    handler.removeCallbacks(candidateLongPressRunnable)
                     candidateTouchActive = false
+
+                    if (candidateLongPressActive) {
+                        candidateLongPressActive = false
+                        candidateLongPressIndex = -1
+                        invalidate()
+                        performClick()
+                        return true  // 長按：不選字，只取消放大鏡
+                    }
+
                     val totalDragX = Math.abs(x - candidateDownX)
 
                     // 展開箭頭：點擊右側 ▼ 區域

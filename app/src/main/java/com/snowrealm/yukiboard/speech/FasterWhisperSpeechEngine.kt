@@ -92,6 +92,7 @@ class FasterWhisperSpeechEngine(
             val pcmStream = ByteArrayOutputStream()
             val buffer = ShortArray(bufferSize / 2)
             var lastPartialTime = System.currentTimeMillis()
+            var silenceStartTime = 0L
             val partialAccumulated = StringBuilder()
 
             try {
@@ -101,6 +102,22 @@ class FasterWhisperSpeechEngine(
                         for (i in 0 until read) {
                             pcmStream.write(buffer[i].toInt() and 0xFF)
                             pcmStream.write((buffer[i].toInt() shr 8) and 0xFF)
+                        }
+
+                        // 靜音偵測：振幅低於閾值超過 3 秒自動停止
+                        val maxAmplitude = (0 until read)
+                            .maxOfOrNull { kotlin.math.abs(buffer[it].toInt()) } ?: 0
+                        val silenceNow = System.currentTimeMillis()
+                        if (maxAmplitude < SILENCE_AMPLITUDE_THRESHOLD) {
+                            if (silenceStartTime == 0L) silenceStartTime = silenceNow
+                            else if (silenceNow - silenceStartTime >= SILENCE_THRESHOLD_MS
+                                     && pcmStream.size() > sampleRate * 2) {
+                                Log.i(tag, "silence detected, auto-stopping")
+                                isListening = false
+                                break
+                            }
+                        } else {
+                            silenceStartTime = 0L
                         }
 
                         // 定期送 partial
@@ -250,5 +267,7 @@ class FasterWhisperSpeechEngine(
         const val ERROR_NO_PERMISSION = 201
         const val ERROR_AUDIO_INIT = 202
         const val ERROR_NETWORK = 203
+        private const val SILENCE_AMPLITUDE_THRESHOLD = 500
+        private const val SILENCE_THRESHOLD_MS = 3000L
     }
 }

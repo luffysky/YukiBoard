@@ -275,6 +275,8 @@ class YukiBoardIMEService : InputMethodService() {
         // 垂直佈局：工具列 → 面板容器 → 鍵盤容器
         rootContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            clipChildren = false
+            clipToPadding = false
         }
 
         // 高度調整把手
@@ -312,7 +314,10 @@ class YukiBoardIMEService : InputMethodService() {
         ))
 
         // 鍵盤容器（FrameLayout 疊加鍵盤 + GL + Lottie + 面板覆蓋）
-        keyboardContainer = FrameLayout(this)
+        keyboardContainer = FrameLayout(this).apply {
+            clipChildren = false
+            clipToPadding = false
+        }
 
         keyboardView = KeyboardView(this)
         keyboardView.setOnKeyPressListener { keyCode, label ->
@@ -655,6 +660,12 @@ class YukiBoardIMEService : InputMethodService() {
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        // 清除上一個 session 的 composing 殘留
+        currentInputConnection?.let { ic ->
+            ic.beginBatchEdit()
+            ic.finishComposingText()
+            ic.endBatchEdit()
+        }
         inputRouter.reset()
 
         // 重新套用鍵盤高度（設定頁可能已修改 / 螢幕旋轉）
@@ -2992,9 +3003,10 @@ class YukiBoardIMEService : InputMethodService() {
                     }
                 }
 
-                ic.setComposingText("", 0)
+                ic.beginBatchEdit()
                 ic.finishComposingText()
                 ic.commitText(result.text, 1)
+                ic.endBatchEdit()
                 characterView?.playHappy()
                 forwardTextToRemote(result.text)
 

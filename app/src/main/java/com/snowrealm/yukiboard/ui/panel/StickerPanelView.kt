@@ -378,10 +378,17 @@ class StickerPanelView(context: Context) : View(context) {
         if (url in loadingUrls) return null
         loadingUrls.add(url)
         scope.launch {
-            val bmp = repository?.getStickerBitmap(url)
-            loadedBitmaps[url] = bmp
-            loadingUrls.remove(url)
-            post { invalidate() }
+            try {
+                val bmp = repository?.getStickerBitmap(url)
+                loadedBitmaps[url] = bmp
+                loadingUrls.remove(url)
+                post { invalidate() }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                loadingUrls.remove(url)
+                android.util.Log.w("StickerPanel", "load failed: ${e.message}")
+            }
         }
         return null
     }

@@ -609,6 +609,15 @@ class InputRouter(private val context: Context) {
                     var score = 0f
                     val freq = smartInput.adaptiveDictionary.getFrequency(word)
                     if (freq > 0) score += freq + 50
+                    // 基礎常用字加分
+                    if (word.length == 1) {
+                        val commonScore = (bopomofoEngine as? com.snowrealm.yukiboard.input.engine.ChewingInputEngine)
+                            ?.getCommonCharScore(word.first()) ?: 0
+                        score += commonScore * 0.4f
+                    }
+                    // 常用詞組加分
+                    val commonFreq = COMMON_WORD_FREQUENCY[word]
+                    if (commonFreq != null) score += commonFreq
                     val ctxScore = contextPredictions[word]
                     if (ctxScore != null) score += ctxScore * 5
                     // 串聯預測加分（上一字的接續候選）
@@ -891,6 +900,18 @@ class InputRouter(private val context: Context) {
                 }
             }
         }
+    }
+
+    companion object {
+        private val COMMON_WORD_FREQUENCY = mapOf(
+            "的" to 40f, "是" to 38f, "在" to 35f, "了" to 34f, "我" to 33f,
+            "他" to 32f, "她" to 32f, "你" to 32f, "們" to 30f, "不" to 30f,
+            "有" to 29f, "這" to 28f, "那" to 28f, "也" to 27f, "就" to 26f,
+            "都" to 25f, "說" to 25f, "要" to 24f, "會" to 24f, "來" to 23f,
+            "去" to 23f, "可以" to 28f, "沒有" to 27f, "知道" to 25f,
+            "覺得" to 24f, "喜歡" to 23f, "謝謝" to 22f, "好的" to 22f,
+            "OK" to 20f, "ok" to 20f, "嗯" to 18f, "哈哈" to 17f,
+        )
     }
 }
 

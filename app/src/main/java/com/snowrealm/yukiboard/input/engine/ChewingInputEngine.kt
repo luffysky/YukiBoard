@@ -290,6 +290,8 @@ class ChewingInputEngine(
 
     override fun getCandidates(): List<String> = currentCandidates
 
+    fun getCommonCharScore(ch: Char): Int = COMMON_CHAR_FREQ[ch] ?: 0
+
     override fun reset() {
         bopomofoBuffer.clear()
         selectedBuffer.clear()
