@@ -83,6 +83,18 @@ class InputRouter(private val context: Context) {
 
     // 前一個提交詞（供智慧糾錯上下文用）
     private var lastCommittedWord: String? = null
+    /**
+     * AUTO 模式切引擎時，若注音引擎有 selectedBuffer 累積的已選字，
+     * 暫存在這裡讓 Service 層先 commit，避免切引擎 reset 丟失已選字。
+     */
+    var pendingCommitText: String? = null
+        private set
+    /** 取出並清空 pendingCommitText */
+    fun consumePendingCommit(): String? {
+        val text = pendingCommitText
+        pendingCommitText = null
+        return text
+    }
     // 目前 App 套件名（供習慣追蹤用）
     var currentAppPackage: String? = null
     // 輸入框上下文（由 Service 從 getTextBeforeCursor 設定，200 字元）
@@ -269,15 +281,17 @@ class InputRouter(private val context: Context) {
         fun directCommit(text: String): InputResult {
             val eng = activeEngine
             if (eng is ChewingInputEngine) {
-                // 注音引擎有 selectedBuffer（已選字累積）
-                // pending 文字已在 IC composing buffer 中，applyInputResult 的
-                // finishComposingText() 會自動 commit，這裡只回傳新選的文字
+                // 注音引擎有 selectedBuffer（已選字累積），
+                // reset 前先取出，和新選的 text 合併一起 commit，
+                // 否則 applyInputResult 的 setComposingText("",1) 會清掉已選字
+                val pending = eng.getSelectedBuffer()
                 eng.reset()
                 candidateManager.clear()
-                onTextCommitted(text)
+                val fullText = pending + text
+                onTextCommitted(fullText)
                 smartInput.onCandidateHit()
                 updateCandidates()
-                return InputResult.CommitText(text)
+                return InputResult.CommitText(fullText)
             }
             activeEngine.reset()
             candidateManager.clear()
@@ -451,8 +465,12 @@ class InputRouter(private val context: Context) {
 
         if (engScore - bopoScore >= threshold && activeEngine !is EnglishInputEngine) {
             // 切到英文引擎（保持 currentMode = AUTO）
+            // 如果注音引擎有 selectedBuffer，先暫存讓 Service commit
+            if (activeEngine is ChewingInputEngine) {
+                val pending = (activeEngine as ChewingInputEngine).getSelectedBuffer()
+                if (pending.isNotEmpty()) pendingCommitText = pending
+            }
             activeEngine.reset()
-            // 不要先 clear，先切引擎並取得新候選
             activeEngine = englishEngine
             for (c in autoQwertyBuffer.toString().dropLast(1)) {
                 englishEngine.processChar(c.toString())

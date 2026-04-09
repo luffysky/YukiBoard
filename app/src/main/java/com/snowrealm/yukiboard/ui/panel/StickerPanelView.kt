@@ -112,6 +112,33 @@ class StickerPanelView(context: Context) : View(context) {
 
     private val downloadProgressMap = mutableMapOf<String, StickerPackDownloadManager.DownloadProgress>()
 
+    /** 情緒推薦標籤（由 EmotionStickerEngine 提供） */
+    private var recommendedTags: List<String> = emptyList()
+    private var hasRecommendation = false
+
+    /**
+     * 設定情緒推薦標籤。StickerPanelView 會在貼圖包列中優先顯示匹配的貼圖包，
+     * 並在頂部顯示「推薦」標示。
+     */
+    fun setRecommendedTags(tags: List<String>) {
+        recommendedTags = tags
+        hasRecommendation = tags.isNotEmpty()
+        if (hasRecommendation) {
+            // 找到匹配推薦標籤的貼圖包，排到最前
+            val matchIdx = filteredPacks.indexOfFirst { pack ->
+                tags.any { tag ->
+                    pack.name.contains(tag, ignoreCase = true) ||
+                    pack.id.contains(tag, ignoreCase = true) ||
+                    pack.stickers.any { s -> s.url.contains(tag, ignoreCase = true) }
+                }
+            }
+            if (matchIdx >= 0) {
+                selectedPackIndex = matchIdx
+            }
+        }
+        invalidate()
+    }
+
     private val headerH = 28f * density
     private val packBarH = 36f * density
     private val cornerR = 8f * density

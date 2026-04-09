@@ -7,6 +7,7 @@ enum class AIProviderType {
     ANTHROPIC,
     GEMINI,
     GROQ,
+    GEMINI_NANO,
     SNOWREALM
 }
 

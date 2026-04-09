@@ -133,6 +133,7 @@ class AISettingsActivity : AppCompatActivity() {
         val providers = listOf(
             Triple(AIProviderType.GEMINI, "Google Gemini（免費推薦）", true),
             Triple(AIProviderType.GROQ, "Groq（免費超快）", true),
+            Triple(AIProviderType.GEMINI_NANO, "Gemini Nano（本地離線）", true),
             Triple(AIProviderType.OPENAI, "OpenAI", true),
             Triple(AIProviderType.ANTHROPIC, "Anthropic", true),
             Triple(AIProviderType.SNOWREALM, "SnowRealm（邀請碼）", true)
@@ -211,6 +212,9 @@ class AISettingsActivity : AppCompatActivity() {
                 AIProviderType.ANTHROPIC -> listOf(
                     "claude-haiku" to "claude-haiku (推薦)",
                     "claude-sonnet" to "claude-sonnet"
+                )
+                AIProviderType.GEMINI_NANO -> listOf(
+                    "gemini-nano" to "Gemini Nano (本地離線)"
                 )
                 AIProviderType.SNOWREALM -> listOf(
                     "snowrealm-default" to "SnowRealm Default"

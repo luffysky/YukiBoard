@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 105
-        versionName "0.9.39"
+        versionCode 107
+        versionName "0.9.41"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,8 +82,15 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 功能列不可見（鍵盤高度未扣除 toolbar 開銷導致 IME 裁切）\n" +
-                    "- fix: 候選字重複提交（注音 directCommit + finishComposingText 雙重 commit）"
+                    "- feat: 單手模式（左手/右手）— 長按⚙切換，邊欄按鈕換向/還原\n" +
+                    "- feat: 鍵盤即時透明度浮動滑桿 — 長按🎨叫出（背景/按鍵/文字）\n" +
+                    "- feat: 色碼選擇器面板 — HSV 取色 + HEX/RGB/HSL + 最近色\n" +
+                    "- feat: 單位換算面板 — 長度/重量/溫度/面積 + 台灣單位\n" +
+                    "- feat: 候選列貼圖情緒推薦提示\n" +
+                    "- feat: Gemini Nano 本地離線 AI 供應商\n" +
+                    "- feat: 工具列長按支援（主題透明度/單手切換）\n" +
+                    "- fix: 選候選字後前面已選字消失\n" +
+                    "- fix: 按鍵反應遲鈍"
             }
         }
         debug {
@@ -92,8 +99,15 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 功能列不可見（鍵盤高度未扣除 toolbar 開銷導致 IME 裁切）\n" +
-                    "- fix: 候選字重複提交（注音 directCommit + finishComposingText 雙重 commit）"
+                    "- feat: 單手模式（左手/右手）— 長按⚙切換，邊欄按鈕換向/還原\n" +
+                    "- feat: 鍵盤即時透明度浮動滑桿 — 長按🎨叫出（背景/按鍵/文字）\n" +
+                    "- feat: 色碼選擇器面板 — HSV 取色 + HEX/RGB/HSL + 最近色\n" +
+                    "- feat: 單位換算面板 — 長度/重量/溫度/面積 + 台灣單位\n" +
+                    "- feat: 候選列貼圖情緒推薦提示\n" +
+                    "- feat: Gemini Nano 本地離線 AI 供應商\n" +
+                    "- feat: 工具列長按支援（主題透明度/單手切換）\n" +
+                    "- fix: 選候選字後前面已選字消失\n" +
+                    "- fix: 按鍵反應遲鈍"
             }
         }
     }
@@ -118,6 +132,37 @@ android {
             assets.srcDirs = ['src/main/assets']
         }
     }
+}
+
+// RIME 詞庫轉換 task：build 前用 Python 腳本轉換 RIME → SQLite
+tasks.register('convertRimeDict') {
+    def scriptFile = rootProject.file('scripts/convert_rime_dict.py')
+    def dictsDir = rootProject.file('scripts/dicts')
+    def outputDb = file('src/main/assets/rime_bopomofo.db')
+
+    // 只在 scripts/dicts/ 有 .yaml 檔案時執行
+    onlyIf {
+        scriptFile.exists() && dictsDir.exists() &&
+            dictsDir.listFiles()?.any { it.name.endsWith('.yaml') }
+    }
+
+    inputs.dir(dictsDir)
+    outputs.file(outputDb)
+
+    doLast {
+        exec {
+            commandLine 'python3', scriptFile.absolutePath,
+                '--local-dir', dictsDir.absolutePath
+        }
+        // 搬移產出的 DB 到 assets
+        def generatedDb = rootProject.file('rime_bopomofo.db')
+        if (generatedDb.exists() && generatedDb.absolutePath != outputDb.absolutePath) {
+            generatedDb.renameTo(outputDb)
+        }
+    }
+}
+tasks.matching { it.name.startsWith('merge') && it.name.contains('Assets') }.configureEach {
+    dependsOn 'convertRimeDict'
 }
 
 dependencies {

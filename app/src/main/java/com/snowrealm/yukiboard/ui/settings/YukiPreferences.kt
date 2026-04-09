@@ -170,6 +170,9 @@ class YukiPreferences(context: Context) {
 
     var floatingModeEnabled: Boolean by BoolPref("floating_mode", false)
 
+    /** 單手模式: "NONE", "LEFT", "RIGHT" */
+    var oneHandSide: String by StringPref("one_hand_side", "NONE")
+
     var floatingX: Int by IntPref("floating_x", -1)
     var floatingY: Int by IntPref("floating_y", -1)
 
@@ -272,6 +275,13 @@ class YukiPreferences(context: Context) {
             prefs.getInt(key, default)
         operator fun setValue(thisRef: Any?, property: KProperty<*>, value: Int) =
             prefs.edit().putInt(key, value).apply()
+    }
+
+    private inner class StringPref(private val key: String, private val default: String) {
+        operator fun getValue(thisRef: Any?, property: KProperty<*>): String =
+            prefs.getString(key, default) ?: default
+        operator fun setValue(thisRef: Any?, property: KProperty<*>, value: String) =
+            prefs.edit().putString(key, value).apply()
     }
 
     companion object {

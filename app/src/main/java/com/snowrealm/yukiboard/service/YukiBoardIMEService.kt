@@ -62,6 +62,7 @@ class YukiBoardIMEService : InputMethodService() {
     private lateinit var topPanelContainer: FrameLayout
     private lateinit var keyboardContainer: FrameLayout
     private var panelControlBar: View? = null
+    private var transparencyOverlay: View? = null
     private var isPanelBehindKeyboard = false
     private lateinit var keyboardView: KeyboardView
     private lateinit var inputRouter: InputRouter
@@ -299,6 +300,13 @@ class YukiBoardIMEService : InputMethodService() {
         // 工具列
         toolbarView = ToolbarView(this)
         toolbarView.onPanelSelected = { panel -> handlePanelToggle(panel) }
+        toolbarView.onPanelLongPressed = { panel ->
+            when (panel) {
+                PanelType.THEME -> showTransparencyOverlay()
+                PanelType.SETTINGS -> toggleOneHandMode()
+                else -> {}
+            }
+        }
         rootContainer.addView(toolbarView, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
@@ -517,6 +525,10 @@ class YukiBoardIMEService : InputMethodService() {
             }
         }
 
+        keyboardView.onStickerHintClick = {
+            handlePanelToggle(PanelType.STICKER)
+        }
+
         // 自訂圖片/影片背景（最底層）
         val bgView = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView(this)
         bgView.scaleMode = prefs.bgScaleMode
@@ -552,6 +564,14 @@ class YukiBoardIMEService : InputMethodService() {
         keyboardView.hapticEnabled = prefs.keyPressVibration
         keyboardView.swipeTrailEnabled = prefs.swipeTrailEnabled
         keyboardView.swipeInputEnabled = prefs.swipeInput
+
+        // 單手模式
+        keyboardView.oneHandSide = try {
+            KeyboardView.OneHandSide.valueOf(prefs.oneHandSide)
+        } catch (_: Exception) { KeyboardView.OneHandSide.NONE }
+        keyboardView.onOneHandChanged = { side ->
+            prefs.oneHandSide = side.name
+        }
 
         // 套用當前主題
         val currentTheme = ThemeManager.getInstance(this).currentTheme
@@ -1446,6 +1466,22 @@ class YukiBoardIMEService : InputMethodService() {
                 p.enterInputMode()
                 p
             }
+            PanelType.COLOR_PICKER -> {
+                val p = ColorPickerPanelView(this)
+                p.theme = theme
+                p.onInsertColor = { colorCode ->
+                    currentInputConnection?.commitText(colorCode, 1)
+                }
+                p
+            }
+            PanelType.UNIT_CONVERTER -> {
+                val p = UnitConverterPanelView(this)
+                p.theme = theme
+                p.onInsertResult = { result ->
+                    currentInputConnection?.commitText(result, 1)
+                }
+                p
+            }
             else -> return
         }
 
@@ -1569,6 +1605,156 @@ class YukiBoardIMEService : InputMethodService() {
         panelControlBar?.let { rootContainer.removeView(it) }
         panelControlBar = null
         panelContainer.alpha = 1f
+    }
+
+    // ── 鍵盤即時透明度浮動滑桿 ──
+
+    private fun showTransparencyOverlay() {
+        hideTransparencyOverlay()
+        val dp = resources.displayMetrics.density
+
+        val overlay = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(0xDD1A1A2E.toInt())
+            setPadding((12 * dp).toInt(), (8 * dp).toInt(), (12 * dp).toInt(), (8 * dp).toInt())
+        }
+
+        // 標題列：標題 + 關閉按鈕
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+        header.addView(android.widget.TextView(this).apply {
+            text = "🎨 透明度調整"
+            textSize = 12f
+            setTextColor(0xFF7FD8FF.toInt())
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        })
+        header.addView(android.widget.TextView(this).apply {
+            text = "✕"
+            textSize = 14f
+            setTextColor(0xFF8899AA.toInt())
+            setPadding((8 * dp).toInt(), 0, 0, 0)
+            setOnClickListener { hideTransparencyOverlay() }
+        })
+        overlay.addView(header)
+
+        // 背景遮罩透明度
+        val bgLabel = android.widget.TextView(this).apply {
+            text = "背景遮罩: %d%%".format((prefs.bgOverlayAlpha * 100) / 255)
+            textSize = 11f
+            setTextColor(0xFFB0D4FF.toInt())
+            setPadding(0, (6 * dp).toInt(), 0, (2 * dp).toInt())
+        }
+        overlay.addView(bgLabel)
+        overlay.addView(android.widget.SeekBar(this).apply {
+            max = 255
+            progress = prefs.bgOverlayAlpha
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(sb: android.widget.SeekBar?, p: Int, fromUser: Boolean) {
+                    if (!fromUser) return
+                    prefs.bgOverlayAlpha = p
+                    bgLabel.text = "背景遮罩: %d%%".format((p * 100) / 255)
+                    keyboardView.bgOverlayAlpha = p
+                    backgroundView?.overlayAlpha = p
+                    keyboardView.invalidate()
+                }
+                override fun onStartTrackingTouch(sb: android.widget.SeekBar?) {}
+                override fun onStopTrackingTouch(sb: android.widget.SeekBar?) {}
+            })
+        })
+
+        // 按鍵不透明度
+        val keyLabel = android.widget.TextView(this).apply {
+            text = "按鍵不透明度: %d%%".format((prefs.keyOpacity * 100) / 255)
+            textSize = 11f
+            setTextColor(0xFFB0D4FF.toInt())
+            setPadding(0, (4 * dp).toInt(), 0, (2 * dp).toInt())
+        }
+        overlay.addView(keyLabel)
+        overlay.addView(android.widget.SeekBar(this).apply {
+            max = 255
+            progress = prefs.keyOpacity
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(sb: android.widget.SeekBar?, p: Int, fromUser: Boolean) {
+                    if (!fromUser) return
+                    prefs.keyOpacity = p
+                    keyLabel.text = "按鍵不透明度: %d%%".format((p * 100) / 255)
+                    keyboardView.keyOpacity = p
+                    keyboardView.invalidate()
+                }
+                override fun onStartTrackingTouch(sb: android.widget.SeekBar?) {}
+                override fun onStopTrackingTouch(sb: android.widget.SeekBar?) {}
+            })
+        })
+
+        // 文字不透明度
+        val textLabel = android.widget.TextView(this).apply {
+            text = "文字不透明度: %d%%".format((prefs.keyTextOpacity * 100) / 255)
+            textSize = 11f
+            setTextColor(0xFFB0D4FF.toInt())
+            setPadding(0, (4 * dp).toInt(), 0, (2 * dp).toInt())
+        }
+        overlay.addView(textLabel)
+        overlay.addView(android.widget.SeekBar(this).apply {
+            max = 255
+            progress = prefs.keyTextOpacity
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(sb: android.widget.SeekBar?, p: Int, fromUser: Boolean) {
+                    if (!fromUser) return
+                    prefs.keyTextOpacity = p
+                    textLabel.text = "文字不透明度: %d%%".format((p * 100) / 255)
+                    keyboardView.keyTextOpacity = p
+                    keyboardView.invalidate()
+                }
+                override fun onStartTrackingTouch(sb: android.widget.SeekBar?) {}
+                override fun onStopTrackingTouch(sb: android.widget.SeekBar?) {}
+            })
+        })
+
+        // 插入到 toolbarView 之後
+        val toolbarIndex = rootContainer.indexOfChild(toolbarView)
+        if (toolbarIndex < 0) return
+        rootContainer.addView(overlay, toolbarIndex + 1, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ))
+        transparencyOverlay = overlay
+    }
+
+    private fun hideTransparencyOverlay() {
+        transparencyOverlay?.let { rootContainer.removeView(it) }
+        transparencyOverlay = null
+    }
+
+    /** 單手模式：NONE → LEFT → RIGHT → NONE 循環 */
+    private fun toggleOneHandMode() {
+        val current = keyboardView.oneHandSide
+        val next = when (current) {
+            KeyboardView.OneHandSide.NONE -> KeyboardView.OneHandSide.RIGHT
+            KeyboardView.OneHandSide.RIGHT -> KeyboardView.OneHandSide.LEFT
+            KeyboardView.OneHandSide.LEFT -> KeyboardView.OneHandSide.NONE
+        }
+        keyboardView.oneHandSide = next
+        prefs.oneHandSide = next.name
+        val msg = when (next) {
+            KeyboardView.OneHandSide.NONE -> "全寬鍵盤"
+            KeyboardView.OneHandSide.LEFT -> "左手模式"
+            KeyboardView.OneHandSide.RIGHT -> "右手模式"
+        }
+        keyboardView.showToast(msg)
     }
 
     /** 交換面板與鍵盤的圖層：��板到後面 → 可打字；再按一次 → 面板回前面 */
@@ -3027,6 +3213,16 @@ class YukiBoardIMEService : InputMethodService() {
     }
 
     private fun applyInputResult(ic: InputConnection, result: InputResult) {
+        // AUTO 模式切引擎時，注音引擎的 selectedBuffer 可能被暫存，
+        // 需要先 commit 出去，否則已選字會消失
+        val pending = inputRouter.consumePendingCommit()
+        if (!pending.isNullOrEmpty()) {
+            ic.beginBatchEdit()
+            ic.setComposingText("", 1)  // 清掉舊 composing（含已選字+未完成注音）
+            ic.commitText(pending, 1)   // 只 commit 已選字部分
+            ic.endBatchEdit()
+        }
+
         when (result) {
             is InputResult.CommitText -> {
                 // 情緒冷靜期檢查
@@ -3070,6 +3266,17 @@ class YukiBoardIMEService : InputMethodService() {
                                 yukiSpeechBubble?.show(response, charAnchor)
                             }
                         }
+                    }
+                }
+
+                // 情緒貼圖推薦（提交 ≥2 字時分析情緒，推薦匹配貼圖標籤）
+                if (result.text.length >= 2) {
+                    val tags = inputRouter.smartInput.getEmotionStickerTags(sentenceBuffer.toString())
+                    if (tags.isNotEmpty()) {
+                        stickerPanel?.setRecommendedTags(tags)
+                        keyboardView.recommendedStickerEmoji = "🖼"
+                    } else {
+                        keyboardView.recommendedStickerEmoji = null
                     }
                 }
 

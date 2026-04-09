@@ -87,6 +87,7 @@ class AIProviderManager private constructor(context: Context) {
                 AIProviderType.ANTHROPIC -> AnthropicProvider(apiKey)
                 AIProviderType.GEMINI -> GeminiProvider(apiKey)
                 AIProviderType.GROQ -> GroqProvider(apiKey)
+                AIProviderType.GEMINI_NANO -> GeminiNanoProvider(appContext)
                 AIProviderType.SNOWREALM -> SnowRealmProvider(appContext)
             }
         }
@@ -132,6 +133,7 @@ class AIProviderManager private constructor(context: Context) {
     fun hasValidConfig(): Boolean {
         val type = getSelectedProviderType()
         if (type == AIProviderType.SNOWREALM) return true  // 用邀請碼，不需 API key
+        if (type == AIProviderType.GEMINI_NANO) return true  // 本地推論，不需 API key
         val key = getApiKey(type)
         return !key.isNullOrBlank()
     }

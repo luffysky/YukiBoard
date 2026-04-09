@@ -17,6 +17,8 @@ enum class PanelType(val icon: String, val displayName: String) {
     PHRASE("💬", "常用語"),
     USER_DICT("📖", "詞庫"),
     DECRYPT("🔐", "解密"),
+    COLOR_PICKER("🎯", "色碼"),
+    UNIT_CONVERTER("📏", "換算"),
     THEME("🎨", "主題"),
     SETTINGS("⚙", "設定")
 }

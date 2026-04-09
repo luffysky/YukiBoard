@@ -288,6 +288,9 @@ class ChewingInputEngine(
         }
     }
 
+    /** 取得已選字累積 buffer（供 InputRouter 在 directCommit 時合併輸出） */
+    fun getSelectedBuffer(): String = selectedBuffer.toString()
+
     override fun getCandidates(): List<String> = currentCandidates
 
     fun getCommonCharScore(ch: Char): Int = COMMON_CHAR_FREQ[ch] ?: 0

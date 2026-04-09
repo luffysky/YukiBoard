@@ -176,6 +176,11 @@ class KeyboardView(context: Context) : View(context) {
     private var allCandidates: List<String> = emptyList()
     internal var candidateSourceMap: Map<String, CandidateSource> = emptyMap()
         private set
+    /** 推薦貼圖情緒標籤（非空時在候選列末尾顯示貼圖提示） */
+    var recommendedStickerEmoji: String? = null
+        set(value) { field = value; invalidate() }
+    var onStickerHintClick: (() -> Unit)? = null
+    private var stickerHintRect: RectF? = null
     private var isSwipeCandidateMode: Boolean = false
     private var isCandidateExpanded: Boolean = false
     // 候選列橫向捲動
@@ -245,6 +250,15 @@ class KeyboardView(context: Context) : View(context) {
     /** 語音辨識中的語言（null = 未啟動） */
     var voiceListeningLocale: String? = null
         set(value) { field = value; invalidate() }
+
+    /** 單手模式 */
+    enum class OneHandSide { NONE, LEFT, RIGHT }
+    var oneHandSide: OneHandSide = OneHandSide.NONE
+        set(value) { field = value; invalidate() }
+    private val oneHandRatio = 0.75f  // 單手模式佔螢幕寬度比例
+    var onOneHandChanged: ((OneHandSide) -> Unit)? = null
+    private var oneHandBtnRect = RectF()   // 切換按鈕
+    private var oneHandExpandRect = RectF() // 還原全寬按鈕
 
     /** 子佈局：NORMAL 模式下可切換數字/符號鍵盤 */
     private enum class SubLayout { ABC, NUMBERS, SYMBOLS, NUMPAD }
@@ -887,6 +901,13 @@ class KeyboardView(context: Context) : View(context) {
             drawKeysInRegion(canvas, keyRows, 0f, dividerX)
             drawDivider(canvas, dividerX)
             drawKeysInRegion(canvas, sideRows, dividerX, width.toFloat())
+        } else if (oneHandSide != OneHandSide.NONE) {
+            val kbWidth = width * oneHandRatio
+            val marginWidth = width - kbWidth
+            val kbLeft = if (oneHandSide == OneHandSide.LEFT) 0f else marginWidth
+            val kbRight = if (oneHandSide == OneHandSide.LEFT) kbWidth else width.toFloat()
+            drawKeysInRegion(canvas, keyRows, kbLeft, kbRight)
+            drawOneHandMargin(canvas, kbLeft, kbRight, marginWidth)
         } else {
             drawKeysInRegion(canvas, keyRows, 0f, width.toFloat())
         }
@@ -943,6 +964,47 @@ class KeyboardView(context: Context) : View(context) {
         } else {
             canvas.drawColor(theme.backgroundColorInt)
         }
+    }
+
+    /**
+     * 單手模式邊欄：切換方向按鈕 + 還原全寬按鈕。
+     */
+    private fun drawOneHandMargin(canvas: Canvas, kbLeft: Float, kbRight: Float, marginWidth: Float) {
+        val isLeft = oneHandSide == OneHandSide.LEFT
+        val marginLeft = if (isLeft) kbRight else 0f
+        val marginRight = if (isLeft) width.toFloat() else kbLeft
+
+        // 邊欄底色（半透明深色）
+        val marginPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        marginPaint.color = (theme.backgroundColorInt and 0x00FFFFFF) or (0x60 shl 24)
+        canvas.drawRect(marginLeft, candidateBarHeight, marginRight, height.toFloat(), marginPaint)
+
+        val cx = (marginLeft + marginRight) / 2f
+        val btnW = marginWidth * 0.7f
+        val btnH = 36f * density
+        val gap = 12f * density
+
+        // 切換方向按鈕（箭頭）
+        val switchY = candidateBarHeight + (height - candidateBarHeight) * 0.35f
+        oneHandBtnRect.set(cx - btnW / 2f, switchY - btnH / 2f, cx + btnW / 2f, switchY + btnH / 2f)
+        marginPaint.color = (theme.keyColorInt and 0x00FFFFFF) or (0xCC shl 24)
+        canvas.drawRoundRect(oneHandBtnRect, 8f * density, 8f * density, marginPaint)
+        val arrow = if (isLeft) "⟩" else "⟨"  // 指向另一側
+        val arrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textAlign = Paint.Align.CENTER
+            textSize = 20f * density
+            color = 0xFFB0D4FF.toInt()
+        }
+        canvas.drawText(arrow, cx, switchY + 7f * density, arrowPaint)
+
+        // 還原全寬按鈕
+        val expandY = switchY + btnH / 2f + gap + btnH / 2f
+        oneHandExpandRect.set(cx - btnW / 2f, expandY - btnH / 2f, cx + btnW / 2f, expandY + btnH / 2f)
+        marginPaint.color = (theme.keyColorInt and 0x00FFFFFF) or (0x80 shl 24)
+        canvas.drawRoundRect(oneHandExpandRect, 8f * density, 8f * density, marginPaint)
+        arrowPaint.textSize = 14f * density
+        arrowPaint.color = 0xFF8899AA.toInt()
+        canvas.drawText("⟷", cx, expandY + 5f * density, arrowPaint)
     }
 
     /** 將顏色的 alpha 乘以指定比例 */
@@ -1133,6 +1195,30 @@ class KeyboardView(context: Context) : View(context) {
             }
 
             drawX = right + candGap
+        }
+
+        // 候選列末尾推薦貼圖提示
+        val stickerEmoji = recommendedStickerEmoji
+        if (stickerEmoji != null && candidates.isNotEmpty()) {
+            val hintW = 36f * density
+            val hintLeft = drawX + 4f * density
+            val hintRight = hintLeft + hintW
+            val hintTop = 4f * density
+            val hintBot = candidateBarHeight - 4f * density
+            val hintRect = RectF(hintLeft, hintTop, hintRight, hintBot)
+            // 柔和膠囊背景
+            keyPaint.color = 0x20FF9800.toInt()
+            canvas.drawRoundRect(hintRect, 8f * density, 8f * density, keyPaint)
+            // 貼圖 emoji
+            candidatePaint.textSize = 16f * density
+            candidatePaint.color = 0xFFFFFFFF.toInt()
+            candidatePaint.textAlign = Paint.Align.CENTER
+            canvas.drawText("🖼", hintRect.centerX(), hintRect.centerY() + 6f * density, candidatePaint)
+            candidatePaint.textSize = 15f * density
+            // 記錄位置供觸控用（需 scroll 偏移修正）
+            stickerHintRect = RectF(hintLeft + candidateScrollX, hintTop, hintRight + candidateScrollX, hintBot)
+        } else {
+            stickerHintRect = null
         }
 
         canvas.restore()
@@ -2065,11 +2151,19 @@ class KeyboardView(context: Context) : View(context) {
                     return true
                 }
                 val currentRect = longPressRect
-                if (currentRect != null && !currentRect.contains(x, y)) {
-                    handler.removeCallbacks(longPressRunnable)
-                    handler.removeCallbacks(deleteRepeatRunnable)
-                    pressedKey = null
-                    invalidate()
+                if (currentRect != null) {
+                    // 加入 8dp 容錯，手指微移不取消按壓
+                    val moveTolerance = 8f * density
+                    val inTolerance = x >= currentRect.left - moveTolerance &&
+                        x <= currentRect.right + moveTolerance &&
+                        y >= currentRect.top - moveTolerance &&
+                        y <= currentRect.bottom + moveTolerance
+                    if (!inTolerance) {
+                        handler.removeCallbacks(longPressRunnable)
+                        handler.removeCallbacks(deleteRepeatRunnable)
+                        pressedKey = null
+                        invalidate()
+                    }
                 }
                 // 滑動輸入：追蹤經過的按鍵
                 if (swipeInputEnabled && !isLongPressTriggered && y >= candidateBarHeight) {
@@ -2243,11 +2337,44 @@ class KeyboardView(context: Context) : View(context) {
                         performClick()
                         return true
                     }
+                    // 貼圖推薦提示觸控 → 開啟貼圖面板
+                    val hintR = stickerHintRect
+                    if (hintR != null && hintR.contains(x + candidateScrollX, y)) {
+                        onStickerHintClick?.invoke()
+                        performClick()
+                        return true
+                    }
                     performClick()
                     return true
                 }
 
-                val hit = keyEntries.firstOrNull { it.touchRect.contains(x, y) }
+                // 單手模式邊欄按鈕
+                if (oneHandSide != OneHandSide.NONE) {
+                    if (oneHandBtnRect.contains(x, y)) {
+                        val newSide = if (oneHandSide == OneHandSide.LEFT) OneHandSide.RIGHT else OneHandSide.LEFT
+                        oneHandSide = newSide
+                        onOneHandChanged?.invoke(newSide)
+                        performClick()
+                        return true
+                    }
+                    if (oneHandExpandRect.contains(x, y)) {
+                        oneHandSide = OneHandSide.NONE
+                        onOneHandChanged?.invoke(OneHandSide.NONE)
+                        performClick()
+                        return true
+                    }
+                }
+
+                var hit = keyEntries.firstOrNull { it.touchRect.contains(x, y) }
+                // 擴大觸控範圍（與 ACTION_DOWN 一致，避免微移導致按鍵不觸發）
+                if (hit == null && y >= candidateBarHeight) {
+                    val expandPx = 16f * density
+                    hit = keyEntries.firstOrNull {
+                        val r = it.touchRect
+                        x >= r.left - expandPx && x <= r.right + expandPx &&
+                        y >= r.top - expandPx && y <= r.bottom + expandPx
+                    }
+                }
                 if (hit != null) {
                     val key = hit.key
                     when {

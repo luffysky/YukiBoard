@@ -201,6 +201,27 @@ MVVM + Clean Architecture
 - [ ] 貼圖包下載管理
 - [ ] 實際 Lottie 角色動畫設計（目前為幾何佔位動畫）
 
+## 環境變數 / API Key
+
+`.env` 檔案放在專案根目錄，`app/build.gradle` 會讀取並注入 `BuildConfig`。
+
+| 變數名 | 用途 | 申請 |
+|--------|------|------|
+| `INVITE_HMAC_SECRET` | 邀請碼 HMAC 簽名密鑰 | 自行設定（開發用預設 `yukiboard_dev_2026`） |
+| `PLATFORM_API_KEY` | SnowRealm Platform 通訊金鑰 | Insight Engine 後台產生 |
+| `INSIGHT_API_BASE_URL` | Insight Engine API 基底 URL | 預設 `https://insight.snowrealm.pet` |
+| `GIPHY_API_KEY` | Giphy GIF 搜尋 | https://developers.giphy.com/ |
+| `OPENAI_API_KEY` | OpenAI（GPT / Whisper） | https://platform.openai.com/api-keys |
+| `ANTHROPIC_API_KEY` | Anthropic（Claude） | https://console.anthropic.com/settings/keys |
+| `OPENWEATHER_API_KEY` | OpenWeatherMap 天氣 | https://home.openweathermap.org/api_keys |
+| `YUKIBOARD_SUPABASE_URL` | Supabase 專案 URL（Z幣/商城/排行榜） | https://supabase.com/dashboard |
+| `YUKIBOARD_SUPABASE_ANON_KEY` | Supabase anon key | 同上，Settings → API |
+| `NEWEBPAY_MERCHANT_ID` | 藍新金流商店代號（Z幣儲值） | https://www.newebpay.com/ |
+| `NEWEBPAY_HASH_KEY` | 藍新 HashKey | 藍新商店後台 → 交易設定 |
+| `NEWEBPAY_HASH_IV` | 藍新 HashIV | 同上 |
+
+> 正式版 AI Key 由使用者在 AISettingsActivity 自行輸入，`.env` 僅供開發測試。
+
 ## 開發環境
 
 - **compileSdk** 35, **minSdk** 26

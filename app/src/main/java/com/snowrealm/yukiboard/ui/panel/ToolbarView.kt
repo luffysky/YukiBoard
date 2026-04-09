@@ -86,6 +86,17 @@ class ToolbarView(context: Context) : View(context) {
         }
 
     var onPanelSelected: ((PanelType) -> Unit)? = null
+    var onPanelLongPressed: ((PanelType) -> Unit)? = null
+
+    private val longPressHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var longPressTriggered = false
+    private val longPressRunnable = Runnable {
+        val panel = pressedPanel ?: return@Runnable
+        longPressTriggered = true
+        onPanelLongPressed?.invoke(panel)
+        pressedPanel = null
+        invalidate()
+    }
 
     private var isTransparent = false
     fun setTransparent(transparent: Boolean) {
@@ -236,10 +247,16 @@ class ToolbarView(context: Context) : View(context) {
                 touchDownScrollX = scrollX
                 touchDownTime = SystemClock.uptimeMillis()
                 isDragging = false
+                longPressTriggered = false
 
                 // 判斷按壓的按鈕
                 pressedPanel = btnRects.firstOrNull { it.rect.contains(event.x + scrollX - (scrollX - touchDownScrollX), event.y) }?.panel
                     ?: btnRects.firstOrNull { it.rect.contains(event.x, event.y) }?.panel
+                // 排程長按偵測
+                longPressHandler.removeCallbacks(longPressRunnable)
+                if (pressedPanel != null) {
+                    longPressHandler.postDelayed(longPressRunnable, 500)
+                }
                 invalidate()
             }
 
@@ -248,6 +265,7 @@ class ToolbarView(context: Context) : View(context) {
                 if (!isDragging && abs(dx) > scrollThreshold) {
                     isDragging = true
                     pressedPanel = null
+                    longPressHandler.removeCallbacks(longPressRunnable)
                     invalidate()
                 }
                 if (isDragging && maxScrollX > 0f) {
@@ -257,9 +275,16 @@ class ToolbarView(context: Context) : View(context) {
             }
 
             MotionEvent.ACTION_UP -> {
+                longPressHandler.removeCallbacks(longPressRunnable)
                 val elapsed = SystemClock.uptimeMillis() - touchDownTime
                 val dx = abs(event.x - touchDownX)
                 pressedPanel = null
+
+                if (longPressTriggered) {
+                    longPressTriggered = false
+                    invalidate()
+                    return true
+                }
 
                 if (!isDragging && dx < scrollThreshold && elapsed < 400) {
                     // 點擊 → 找命中的按鈕
@@ -281,6 +306,8 @@ class ToolbarView(context: Context) : View(context) {
             }
 
             MotionEvent.ACTION_CANCEL -> {
+                longPressHandler.removeCallbacks(longPressRunnable)
+                longPressTriggered = false
                 pressedPanel = null
                 isDragging = false
                 invalidate()
