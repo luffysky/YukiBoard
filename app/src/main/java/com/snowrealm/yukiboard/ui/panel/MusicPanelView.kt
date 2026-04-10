@@ -67,10 +67,13 @@ class MusicPanelView(context: Context) : View(context) {
 
     // ── 鋼琴鍵盤 ──
     // 一個八度 = 7 白鍵 + 5 黑鍵
-    // 顯示 2 個八度（14 白鍵），可左右滑動換八度
-    private var baseOctave = 3  // C3 開始（比中央C低一個八度，涵蓋更多低音）
-    private val visibleOctaves = 3
-    private val whiteKeysVisible get() = visibleOctaves * 7
+    // 可調整顯示白鍵數量（最少 10 = ~16 鍵含黑鍵，最多 28 = 4 八度）
+    private var baseOctave = 3  // C3 開始
+    private var visibleWhiteKeyCount = 14  // 預設 14 白鍵（2 八度）
+    private val whiteKeysVisible get() = visibleWhiteKeyCount
+    // 預設選項
+    private val keyCountOptions = intArrayOf(10, 14, 17, 21, 28) // ~16鍵, 2八度, ~27鍵, 3八度, 4八度
+    private val keyCountLabels = arrayOf("16鍵", "2八度", "27鍵", "3八度", "4八度")
 
     // 每個白鍵的音符偏移（相對 C 的半音數）
     private val whiteKeyOffsets = intArrayOf(0, 2, 4, 5, 7, 9, 11) // C D E F G A B
@@ -232,39 +235,62 @@ class MusicPanelView(context: Context) : View(context) {
     // 控制列（八度 / 錄音）
     // ═══════════════════════════════════════════════════════════
 
+    /** 計算最高可切換的起始八度 */
+    private fun maxBaseOctave(): Int {
+        val octavesNeeded = (visibleWhiteKeyCount + 6) / 7 // 向上取整
+        return (8 - octavesNeeded).coerceAtLeast(0)
+    }
+
+    /** 計算顯示範圍的最高音名 */
+    private fun endNoteName(): String {
+        val lastWhiteIdx = visibleWhiteKeyCount - 1
+        val octave = baseOctave + lastWhiteIdx / 7
+        val noteIdx = lastWhiteIdx % 7
+        val noteNames = arrayOf("C", "D", "E", "F", "G", "A", "B")
+        return "${noteNames[noteIdx]}$octave"
+    }
+
     private fun drawControlBar(canvas: Canvas, w: Float) {
         val y = tabBarH + instrumentBarH
         bgPaint.color = darken(theme.effectivePanelBackground(), 0.95f)
         canvas.drawRect(0f, y, w, y + controlBarH, bgPaint)
 
-        textPaint.textSize = dpf(11f)
+        textPaint.textSize = dpf(10f)
+        val midY = y + controlBarH / 2 + textPaint.textSize * 0.35f
 
-        // 左：八度 -
+        // 按鍵數選擇（左側）
+        val curIdx = keyCountOptions.indexOf(visibleWhiteKeyCount).let { if (it < 0) 1 else it }
+        val keyLabel = keyCountLabels.getOrElse(curIdx) { "${visibleWhiteKeyCount}" }
+        textPaint.color = theme.effectiveAccentColor()
+        canvas.drawText("🎹 $keyLabel", dpf(30f), midY, textPaint)
+        // - / + 按鈕
+        textPaint.color = if (curIdx > 0) theme.effectiveToolbarIconColor() else (theme.effectiveToolbarIconColor() and 0x00FFFFFF or 0x40000000)
+        canvas.drawText("−", dpf(4f), midY, textPaint)
+        textPaint.color = if (curIdx < keyCountOptions.size - 1) theme.effectiveToolbarIconColor() else (theme.effectiveToolbarIconColor() and 0x00FFFFFF or 0x40000000)
+        canvas.drawText("+", dpf(58f), midY, textPaint)
+
+        // 八度切換（中間）
+        val octCenterX = w * 0.45f
         textPaint.color = if (baseOctave > 0) theme.effectiveToolbarIconColor() else (theme.effectiveToolbarIconColor() and 0x00FFFFFF or 0x40000000)
-        canvas.drawText("◀", dpf(20f), y + controlBarH / 2 + textPaint.textSize * 0.35f, textPaint)
+        canvas.drawText("◀", octCenterX - dpf(35f), midY, textPaint)
 
-        // 中：顯示八度
         textPaint.color = theme.effectiveToolbarIconColor()
-        val octaveLabel = "C${baseOctave} - B${baseOctave + visibleOctaves - 1}"
-        canvas.drawText(octaveLabel, w * 0.3f, y + controlBarH / 2 + textPaint.textSize * 0.35f, textPaint)
+        val octaveLabel = "C${baseOctave}~${endNoteName()}"
+        canvas.drawText(octaveLabel, octCenterX, midY, textPaint)
 
-        // 右：八度 +
-        textPaint.color = if (baseOctave + visibleOctaves < 8) theme.effectiveToolbarIconColor() else (theme.effectiveToolbarIconColor() and 0x00FFFFFF or 0x40000000)
-        canvas.drawText("▶", dpf(60f) + textPaint.measureText(octaveLabel), y + controlBarH / 2 + textPaint.textSize * 0.35f, textPaint)
+        textPaint.color = if (baseOctave < maxBaseOctave()) theme.effectiveToolbarIconColor() else (theme.effectiveToolbarIconColor() and 0x00FFFFFF or 0x40000000)
+        canvas.drawText("▶", octCenterX + dpf(35f), midY, textPaint)
 
-        // 錄音按鈕
-        val recX = w - dpf(60f)
-        val recColor = if (isRecording) 0xFFFF4444.toInt() else theme.effectiveToolbarIconColor()
-        textPaint.color = recColor
-        val recLabel = if (isRecording) "⏹ 停止" else "⏺ 錄音"
-        canvas.drawText(recLabel, recX, y + controlBarH / 2 + textPaint.textSize * 0.35f, textPaint)
+        // 錄音按鈕（右側）
+        val recX = w - dpf(50f)
+        textPaint.color = if (isRecording) 0xFFFF4444.toInt() else theme.effectiveToolbarIconColor()
+        canvas.drawText(if (isRecording) "⏹" else "⏺", recX, midY, textPaint)
 
-        // 回放按鈕（有錄音時）
+        // 回放按鈕
         if (recordedNotes.isNotEmpty() && !isRecording) {
-            val playX = w - dpf(120f)
+            val playX = w - dpf(80f)
             textPaint.color = if (isPlayingRecording) 0xFF4CAF50.toInt() else theme.effectiveToolbarIconColor()
-            val playLabel = if (isPlayingRecording) "⏹" else "▶ 回放"
-            canvas.drawText(playLabel, playX, y + controlBarH / 2 + textPaint.textSize * 0.35f, textPaint)
+            canvas.drawText(if (isPlayingRecording) "⏹" else "▶", playX, midY, textPaint)
         }
     }
 
@@ -606,22 +632,41 @@ class MusicPanelView(context: Context) : View(context) {
 
     private fun handleControlTap(px: Float, py: Float) {
         val w = width.toFloat()
-        // 八度 ◀
-        if (px < dpf(40f)) {
-            if (baseOctave > 0) { baseOctave--; invalidate() }
+        val curIdx = keyCountOptions.indexOf(visibleWhiteKeyCount).let { if (it < 0) 1 else it }
+
+        // 按鍵數 − (左側最左)
+        if (px < dpf(14f)) {
+            if (curIdx > 0) {
+                visibleWhiteKeyCount = keyCountOptions[curIdx - 1]
+                baseOctave = baseOctave.coerceAtMost(maxBaseOctave())
+                invalidate()
+            }
             return
         }
-        // 八度 ▶（約在 octave label 右邊）
-        if (px in dpf(40f)..dpf(120f)) {
-            // 對照表區域的右邊
-        }
-        if (px > dpf(80f) && px < dpf(140f)) {
-            if (baseOctave + visibleOctaves < 8) { baseOctave++; invalidate() }
+        // 按鍵數 + (左側偏右)
+        if (px in dpf(50f)..dpf(70f)) {
+            if (curIdx < keyCountOptions.size - 1) {
+                visibleWhiteKeyCount = keyCountOptions[curIdx + 1]
+                baseOctave = baseOctave.coerceAtMost(maxBaseOctave())
+                invalidate()
+            }
             return
         }
 
-        // 錄音
-        if (px > w - dpf(90f) && px < w - dpf(30f)) {
+        // 八度 ◀ (中間偏左)
+        val octCenterX = w * 0.45f
+        if (px in (octCenterX - dpf(50f))..(octCenterX - dpf(20f))) {
+            if (baseOctave > 0) { baseOctave--; invalidate() }
+            return
+        }
+        // 八度 ▶ (中間偏右)
+        if (px in (octCenterX + dpf(20f))..(octCenterX + dpf(50f))) {
+            if (baseOctave < maxBaseOctave()) { baseOctave++; invalidate() }
+            return
+        }
+
+        // 錄音（右側）
+        if (px > w - dpf(65f) && px < w - dpf(30f)) {
             if (isRecording) {
                 isRecording = false
             } else {
@@ -634,7 +679,7 @@ class MusicPanelView(context: Context) : View(context) {
         }
 
         // 回放
-        if (px > w - dpf(150f) && px < w - dpf(90f) && recordedNotes.isNotEmpty()) {
+        if (px > w - dpf(100f) && px < w - dpf(65f) && recordedNotes.isNotEmpty()) {
             if (isPlayingRecording) {
                 stopPlayback()
             } else {
