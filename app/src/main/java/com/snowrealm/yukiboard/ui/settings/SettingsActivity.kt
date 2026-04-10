@@ -37,6 +37,10 @@ class SettingsActivity : AppCompatActivity() {
     private var isRestarting = false
     private lateinit var themeManager: ThemeManager
     private lateinit var prefs: YukiPreferences
+    private var currentLang = SettingsStrings.Lang.ZH
+
+    /** 多語言翻譯捷徑 */
+    private fun tr(zh: String) = SettingsStrings.tr(zh, currentLang)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,7 +51,7 @@ class SettingsActivity : AppCompatActivity() {
             val msg = e.stackTraceToString().take(3000)
             android.util.Log.e("SettingsActivity", "CRASH in onCreate", e)
             val errView = TextView(this).apply {
-                text = "YukiBoard 啟動錯誤：\n\n$msg\n\n請截圖回報"
+                text = tr("YukiBoard 啟動錯誤：\n\n$msg\n\n請截圖回報")
                 textSize = 11f
                 setTextColor(0xFFFF5555.toInt())
                 setBackgroundColor(0xFF111111.toInt())
@@ -61,6 +65,7 @@ class SettingsActivity : AppCompatActivity() {
     private fun onCreateInternal() {
         themeManager = ThemeManager.getInstance(this)
         prefs = YukiPreferences(this)
+        currentLang = SettingsStrings.Lang.fromCode(prefs.settingsLanguage)
 
         val scrollView = ScrollView(this).apply {
             setBackgroundColor(0xFF1A2035.toInt())
@@ -71,13 +76,50 @@ class SettingsActivity : AppCompatActivity() {
             setPadding(dp(16), dp(32), dp(16), dp(24))
         }
 
-        // ── 標題列 ──
-        root.addView(TextView(this).apply {
-            text = getString(R.string.settings_title)
+        // ── 標題列（含語言選單）──
+        val titleRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(8), 0, dp(8), dp(8))
+        }
+        titleRow.addView(TextView(this).apply {
+            text = tr("YukiBoard 設定")
             textSize = 24f
             setTextColor(0xFFE8F4FF.toInt())
-            setPadding(dp(8), 0, dp(8), dp(8))
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         })
+        // 語言下拉選單按鈕
+        titleRow.addView(Button(this).apply {
+            text = currentLang.displayName
+            setTextColor(0xFFE8F4FF.toInt())
+            textSize = 12f
+            minWidth = 0; minimumWidth = 0; minHeight = 0; minimumHeight = 0
+            background = GradientDrawable().apply {
+                setColor(0xFF2A3A5C.toInt())
+                cornerRadius = dp(8).toFloat()
+            }
+            setPadding(dp(12), dp(6), dp(12), dp(6))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { gravity = android.view.Gravity.CENTER_VERTICAL }
+            setOnClickListener { btn ->
+                val popup = android.widget.PopupMenu(this@SettingsActivity, btn)
+                SettingsStrings.Lang.entries.forEachIndexed { i, lang ->
+                    popup.menu.add(0, i, i, lang.displayName)
+                }
+                popup.setOnMenuItemClickListener { item ->
+                    val selectedLang = SettingsStrings.Lang.entries[item.itemId]
+                    prefs.settingsLanguage = selectedLang.code
+                    currentLang = selectedLang
+                    // 重建 Activity 以套用新語言
+                    isRestarting = true
+                    recreate()
+                    true
+                }
+                popup.show()
+            }
+        })
+        root.addView(titleRow)
 
         // ── 按鈕列（獨立一行，不擠壓標題）──
         val btnRow = LinearLayout(this).apply {
@@ -85,7 +127,7 @@ class SettingsActivity : AppCompatActivity() {
             setPadding(dp(8), 0, dp(8), dp(16))
         }
         btnRow.addView(Button(this).apply {
-            text = "功能說明"
+            text = tr("功能說明")
             setTextColor(0xFFFFFFFF.toInt())
             textSize = 13f
             minWidth = 0; minimumWidth = 0; minHeight = 0; minimumHeight = 0
@@ -103,7 +145,7 @@ class SettingsActivity : AppCompatActivity() {
             }
         })
         btnRow.addView(Button(this).apply {
-            text = "Z幣錢包"
+            text = tr("Z幣錢包")
             setTextColor(0xFFFFFFFF.toInt())
             textSize = 13f
             minWidth = 0; minimumWidth = 0; minHeight = 0; minimumHeight = 0
@@ -141,27 +183,27 @@ class SettingsActivity : AppCompatActivity() {
         // 1. AI 功能
         // ═══════════════════════════════════════════════════════
         val aiChildren = mutableListOf<View>()
-        root.addView(cardGroup("AI 功能", prefs.aiEnabled, { prefs.aiEnabled = it }, aiChildren) {
-            aiChildren += switchRow("AI 補字預測", "智慧預測下一個詞", prefs.aiPrediction) { prefs.aiPrediction = it }
-            aiChildren += switchRow("雪凜寫手", "幫你寫、回覆、換說法", prefs.aiWriter) { prefs.aiWriter = it }
-            aiChildren += switchRow("即時翻譯", "中英日等多語言翻譯", prefs.aiTranslate) { prefs.aiTranslate = it }
-            aiChildren += switchRow("情聖月老", "讓訊息更有魅力", prefs.aiCupid) { prefs.aiCupid = it }
-            aiChildren += switchRow("AI 語音 (Whisper)", "OpenAI 語音辨識", prefs.aiWhisper) { prefs.aiWhisper = it }
-            aiChildren += switchRow("文法糾錯", "一鍵修正錯字和文法", prefs.aiGrammarCheck) { prefs.aiGrammarCheck = it }
-            aiChildren += switchRow("語氣調整", "正式/casual/可愛/專業", prefs.aiToneAdjust) { prefs.aiToneAdjust = it }
-            aiChildren += switchRow("摘要精簡", "長文縮成一句話", prefs.aiSummarize) { prefs.aiSummarize = it }
-            aiChildren += switchRow("迷因生成", "產生流行語和梗圖文字", prefs.aiMemeText) { prefs.aiMemeText = it }
-            aiChildren += switchRow("Emoji 翻譯", "文字與 Emoji 互轉", prefs.aiEmojiTranslate) { prefs.aiEmojiTranslate = it }
-            aiChildren += switchRow("快速回覆", "建議整句回覆", prefs.aiQuickReply) { prefs.aiQuickReply = it }
-            aiChildren += switchRow("程式碼補全", "開發者模式中 AI 補完", prefs.aiCodeComplete) { prefs.aiCodeComplete = it }
-            aiChildren += switchRow("正則產生器", "描述需求產生 Regex", prefs.aiRegexGen) { prefs.aiRegexGen = it }
-            aiChildren += switchRow("Commit 訊息", "貼上 diff 產生 commit message", prefs.aiCommitMessage) { prefs.aiCommitMessage = it }
-            aiChildren += switchRow("雪凜聊天", "跟雪凜對話，幫你想怎麼說", prefs.aiYukiChat) { prefs.aiYukiChat = it }
-            aiChildren += switchRow("心情日記", "被動偵測打字情緒", prefs.aiMoodDiary) { prefs.aiMoodDiary = it }
-            aiChildren += switchRow("天氣助理", "天氣資訊與穿衣建議", prefs.aiWeather) { prefs.aiWeather = it }
-            aiChildren += switchRow("防詐偵測", "分析對話內容偵測可疑模式", prefs.aiFraudDetect) { prefs.aiFraudDetect = it }
-            aiChildren += switchRow("被動防詐掃描", "打字時自動掃描上下文", prefs.aiFraudPassiveScan) { prefs.aiFraudPassiveScan = it }
-            aiChildren += switchRow("連結風險掃描", "自動偵測可疑網址", prefs.aiFraudUrlScan) { prefs.aiFraudUrlScan = it }
+        root.addView(cardGroup(tr("AI 功能"), prefs.aiEnabled, { prefs.aiEnabled = it }, aiChildren) {
+            aiChildren += switchRow(tr("AI 補字預測"), tr("智慧預測下一個詞"), prefs.aiPrediction) { prefs.aiPrediction = it }
+            aiChildren += switchRow(tr("雪凜寫手"), tr("幫你寫、回覆、換說法"), prefs.aiWriter) { prefs.aiWriter = it }
+            aiChildren += switchRow(tr("即時翻譯"), tr("中英日等多語言翻譯"), prefs.aiTranslate) { prefs.aiTranslate = it }
+            aiChildren += switchRow(tr("情聖月老"), tr("讓訊息更有魅力"), prefs.aiCupid) { prefs.aiCupid = it }
+            aiChildren += switchRow(tr("AI 語音 (Whisper)"), tr("OpenAI 語音辨識"), prefs.aiWhisper) { prefs.aiWhisper = it }
+            aiChildren += switchRow(tr("文法糾錯"), tr("一鍵修正錯字和文法"), prefs.aiGrammarCheck) { prefs.aiGrammarCheck = it }
+            aiChildren += switchRow(tr("語氣調整"), tr("正式/casual/可愛/專業"), prefs.aiToneAdjust) { prefs.aiToneAdjust = it }
+            aiChildren += switchRow(tr("摘要精簡"), tr("長文縮成一句話"), prefs.aiSummarize) { prefs.aiSummarize = it }
+            aiChildren += switchRow(tr("迷因生成"), tr("產生流行語和梗圖文字"), prefs.aiMemeText) { prefs.aiMemeText = it }
+            aiChildren += switchRow(tr("Emoji 翻譯"), tr("文字與 Emoji 互轉"), prefs.aiEmojiTranslate) { prefs.aiEmojiTranslate = it }
+            aiChildren += switchRow(tr("快速回覆"), tr("建議整句回覆"), prefs.aiQuickReply) { prefs.aiQuickReply = it }
+            aiChildren += switchRow(tr("程式碼補全"), tr("開發者模式中 AI 補完"), prefs.aiCodeComplete) { prefs.aiCodeComplete = it }
+            aiChildren += switchRow(tr("正則產生器"), tr("描述需求產生 Regex"), prefs.aiRegexGen) { prefs.aiRegexGen = it }
+            aiChildren += switchRow(tr("Commit 訊息"), tr("貼上 diff 產生 commit message"), prefs.aiCommitMessage) { prefs.aiCommitMessage = it }
+            aiChildren += switchRow(tr("雪凜聊天"), tr("跟雪凜對話，幫你想怎麼說"), prefs.aiYukiChat) { prefs.aiYukiChat = it }
+            aiChildren += switchRow(tr("心情日記"), tr("被動偵測打字情緒"), prefs.aiMoodDiary) { prefs.aiMoodDiary = it }
+            aiChildren += switchRow(tr("天氣助理"), tr("天氣資訊與穿衣建議"), prefs.aiWeather) { prefs.aiWeather = it }
+            aiChildren += switchRow(tr("防詐偵測"), tr("分析對話內容偵測可疑模式"), prefs.aiFraudDetect) { prefs.aiFraudDetect = it }
+            aiChildren += switchRow(tr("被動防詐掃描"), tr("打字時自動掃描上下文"), prefs.aiFraudPassiveScan) { prefs.aiFraudPassiveScan = it }
+            aiChildren += switchRow(tr("連結風險掃描"), tr("自動偵測可疑網址"), prefs.aiFraudUrlScan) { prefs.aiFraudUrlScan = it }
 
             // 防詐模型更新按鈕
             run {
@@ -175,7 +217,7 @@ class SettingsActivity : AppCompatActivity() {
                 aiChildren += modelStatusText
 
                 aiChildren += Button(this).apply {
-                    text = "防詐模型更新"
+                    text = tr("防詐模型更新")
                     setTextColor(0xFFFFFFFF.toInt())
                     textSize = 13f
                     background = GradientDrawable().apply {
@@ -189,7 +231,7 @@ class SettingsActivity : AppCompatActivity() {
                     ).apply { setMargins(dp(8), dp(4), 0, dp(4)) }
                     setOnClickListener {
                         isEnabled = false
-                        text = "檢查中..."
+                        text = tr("檢查中...")
                         val supabaseUrl = com.snowrealm.yukiboard.BuildConfig.YUKIBOARD_SUPABASE_URL
                         val supabaseKey = com.snowrealm.yukiboard.BuildConfig.YUKIBOARD_SUPABASE_ANON_KEY
                         val appVersionCode = com.snowrealm.yukiboard.BuildConfig.VERSION_CODE
@@ -202,13 +244,13 @@ class SettingsActivity : AppCompatActivity() {
                                     callback = object : com.snowrealm.yukiboard.security.FraudModelManager.DownloadCallback {
                                         override fun onProgress(percent: Int) {
                                             launch(Dispatchers.Main) {
-                                                text = "更新中 $percent%..."
+                                                text = tr("更新中 $percent%...")
                                             }
                                         }
                                         override fun onComplete(success: Boolean, message: String) {
                                             launch(Dispatchers.Main) {
                                                 isEnabled = true
-                                                text = "防詐模型更新"
+                                                text = tr("防詐模型更新")
                                                 modelStatusText.text = modelManager.getStatusSummary()
                                                 Toast.makeText(this@SettingsActivity, message, Toast.LENGTH_SHORT).show()
                                             }
@@ -219,7 +261,7 @@ class SettingsActivity : AppCompatActivity() {
                             catch (e: Exception) {
                                 kotlinx.coroutines.withContext(Dispatchers.Main) {
                                     isEnabled = true
-                                    text = "檢查失敗"
+                                    text = tr("檢查失敗")
                                 }
                             }
                         }
@@ -229,7 +271,7 @@ class SettingsActivity : AppCompatActivity() {
 
             // AI 設定按鈕
             aiChildren += Button(this).apply {
-                text = "AI 設定 / Provider"
+                text = tr("AI 設定 / Provider")
                 setTextColor(0xFFFFFFFF.toInt())
                 textSize = 13f
                 background = GradientDrawable().apply {
@@ -251,25 +293,25 @@ class SettingsActivity : AppCompatActivity() {
         // 2. 雪凜行為
         // ═══════════════════════════════════════════════════════
         val yukiChildren = mutableListOf<View>()
-        root.addView(cardGroup("雪凜行為", prefs.yukiSarcasticComments, null, yukiChildren) {
-            yukiChildren += switchRow("微吐槽", "雪凜偶爾的有趣短評", prefs.yukiSarcasticComments) { prefs.yukiSarcasticComments = it }
-            yukiChildren += switchRow("情緒冷靜期", "偵測激烈文字時暫停提醒", prefs.yukiEmotionalCooldown) { prefs.yukiEmotionalCooldown = it }
-            yukiChildren += switchRow("心情日記被動偵測", "自動分析打字情緒", prefs.yukiMoodDiaryPassive) { prefs.yukiMoodDiaryPassive = it }
-            yukiChildren += switchRow("天氣主動提醒", "天氣變化時雪凜提醒", prefs.yukiWeatherAlert) { prefs.yukiWeatherAlert = it }
-            yukiChildren += switchRow("深夜關心", "深夜打字時的溫馨提醒", prefs.yukiLateNightComment) { prefs.yukiLateNightComment = it }
+        root.addView(cardGroup(tr("雪凜行為"), prefs.yukiSarcasticComments, null, yukiChildren) {
+            yukiChildren += switchRow(tr("微吐槽"), tr("雪凜偶爾的有趣短評"), prefs.yukiSarcasticComments) { prefs.yukiSarcasticComments = it }
+            yukiChildren += switchRow(tr("情緒冷靜期"), tr("偵測激烈文字時暫停提醒"), prefs.yukiEmotionalCooldown) { prefs.yukiEmotionalCooldown = it }
+            yukiChildren += switchRow(tr("心情日記被動偵測"), tr("自動分析打字情緒"), prefs.yukiMoodDiaryPassive) { prefs.yukiMoodDiaryPassive = it }
+            yukiChildren += switchRow(tr("天氣主動提醒"), tr("天氣變化時雪凜提醒"), prefs.yukiWeatherAlert) { prefs.yukiWeatherAlert = it }
+            yukiChildren += switchRow(tr("深夜關心"), tr("深夜打字時的溫馨提醒"), prefs.yukiLateNightComment) { prefs.yukiLateNightComment = it }
         })
 
         // ═══════════════════════════════════════════════════════
         // 3. 感測器
         // ═══════════════════════════════════════════════════════
         val sensorChildren = mutableListOf<View>()
-        root.addView(cardGroup("感測器", null, null, sensorChildren) {
-            sensorChildren += switchRow("搖手機復原", "搖晃手機觸發 Ctrl+Z", prefs.shakeToUndoEnabled) { prefs.shakeToUndoEnabled = it }
-            sensorChildren += switchRow("陀螺儀游標", "長按空白鍵 + 傾斜控制游標", prefs.gyroscopeCursorEnabled) { prefs.gyroscopeCursorEnabled = it }
+        root.addView(cardGroup(tr("感測器"), null, null, sensorChildren) {
+            sensorChildren += switchRow(tr("搖手機復原"), tr("搖晃手機觸發 Ctrl+Z"), prefs.shakeToUndoEnabled) { prefs.shakeToUndoEnabled = it }
+            sensorChildren += switchRow(tr("陀螺儀游標"), tr("長按空白鍵 + 傾斜控制游標"), prefs.gyroscopeCursorEnabled) { prefs.gyroscopeCursorEnabled = it }
 
             // 陀螺儀靈敏度滑桿
             val sensitivityLabel = TextView(this).apply {
-                text = "靈敏度: %.1f".format(prefs.gyroscopeSensitivity)
+                text = tr("靈敏度: %.1f").format(prefs.gyroscopeSensitivity)
                 textSize = 12f
                 setTextColor(0xFF7FD8FF.toInt())
                 setPadding(dp(12), dp(4), 0, dp(4))
@@ -283,27 +325,27 @@ class SettingsActivity : AppCompatActivity() {
                     override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
                         val v = 0.5f + p * 0.1f
                         prefs.gyroscopeSensitivity = v
-                        sensitivityLabel.text = "靈敏度: %.1f".format(v)
+                        sensitivityLabel.text = tr("靈敏度: %.1f").format(v)
                     }
                     override fun onStartTrackingTouch(sb: SeekBar?) {}
                     override fun onStopTrackingTouch(sb: SeekBar?) {}
                 })
             }
 
-            sensorChildren += switchRow("App 自動切換模式", "偵測前景 App 自動切換模式", prefs.appAutoDetectEnabled) { prefs.appAutoDetectEnabled = it }
+            sensorChildren += switchRow(tr("App 自動切換模式"), tr("偵測前景 App 自動切換模式"), prefs.appAutoDetectEnabled) { prefs.appAutoDetectEnabled = it }
         })
 
         // ═══════════════════════════════════════════════════════
         // 4. 動畫特效
         // ═══════════════════════════════════════════════════════
         val animChildren = mutableListOf<View>()
-        root.addView(cardGroup("動畫特效", null, null, animChildren) {
-            animChildren += switchRow("流光動畫", "OpenGL ES 流光覆蓋效果", prefs.flowLightEnabled) { prefs.flowLightEnabled = it }
-            animChildren += switchRow("雪凜角色", "顯示雪凜浮動角色（Lottie / VRM）", prefs.characterAnimEnabled) { prefs.characterAnimEnabled = it }
-            animChildren += switchRow("VRM 3D 角色", "3D VRM 模型取代 Lottie 角色", prefs.vrmCharacterEnabled) { prefs.vrmCharacterEnabled = it }
-            animChildren += switchRow("按鍵粒子效果", "打字時的粒子動畫", prefs.keyParticleEffect) { prefs.keyParticleEffect = it }
-            animChildren += switchRow("按鍵震動", "按鍵時的觸覺回饋", prefs.keyPressVibration) { prefs.keyPressVibration = it }
-            animChildren += switchRow("按鍵音效", "按鍵時的聲音回饋", prefs.keySoundEnabled) { prefs.keySoundEnabled = it }
+        root.addView(cardGroup(tr("動畫特效"), null, null, animChildren) {
+            animChildren += switchRow(tr("流光動畫"), tr("OpenGL ES 流光覆蓋效果"), prefs.flowLightEnabled) { prefs.flowLightEnabled = it }
+            animChildren += switchRow(tr("雪凜角色"), tr("顯示雪凜浮動角色（Lottie / VRM）"), prefs.characterAnimEnabled) { prefs.characterAnimEnabled = it }
+            animChildren += switchRow(tr("VRM 3D 角色"), tr("3D VRM 模型取代 Lottie 角色"), prefs.vrmCharacterEnabled) { prefs.vrmCharacterEnabled = it }
+            animChildren += switchRow(tr("按鍵粒子效果"), tr("打字時的粒子動畫"), prefs.keyParticleEffect) { prefs.keyParticleEffect = it }
+            animChildren += switchRow(tr("按鍵震動"), tr("按鍵時的觸覺回饋"), prefs.keyPressVibration) { prefs.keyPressVibration = it }
+            animChildren += switchRow(tr("按鍵音效"), tr("按鍵時的聲音回饋"), prefs.keySoundEnabled) { prefs.keySoundEnabled = it }
 
             // 鍵盤動畫主題選擇
             val kbAnimOptions = arrayOf("無", "星空 Starfield", "海洋 Ocean", "餘燼 Ember", "矩陣 Matrix", "冰霜 Frost", "熔岩 Lava", "彩虹 Rainbow", "雷電 Thunder")
@@ -314,7 +356,7 @@ class SettingsActivity : AppCompatActivity() {
                 setPadding(0, dp(8), 0, dp(8))
             }
             kbAnimRow.addView(TextView(this).apply {
-                text = "動畫主題"
+                text = tr("動畫主題")
                 setTextColor(0xFFFFFFFF.toInt())
                 textSize = 14f
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
@@ -327,13 +369,13 @@ class SettingsActivity : AppCompatActivity() {
                 setOnClickListener { btn ->
                     val cur = kbAnimValues.indexOf(prefs.toolbarAnimStyle).coerceAtLeast(0)
                     android.app.AlertDialog.Builder(this@SettingsActivity)
-                        .setTitle("選擇動畫主題")
+                        .setTitle(tr("選擇動畫主題"))
                         .setSingleChoiceItems(kbAnimOptions, cur) { dialog, which ->
                             prefs.toolbarAnimStyle = kbAnimValues[which]
                             (btn as TextView).text = kbAnimOptions[which]
                             dialog.dismiss()
                         }
-                        .setNegativeButton("取消", null)
+                        .setNegativeButton(tr("取消"), null)
                         .show()
                 }
             }
@@ -349,7 +391,7 @@ class SettingsActivity : AppCompatActivity() {
                 setPadding(0, dp(8), 0, dp(8))
             }
             val styleLabel = TextView(this).apply {
-                text = "音色風格"
+                text = tr("音色風格")
                 setTextColor(0xFFFFFFFF.toInt())
                 textSize = 14f
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
@@ -362,13 +404,13 @@ class SettingsActivity : AppCompatActivity() {
                 setOnClickListener {
                     val cur = styleValues.indexOf(prefs.keySoundStyle).coerceAtLeast(0)
                     android.app.AlertDialog.Builder(this@SettingsActivity)
-                        .setTitle("選擇音色風格")
+                        .setTitle(tr("選擇音色風格"))
                         .setSingleChoiceItems(styleOptions, cur) { dialog, which ->
                             prefs.keySoundStyle = styleValues[which]
                             (it as TextView).text = styleOptions[which]
                             dialog.dismiss()
                         }
-                        .setNegativeButton("取消", null)
+                        .setNegativeButton(tr("取消"), null)
                         .show()
                 }
             }
@@ -382,7 +424,7 @@ class SettingsActivity : AppCompatActivity() {
                 setPadding(0, dp(4), 0, dp(8))
             }
             volRow.addView(TextView(this).apply {
-                text = "音量：${(prefs.keySoundVolume * 100).toInt()}%"
+                text = tr("音量：${(prefs.keySoundVolume * 100).toInt()}%")
                 setTextColor(0xFFFFFFFF.toInt())
                 textSize = 14f
                 tag = "volLabel"
@@ -394,7 +436,7 @@ class SettingsActivity : AppCompatActivity() {
                     override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
                         if (fromUser) {
                             prefs.keySoundVolume = p / 100f
-                            volRow.findViewWithTag<TextView>("volLabel")?.text = "音量：${p}%"
+                            volRow.findViewWithTag<TextView>("volLabel")?.text = tr("音量：${p}%")
                         }
                     }
                     override fun onStartTrackingTouch(sb: SeekBar?) {}
@@ -415,17 +457,17 @@ class SettingsActivity : AppCompatActivity() {
                 setBackgroundColor(0xFF1E1E2E.toInt())
             }
             val noteMapToggle = TextView(this).apply {
-                text = "▶ 音階對照表"
+                text = tr("▶ 音階對照表")
                 setTextColor(0xFF90CAF9.toInt())
                 textSize = 14f
                 setPadding(0, dp(4), 0, dp(4))
                 setOnClickListener {
                     if (noteMapContent.visibility == View.GONE) {
                         noteMapContent.visibility = View.VISIBLE
-                        (it as TextView).text = "▼ 音階對照表"
+                        (it as TextView).text = tr("▼ 音階對照表")
                     } else {
                         noteMapContent.visibility = View.GONE
-                        (it as TextView).text = "▶ 音階對照表"
+                        (it as TextView).text = tr("▶ 音階對照表")
                     }
                 }
             }
@@ -471,36 +513,36 @@ class SettingsActivity : AppCompatActivity() {
         // 5. 遊戲
         // ═══════════════════════════════════════════════════════
         val gameChildren = mutableListOf<View>()
-        root.addView(cardGroup("遊戲", prefs.gamesEnabled, { prefs.gamesEnabled = it }, gameChildren) {
-            gameChildren += switchRow("背景音樂", "遊戲背景音樂", prefs.gameBackgroundMusic) { prefs.gameBackgroundMusic = it }
-            gameChildren += switchRow("音效", "遊戲音效", prefs.gameSoundEffects) { prefs.gameSoundEffects = it }
+        root.addView(cardGroup(tr("遊戲"), prefs.gamesEnabled, { prefs.gamesEnabled = it }, gameChildren) {
+            gameChildren += switchRow(tr("背景音樂"), tr("遊戲背景音樂"), prefs.gameBackgroundMusic) { prefs.gameBackgroundMusic = it }
+            gameChildren += switchRow(tr("音效"), tr("遊戲音效"), prefs.gameSoundEffects) { prefs.gameSoundEffects = it }
         })
 
         // ═══════════════════════════════════════════════════════
         // 5.5 剪貼簿
         // ═══════════════════════════════════════════════════════
         val clipboardChildren = mutableListOf<View>()
-        root.addView(cardGroup("剪貼簿", null, null, clipboardChildren) {
-            clipboardChildren += switchRow("加密功能", "允許加密剪貼簿項目（AES-256）", prefs.clipboardEncryptionEnabled) { prefs.clipboardEncryptionEnabled = it }
-            clipboardChildren += switchRow("敏感偵測", "自動偵測信用卡、身分證等敏感內容", prefs.clipboardAutoDetectSensitive) { prefs.clipboardAutoDetectSensitive = it }
-            clipboardChildren += switchRow("跨裝置同步", "透過 Insight 同步剪貼簿（需登入）", prefs.clipboardSyncEnabled) { prefs.clipboardSyncEnabled = it }
+        root.addView(cardGroup(tr("剪貼簿"), null, null, clipboardChildren) {
+            clipboardChildren += switchRow(tr("加密功能"), tr("允許加密剪貼簿項目（AES-256）"), prefs.clipboardEncryptionEnabled) { prefs.clipboardEncryptionEnabled = it }
+            clipboardChildren += switchRow(tr("敏感偵測"), tr("自動偵測信用卡、身分證等敏感內容"), prefs.clipboardAutoDetectSensitive) { prefs.clipboardAutoDetectSensitive = it }
+            clipboardChildren += switchRow(tr("跨裝置同步"), tr("透過 Insight 同步剪貼簿（需登入）"), prefs.clipboardSyncEnabled) { prefs.clipboardSyncEnabled = it }
         })
 
         // ═══════════════════════════════════════════════════════
         // 6. 輸入行為 + 外觀
         // ═══════════════════════════════════════════════════════
         val inputChildren = mutableListOf<View>()
-        root.addView(cardGroup("輸入行為", null, null, inputChildren) {
-            inputChildren += switchRow("智慧中英切換", "自動判斷注音/英文意圖（免手動切換）", prefs.autoInputMode) { prefs.autoInputMode = it }
-            inputChildren += switchRow("滑動輸入", "滑動手勢輸入", prefs.swipeInput) { prefs.swipeInput = it }
-            inputChildren += switchRow("滑動軌跡特效", "滑動時顯示紫色光暈路徑", prefs.swipeTrailEnabled) { prefs.swipeTrailEnabled = it }
-            inputChildren += switchRow("自動更正", "英文自動更正", prefs.autoCorrect) { prefs.autoCorrect = it }
-            inputChildren += switchRow("RIME 詞庫", "啟用 RIME 大型注音詞庫（更準確的候選字）", prefs.rimeDictEnabled) { prefs.rimeDictEnabled = it }
-            inputChildren += switchRow("滑動自我學習", "記住你選過的滑動候選，越用越準", prefs.swipeSelfLearn) { prefs.swipeSelfLearn = it }
-            inputChildren += switchRow("糾錯自我學習", "記住你接受/拒絕的校正，越改越聰明", prefs.correctionSelfLearn) { prefs.correctionSelfLearn = it }
-            inputChildren += switchRow("Snippet 展開", "開發者模式：縮寫 + Tab 展開", prefs.snippetEnabled) { prefs.snippetEnabled = it }
+        root.addView(cardGroup(tr("輸入行為"), null, null, inputChildren) {
+            inputChildren += switchRow(tr("智慧中英切換"), tr("自動判斷注音/英文意圖（免手動切換）"), prefs.autoInputMode) { prefs.autoInputMode = it }
+            inputChildren += switchRow(tr("滑動輸入"), tr("滑動手勢輸入"), prefs.swipeInput) { prefs.swipeInput = it }
+            inputChildren += switchRow(tr("滑動軌跡特效"), tr("滑動時顯示紫色光暈路徑"), prefs.swipeTrailEnabled) { prefs.swipeTrailEnabled = it }
+            inputChildren += switchRow(tr("自動更正"), tr("英文自動更正"), prefs.autoCorrect) { prefs.autoCorrect = it }
+            inputChildren += switchRow(tr("RIME 詞庫"), tr("啟用 RIME 大型注音詞庫（更準確的候選字）"), prefs.rimeDictEnabled) { prefs.rimeDictEnabled = it }
+            inputChildren += switchRow(tr("滑動自我學習"), tr("記住你選過的滑動候選，越用越準"), prefs.swipeSelfLearn) { prefs.swipeSelfLearn = it }
+            inputChildren += switchRow(tr("糾錯自我學習"), tr("記住你接受/拒絕的校正，越改越聰明"), prefs.correctionSelfLearn) { prefs.correctionSelfLearn = it }
+            inputChildren += switchRow(tr("Snippet 展開"), tr("開發者模式：縮寫 + Tab 展開"), prefs.snippetEnabled) { prefs.snippetEnabled = it }
 
-            inputChildren += switchRow("私房話模式", "AES-256 加密訊息（Enter 送出時加密）", prefs.secretMessageMode) { prefs.secretMessageMode = it }
+            inputChildren += switchRow(tr("私房話模式"), tr("AES-256 加密訊息（Enter 送出時加密）"), prefs.secretMessageMode) { prefs.secretMessageMode = it }
             // 悄悄話密碼設定
             val pwdRow = LinearLayout(this@SettingsActivity).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -508,7 +550,7 @@ class SettingsActivity : AppCompatActivity() {
                 setPadding(0, dp(4), 0, dp(4))
             }
             pwdRow.addView(TextView(this@SettingsActivity).apply {
-                text = "悄悄話密碼"
+                text = tr("悄悄話密碼")
                 textSize = 14f
                 setTextColor(0xFFE8F4FF.toInt())
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.4f)
@@ -532,34 +574,34 @@ class SettingsActivity : AppCompatActivity() {
                     setPadding(dp(12), dp(8), dp(12), dp(8))
                 }
                 android.app.AlertDialog.Builder(this@SettingsActivity, android.R.style.Theme_Material_Dialog_Alert)
-                    .setTitle("設定悄悄話密碼")
+                    .setTitle(tr("設定悄悄話密碼"))
                     .setMessage("雙方需要使用相同密碼才能加解密。\n留空則使用舊版預設金鑰。")
                     .setView(input)
-                    .setPositiveButton("確定") { _, _ ->
+                    .setPositiveButton(tr("確定")) { _, _ ->
                         prefs.secretMessagePassword = input.text.toString()
                         (it as TextView).text = if (prefs.secretMessagePassword.isEmpty()) "未設定（使用預設金鑰）" else "已設定 ●●●●"
                     }
-                    .setNegativeButton("取消", null)
+                    .setNegativeButton(tr("取消"), null)
                     .show()
             }
             pwdRow.addView(pwdBtn)
             inputChildren += pwdRow
-            inputChildren += switchRow("語氣偵測", "偵測打字語氣", prefs.toneDetection) { prefs.toneDetection = it }
-            inputChildren += switchRow("懸浮面板", "啟用懸浮面板功能", prefs.floatingPanelEnabled) { prefs.floatingPanelEnabled = it }
-            inputChildren += switchRow("遠端鍵盤", "藍牙/WiFi 遠端控制", prefs.remoteKeyboardEnabled) { prefs.remoteKeyboardEnabled = it }
+            inputChildren += switchRow(tr("語氣偵測"), tr("偵測打字語氣"), prefs.toneDetection) { prefs.toneDetection = it }
+            inputChildren += switchRow(tr("懸浮面板"), tr("啟用懸浮面板功能"), prefs.floatingPanelEnabled) { prefs.floatingPanelEnabled = it }
+            inputChildren += switchRow(tr("遠端鍵盤"), tr("藍牙/WiFi 遠端控制"), prefs.remoteKeyboardEnabled) { prefs.remoteKeyboardEnabled = it }
 
             // 語音引擎選擇
             inputChildren += speechEngineSelector()
             inputChildren += speechLanguageSelector()
             inputChildren += voiceSilenceSensitivitySelector()
-            inputChildren += switchRow("語音後處理", "AI 自動清除口語贅詞（嗯、那個…）", prefs.voicePostProcessEnabled) { prefs.voicePostProcessEnabled = it }
+            inputChildren += switchRow(tr("語音後處理"), tr("AI 自動清除口語贅詞（嗯、那個…）"), prefs.voicePostProcessEnabled) { prefs.voicePostProcessEnabled = it }
         })
 
         // ═══════════════════════════════════════════════════════
         // 6.5 TTS 語音輸出
         // ═══════════════════════════════════════════════════════
         val ttsChildren = mutableListOf<View>()
-        root.addView(cardGroup("語音輸出 (TTS)", null, null, ttsChildren) {
+        root.addView(cardGroup(tr("語音輸出 (TTS)"), null, null, ttsChildren) {
             ttsChildren += ttsSettingsSection()
         })
 
@@ -577,11 +619,11 @@ class SettingsActivity : AppCompatActivity() {
         // 7. 智慧輸入
         // ═══════════════════════════════════════════════════════
         val smartChildren = mutableListOf<View>()
-        root.addView(cardGroup("智慧輸入", null, null, smartChildren) {
-            smartChildren += switchRow("智慧糾錯", "AI 偵測打錯字並自動修正", prefs.smartCorrection) { prefs.smartCorrection = it }
-            smartChildren += switchRow("自動學詞", "常用字彙自動加入字典", prefs.adaptiveDict) { prefs.adaptiveDict = it }
-            smartChildren += switchRow("語句預測", "預測下一個可能的詞或片語", prefs.phrasePredict) { prefs.phrasePredict = it }
-            smartChildren += switchRow("習慣追蹤", "學習打字習慣提升預測精準度", prefs.habitTracking) { prefs.habitTracking = it }
+        root.addView(cardGroup(tr("智慧輸入"), null, null, smartChildren) {
+            smartChildren += switchRow(tr("智慧糾錯"), tr("AI 偵測打錯字並自動修正"), prefs.smartCorrection) { prefs.smartCorrection = it }
+            smartChildren += switchRow(tr("自動學詞"), tr("常用字彙自動加入字典"), prefs.adaptiveDict) { prefs.adaptiveDict = it }
+            smartChildren += switchRow(tr("語句預測"), tr("預測下一個可能的詞或片語"), prefs.phrasePredict) { prefs.phrasePredict = it }
+            smartChildren += switchRow(tr("習慣追蹤"), tr("學習打字習慣提升預測精準度"), prefs.habitTracking) { prefs.habitTracking = it }
 
             // 候選字來源顏色說明
             smartChildren += buildCandidateColorLegend()
@@ -592,7 +634,7 @@ class SettingsActivity : AppCompatActivity() {
         // ═══════════════════════════════════════════════════════
         val insightAuth = com.snowrealm.yukiboard.auth.SnowRealmAuthClient.getInstance(this)
         val insightChildren = mutableListOf<View>()
-        root.addView(cardGroup("Insight 整合", null, null, insightChildren) {
+        root.addView(cardGroup(tr("Insight 整合"), null, null, insightChildren) {
             // Plan badge
             if (insightAuth.isLoggedIn) {
                 val user = insightAuth.currentUser
@@ -603,15 +645,15 @@ class SettingsActivity : AppCompatActivity() {
                     else -> "Free"
                 }
                 insightChildren += TextView(this).apply {
-                    text = "訂閱等級：$planText"
+                    text = tr("訂閱等級：$planText")
                     textSize = 14f
                     setTextColor(0xFF40E0D0.toInt())
                     setPadding(dp(16), dp(8), dp(16), dp(8))
                 }
             }
-            insightChildren += switchRow("情境問卷", "打字時觸發問卷，回答得 Z 幣", prefs.insightSurveyEnabled) { prefs.insightSurveyEnabled = it }
-            insightChildren += switchRow("主題雲端同步", "自動同步在 Insight 購買的主題", prefs.insightThemeSyncEnabled) { prefs.insightThemeSyncEnabled = it }
-            insightChildren += switchRow("設定備份", "登入後自動備份鍵盤設定", prefs.insightSettingsBackup) { prefs.insightSettingsBackup = it }
+            insightChildren += switchRow(tr("情境問卷"), tr("打字時觸發問卷，回答得 Z 幣"), prefs.insightSurveyEnabled) { prefs.insightSurveyEnabled = it }
+            insightChildren += switchRow(tr("主題雲端同步"), tr("自動同步在 Insight 購買的主題"), prefs.insightThemeSyncEnabled) { prefs.insightThemeSyncEnabled = it }
+            insightChildren += switchRow(tr("設定備份"), tr("登入後自動備份鍵盤設定"), prefs.insightSettingsBackup) { prefs.insightSettingsBackup = it }
         })
 
         // ═══════════════════════════════════════════════════════
@@ -626,7 +668,7 @@ class SettingsActivity : AppCompatActivity() {
         // 輸入法測試
         // ═══════════════════════════════════════════════════════
         root.addView(Button(this).apply {
-            text = "輸入法完整測試"
+            text = tr("輸入法完整測試")
             setTextColor(0xFFFFFFFF.toInt())
             textSize = 15f
             background = GradientDrawable().apply {
@@ -823,7 +865,7 @@ class SettingsActivity : AppCompatActivity() {
 
         // 無圖提示文字
         val label = TextView(this).apply {
-            text = "尚未設定背景"
+            text = tr("尚未設定背景")
             setTextColor(0xFF6688AA.toInt())
             textSize = 13f
             gravity = android.view.Gravity.CENTER
@@ -875,7 +917,7 @@ class SettingsActivity : AppCompatActivity() {
             dir.listFiles()?.forEach { it.delete() }
             prefs.useCustomBackground = false
             bgPreviewImage?.setImageBitmap(null)
-            bgPreviewLabel?.text = "尚未設定背景"
+            bgPreviewLabel?.text = tr("尚未設定背景")
             bgPreviewLabel?.visibility = View.VISIBLE
             fullPreviewBgBitmap = null
             fullPreviewView?.invalidate()
@@ -888,7 +930,7 @@ class SettingsActivity : AppCompatActivity() {
 
         // ── 遮罩透明度滑桿 ──
         val alphaLabel = TextView(this).apply {
-            text = "遮罩深度: %d%%".format((prefs.bgOverlayAlpha * 100) / 255)
+            text = tr("遮罩深度: %d%%").format((prefs.bgOverlayAlpha * 100) / 255)
             textSize = 12f
             setTextColor(0xFF7FD8FF.toInt())
             setPadding(dp(12), dp(8), 0, dp(4))
@@ -902,7 +944,7 @@ class SettingsActivity : AppCompatActivity() {
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
                     prefs.bgOverlayAlpha = p
-                    alphaLabel.text = "遮罩深度: %d%%".format((p * 100) / 255)
+                    alphaLabel.text = tr("遮罩深度: %d%%").format((p * 100) / 255)
                     bgPreviewOverlay?.setBackgroundColor(android.graphics.Color.argb(p, 0, 0, 0))
                     fullPreviewView?.invalidate()
                 }
@@ -917,7 +959,7 @@ class SettingsActivity : AppCompatActivity() {
             setPadding(dp(12), dp(8), dp(12), dp(4))
         }
         val scaleModeLabel = TextView(this).apply {
-            text = "顯示比例:"
+            text = tr("顯示比例:")
             textSize = 12f
             setTextColor(0xFF7FD8FF.toInt())
             gravity = android.view.Gravity.CENTER_VERTICAL
@@ -925,7 +967,7 @@ class SettingsActivity : AppCompatActivity() {
         scaleModeRow.addView(scaleModeLabel)
 
         val btnCrop = android.widget.Button(this).apply {
-            text = "保持比例"
+            text = tr("保持比例")
             textSize = 11f
             setTextColor(if (prefs.bgScaleMode == 0) 0xFF111827.toInt() else 0xFFE8F4FF.toInt())
             setBackgroundColor(if (prefs.bgScaleMode == 0) 0xFF7FD8FF.toInt() else 0xFF2A3A5C.toInt())
@@ -933,7 +975,7 @@ class SettingsActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(0, dp(32), 1f).apply { marginStart = dp(8) }
         }
         val btnFit = android.widget.Button(this).apply {
-            text = "整張塞入"
+            text = tr("整張塞入")
             textSize = 11f
             setTextColor(if (prefs.bgScaleMode == 1) 0xFF111827.toInt() else 0xFFE8F4FF.toInt())
             setBackgroundColor(if (prefs.bgScaleMode == 1) 0xFF7FD8FF.toInt() else 0xFF2A3A5C.toInt())
@@ -958,7 +1000,7 @@ class SettingsActivity : AppCompatActivity() {
 
         // ── 背景位置 X 拉桿 ──
         val xLabel = TextView(this).apply {
-            text = "水平位置 X: %d%%".format((prefs.bgOffsetX * 100).toInt())
+            text = tr("水平位置 X: %d%%").format((prefs.bgOffsetX * 100).toInt())
             textSize = 12f
             setTextColor(0xFF7FD8FF.toInt())
             setPadding(dp(12), dp(8), 0, dp(4))
@@ -971,7 +1013,7 @@ class SettingsActivity : AppCompatActivity() {
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
                     prefs.bgOffsetX = p / 100f
-                    xLabel.text = "水平位置 X: %d%%".format(p)
+                    xLabel.text = tr("水平位置 X: %d%%").format(p)
                     updateBgPreviewMatrix(); updateVideoPreviewTransform(); fullPreviewView?.invalidate()
                 }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
@@ -981,7 +1023,7 @@ class SettingsActivity : AppCompatActivity() {
 
         // ── 背景位置 Y 拉桿 ──
         val yLabel = TextView(this).apply {
-            text = "垂直位置 Y: %d%%".format((prefs.bgOffsetY * 100).toInt())
+            text = tr("垂直位置 Y: %d%%").format((prefs.bgOffsetY * 100).toInt())
             textSize = 12f
             setTextColor(0xFF7FD8FF.toInt())
             setPadding(dp(12), dp(4), 0, dp(4))
@@ -994,7 +1036,7 @@ class SettingsActivity : AppCompatActivity() {
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
                     prefs.bgOffsetY = p / 100f
-                    yLabel.text = "垂直位置 Y: %d%%".format(p)
+                    yLabel.text = tr("垂直位置 Y: %d%%").format(p)
                     updateBgPreviewMatrix(); updateVideoPreviewTransform(); fullPreviewView?.invalidate()
                 }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
@@ -1005,7 +1047,7 @@ class SettingsActivity : AppCompatActivity() {
         // ── 鍵盤高度拉桿 ──
         val heightPct = ((prefs.keyboardHeightRatio - 0.25f) / 0.30f * 100).toInt().coerceIn(0, 100)
         val kbHeightLabel = TextView(this).apply {
-            text = "鍵盤高度: %d%%".format(heightPct)
+            text = tr("鍵盤高度: %d%%").format(heightPct)
             textSize = 12f
             setTextColor(0xFF7FD8FF.toInt())
             setPadding(dp(12), dp(8), 0, dp(4))
@@ -1018,7 +1060,7 @@ class SettingsActivity : AppCompatActivity() {
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
                     prefs.keyboardHeightRatio = 0.25f + p / 100f * 0.30f
-                    kbHeightLabel.text = "鍵盤高度: %d%%".format(p)
+                    kbHeightLabel.text = tr("鍵盤高度: %d%%").format(p)
                     updateFullPreviewHeight()
                 }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
@@ -1028,7 +1070,7 @@ class SettingsActivity : AppCompatActivity() {
 
         // ── 按鍵大小拉桿 ──
         val keySizeLabel = TextView(this).apply {
-            text = "按鍵大小: %d%%".format(prefs.keyScalePercent)
+            text = tr("按鍵大小: %d%%").format(prefs.keyScalePercent)
             textSize = 12f
             setTextColor(0xFF7FD8FF.toInt())
             setPadding(dp(12), dp(8), 0, dp(4))
@@ -1041,7 +1083,7 @@ class SettingsActivity : AppCompatActivity() {
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
                     prefs.keyScalePercent = p + 70
-                    keySizeLabel.text = "按鍵大小: %d%%".format(p + 70)
+                    keySizeLabel.text = tr("按鍵大小: %d%%").format(p + 70)
                     fullPreviewView?.invalidate()
                 }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
@@ -1051,7 +1093,7 @@ class SettingsActivity : AppCompatActivity() {
 
         // ── 按鍵透明度拉桿 ──
         val keyOpLabel = TextView(this).apply {
-            text = "按鍵不透明度: %d%%".format((prefs.keyOpacity * 100) / 255)
+            text = tr("按鍵不透明度: %d%%").format((prefs.keyOpacity * 100) / 255)
             textSize = 12f
             setTextColor(0xFF7FD8FF.toInt())
             setPadding(dp(12), dp(4), 0, dp(4))
@@ -1064,7 +1106,7 @@ class SettingsActivity : AppCompatActivity() {
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
                     prefs.keyOpacity = p
-                    keyOpLabel.text = "按鍵不透明度: %d%%".format((p * 100) / 255)
+                    keyOpLabel.text = tr("按鍵不透明度: %d%%").format((p * 100) / 255)
                     fullPreviewView?.invalidate()
                 }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
@@ -1074,7 +1116,7 @@ class SettingsActivity : AppCompatActivity() {
 
         // ── 文字透明度拉桿 ──
         val keyTextOpLabel = TextView(this).apply {
-            text = "文字不透明度: %d%%".format((prefs.keyTextOpacity * 100) / 255)
+            text = tr("文字不透明度: %d%%").format((prefs.keyTextOpacity * 100) / 255)
             textSize = 12f
             setTextColor(0xFF7FD8FF.toInt())
             setPadding(dp(12), dp(4), 0, dp(4))
@@ -1087,7 +1129,7 @@ class SettingsActivity : AppCompatActivity() {
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
                     prefs.keyTextOpacity = p
-                    keyTextOpLabel.text = "文字不透明度: %d%%".format((p * 100) / 255)
+                    keyTextOpLabel.text = tr("文字不透明度: %d%%").format((p * 100) / 255)
                     fullPreviewView?.invalidate()
                 }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
@@ -1097,7 +1139,7 @@ class SettingsActivity : AppCompatActivity() {
 
         // ── ��盤完整預覽（背景 + 遮罩 + 按鍵） ──
         val previewTitle = TextView(this).apply {
-            text = "鍵盤預覽"
+            text = tr("鍵盤預覽")
             textSize = 13f
             setTextColor(0xFF7FD8FF.toInt())
             setPadding(dp(12), dp(12), 0, dp(4))
@@ -1109,13 +1151,13 @@ class SettingsActivity : AppCompatActivity() {
         card.addView(kbPreview)
 
         // ── 透明鍵盤 ──
-        card.addView(switchRow("透明鍵盤", "背景完全透視到底層 App", prefs.transparentKeyboard) {
+        card.addView(switchRow(tr("透明鍵盤"), tr("背景完全透視到底層 App"), prefs.transparentKeyboard) {
             prefs.transparentKeyboard = it
         })
 
         // 透明度滑桿
         val tAlphaLabel = TextView(this).apply {
-            text = "透明度: %d%%".format((prefs.transparentKeyboardAlpha * 100) / 255)
+            text = tr("透明度: %d%%").format((prefs.transparentKeyboardAlpha * 100) / 255)
             textSize = 11f
             setTextColor(0xFF8899AA.toInt())
             setPadding(dp(12), dp(4), 0, 0)
@@ -1128,7 +1170,7 @@ class SettingsActivity : AppCompatActivity() {
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
                     prefs.transparentKeyboardAlpha = p
-                    tAlphaLabel.text = "透明度: %d%%".format((p * 100) / 255)
+                    tAlphaLabel.text = tr("透明度: %d%%").format((p * 100) / 255)
                 }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
                 override fun onStopTrackingTouch(sb: SeekBar?) {}
@@ -1172,14 +1214,14 @@ class SettingsActivity : AppCompatActivity() {
                                 mp.prepareAsync()
                                 bgVideoPlayer = mp
                             } catch (e: Exception) {
-                                bgPreviewLabel?.text = "🎬 影片播放失敗"
+                                bgPreviewLabel?.text = tr("🎬 影片播放失敗")
                                 bgPreviewLabel?.visibility = View.VISIBLE
                                 try { mp.release() } catch (_: Exception) {}
                             }
                         }
                     } catch (e: Exception) {
                         withContext(Dispatchers.Main) {
-                            bgPreviewLabel?.text = "🎬 影片載入失敗"
+                            bgPreviewLabel?.text = tr("🎬 影片載入失敗")
                             bgPreviewLabel?.visibility = View.VISIBLE
                         }
                     }
@@ -1295,7 +1337,7 @@ class SettingsActivity : AppCompatActivity() {
             startVideoPreview(savedBg.absolutePath)
         } else {
             bgPreviewImage?.setImageBitmap(null)
-            bgPreviewLabel?.text = "尚未設定背景"
+            bgPreviewLabel?.text = tr("尚未設定背景")
             bgPreviewLabel?.visibility = View.VISIBLE
         }
         // 同步更新鍵盤完整預覽的背景
@@ -1492,7 +1534,7 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         container.addView(TextView(this).apply {
-            text = "按鍵字體顏色"
+            text = tr("按鍵字體顏色")
             textSize = 12f
             setTextColor(0xFF7FD8FF.toInt())
             setPadding(dp(4), 0, 0, dp(8))
@@ -1612,7 +1654,7 @@ class SettingsActivity : AppCompatActivity() {
 
         // 自訂顏色按鈕
         container.addView(TextView(this).apply {
-            text = "＋ 自訂顏色..."
+            text = tr("＋ 自訂顏色...")
             textSize = 12f
             setTextColor(0xFF7FD8FF.toInt())
             setPadding(dp(8), dp(8), dp(8), dp(4))
@@ -1761,13 +1803,13 @@ class SettingsActivity : AppCompatActivity() {
         })
 
         android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-            .setTitle("自訂字體顏色")
+            .setTitle(tr("自訂字體顏色"))
             .setView(dialogLayout)
-            .setPositiveButton("確定") { _, _ ->
+            .setPositiveButton(tr("確定")) { _, _ ->
                 val color = android.graphics.Color.rgb(r, g, b) or 0xFF000000.toInt()
                 onColorPicked(color)
             }
-            .setNegativeButton("取消", null)
+            .setNegativeButton(tr("取消"), null)
             .show()
     }
 
@@ -1962,12 +2004,12 @@ class SettingsActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
         textContainer.addView(TextView(this).apply {
-            text = "語音辨識引擎"
+            text = tr("語音辨識引擎")
             textSize = 14f
             setTextColor(0xFFE8F4FF.toInt())
         })
         textContainer.addView(TextView(this).apply {
-            text = "Whisper 需 API Key / Faster-Whisper 自架免費"
+            text = tr("Whisper 需 API Key / Faster-Whisper 自架免費")
             textSize = 11f
             setTextColor(0xFF6688AA.toInt())
         })
@@ -1985,7 +2027,7 @@ class SettingsActivity : AppCompatActivity() {
             }
             setOnClickListener {
                 android.app.AlertDialog.Builder(this@SettingsActivity, android.R.style.Theme_Material_Dialog_Alert)
-                    .setTitle("選擇語音辨識引擎")
+                    .setTitle(tr("選擇語音辨識引擎"))
                     .setSingleChoiceItems(options, prefs.speechEngineType.coerceIn(0, options.lastIndex)) { dialog, which ->
                         prefs.speechEngineType = which
                         text = options[which]
@@ -2036,30 +2078,30 @@ class SettingsActivity : AppCompatActivity() {
             setPadding(0, dp(6), 0, 0)
         }
         btnRow.addView(TextView(this).apply {
-            text = "測試 Whisper 連線"
+            text = tr("測試 Whisper 連線")
             textSize = 12f
             setTextColor(0xFF66AAFF.toInt())
             setPadding(dp(4), dp(6), dp(12), dp(4))
             setOnClickListener {
-                testStatus.text = "測試中..."
+                testStatus.text = tr("測試中...")
                 testStatus.setTextColor(0xFFFFCC00.toInt())
                 testWhisperConnection(testStatus)
             }
         })
         btnRow.addView(TextView(this).apply {
-            text = "測試 Faster-Whisper"
+            text = tr("測試 Faster-Whisper")
             textSize = 12f
             setTextColor(0xFF66AAFF.toInt())
             setPadding(dp(4), dp(6), dp(4), dp(4))
             setOnClickListener { _ ->
                 val url = urlInput.text.toString().trim()
                 if (url.isBlank()) {
-                    testStatus.text = "✕ 請先輸入 Server URL"
+                    testStatus.text = tr("✕ 請先輸入 Server URL")
                     testStatus.setTextColor(0xFFFF6B6B.toInt())
                     return@setOnClickListener
                 }
                 prefs.fasterWhisperServerUrl = url
-                testStatus.text = "測試中..."
+                testStatus.text = tr("測試中...")
                 testStatus.setTextColor(0xFFFFCC00.toInt())
                 testFasterWhisperConnection(url, testStatus)
             }
@@ -2094,12 +2136,12 @@ class SettingsActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
         textCol.addView(TextView(this).apply {
-            text = "語音辨識語言"
+            text = tr("語音辨識語言")
             textSize = 14f
             setTextColor(0xFFE8F4FF.toInt())
         })
         textCol.addView(TextView(this).apply {
-            text = "混合語言 = Whisper 自動偵測（中英日韓混說）"
+            text = tr("混合語言 = Whisper 自動偵測（中英日韓混說）")
             textSize = 11f
             setTextColor(0xFF6688AA.toInt())
         })
@@ -2118,7 +2160,7 @@ class SettingsActivity : AppCompatActivity() {
             setOnClickListener {
                 val cur = langValues.indexOf(prefs.speechLanguage).coerceAtLeast(0)
                 android.app.AlertDialog.Builder(this@SettingsActivity, android.R.style.Theme_Material_Dialog_Alert)
-                    .setTitle("選擇語音辨識語言")
+                    .setTitle(tr("選擇語音辨識語言"))
                     .setSingleChoiceItems(langLabels, cur) { dialog, which ->
                         prefs.speechLanguage = langValues[which]
                         (it as TextView).text = langLabels[which]
@@ -2147,12 +2189,12 @@ class SettingsActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
         textCol.addView(TextView(this).apply {
-            text = "靜音偵測靈敏度"
+            text = tr("靜音偵測靈敏度")
             textSize = 14f
             setTextColor(0xFFE8F4FF.toInt())
         })
         textCol.addView(TextView(this).apply {
-            text = "嘈雜環境選「低」避免被截斷"
+            text = tr("嘈雜環境選「低」避免被截斷")
             textSize = 11f
             setTextColor(0xFF6688AA.toInt())
         })
@@ -2171,7 +2213,7 @@ class SettingsActivity : AppCompatActivity() {
             setOnClickListener {
                 val cur = prefs.voiceSilenceSensitivity.coerceIn(0, 2)
                 android.app.AlertDialog.Builder(this@SettingsActivity, android.R.style.Theme_Material_Dialog_Alert)
-                    .setTitle("選擇靜音偵測靈敏度")
+                    .setTitle(tr("選擇靜音偵測靈敏度"))
                     .setSingleChoiceItems(labels, cur) { dialog, which ->
                         prefs.voiceSilenceSensitivity = which
                         (it as TextView).text = labels[which]
@@ -2197,7 +2239,7 @@ class SettingsActivity : AppCompatActivity() {
                 val body = response.body?.string() ?: ""
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                     if (response.isSuccessful) {
-                        statusView.text = "✓ Faster-Whisper 連線成功！$body"
+                        statusView.text = tr("✓ Faster-Whisper 連線成功！$body")
                         statusView.setTextColor(0xFF66FF66.toInt())
                     } else {
                         statusView.text = "✕ HTTP ${response.code}: ${body.take(100)}"
@@ -2206,7 +2248,7 @@ class SettingsActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    statusView.text = "✕ 連線失敗: ${e.message}"
+                    statusView.text = tr("✕ 連線失敗: ${e.message}")
                     statusView.setTextColor(0xFFFF6B6B.toInt())
                 }
             }
@@ -2220,7 +2262,7 @@ class SettingsActivity : AppCompatActivity() {
             ?: providerManager.getApiKey(com.snowrealm.yukiboard.claw.provider.AIProviderType.OPENAI)
 
         if (apiKey.isNullOrBlank()) {
-            statusView.text = "✗ 沒有 OpenAI API Key — 請先到 AI 設定填入"
+            statusView.text = tr("✗ 沒有 OpenAI API Key — 請先到 AI 設定填入")
             statusView.setTextColor(0xFFFF6666.toInt())
             return
         }
@@ -2259,29 +2301,29 @@ class SettingsActivity : AppCompatActivity() {
                 runOnUiThread {
                     when (code) {
                         200 -> {
-                            statusView.text = "✓ Whisper API 連線成功！可正常使用"
+                            statusView.text = tr("✓ Whisper API 連線成功！可正常使用")
                             statusView.setTextColor(0xFF66CC88.toInt())
                         }
                         401 -> {
-                            statusView.text = "✗ API Key 無效（401 Unauthorized）"
+                            statusView.text = tr("✗ API Key 無效（401 Unauthorized）")
                             statusView.setTextColor(0xFFFF6666.toInt())
                         }
                         429 -> {
-                            statusView.text = "✗ 額度用完或速率限制（429 Rate Limit）"
+                            statusView.text = tr("✗ 額度用完或速率限制（429 Rate Limit）")
                             statusView.setTextColor(0xFFFF9933.toInt())
                         }
                         else -> {
                             val msg = try {
                                 org.json.JSONObject(responseBody).optString("error", responseBody.take(100))
                             } catch (_: Exception) { responseBody.take(100) }
-                            statusView.text = "✗ 錯誤 $code: $msg"
+                            statusView.text = tr("✗ 錯誤 $code: $msg")
                             statusView.setTextColor(0xFFFF6666.toInt())
                         }
                     }
                 }
             } catch (e: Exception) {
                 runOnUiThread {
-                    statusView.text = "✗ 連線失敗: ${e.message?.take(80)}"
+                    statusView.text = tr("✗ 連線失敗: ${e.message?.take(80)}")
                     statusView.setTextColor(0xFFFF6666.toInt())
                 }
             }
@@ -2343,12 +2385,12 @@ class SettingsActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
         engineText.addView(TextView(this).apply {
-            text = "TTS 引擎"
+            text = tr("TTS 引擎")
             textSize = 14f
             setTextColor(0xFFE8F4FF.toInt())
         })
         engineText.addView(TextView(this).apply {
-            text = "Google Cloud 需要 API Key"
+            text = tr("Google Cloud 需要 API Key")
             textSize = 11f
             setTextColor(0xFF6688AA.toInt())
         })
@@ -2366,7 +2408,7 @@ class SettingsActivity : AppCompatActivity() {
             }
             setOnClickListener {
                 android.app.AlertDialog.Builder(this@SettingsActivity, android.R.style.Theme_Material_Dialog_Alert)
-                    .setTitle("選擇 TTS 引擎")
+                    .setTitle(tr("選擇 TTS 引擎"))
                     .setSingleChoiceItems(engineOptions, prefs.ttsEngineType) { dialog, which ->
                         prefs.ttsEngineType = which
                         text = engineOptions[which]
@@ -2431,12 +2473,12 @@ class SettingsActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.4f)
         }
         voiceTextCol.addView(TextView(this).apply {
-            text = "語音音色"
+            text = tr("語音音色")
             textSize = 14f
             setTextColor(0xFFE8F4FF.toInt())
         })
         voiceTextCol.addView(TextView(this).apply {
-            text = "選擇 TTS 語音"
+            text = tr("選擇 TTS 語音")
             textSize = 10f
             setTextColor(0xFF667788.toInt())
         })
@@ -2539,7 +2581,7 @@ class SettingsActivity : AppCompatActivity() {
                     listView.setSelection(currentIdx)
 
                     val dlg = android.app.AlertDialog.Builder(this@SettingsActivity, android.R.style.Theme_Material_Dialog_Alert)
-                        .setTitle("選擇語音音色 (${sorted.size} 種)")
+                        .setTitle(tr("選擇語音音色 (${sorted.size} 種)"))
                         .setView(dialogLayout)
                         .setOnDismissListener {
                             handler.postDelayed({
@@ -2568,7 +2610,7 @@ class SettingsActivity : AppCompatActivity() {
                         val item = filteredItems.getOrNull(position) ?: return@setOnItemClickListener
                         if (item.second == null) {
                             prefs.ttsVoiceName = ""
-                            (btn as? TextView)?.text = "系統預設"
+                            (btn as? TextView)?.text = tr("系統預設")
                         } else {
                             val selected = item.second ?: return@setOnItemClickListener
                             prefs.ttsVoiceName = selected.name
@@ -2592,9 +2634,9 @@ class SettingsActivity : AppCompatActivity() {
         outer.addView(voiceRow)
 
         // 功能開關
-        outer.addView(switchRow("翻譯朗讀", "翻譯完成後自動朗讀結果", prefs.ttsTranslateRead) { prefs.ttsTranslateRead = it })
-        outer.addView(switchRow("Yuki 語音", "雪凜對話泡泡同步語音", prefs.ttsYukiVoice) { prefs.ttsYukiVoice = it })
-        outer.addView(switchRow("候選字朗讀", "無障礙：選字時唸出候選字", prefs.ttsCandidateRead) { prefs.ttsCandidateRead = it })
+        outer.addView(switchRow(tr("翻譯朗讀"), tr("翻譯完成後自動朗讀結果"), prefs.ttsTranslateRead) { prefs.ttsTranslateRead = it })
+        outer.addView(switchRow(tr("Yuki 語音"), tr("雪凜對話泡泡同步語音"), prefs.ttsYukiVoice) { prefs.ttsYukiVoice = it })
+        outer.addView(switchRow(tr("候選字朗讀"), tr("無障礙：選字時唸出候選字"), prefs.ttsCandidateRead) { prefs.ttsCandidateRead = it })
 
         // 語速調整
         val speedRow = LinearLayout(this).apply {
@@ -2603,7 +2645,7 @@ class SettingsActivity : AppCompatActivity() {
             setPadding(0, dp(6), 0, dp(4))
         }
         speedRow.addView(TextView(this).apply {
-            text = "語速"
+            text = tr("語速")
             textSize = 13f
             setTextColor(0xFFAABBCC.toInt())
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
@@ -2652,7 +2694,7 @@ class SettingsActivity : AppCompatActivity() {
 
         // TTS 測試按鈕
         val testBtn = TextView(this).apply {
-            text = "▶ 測試語音輸出"
+            text = tr("▶ 測試語音輸出")
             textSize = 13f
             setTextColor(0xFF66AAFF.toInt())
             setPadding(dp(12), dp(12), dp(12), dp(12))
@@ -2673,12 +2715,12 @@ class SettingsActivity : AppCompatActivity() {
                 // 先存 EditText 當前值（避免焦點未離開時 prefs 還沒更新）
                 prefs.googleCloudTtsApiKey = keyInput.text.toString().trim()
                 btn.isEnabled = false
-                (btn as? TextView)?.text = "⏳ 初始化中..."
+                (btn as? TextView)?.text = tr("⏳ 初始化中...")
 
                 val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
                 val resetBtn = {
                     btn.isEnabled = true
-                    (btn as? TextView)?.text = "▶ 測試語音輸出"
+                    (btn as? TextView)?.text = tr("▶ 測試語音輸出")
                 }
 
                 when (prefs.ttsEngineType) {
@@ -2689,7 +2731,7 @@ class SettingsActivity : AppCompatActivity() {
                             resetBtn()
                             return@setOnClickListener
                         }
-                        (btn as? TextView)?.text = "🔊 呼叫 Google Cloud..."
+                        (btn as? TextView)?.text = tr("🔊 呼叫 Google Cloud...")
                         android.widget.Toast.makeText(this@SettingsActivity, "API Key: ${key.take(10)}... 呼叫中", android.widget.Toast.LENGTH_SHORT).show()
                         val engine = com.snowrealm.yukiboard.speech.GoogleCloudTtsEngine(key)
                         engine.speak(testText, null, prefs.ttsSpeed) {
@@ -2746,7 +2788,7 @@ class SettingsActivity : AppCompatActivity() {
                                     audioMgr.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, maxVol / 2, android.media.AudioManager.FLAG_SHOW_UI)
                                 }
 
-                                (btn as? TextView)?.text = "🔊 播放中... ($info)"
+                                (btn as? TextView)?.text = tr("🔊 播放中... ($info)")
                                 rawTts?.setSpeechRate(prefs.ttsSpeed)
                                 val speakResult = rawTts?.speak(testText, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "test_utterance")
                                 android.util.Log.i("TTS_TEST", "speakResult=$speakResult $info")
@@ -2773,7 +2815,7 @@ class SettingsActivity : AppCompatActivity() {
             setPadding(dp(12), dp(8), dp(12), dp(8))
         }
         val title = TextView(this).apply {
-            text = "候選字顏色說明"
+            text = tr("候選字顏色說明")
             textSize = 12f
             setTextColor(0xFF7FD8FF.toInt())
             setPadding(0, 0, 0, dp(6))
@@ -2840,7 +2882,7 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         card.addView(TextView(this).apply {
-            text = "勾選要啟用的輸入法（切換語言時循環）"
+            text = tr("勾選要啟用的輸入法（切換語言時循環）")
             textSize = 12f
             setTextColor(0xFF6688AA.toInt())
             setPadding(dp(8), dp(4), dp(8), dp(8))
@@ -2888,7 +2930,7 @@ class SettingsActivity : AppCompatActivity() {
             val custom = snippetMgr.getCustomSnippets()
             if (custom.isNotEmpty()) {
                 listContainer.addView(TextView(this).apply {
-                    text = "自訂 Snippet"
+                    text = tr("自訂 Snippet")
                     textSize = 13f
                     setTextColor(0xFF7FD8FF.toInt())
                     setPadding(dp(4), dp(8), dp(4), dp(4))
@@ -2926,17 +2968,17 @@ class SettingsActivity : AppCompatActivity() {
                 visibility = View.GONE
             }
             val toggleLabel = TextView(this).apply {
-                text = "▸ 內建 Snippet (${builtIn.size} 個) — 點擊展開"
+                text = tr("▸ 內建 Snippet (${builtIn.size} 個) — 點擊展開")
                 textSize = 13f
                 setTextColor(0xFF6688AA.toInt())
                 setPadding(dp(4), dp(8), dp(4), dp(4))
                 setOnClickListener {
                     if (builtInContainer.visibility == View.GONE) {
                         builtInContainer.visibility = View.VISIBLE
-                        text = "▾ 內建 Snippet (${builtIn.size} 個) — 點擊收合"
+                        text = tr("▾ 內建 Snippet (${builtIn.size} 個) — 點擊收合")
                     } else {
                         builtInContainer.visibility = View.GONE
-                        text = "▸ 內建 Snippet (${builtIn.size} 個) — 點擊展開"
+                        text = tr("▸ 內建 Snippet (${builtIn.size} 個) — 點擊展開")
                     }
                 }
             }
@@ -2957,7 +2999,7 @@ class SettingsActivity : AppCompatActivity() {
 
         // 新增按鈕
         card.addView(Button(this).apply {
-            text = "+ 新增 Snippet"
+            text = tr("+ 新增 Snippet")
             setTextColor(0xFF7FD8FF.toInt())
             setBackgroundColor(0xFF1A3A5C.toInt())
             layoutParams = LinearLayout.LayoutParams(
@@ -2992,9 +3034,9 @@ class SettingsActivity : AppCompatActivity() {
                 dialogView.addView(expansionInput)
 
                 android.app.AlertDialog.Builder(this@SettingsActivity)
-                    .setTitle("新增 Snippet")
+                    .setTitle(tr("新增 Snippet"))
                     .setView(dialogView)
-                    .setPositiveButton("新增") { _, _ ->
+                    .setPositiveButton(tr("新增")) { _, _ ->
                         val abbr = abbrInput.text.toString().trim()
                         val expansion = expansionInput.text.toString()
                         if (abbr.isNotBlank() && expansion.isNotBlank()) {
@@ -3002,7 +3044,7 @@ class SettingsActivity : AppCompatActivity() {
                             refreshSnippetList()
                         }
                     }
-                    .setNegativeButton("取消", null)
+                    .setNegativeButton(tr("取消"), null)
                     .show()
             }
         })

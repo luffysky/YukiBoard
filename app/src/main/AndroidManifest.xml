@@ -80,6 +80,11 @@
             android:exported="false" />
 
         <activity
+            android:name=".ui.MidiImportActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:exported="false" />
+
+        <activity
             android:name=".ui.settings.ApiGuideActivity"
             android:label="AI 服務申請教學"
             android:exported="false" />

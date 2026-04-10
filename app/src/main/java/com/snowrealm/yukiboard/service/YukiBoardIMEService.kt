@@ -1565,6 +1565,24 @@ class YukiBoardIMEService : InputMethodService() {
                 val p = MusicPanelView(this)
                 p.theme = theme
                 p.soundEngine = keySoundEngine
+                p.onImportMidi = {
+                    com.snowrealm.yukiboard.ui.MidiImportActivity.onMidiImported = { midiSong ->
+                        val song = MusicPanelView.Song(
+                            name = midiSong.name,
+                            artist = "MIDI",
+                            bpm = 120,
+                            notes = midiSong.notes.map { n ->
+                                MusicPanelView.SongNote(n.semitone, n.startMs, n.durationMs)
+                            }
+                        )
+                        android.os.Handler(android.os.Looper.getMainLooper()).post { p.addImportedSong(song) }
+                    }
+                    try {
+                        val intent = android.content.Intent(this, com.snowrealm.yukiboard.ui.MidiImportActivity::class.java)
+                        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(intent)
+                    } catch (_: Exception) {}
+                }
                 p
             }
             PanelType.HANDWRITING -> {
