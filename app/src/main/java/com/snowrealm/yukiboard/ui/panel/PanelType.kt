@@ -21,6 +21,8 @@ enum class PanelType(val icon: String, val displayName: String) {
     UNIT_CONVERTER("📏", "換算"),
     HANDWRITING("✍", "手寫"),
     MUSIC("🎹", "音樂"),
+    DICTIONARY("📚", "字典"),
+    LANG_LEARN("🎓", "學語言"),
     THEME("🎨", "主題"),
     SETTINGS("⚙", "設定")
 }

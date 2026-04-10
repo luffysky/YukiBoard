@@ -1619,6 +1619,30 @@ class YukiBoardIMEService : InputMethodService() {
                 }
                 p
             }
+            PanelType.DICTIONARY -> {
+                val p = DictionaryPanelView(this)
+                p.theme = theme
+                p.inputTextProvider = {
+                    val ic = currentInputConnection
+                    val selected = ic?.getSelectedText(0)?.toString()
+                    if (!selected.isNullOrEmpty()) selected
+                    else ic?.getTextBeforeCursor(200, 0)?.toString()?.trim()?.split("\\s+".toRegex())?.lastOrNull() ?: ""
+                }
+                p.onInsertText = { text -> currentInputConnection?.commitText(text, 1) }
+                p
+            }
+            PanelType.LANG_LEARN -> {
+                val p = LangLearnPanelView(this)
+                p.theme = theme
+                p.inputTextProvider = {
+                    val ic = currentInputConnection
+                    val selected = ic?.getSelectedText(0)?.toString()
+                    if (!selected.isNullOrEmpty()) selected
+                    else ic?.getTextBeforeCursor(200, 0)?.toString()?.trim()?.split("\\s+".toRegex())?.lastOrNull() ?: ""
+                }
+                p.onInsertText = { text -> currentInputConnection?.commitText(text, 1) }
+                p
+            }
             else -> return
         }
 
