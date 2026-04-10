@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 124
-        versionName "0.9.58"
+        versionCode 125
+        versionName "0.9.59"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,10 +82,10 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 音樂面板（鋼琴鍵盤彈奏 + 10 首曲庫 + 錄音回放）\n" +
-                    "- feat: 7 種樂器即時切換（鋼琴/音樂盒/吉他/豎琴/風琴/木琴/柔和）\n" +
-                    "- feat: 8 款工具列動畫主題（星空/海洋/餘燼/矩陣3D/冰霜/熔岩/彩虹/雷電）\n" +
-                    "- fix: 各樂器音色差異化增強（泛音+衰減+餘韻重新調校）"
+                    "- feat: 8 款全鍵盤動畫主題（星空/海洋/餘燼/矩陣3D/冰霜/熔岩/彩虹/雷電）\n" +
+                    "- feat: 音樂面板（鋼琴鍵盤 + 10 首曲庫 + 錄音回放 + 7 樂器）\n" +
+                    "- feat: 主題面板可直接切換動畫主題\n" +
+                    "- fix: 各樂器音色差異化增強"
             }
         }
         debug {
@@ -94,10 +94,10 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 音樂面板（鋼琴鍵盤彈奏 + 10 首曲庫 + 錄音回放）\n" +
-                    "- feat: 7 種樂器即時切換（鋼琴/音樂盒/吉他/豎琴/風琴/木琴/柔和）\n" +
-                    "- feat: 8 款工具列動畫主題（星空/海洋/餘燼/矩陣3D/冰霜/熔岩/彩虹/雷電）\n" +
-                    "- fix: 各樂器音色差異化增強（泛音+衰減+餘韻重新調校）"
+                    "- feat: 8 款全鍵盤動畫主題（星空/海洋/餘燼/矩陣3D/冰霜/熔岩/彩虹/雷電）\n" +
+                    "- feat: 音樂面板（鋼琴鍵盤 + 10 首曲庫 + 錄音回放 + 7 樂器）\n" +
+                    "- feat: 主題面板可直接切換動畫主題\n" +
+                    "- fix: 各樂器音色差異化增強"
             }
         }
     }

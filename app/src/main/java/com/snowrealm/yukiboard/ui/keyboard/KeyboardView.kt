@@ -258,6 +258,36 @@ class KeyboardView(context: Context) : View(context) {
     private var expandDownY = 0f                   // 展開面板 DOWN 位置 Y
     private var composingText: String = ""
     private var theme: KeyboardTheme = KeyboardTheme.default()
+
+    // 動畫背景渲染器（星空/海洋/矩陣等全鍵盤動畫主題）
+    private var animRenderer: com.snowrealm.yukiboard.ui.panel.ToolbarAnimRenderer? = null
+    private var animStyle = com.snowrealm.yukiboard.ui.panel.ToolbarAnimRenderer.Style.NONE
+    private var animRunning = false
+    private val animTick = object : Runnable {
+        override fun run() {
+            if (!animRunning) return
+            invalidate()
+            postDelayed(this, 16)
+        }
+    }
+    fun setAnimStyle(styleId: String) {
+        val newStyle = com.snowrealm.yukiboard.ui.panel.ToolbarAnimRenderer.Style.fromId(styleId)
+        if (newStyle != animStyle) {
+            animStyle = newStyle
+            if (newStyle != com.snowrealm.yukiboard.ui.panel.ToolbarAnimRenderer.Style.NONE) {
+                if (animRenderer == null) {
+                    animRenderer = com.snowrealm.yukiboard.ui.panel.ToolbarAnimRenderer(density)
+                }
+                animRenderer?.resetStyle()
+                animRunning = true
+                post(animTick)
+            } else {
+                animRunning = false
+                removeCallbacks(animTick)
+            }
+            invalidate()
+        }
+    }
     private var isShifted: Boolean = false
     private var isCapsLock: Boolean = false
     private var isCtrlActive: Boolean = false
@@ -984,12 +1014,18 @@ class KeyboardView(context: Context) : View(context) {
 
     private fun drawBackground(canvas: Canvas) {
         if (hasCustomBackground) {
-            // 先清透明，再畫使用者設定的遮罩深度
             canvas.drawColor(android.graphics.Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
             val alpha = bgOverlayAlpha.coerceIn(0, 255)
             canvas.drawColor(android.graphics.Color.argb(alpha, 0, 0, 0))
             return
         }
+
+        // 動畫主題背景（星空/海洋/矩陣等）
+        if (animStyle != com.snowrealm.yukiboard.ui.panel.ToolbarAnimRenderer.Style.NONE) {
+            animRenderer?.draw(canvas, width, height, animStyle, android.os.SystemClock.uptimeMillis())
+            return
+        }
+
         val startColor = theme.backgroundGradientStartInt
         val endColor = theme.backgroundGradientEndInt
         if (startColor != null && endColor != null) {

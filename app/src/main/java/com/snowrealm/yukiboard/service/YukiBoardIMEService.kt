@@ -640,6 +640,7 @@ class YukiBoardIMEService : InputMethodService() {
         keyboardView.applyTheme(currentTheme)
         toolbarView.theme = currentTheme
         toolbarView.setAnimStyle(prefs.toolbarAnimStyle)
+        keyboardView.setAnimStyle(prefs.toolbarAnimStyle)
 
         // 動態粒子覆蓋層（在鍵盤上方、GL 下方）
         val pv = com.snowrealm.yukiboard.animation.KeyboardParticleView(this)
@@ -1351,6 +1352,10 @@ class YukiBoardIMEService : InputMethodService() {
                     applyTheme(selected)
                     p.previewBgBitmap = null
                 }
+                p.onAnimThemeSelected = { styleId ->
+                    toolbarView.setAnimStyle(styleId)
+                    keyboardView.setAnimStyle(styleId)
+                }
                 val themeListener: (com.snowrealm.yukiboard.theme.KeyboardTheme) -> Unit = { newTheme ->
                     p.currentThemeId = newTheme.id
                     p.theme = newTheme
@@ -1905,6 +1910,7 @@ class YukiBoardIMEService : InputMethodService() {
     private fun applyTheme(theme: KeyboardTheme) {
         toolbarView.theme = theme
         toolbarView.setAnimStyle(prefs.toolbarAnimStyle)
+        keyboardView.setAnimStyle(prefs.toolbarAnimStyle)
         keyboardView.applyTheme(theme)
         glSurfaceView?.setFlowAlpha(theme.flowLightAlpha)
         glSurfaceView?.setFlowColor(theme.flowLightColorInt)

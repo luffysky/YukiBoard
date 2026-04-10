@@ -49,6 +49,7 @@ class ThemePanelView(context: Context) : View(context) {
         set(value) { field = value; invalidate() }
 
     var onThemeSelected: ((KeyboardTheme) -> Unit)? = null
+    var onAnimThemeSelected: ((String) -> Unit)? = null
     var onPickBackground: (() -> Unit)? = null
     var onPickVideo: (() -> Unit)? = null
     var onClearBackground: (() -> Unit)? = null
@@ -72,6 +73,7 @@ class ThemePanelView(context: Context) : View(context) {
         set(value) { field = value; invalidate() }
 
     private val themeRects = mutableListOf<Pair<RectF, Int>>()
+    private val animThemeRects = mutableListOf<Pair<RectF, ToolbarAnimRenderer.Style>>()
     private val cornerR = 10f * density
     private val pad = 8f * density
     private val sectionGap = 12f * density
@@ -167,6 +169,7 @@ class ThemePanelView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         themeRects.clear()
+        animThemeRects.clear()
         colorRects.clear()
         perKeyRects.clear()
         pickImgRect = null; pickVideoRect = null; clearBgRect = null
@@ -187,6 +190,11 @@ class ThemePanelView(context: Context) : View(context) {
         // ═══ 1: 主題列表 ═══
         curY = drawSectionTitle(canvas, "主題", curY)
         curY = drawThemeCards(canvas, curY)
+        curY += sectionGap
+
+        // ═══ 1.5: 動畫主題 ═══
+        curY = drawSectionTitle(canvas, "動畫主題", curY)
+        curY = drawAnimThemeCards(canvas, curY)
         curY += sectionGap
 
         // ═══ 2: 背景控制 ═══
@@ -297,6 +305,62 @@ class ThemePanelView(context: Context) : View(context) {
                 checkPaint.color = theme.candidateSelectedColorInt
                 canvas.drawText("✓", rect.right - 12 * density, rect.top + 14 * density, checkPaint)
             }
+            y = cy + cardH + pad
+        }
+        return y
+    }
+
+    // ─── 動畫主題卡片 ───
+
+    private fun drawAnimThemeCards(canvas: Canvas, startY: Float): Float {
+        val animStyles = ToolbarAnimRenderer.Style.entries
+        val cardH = 52f * density
+        val cols = ((width - pad) / (100f * density + pad)).toInt().coerceAtLeast(3)
+        val actualCardW = (width - pad * (cols + 1)) / cols
+        val currentAnimStyle = prefs.toolbarAnimStyle
+
+        var y = startY
+        animStyles.forEachIndexed { i, style ->
+            val col = i % cols
+            val row = i / cols
+            val x = pad + col * (actualCardW + pad)
+            val cy = startY + row * (cardH + pad)
+            val rect = RectF(x, cy, x + actualCardW, cy + cardH)
+            animThemeRects.add(rect to style)
+
+            // 卡片背景色 — 依動畫主題特色
+            val bgColor = when (style) {
+                ToolbarAnimRenderer.Style.NONE -> theme.effectivePanelBackground()
+                ToolbarAnimRenderer.Style.STARFIELD -> 0xFF0A0A2E.toInt()
+                ToolbarAnimRenderer.Style.OCEAN -> 0xFF001830.toInt()
+                ToolbarAnimRenderer.Style.EMBER -> 0xFF1A0A00.toInt()
+                ToolbarAnimRenderer.Style.MATRIX -> 0xFF050505.toInt()
+                ToolbarAnimRenderer.Style.FROST -> 0xFF0A1828.toInt()
+                ToolbarAnimRenderer.Style.LAVA -> 0xFF1A0500.toInt()
+                ToolbarAnimRenderer.Style.RAINBOW -> 0xFF0A0A14.toInt()
+                ToolbarAnimRenderer.Style.THUNDER -> 0xFF0A0520.toInt()
+            }
+            cardPaint.color = bgColor
+            canvas.drawRoundRect(rect, cornerR, cornerR, cardPaint)
+
+            // 選中框
+            val isActive = style.id == currentAnimStyle
+            if (isActive) {
+                val bp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    this.style = Paint.Style.STROKE; strokeWidth = 2.5f * density
+                    color = theme.candidateSelectedColorInt
+                }
+                canvas.drawRoundRect(rect, cornerR, cornerR, bp)
+                checkPaint.color = theme.candidateSelectedColorInt
+                canvas.drawText("✓", rect.right - 12 * density, rect.top + 14 * density, checkPaint)
+            }
+
+            // 名稱
+            textPaint.textSize = 10f * density
+            textPaint.color = 0xFFE0E0E0.toInt()
+            canvas.drawText(style.displayName, rect.centerX(), rect.bottom - 5 * density, textPaint)
+            textPaint.textSize = 12f * density
+
             y = cy + cardH + pad
         }
         return y
@@ -833,9 +897,23 @@ class ThemePanelView(context: Context) : View(context) {
                     if (selected != null) {
                         currentThemeId = selected.id
                         prefs.useCustomBackground = false
+                        // 選靜態主題時清除動畫主題
+                        prefs.toolbarAnimStyle = "none"
+                        onAnimThemeSelected?.invoke("none")
                         onThemeSelected?.invoke(selected)
                         performClick()
                     }
+                    return true
+                }
+
+                // 動畫主題卡片
+                val animHit = animThemeRects.firstOrNull { it.first.contains(cx, cy) }
+                if (animHit != null) {
+                    val style = animHit.second
+                    prefs.toolbarAnimStyle = style.id
+                    onAnimThemeSelected?.invoke(style.id)
+                    invalidate()
+                    performClick()
                     return true
                 }
 
