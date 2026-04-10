@@ -188,7 +188,30 @@ class JapaneseInputEngine(context: Context? = null) : InputEngine {
         return InputResult.CommitText(text)
     }
 
-    override fun getCandidates(): List<String> = candidates
+    override fun getCandidates(): List<String> {
+        // 変換モード中はそのまま candidates を返す
+        if (isConverting) return candidates
+
+        // 入力中：仮名バッファから即時候補を生成
+        val reading = kanaBuffer.toString()
+        if (reading.isEmpty()) return emptyList()
+
+        val live = mutableListOf<String>()
+        // 完全一致
+        kanjiDictionary[reading]?.let { live.addAll(it.take(6)) }
+        // 部分一致（最後の2-4文字で辞書引き）
+        if (live.size < 5 && reading.length >= 2) {
+            for (len in minOf(reading.length, 4) downTo 2) {
+                val tail = reading.substring(reading.length - len)
+                kanjiDictionary[tail]?.forEach { k ->
+                    val compound = reading.substring(0, reading.length - len) + k
+                    if (compound !in live && live.size < 8) live.add(compound)
+                }
+                if (live.size >= 5) break
+            }
+        }
+        return live
+    }
 
     override fun reset() {
         resetState()

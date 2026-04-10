@@ -67,7 +67,7 @@ class YukiPreferences(context: Context) {
     var keyPressVibration: Boolean by BoolPref("key_vibration", true)
     var keySoundEnabled: Boolean by BoolPref("key_sound", false)
     var toolbarAnimStyle: String by StringPref("toolbar_anim_style", "none")
-    var settingsLanguage: String by StringPref("settings_language", "zh")
+    var settingsLanguage: String by StringPref("settings_language", detectDefaultLanguage())
     var keySoundStyle: String by StringPref("key_sound_style", "piano")
     var keySoundVolume: Float by FloatPref("key_sound_volume", 0.45f)
     var voicePostProcessEnabled: Boolean by BoolPref("voice_post_process", true)
@@ -299,5 +299,23 @@ class YukiPreferences(context: Context) {
         const val MAX_HEIGHT_RATIO = 0.55f
         const val MIN_WIDTH_RATIO = 0.5f
         const val MAX_WIDTH_RATIO = 1.0f
+
+        /** 從系統 Locale 偵測預設語言（設定頁 + 鍵盤預設語言） */
+        fun detectDefaultLanguage(): String {
+            val locale = java.util.Locale.getDefault()
+            return when (locale.language) {
+                "zh" -> "zh"
+                "ja" -> "ja"
+                "ko" -> "ko"
+                "en" -> "en"
+                "de" -> "de"
+                "fr" -> "fr"
+                "es" -> "es"
+                "vi" -> "vi"
+                "it" -> "it"
+                "pt" -> "en"  // 葡萄牙語 fallback 英文
+                else -> "en"  // 其他語言 fallback 英文
+            }
+        }
     }
 }

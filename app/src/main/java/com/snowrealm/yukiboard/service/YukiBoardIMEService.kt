@@ -159,6 +159,8 @@ class YukiBoardIMEService : InputMethodService() {
     private var remotePanel: RemoteKeyboardPanelView? = null
     private var userDictPanel: UserDictionaryPanelView? = null
     private var decryptPanel: com.snowrealm.yukiboard.ui.panel.DecryptPanelView? = null
+    private var dictionaryPanel: DictionaryPanelView? = null
+    private var langLearnPanel: LangLearnPanelView? = null
 
     // 手寫辨識
     private var handwritingEngine: com.snowrealm.yukiboard.input.handwriting.HandwritingEngine? = null
@@ -397,15 +399,13 @@ class YukiBoardIMEService : InputMethodService() {
         // 長按注音/聲調直接輸出（不走 InputRouter）
         keyboardView.setOnRawCommitListener { text ->
             // 面板輸入模式：長按選字也送到面板
-            val tpR = translatePanel
-            val gpR = gifPanel
-            val udpR = userDictPanel
-            val dpR = decryptPanel
-            when {
-                tpR != null && tpR.isInInputMode -> { tpR.onComposedTextInput(text); return@setOnRawCommitListener }
-                gpR != null && gpR.isInInputMode -> { gpR.onComposedTextInput(text); return@setOnRawCommitListener }
-                udpR != null && udpR.isInInputMode -> { udpR.onComposedTextInput(text); return@setOnRawCommitListener }
-                dpR != null && dpR.isInInputMode -> { dpR.onComposedTextInput(text); return@setOnRawCommitListener }
+            val rawTarget: PanelInputTarget? = listOfNotNull(
+                translatePanel, gifPanel, userDictPanel, decryptPanel,
+                dictionaryPanel, langLearnPanel
+            ).firstOrNull { it.isInInputMode }
+            if (rawTarget != null) {
+                rawTarget.onComposedTextInput(text)
+                return@setOnRawCommitListener
             }
             val ic = currentInputConnection ?: return@setOnRawCommitListener
             // 先提交正在組合的注音
@@ -435,20 +435,17 @@ class YukiBoardIMEService : InputMethodService() {
         keyboardView.setOnCandidateSpeakListener { text -> onCandidateSpeak(text) }
         keyboardView.setOnCandidateSelectListener { index ->
             // 面板輸入模式 helper：找到正在輸入的面板
-            fun activePanelInputTarget(): Any? {
+            fun activePanelInputTarget(): PanelInputTarget? {
                 translatePanel?.let { if (it.isInInputMode) return it }
                 gifPanel?.let { if (it.isInInputMode) return it }
                 userDictPanel?.let { if (it.isInInputMode) return it }
                 decryptPanel?.let { if (it.isInInputMode) return it }
+                dictionaryPanel?.let { if (it.isInInputMode) return it }
+                langLearnPanel?.let { if (it.isInInputMode) return it }
                 return null
             }
-            fun commitToPanel(target: Any, text: String) {
-                when (target) {
-                    is TranslatePanelView -> target.onComposedTextInput(text)
-                    is GifPanelView -> target.onComposedTextInput(text)
-                    is UserDictionaryPanelView -> target.onComposedTextInput(text)
-                    is DecryptPanelView -> target.onComposedTextInput(text)
-                }
+            fun commitToPanel(target: PanelInputTarget, text: String) {
+                target.onComposedTextInput(text)
             }
 
             // 滑動輸入候選：直接 commit，不走 InputRouter
@@ -515,18 +512,9 @@ class YukiBoardIMEService : InputMethodService() {
 
             val result = inputRouter.selectCandidate(index)
             // 面板輸入模式：選字提交到面板而非目標 App
-            val gpRef = gifPanel
-            val tpRef = translatePanel
-            val udpRef = userDictPanel
-            val dpRef = decryptPanel
-            if (gpRef != null && gpRef.isInInputMode && result is InputResult.CommitText) {
-                gpRef.onComposedTextInput(result.text)
-            } else if (tpRef != null && tpRef.isInInputMode && result is InputResult.CommitText) {
-                tpRef.onComposedTextInput(result.text)
-            } else if (udpRef != null && udpRef.isInInputMode && result is InputResult.CommitText) {
-                udpRef.onComposedTextInput(result.text)
-            } else if (dpRef != null && dpRef.isInInputMode && result is InputResult.CommitText) {
-                dpRef.onComposedTextInput(result.text)
+            val activeTarget = activePanelInputTarget()
+            if (activeTarget != null && result is InputResult.CommitText) {
+                activeTarget.onComposedTextInput(result.text)
             } else {
                 val ic = currentInputConnection ?: return@setOnCandidateSelectListener
                 applyInputResult(ic, result)
@@ -1206,10 +1194,14 @@ class YukiBoardIMEService : InputMethodService() {
         gifPanel?.exitInputMode()
         userDictPanel?.exitInputMode()
         decryptPanel?.exitInputMode()
+        dictionaryPanel?.exitInputMode()
+        langLearnPanel?.exitInputMode()
         translatePanel = null
         gifPanel = null
         userDictPanel = null
         decryptPanel = null
+        dictionaryPanel = null
+        langLearnPanel = null
         panelContainer.removeAllViews()
         panelContainer.visibility = View.GONE
         topPanelContainer.removeAllViews()
@@ -1620,7 +1612,7 @@ class YukiBoardIMEService : InputMethodService() {
                 p
             }
             PanelType.DICTIONARY -> {
-                val p = DictionaryPanelView(this)
+                val p = DictionaryPanelView(this).also { dictionaryPanel = it }
                 p.theme = theme
                 p.inputTextProvider = {
                     val ic = currentInputConnection
@@ -1632,7 +1624,7 @@ class YukiBoardIMEService : InputMethodService() {
                 p
             }
             PanelType.LANG_LEARN -> {
-                val p = LangLearnPanelView(this)
+                val p = LangLearnPanelView(this).also { langLearnPanel = it }
                 p.theme = theme
                 p.inputTextProvider = {
                     val ic = currentInputConnection
@@ -1646,11 +1638,10 @@ class YukiBoardIMEService : InputMethodService() {
             else -> return
         }
 
-        // 需要輸入的面板放在鍵盤上方（不擋鍵盤，可同時打字）
-        val isTopPanel = panel == PanelType.TRANSLATE || panel == PanelType.GIF
-                || panel == PanelType.USER_DICT || panel == PanelType.DECRYPT
-                || panel == PanelType.CLIPBOARD
-        if (isTopPanel) {
+        // 動態偵測：面板有輸入功能（實作 PanelInputTarget）就放在鍵盤上方，不擋鍵盤
+        val isInputPanel = panelView is PanelInputTarget
+                || panel == PanelType.CLIPBOARD  // 剪貼簿沒有搜尋框但需要顯示在上方
+        if (isInputPanel) {
             topPanelContainer.addView(panelView)
             topPanelContainer.visibility = View.VISIBLE
         } else {
@@ -1672,10 +1663,14 @@ class YukiBoardIMEService : InputMethodService() {
         gifPanel?.exitInputMode()
         userDictPanel?.exitInputMode()
         decryptPanel?.exitInputMode()
+        dictionaryPanel?.exitInputMode()
+        langLearnPanel?.exitInputMode()
         translatePanel = null
         gifPanel = null
         userDictPanel = null
         decryptPanel = null
+        dictionaryPanel = null
+        langLearnPanel = null
         handwritingPanel = null
         activePanel = null
         toolbarView.activePanel = null
@@ -3116,10 +3111,62 @@ class YukiBoardIMEService : InputMethodService() {
             return
         }
 
+        // 字典 / 語言學習面板輸入模式：通用 PanelInputTarget 路由
+        val genericPanel: PanelInputTarget? = when {
+            dictionaryPanel?.isInInputMode == true -> dictionaryPanel
+            langLearnPanel?.isInInputMode == true -> langLearnPanel
+            else -> null
+        }
+        if (genericPanel != null) {
+            val isCjk = inputRouter.inputMode != InputMode.ENGLISH
+            when (keyCode) {
+                KeyboardView.KEYCODE_DELETE -> {
+                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
+                        inputRouter.processDelete()
+                        keyboardView.updateComposingText(inputRouter.composingText)
+                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
+                    } else genericPanel.onDeleteInput()
+                }
+                KeyboardView.KEYCODE_ENTER -> {
+                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
+                        genericPanel.onComposedTextInput(inputRouter.composingText)
+                        inputRouter.reset()
+                        keyboardView.updateComposingText("")
+                        keyboardView.updateCandidates(emptyList())
+                    }
+                    genericPanel.onEnterInput()
+                }
+                KeyboardView.KEYCODE_SPACE -> {
+                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
+                        val result = inputRouter.processSpace()
+                        if (result is InputResult.CommitText) genericPanel.onComposedTextInput(result.text)
+                        keyboardView.updateComposingText(inputRouter.composingText)
+                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
+                    } else genericPanel.onSpaceInput()
+                }
+                KeyboardView.KEYCODE_SWITCH_LANG -> handleSwitchLang()
+                KeyboardView.KEYCODE_SHIFT, KeyboardView.KEYCODE_CTRL -> { }
+                else -> if (label.isNotEmpty() && keyCode >= 0) {
+                    if (isCjk) {
+                        val result = inputRouter.processInput(label)
+                        if (result is InputResult.CommitText) genericPanel.onComposedTextInput(result.text)
+                        keyboardView.updateComposingText(inputRouter.composingText)
+                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
+                        genericPanel.updateComposingHint(inputRouter.composingText)
+                    } else genericPanel.onCharInput(label)
+                }
+            }
+            return
+        }
+
         // 面板開啟中但使用者按了鍵盤按鍵 → 需要輸入的面板保持開啟，其他面板關閉
         if (activePanel != null) {
-            val keepOpen = activePanel == PanelType.TRANSLATE || activePanel == PanelType.GIF
-                    || activePanel == PanelType.USER_DICT || activePanel == PanelType.DECRYPT
+            // 動態偵測：有正在輸入的面板就保持開啟
+            val hasActiveInput = listOfNotNull(
+                translatePanel, gifPanel, userDictPanel, decryptPanel,
+                dictionaryPanel, langLearnPanel
+            ).any { it.isInInputMode }
+            val keepOpen = hasActiveInput
                     || activePanel == PanelType.CLIPBOARD
             if (!keepOpen) {
                 closePanel()

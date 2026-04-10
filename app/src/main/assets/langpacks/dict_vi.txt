@@ -67,7 +67,6 @@ trước
 bị
 thấy
 họ
-tất cả
 biết
 lớn
 nhất
@@ -90,7 +89,6 @@ nhà
 thật
 đầu
 chị
-xã hội
 ông
 bà
 con
@@ -106,16 +104,12 @@ cả
 ngay
 bên
 tới
-việt
-nam
 ta
 sống
-đã từng
 ai
 nữa
 cao
 lần
-vấn đề
 gần
 tốt
 luôn
@@ -145,11 +139,8 @@ nhỏ
 tiền
 chung
 mất
-gia đình
 ngoài
-bao giờ
 mắt
-đặc biệt
 trẻ
 gọi
 giúp
@@ -179,11 +170,9 @@ chết
 chiến
 dài
 dưới
-gần đây
 giáo
 hàng
 hiện
-hồ
 khá
 kinh
 lấy
@@ -191,7 +180,6 @@ mặt
 mong
 ngồi
 nhìn
-nói chung
 phát
 quá
 quê
@@ -202,7 +190,6 @@ sức
 thắng
 tin
 trở
-tưởng
 uống
 xem
 bảo
@@ -248,7 +235,6 @@ bệnh
 bình
 buồn
 cảm
-cần thiết
 chấp
 chờ
 chuẩn
@@ -256,7 +242,6 @@ chức
 cộng
 cửa
 dễ
-đảm
 đạo
 điểm
 đoàn
@@ -267,16 +252,10 @@ giàu
 giống
 giữ
 góp
-hàng ngày
-hạnh phúc
-hay là
-hiện nay
 học
 hướng
 kết
 khoảng
-không bao giờ
-không gian
 khởi
 lao
 lập
@@ -290,8 +269,6 @@ mua
 mùa
 nắng
 ngành
-nghe nói
-nghiên cứu
 nghiệp
 ngôi
 ngủ
@@ -310,7 +287,6 @@ quyết
 rõ
 sai
 sinh
-sợi
 suy
 tác
 tham
@@ -331,8 +307,6 @@ tục
 tùy
 từng
 vai
-vào lúc
-về sau
 vệ
 vòng
 vui
@@ -340,34 +314,240 @@ vượt
 xanh
 xây
 xử
+tất cả
+xã hội
+gia đình
+bao giờ
+đã từng
+vấn đề
+đặc biệt
+gần đây
+nói chung
+hàng ngày
+hạnh phúc
+hay là
+hiện nay
+không bao giờ
+không gian
+nghe nói
+nghiên cứu
 an ninh
 bảo vệ
-bầu
-bổ
-bội
 cá nhân
-cải
-cầu
-cha
-chăm
-chào
-chấp nhận
-chất
-chiến tranh
-chín
 chính phủ
 cho phép
-chợ
-chuẩn bị
-chứ
-chứa
-coi
 công nghệ
 công ty
 công việc
-cổ
 cơ hội
 cơ quan
+an toàn
+bắt đầu
+cải cách
+chăm sóc
+chiến lược
+chủ nghĩa
+cộng đồng
+công dân
+công nhân
+công bằng
+con đường
+cơ bản
+cơ sở
+cung cấp
+cuộc sống
+đại diện
+đại học
+đàm phán
+đảm bảo
+đánh giá
+đầu tư
+điều kiện
+điện thoại
+đối mặt
+đối với
+đóng góp
+đời sống
+đường phố
+gắn bó
+giá trị
+giải pháp
+giải quyết
+giải thích
+giao dịch
+giao thông
+giấc mơ
+giới thiệu
+hành động
+hầu hết
+hệ thống
+hiện đại
+hiện tượng
+hình ảnh
+hình thức
+hòa bình
+hóa học
+hội nghị
+hôm nay
+hợp đồng
+hợp tác
+hướng dẫn
+kế hoạch
+kết hợp
+kết quả
+khả năng
+khái niệm
+khoa học
+khoảng cách
+không khí
+không thể
+khu vực
+kiểm tra
+kinh doanh
+kinh nghiệm
+kinh tế
+kỹ thuật
+kỹ năng
+lãnh đạo
+lãnh thổ
+lao động
+lắng nghe
+lập trường
+lịch sử
+lợi ích
+lợi nhuận
+lực lượng
+mặt trời
+mặc dù
+may mắn
+miễn phí
+minh bạch
+mở rộng
+mục đích
+năng suất
+ngân hàng
+ngân sách
+ngày nay
+nghệ thuật
+ngôn ngữ
+người dân
+người ta
+nhà máy
+nhà nước
+nhận thức
+nhân dân
+nhân viên
+nhiệm vụ
+niềm tin
+nội dung
+nông nghiệp
+nước ngoài
+ổn định
+pháp luật
+phát hiện
+phát minh
+phát triển
+phản ánh
+phản đối
+phổ biến
+phụ nữ
+phục vụ
+phương pháp
+quan điểm
+quan hệ
+quan tâm
+quá trình
+quê hương
+quốc gia
+quốc tế
+quyền lực
+quyết định
+sản phẩm
+sản xuất
+sáng tạo
+sở hữu
+sức khỏe
+sức mạnh
+sự kiện
+sự thật
+sử dụng
+tài chính
+tài nguyên
+tài sản
+tập trung
+tất nhiên
+tăng trưởng
+thách thức
+thái độ
+thành công
+thành phố
+thanh niên
+thảo luận
+thay đổi
+theo dõi
+thế giới
+thế kỷ
+thiên nhiên
+thiết bị
+thiết kế
+thỏa thuận
+thông báo
+thông tin
+thời đại
+thời gian
+thời kỳ
+thời tiết
+thực hiện
+thực phẩm
+thực tế
+thuận lợi
+thương mại
+tiến bộ
+tiềm năng
+tiêu chuẩn
+tinh thần
+toàn bộ
+toàn cầu
+tổ chức
+tội phạm
+trách nhiệm
+trải nghiệm
+trở lại
+trở nên
+trung bình
+trung tâm
+truyền thống
+tư vấn
+tự do
+tự nhiên
+tương lai
+tương tự
+uy tín
+văn hóa
+văn phòng
+vận chuyển
+xác định
+xây dựng
+xảy ra
+xin lỗi
+xuất hiện
+xuất khẩu
+xử lý
+ý kiến
+yêu cầu
+yên tĩnh
+yếu tố
+bầu
+bổ
+cầu
+cha
+chào
+chất
+chín
+chợ
+chứa
+coi
+cổ
 cuối
 cưới
 dạy
@@ -383,10 +563,8 @@ dự
 đặt
 đấu
 đen
-đều đặn
-đề nghị
+đề
 địa
-địa phương
 điện
 đỏ
 độ
@@ -395,23 +573,16 @@ dự
 đóng
 đứng
 đưa
-được phép
 gái
 gắn
 giải
 giao
-giáo dục
 giấy
-giữa hai
 hải
 hàm
-hàng hóa
 hát
 hệ
 hoa
-hoạt động
-hoàn
-hoàn toàn
 hóa
 hợp
 hưởng
@@ -427,30 +598,23 @@ kịp
 kỳ
 lãi
 lạnh
-lao động
 lá
-lên tiếng
 liên
-liên hệ
 liệu
 loại
 lợi
 lương
 lưu
 máy
-mâu
 mến
 minh
 mở
 mối
-môi trường
 mục
 mưa
-nặng nề
-năng lượng
+năng
 ngắn
 ngân
-ngày càng
 ngoại
 ngon
 ngờ
@@ -460,59 +624,40 @@ nhân
 nhận ra
 nhiệm
 nhiệt
-nhờ vào
 nhu cầu
-nhượng
 nổi tiếng
 nợ
-nước ngoài
 ổn
 phá
-phải không
 phạm
 pháp
 phản
-phát triển
 phẩm
 phiên
 phong
-phổ biến
-phụ nữ
-phục vụ
+phục hồi
 quan
-quan hệ
-quan tâm
-quốc gia
 quý
 riêng
 ruộng
 sản
-sản xuất
-sáng tạo
 sắp
 sở
-sống còn
-sức khỏe
-sử dụng
-sự kiện
+sinh ra
+sợi
 tài
-tài chính
-tâm lý
+tấn
+tầng
 tập
 thách
-thành công
-thành phố
-thanh niên
-thảo luận
-thay đổi
+thải
+thăm
 thẻ
-theo dõi
 thể
 thích
 thiết
 thịt
 thỏa
-thông tin
 thổ
 thuê
 thuận
@@ -524,48 +669,34 @@ tiếng
 tiết
 tinh
 tòa
-toàn bộ
 tổ
-tổ chức
 tổn
-trách nhiệm
 trải
 trạng
 trận
 triển
-trong nước
 trọng
-trở lại
-trở nên
+trồng
 truyền
 tư
 từ chối
 tương
-tương lai
-tưởng tượng
 ủng hộ
 vải
 vàng
-vào lúc này
 vay
-về phía
 viện
 vô
 vốn
 vụ
 xác
-xảy ra
 xem xét
-xin lỗi
-xuất
+xin phép
 xung quanh
-ý kiến
 yên
 yếu
-an toàn
 áo
 áp
-áp lực
 bác
 bán
 bản
@@ -574,7 +705,6 @@ bảo đảm
 bảo hiểm
 bảo tồn
 bắc
-bắt đầu
 bằng
 bí mật
 biên
@@ -582,201 +712,89 @@ biến
 biểu
 bóng
 cá
-cách mạng
 cảm ơn
 cạnh
 cánh
-cao cấp
 cát
 chắc
-chắc chắn
-chăm sóc
 chặt
-chiến lược
-chỉ số
-chờ đợi
 chủ
-chủ nghĩa
-chưa bao giờ
 chuyên
 chuyên gia
 chuyến
 cố
-cộng đồng
-công dân
-công nhân
-công bằng
-con đường
-cơ bản
-cơ sở
-cung cấp
-cuộc sống
+công cụ
 đá
 đài
-đại diện
-đại học
-đàm phán
-đảm bảo
+đảm
 đang lúc
 đáng
 đánh
-đánh giá
 đào
 đạp
 đặc
-đặc điểm
-đầu tư
 đẩy
 đệ
 đêm
 đền
 để ý
-đìa
 địch
-điểm số
-điện thoại
-điều kiện
 đoạn
 đổ
 đói
 đồng
 đồng ý
-đối mặt
-đối với
-đóng góp
 đợi
-đời sống
 đủ
-đường phố
-gắn bó
-giá
-giá trị
-giải pháp
-giải quyết
-giải thích
-gian
-giao dịch
-giao thông
-giấc mơ
-giới
-giới thiệu
-gỗ
 gốc
 gương
-hải quân
 hành
-hành động
 hào
-hầu hết
-hệ thống
 hiểm
-hiện đại
-hiện tượng
 hiệp
 hiệu
-hình ảnh
-hình thức
 hòa
-hòa bình
-hóa học
 hoạch
+hoàn
+hoàn toàn
 hoàng
 hoàn cảnh
-hội nghị
-hôm nay
+hoạt động
 hôn
-hợp đồng
-hợp tác
 hứa
-hướng dẫn
 kẻ
-kết hợp
-kết quả
-kế hoạch
-khả năng
 khách
-khái niệm
 khẩn
 khí
 khoa
-khoa học
-khoảng cách
 khối
-không khí
-không thể
-khu vực
 khung
 khuyến
 kiểm
-kiểm tra
 kiểu
-kinh doanh
-kinh nghiệm
-kinh tế
-kỹ thuật
-kỹ năng
 lãnh
-lãnh đạo
-lãnh thổ
 lạ
-lại có
 lam
-lắng nghe
-lập trường
 lẻ
-lịch sử
-lợi ích
-lợi nhuận
+liên hệ
 luận
 luật
 lùi
-lực lượng
-mặt trời
-mặc dù
-may mắn
+mặt trăng
 mê
-miễn phí
-minh bạch
 mới đây
-mở rộng
-mục đích
 mức
 nắm
-năng suất
 nặng nhọc
-ngân hàng
-ngân sách
-ngày nay
-nghệ thuật
+ngày càng
 nghị
 nghĩa
 ngọt
-ngôn ngữ
-người dân
-người ta
-nhà máy
-nhà nước
-nhận thức
-nhân dân
-nhân viên
-nhiệm vụ
+nhà cửa
+nhóm người
 nhựa
-niềm tin
 nổ
-nổ lực
-nội dung
-nông nghiệp
-nước mắt
-ổn định
-ổ
-phá hủy
 phải chăng
-pháp luật
-phát hiện
-phát minh
-phẩm chất
-phản ánh
-phản đối
 phê
 phiếu
 phong cách
@@ -784,91 +802,40 @@ phong trào
 phòng
 phổ thông
 phụ thuộc
-phục hồi
-phương pháp
-quan điểm
-quản lý
 quảng
-quá trình
-quê hương
-quốc tế
-quyền lực
-quyết định
 rác
-rất nhiều
 rao
 rộng
 rủi ro
 rừng
 sẵn
-sản phẩm
 sáng kiến
 sắt
 sâu
-sở hữu
-sống sót
-sức mạnh
+sống còn
 sứ mệnh
-sự thật
 tài liệu
-tài nguyên
-tài sản
-tấn
+tâm lý
 tấn công
-tầng
-tập trung
-tất nhiên
-tăng
-tăng trưởng
-thách thức
-thái
-thái độ
-thải
-thảm
-thăm
 thành lập
 thành viên
 thay thế
-thắm
+thần
 thẩm
 thận
-thần
 thấu
-thế giới
-thế kỷ
-thiên nhiên
 thiếu niên
-thiết bị
-thiết kế
 thịnh
-thỏa thuận
-thông báo
 thợ
-thời đại
-thời gian
-thời kỳ
-thời tiết
 thức
-thực hiện
-thực phẩm
-thực tế
-thuận lợi
-thương mại
-tiến bộ
-tiềm năng
-tiêu chuẩn
-tinh thần
 tính
 tính chất
 toán
-toàn cầu
 tội
-tội phạm
 tổng
 tổng thống
 tốn
 trái
-trải nghiệm
 trạm
 trận đấu
 trí
@@ -878,25 +845,11 @@ trình
 trình bày
 trình độ
 trọng tâm
-trồng
 trưng
-trung bình
-trung tâm
-truyền thống
 trừ
-tư vấn
-tự do
-tự nhiên
-từ từ
 tương đối
-tương tự
-uy tín
 văn
-văn hóa
-văn phòng
 vận
-vận chuyển
-vấn đề
 vất
 vật
 vệ sinh
@@ -906,17 +859,663 @@ vô cùng
 vô tội
 vụ án
 vùng
-xã hội
-xác định
+bài học
+ban đầu
+bản chất
+bảng xếp hạng
+bất cứ
+bất kỳ
+bất ngờ
+bền vững
+biến đổi
+biệt danh
+bình đẳng
+bình luận
+bình thường
+bí quyết
+bỏ cuộc
+bổ nhiệm
+bổ sung
+bọn trẻ
+bộ phận
+bước đầu
+bước ngoặt
+cải tiến
+cải thiện
+cải tổ
+cân bằng
+cân nhắc
+căn bản
+căn cứ
+căn hộ
+cận cảnh
+cấp bách
+cập nhật
+cầu nguyện
+cầu thủ
+chạm vào
+chăn nuôi
+chấm dứt
+chấn thương
+chấp nhận
+châu lục
+chế độ
+chi phí
+chi tiết
+chia sẻ
+chiếm lĩnh
+chiến đấu
+chiến sĩ
+chiến thắng
+chiều cao
+chỉ tiêu
+chinh phục
+chín chắn
+chống lại
+chủ đề
+chủ động
+chủ nhân
+chủ tịch
+chủ yếu
+chúc mừng
+chuẩn bị
+chức năng
+chứng khoán
+chứng minh
+chuyện gì
+cô đơn
+cô gái
+cơ chế
+cơ cấu
+cơ thể
+cổ điển
+cổ phần
+cống hiến
+công chức
+công khai
+công lý
+công nghiệp
+công sức
+công trình
+cộng hòa
+cơn bão
+cờ vua
+cuối cùng
+cường quốc
+cứu trợ
+dân chủ
+dân cư
+dân số
+dân tộc
+dần dần
+dáng vẻ
+danh dự
+danh sách
+danh tiếng
+dấu hiệu
+dẫn đầu
+dầu mỏ
+dây chuyền
+di chuyển
+di cư
+di sản
+di tích
+diễn biến
+diễn đàn
+dinh dưỡng
+doanh nghiệp
+doanh thu
+do dự
+đa dạng
+đã lâu
+đại chúng
+đại dương
+đại sứ
+đạm bạc
+đàn ông
+đảng viên
+đáng kể
+đáng tin
+đánh bại
+đánh dấu
+đánh mất
+đạo đức
+đào tạo
+đặc sắc
+đặc trưng
+đặt ra
+đấu tranh
+đầu tiên
+đề cao
+đề cập
+đề xuất
+đền bù
+đêm khuya
+đích thực
+điểm mạnh
+điểm yếu
+điều chỉnh
+điều hành
+điều tra
+điện ảnh
+đình công
+đoàn kết
+đoàn thể
+đô thị
+đối lập
+đối phó
+đối tác
+đối thủ
+đối thoại
+đối xử
+đội ngũ
+độc đáo
+độc lập
+đón nhận
+đóng cửa
+đóng vai
+đồng bào
+đồng chí
+đồng hành
+đồng lương
+đồng minh
+đồng thời
+đợi chờ
+đột biến
+đột ngột
+đột phá
+đỡ đần
+được mùa
+đương đầu
+gắn liền
+gánh nặng
+gần gũi
+ghi chép
+ghi nhận
+ghi nhớ
+gia nhập
+gia tăng
+giá cả
+giả mạo
+giải đáp
+giải phóng
+giải trí
+giảm bớt
+giảm giá
+gian nan
+giao lưu
+giáo viên
+giới hạn
+giới trẻ
+giữ gìn
+giữa đường
+góc độ
+góc nhìn
+gom góp
+gốc rễ
+gợi ý
+hài hòa
+hải sản
+hàm lượng
+hàng không
+hàng loạt
+hàng triệu
+hành khách
+hành lang
+hành trình
+hành vi
+hạn chế
+hào hứng
+hàu hết
+hệ quả
+hẹn gặp
+hiệp hội
+hiệu quả
+hiệu ứng
+hiếm hoi
+hiến pháp
+hiền lành
+hiểu biết
+hiểu rõ
+hiện thực
+hình dung
+hỗ trợ
+hộ chiếu
+hội đồng
+hội nhập
+hồi phục
+hồi sinh
+hồi tưởng
+hoài niệm
+hoạt bát
+hoạt động
+hoàn hảo
+hoàn thiện
+hoàn thành
+hoàn toàn
+hoang dã
+hoàng gia
+hoàng hôn
+hoa quả
+hóa ra
+hối hận
+hội trường
+hòm thư
+hồn nhiên
+hỗn loạn
+huấn luyện
+hùng biện
+hút thuốc
+hưu trí
+kẻ thù
+kê khai
+kéo dài
+kêu gọi
+khách hàng
+khác nhau
+khác biệt
+khai mạc
+khai thác
+khám phá
+khán giả
+khăng khăng
+khắc phục
+khắp nơi
+khẩn cấp
+khẩn trương
+khéo léo
+khí hậu
+khía cạnh
+khiêm tốn
+khó khăn
+khoa trương
+khoáng sản
+khổng lồ
+khu công nghiệp
+khu dân cư
+khúc mắc
+khuôn mặt
+khuôn mẫu
+khẩu hiệu
+kiểm soát
+kiên cường
+kiên nhẫn
+kiên quyết
+kiến thức
+kiến trúc
+kinh hoàng
+kinh khủng
+kỹ lưỡng
+lạc hậu
+lạc quan
+lãi suất
+lại gần
+lãng phí
+lãng mạn
+lao đao
+lão thành
+lặng lẽ
+lật đổ
+lấp lánh
+lâu dài
+lâu đời
+lên án
+lên kế hoạch
+lên tiếng
+liên bang
+liên kết
+liên minh
+liên quan
+liên tiếp
+liên tục
+liều lĩnh
+linh hoạt
+lộ trình
+lối sống
+lớp học
+lợi thế
+luân lý
+luân phiên
+lưới điện
+lương tâm
+lượng lớn
+mãnh liệt
+mất mát
+mâu thuẫn
+mệnh lệnh
+miêu tả
+mô hình
+mô phỏng
+mô tả
+mối quan hệ
+mối đe dọa
+môn học
+môi giới
+mồ hôi
+một cách
+mở cửa
+mỗi ngày
+mưu sinh
+na ná
+nặng nề
+năng động
+năng lực
+nâng cao
+nắm bắt
+ngầm hiểu
+ngẫu nhiên
+ngày mai
+ngày xưa
+ngăn cản
+ngăn chặn
+ngẩng đầu
+nghệ sĩ
+nghi ngờ
+nghiêm túc
+ngọn lửa
+ngôi nhà
+ngôi sao
+nguy hiểm
+nguy cơ
+người lớn
+nhà báo
+nhà khoa học
+nhà lãnh đạo
+nhà trường
+nhà văn
+nhạc sĩ
+nhanh chóng
+nhận biết
+nhận định
+nhận xét
+nhân cách
+nhân đạo
+nhân loại
+nhân quyền
+nhân tố
+nhập khẩu
+nhất định
+nhất quán
+nhất trí
+nhiễm bẩn
+nhịp sống
+nỗ lực
+nồng nhiệt
+nổi bật
+nổi dậy
+nóng bỏng
+nữ giới
+phá bỏ
+phá hoại
+phác thảo
+phải lòng
+phạm tội
+phạm vi
+phân biệt
+phân bổ
+phân loại
+phân tích
+phần lớn
+phần mềm
+phần trăm
+phản hồi
+phản ứng
+phát biểu
+phát huy
+phát sinh
+phát sóng
+phê bình
+phê phán
+phi thường
+phiêu lưu
+phóng viên
+phòng chống
+phòng thí nghiệm
+phù hợp
+phúc lợi
+phục tùng
+phương châm
+phương hướng
+phương tiện
+quả đất
+quản trị
+quang cảnh
+quảng bá
+quảng cáo
+quảng đại
+quần chúng
+quần đảo
+quần thể
+quấy rối
+quý báu
+quý giá
+quỹ đạo
+rõ ràng
+rộng lớn
+rộng rãi
+rửa sạch
+rực rỡ
+sai lầm
+sáng chế
+sáng suốt
+sẵn sàng
+sắp đặt
+sắp xếp
+sắc bén
+siêng năng
+sinh hoạt
+sinh viên
+số liệu
+số lượng
+số phận
+sơ bộ
+sơ khai
+sổ sách
+sống động
+sống sót
+sôi nổi
+sở thích
+sơ tán
+sợ hãi
+sức bền
+sức ép
+sung sướng
+suy giảm
+suy nghĩ
+suy thoái
+suy tư
+tài giỏi
+tài năng
+tàn phá
+tán thưởng
+tận tâm
+tận tụy
+tận dụng
+tầm quan trọng
+tâm hồn
+tâm sự
+tâm trạng
+tập quán
+tập thể
+tắc nghẽn
+tấm gương
+tầm nhìn
+thách đố
+thái bình
+tham mưu
+tham nhũng
+tham quan
+thẩm mỹ
+thần kỳ
+thần thoại
+thận trọng
+thăng tiến
+thành quả
+thành tựu
+thắp sáng
+thấm nhuần
+thận trọng
+thất bại
+thất nghiệp
+thấu hiểu
+thầm lặng
+thế mạnh
+thể chất
+thể hiện
+thể loại
+thể thao
+thể thức
+thi đấu
+thi đua
+thiện chí
+thiếu sót
+thịnh vượng
+thống kê
+thống nhất
+thốt lên
+thổi bay
+thú vị
+thủ đô
+thủ tục
+thử nghiệm
+thử thách
+thực dụng
+thương hiệu
+thương lượng
+thương tâm
+thương yêu
+tiên phong
+tiên tiến
+tiếp cận
+tiếp nhận
+tiếp tục
+tiếp xúc
+tiện ích
+tiện lợi
+tiêu biểu
+tiêu dùng
+tiêu diệt
+tình cảm
+tình cờ
+tình hình
+tình huống
+tình trạng
+tình yêu
+tín hiệu
+tín nhiệm
+toả sáng
+toàn diện
+tốc độ
+tối ưu
+tối thiểu
+tội ác
+tôn giáo
+tôn trọng
+tồn tại
+tổng cộng
+tổng hợp
+tổng kết
+tổng quát
+tốt bụng
+tốt đẹp
+tốt lành
+trả lời
+trái đất
+trái phải
+trải qua
+trạng thái
+tránh xa
+tri thức
+trí nhớ
+trí óc
+triệt để
+triển khai
+triển vọng
+trình tự
+trong sáng
+trong suốt
+trọng đại
+trọng điểm
+trở ngại
+trồng trọt
+trung thành
+trung thực
+truyền bá
+truyền đạt
+truyền thông
+trưởng thành
+tự hào
+tự tin
+tự trọng
+tuyên bố
+tuyên truyền
+tuyệt đối
+tuyệt vời
+tư duy
+tư liệu
+tư nhân
+tư tưởng
+từ bỏ
+từ đó
+từ lâu
+tương ứng
+tương quan
+tương xứng
+ủy ban
+vạch trần
+vãn hồi
+vang dội
+vào đời
+vận dụng
+vận động
+vận hành
+vận mệnh
+vật chất
+vật liệu
+vật lý
+vẻ đẹp
+vị giác
+vĩ đại
+vị thế
+viễn cảnh
+viện trợ
+vĩnh cửu
+vĩnh viễn
+vô giá
+vô hạn
+vô ích
+vô số
+vô tư
+vũ khí
+vũ trụ
+vượt qua
+vượt trội
+xác minh
+xác nhận
+xác suất
+xã giao
+xã luận
+xâm chiếm
+xâm lược
+xâm nhập
+xấu hổ
 xây dựng
-xem như
-xét
-xin phép
-xuất hiện
-xuất khẩu
-xúc
-xử lý
-ý nghĩa
-yêu cầu
-yên tĩnh
-yếu tố
+xe cộ
+xuất bản
+xuất phát
+xuất sắc
+xúc động
+xúc tiến
+xung đột
+ý chí
+ý định
+ý niệm
+ý thức
+ý tưởng
+yên bình
+yên lành
+yêu đương
+yêu mến
+yêu nước
+yêu quý
+yêu thương

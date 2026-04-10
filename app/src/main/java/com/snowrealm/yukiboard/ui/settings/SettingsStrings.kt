@@ -12,10 +12,15 @@ object SettingsStrings {
         ZH("zh", "中文"),
         EN("en", "English"),
         JA("ja", "日本語"),
-        KO("ko", "한국어");
+        KO("ko", "한국어"),
+        DE("de", "Deutsch"),
+        FR("fr", "Français"),
+        ES("es", "Español"),
+        VI("vi", "Tiếng Việt"),
+        IT("it", "Italiano");
 
         companion object {
-            fun fromCode(code: String): Lang = entries.find { it.code == code } ?: ZH
+            fun fromCode(code: String): Lang = entries.find { it.code == code } ?: EN
         }
     }
 
@@ -26,9 +31,14 @@ object SettingsStrings {
             Lang.EN -> en
             Lang.JA -> ja
             Lang.KO -> ko
+            Lang.DE -> de
+            Lang.FR -> fr
+            Lang.ES -> es
+            Lang.VI -> vi
+            Lang.IT -> it
             Lang.ZH -> return zh
         }
-        return table[zh] ?: zh
+        return table[zh] ?: en[zh] ?: zh  // fallback: 英文 → 中文原文
     }
 
     // ═════════════════════════════════════════════════════════
@@ -597,5 +607,130 @@ object SettingsStrings {
         "下載" to "다운로드",
         "下載中…" to "다운로드 중…",
         "移除" to "삭제",
+    )
+
+    // ═════════════════════════════════════════════════════════
+    // Deutsch (German)
+    // ═════════════════════════════════════════════════════════
+    private val de = mapOf(
+        "YukiBoard 設定" to "YukiBoard Einstellungen",
+        "功能說明" to "Funktionen",
+        "帳號" to "Konto",
+        "登入" to "Anmelden",
+        "AI 功能" to "KI-Funktionen",
+        "雪凜行為" to "Yuki Verhalten",
+        "感測器" to "Sensoren",
+        "動畫特效" to "Animationseffekte",
+        "遊戲" to "Spiele",
+        "剪貼簿" to "Zwischenablage",
+        "輸入行為" to "Eingabeverhalten",
+        "智慧輸入" to "Intelligente Eingabe",
+        "語言套件 / Language Packs" to "Sprachpakete",
+        "已啟用的輸入法" to "Aktivierte Eingabemethoden",
+        "可下載的語言套件" to "Herunterladbare Sprachpakete",
+        "下載" to "Herunterladen",
+        "下載中…" to "Wird heruntergeladen…",
+        "移除" to "Entfernen",
+        "選擇語言" to "Sprache wählen",
+    )
+
+    // ═════════════════════════════════════════════════════════
+    // Français (French)
+    // ═════════════════════════════════════════════════════════
+    private val fr = mapOf(
+        "YukiBoard 設定" to "Paramètres YukiBoard",
+        "功能說明" to "Fonctionnalités",
+        "帳號" to "Compte",
+        "登入" to "Connexion",
+        "AI 功能" to "Fonctions IA",
+        "雪凜行為" to "Comportement de Yuki",
+        "感測器" to "Capteurs",
+        "動畫特效" to "Effets d'animation",
+        "遊戲" to "Jeux",
+        "剪貼簿" to "Presse-papiers",
+        "輸入行為" to "Comportement de saisie",
+        "智慧輸入" to "Saisie intelligente",
+        "語言套件 / Language Packs" to "Packs de langues",
+        "已啟用的輸入法" to "Méthodes de saisie activées",
+        "可下載的語言套件" to "Packs de langues téléchargeables",
+        "下載" to "Télécharger",
+        "下載中…" to "Téléchargement…",
+        "移除" to "Supprimer",
+        "選擇語言" to "Choisir la langue",
+    )
+
+    // ═════════════════════════════════════════════════════════
+    // Español (Spanish)
+    // ═════════════════════════════════════════════════════════
+    private val es = mapOf(
+        "YukiBoard 設定" to "Ajustes de YukiBoard",
+        "功能說明" to "Funciones",
+        "帳號" to "Cuenta",
+        "登入" to "Iniciar sesión",
+        "AI 功能" to "Funciones de IA",
+        "雪凜行為" to "Comportamiento de Yuki",
+        "感測器" to "Sensores",
+        "動畫特效" to "Efectos de animación",
+        "遊戲" to "Juegos",
+        "剪貼簿" to "Portapapeles",
+        "輸入行為" to "Comportamiento de entrada",
+        "智慧輸入" to "Entrada inteligente",
+        "語言套件 / Language Packs" to "Paquetes de idiomas",
+        "已啟用的輸入法" to "Métodos de entrada activados",
+        "可下載的語言套件" to "Paquetes de idiomas descargables",
+        "下載" to "Descargar",
+        "下載中…" to "Descargando…",
+        "移除" to "Eliminar",
+        "選擇語言" to "Elegir idioma",
+    )
+
+    // ═════════════════════════════════════════════════════════
+    // Tiếng Việt (Vietnamese)
+    // ═════════════════════════════════════════════════════════
+    private val vi = mapOf(
+        "YukiBoard 設定" to "Cài đặt YukiBoard",
+        "功能說明" to "Tính năng",
+        "帳號" to "Tài khoản",
+        "登入" to "Đăng nhập",
+        "AI 功能" to "Tính năng AI",
+        "雪凜行為" to "Hành vi Yuki",
+        "感測器" to "Cảm biến",
+        "動畫特效" to "Hiệu ứng hoạt hình",
+        "遊戲" to "Trò chơi",
+        "剪貼簿" to "Bộ nhớ tạm",
+        "輸入行為" to "Hành vi nhập liệu",
+        "智慧輸入" to "Nhập liệu thông minh",
+        "語言套件 / Language Packs" to "Gói ngôn ngữ",
+        "已啟用的輸入法" to "Phương thức nhập đã bật",
+        "可下載的語言套件" to "Gói ngôn ngữ có thể tải",
+        "下載" to "Tải xuống",
+        "下載中…" to "Đang tải…",
+        "移除" to "Xóa",
+        "選擇語言" to "Chọn ngôn ngữ",
+    )
+
+    // ═════════════════════════════════════════════════════════
+    // Italiano (Italian)
+    // ═════════════════════════════════════════════════════════
+    private val it = mapOf(
+        "YukiBoard 設定" to "Impostazioni YukiBoard",
+        "功能說明" to "Funzionalità",
+        "帳號" to "Account",
+        "登入" to "Accedi",
+        "AI 功能" to "Funzioni IA",
+        "雪凜行為" to "Comportamento di Yuki",
+        "感測器" to "Sensori",
+        "動畫特效" to "Effetti di animazione",
+        "遊戲" to "Giochi",
+        "剪貼簿" to "Appunti",
+        "輸入行為" to "Comportamento di input",
+        "智慧輸入" to "Input intelligente",
+        "語言套件 / Language Packs" to "Pacchetti lingua",
+        "已啟用的輸入法" to "Metodi di input attivati",
+        "可下載的語言套件" to "Pacchetti lingua scaricabili",
+        "下載" to "Scarica",
+        "下載中…" to "Download in corso…",
+        "移除" to "Rimuovi",
+        "選擇語言" to "Scegli lingua",
     )
 }

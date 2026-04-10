@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 133
-        versionName "0.9.67"
+        versionCode 134
+        versionName "0.9.68"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,13 +82,12 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 語言套件系統（德/法/西/越/義可下載）\n" +
-                    "- feat: 字典面板（15 語言，Free Dictionary + Wiktionary API）\n" +
-                    "- feat: 語言學習面板（查詞/音標/例句/收藏）\n" +
-                    "- feat: 圓環語言選單動態化（從設定抓取）\n" +
-                    "- fix: API Key 同步「請先登入」修復\n" +
-                    "- fix: 韓文 Jamo 候選字修復\n" +
-                    "- fix: 候選字方格子修復（字體載入優化）"
+                    "- feat: 面板輸入修復（字典/學習面板可直接打字搜尋）\n" +
+                    "- feat: 日文即時候選字（打字時顯示漢字候選）\n" +
+                    "- feat: 設定頁多語言擴充（德/法/西/越/義）\n" +
+                    "- feat: 系統語言自動偵測（Locale → 預設設定語言）\n" +
+                    "- feat: 5 語言詞庫擴充（2700-2900 詞）\n" +
+                    "- fix: 面板動態上移（有搜尋框自動不擋鍵盤）"
             }
         }
         debug {
@@ -97,13 +96,12 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 語言套件系統（德/法/西/越/義可下載）\n" +
-                    "- feat: 字典面板（15 語言，Free Dictionary + Wiktionary API）\n" +
-                    "- feat: 語言學習面板（查詞/音標/例句/收藏）\n" +
-                    "- feat: 圓環語言選單動態化（從設定抓取）\n" +
-                    "- fix: API Key 同步「請先登入」修復\n" +
-                    "- fix: 韓文 Jamo 候選字修復\n" +
-                    "- fix: 候選字方格子修復（字體載入優化）"
+                    "- feat: 面板輸入修復（字典/學習面板可直接打字搜尋）\n" +
+                    "- feat: 日文即時候選字（打字時顯示漢字候選）\n" +
+                    "- feat: 設定頁多語言擴充（德/法/西/越/義）\n" +
+                    "- feat: 系統語言自動偵測（Locale → 預設設定語言）\n" +
+                    "- feat: 5 語言詞庫擴充（2700-2900 詞）\n" +
+                    "- fix: 面板動態上移（有搜尋框自動不擋鍵盤）"
             }
         }
     }

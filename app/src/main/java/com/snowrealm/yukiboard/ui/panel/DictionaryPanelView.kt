@@ -9,7 +9,6 @@ import android.text.TextPaint
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
-import android.view.inputmethod.EditorInfo
 import android.widget.*
 import com.snowrealm.yukiboard.theme.KeyboardTheme
 import kotlinx.coroutines.*
@@ -26,7 +25,7 @@ import java.util.concurrent.TimeUnit
  * - English: Free Dictionary API (dictionaryapi.dev) — 音標 + 詞性 + 定義 + 例句
  * - 其他語言: Wiktionary API — 全球語言支援
  */
-class DictionaryPanelView(context: Context) : LinearLayout(context) {
+class DictionaryPanelView(context: Context) : LinearLayout(context), PanelInputTarget {
 
     var theme: KeyboardTheme = KeyboardTheme.default()
         set(value) { field = value; applyTheme() }
@@ -47,8 +46,55 @@ class DictionaryPanelView(context: Context) : LinearLayout(context) {
     private val density = resources.displayMetrics.density
     private fun dp(n: Int) = (n * density).toInt()
 
+    // ── PanelInputTarget 輸入緩衝 ──
+    private val inputBuffer = StringBuilder()
+    private var _isInInputMode = true  // 預設開啟輸入模式
+
+    override val isInInputMode: Boolean get() = _isInInputMode
+
+    override fun onCharInput(text: String) {
+        if (!_isInInputMode) return
+        inputBuffer.append(text)
+        searchInput.text = inputBuffer.toString()
+    }
+
+    override fun onDeleteInput() {
+        if (!_isInInputMode || inputBuffer.isEmpty()) return
+        inputBuffer.deleteCharAt(inputBuffer.lastIndex)
+        searchInput.text = inputBuffer.toString()
+    }
+
+    override fun onSpaceInput() {
+        if (!_isInInputMode) return
+        inputBuffer.append(" ")
+        searchInput.text = inputBuffer.toString()
+    }
+
+    override fun onEnterInput() {
+        if (!_isInInputMode) return
+        doSearch()
+    }
+
+    override fun onComposedTextInput(text: String) {
+        if (!_isInInputMode) return
+        inputBuffer.append(text)
+        searchInput.text = inputBuffer.toString()
+    }
+
+    override fun updateComposingHint(hint: String) {
+        // 顯示組字中的提示（如注音的中間狀態）
+    }
+
+    override fun exitInputMode() {
+        _isInInputMode = false
+    }
+
+    override fun enterInputMode() {
+        _isInInputMode = true
+    }
+
     // ── UI 元件 ──
-    private val searchInput: EditText
+    private val searchInput: TextView
     private val langSpinner: Spinner
     private val searchBtn: TextView
     private val resultScroll: ScrollView
@@ -92,20 +138,22 @@ class DictionaryPanelView(context: Context) : LinearLayout(context) {
         }
         searchRow.addView(langSpinner)
 
-        searchInput = EditText(context).apply {
-            hint = "輸入單字..."
+        searchInput = TextView(context).apply {
+            hint = "直接打字搜尋..."
             setTextColor(0xFFE0E8F0.toInt())
             setHintTextColor(0xFF607080.toInt())
             textSize = 14f
             setSingleLine(true)
-            imeOptions = EditorInfo.IME_ACTION_SEARCH
             setPadding(dp(8), dp(6), dp(8), dp(6))
             layoutParams = LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f)
-            setOnEditorActionListener { _, actionId, _ ->
-                if (actionId == EditorInfo.IME_ACTION_SEARCH) {
-                    doSearch()
-                    true
-                } else false
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xFF1A2840.toInt())
+                cornerRadius = dp(6).toFloat()
+            }
+            setOnClickListener {
+                _isInInputMode = true
+                inputBuffer.clear()
+                text = ""
             }
         }
         searchRow.addView(searchInput)
@@ -124,11 +172,12 @@ class DictionaryPanelView(context: Context) : LinearLayout(context) {
             textSize = 16f
             setPadding(dp(6), dp(6), dp(6), dp(6))
             setOnClickListener {
-                val text = inputTextProvider?.invoke()?.trim() ?: ""
-                if (text.isNotEmpty()) {
-                    // 取最後一個單字
-                    val word = text.split("\\s+".toRegex()).lastOrNull() ?: text
-                    searchInput.setText(word)
+                val grabbed = inputTextProvider?.invoke()?.trim() ?: ""
+                if (grabbed.isNotEmpty()) {
+                    val word = grabbed.split("\\s+".toRegex()).lastOrNull() ?: grabbed
+                    inputBuffer.clear()
+                    inputBuffer.append(word)
+                    searchInput.text = word
                     doSearch()
                 }
             }
@@ -165,7 +214,7 @@ class DictionaryPanelView(context: Context) : LinearLayout(context) {
     }
 
     private fun doSearch() {
-        val word = searchInput.text.toString().trim()
+        val word = inputBuffer.toString().trim()
         if (word.isEmpty()) return
         val langCode = LANGUAGES[langSpinner.selectedItemPosition].first
 
