@@ -367,6 +367,68 @@ class SettingsActivity : AppCompatActivity() {
                 })
             })
             animChildren += volRow
+
+            // 音階對照表（點擊展開/收合）
+            val noteMapContainer = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(0, dp(4), 0, dp(8))
+            }
+            val noteMapContent = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                visibility = View.GONE
+                setPadding(dp(8), dp(8), dp(8), dp(8))
+                setBackgroundColor(0xFF1E1E2E.toInt())
+            }
+            val noteMapToggle = TextView(this).apply {
+                text = "▶ 音階對照表"
+                setTextColor(0xFF90CAF9.toInt())
+                textSize = 14f
+                setPadding(0, dp(4), 0, dp(4))
+                setOnClickListener {
+                    if (noteMapContent.visibility == View.GONE) {
+                        noteMapContent.visibility = View.VISIBLE
+                        (it as TextView).text = "▼ 音階對照表"
+                    } else {
+                        noteMapContent.visibility = View.GONE
+                        (it as TextView).text = "▶ 音階對照表"
+                    }
+                }
+            }
+            // 對照表內容
+            val noteLines = listOf(
+                "── 數字列 ──",
+                "1→C5  2→C#5  3→D5  4→D#5  5→E5",
+                "6→F5  7→F#5  8→G5  9→G#5  0→A5",
+                "",
+                "── Q 列 ──",
+                "Q→C4  W→C#4  E→D4  R→D#4  T→E4",
+                "Y→F4  U→F#4  I→G4  O→G#4  P→A4",
+                "",
+                "── A 列 ──",
+                "A→A3  S→A#3  D→B3  F→C4  G→C#4",
+                "H→D4  J→D#4  K→E4  L→F4",
+                "",
+                "── Z 列 ──",
+                "Z→F3  X→F#3  C→G3  V→G#3",
+                "B→A3  N→A#3  M→B3",
+                "",
+                "── 功能鍵 ──",
+                "空白→C4  ⌫→D#3  換行→E3",
+                "",
+                "♯ = 黑鍵（半音）  其餘 = 白鍵"
+            )
+            noteLines.forEach { line ->
+                noteMapContent.addView(TextView(this).apply {
+                    text = line
+                    setTextColor(if (line.startsWith("──") || line.startsWith("♯")) 0xFFFFD54F.toInt() else 0xFFCCCCCC.toInt())
+                    textSize = if (line.startsWith("──")) 13f else 12f
+                    typeface = android.graphics.Typeface.MONOSPACE
+                    setPadding(0, if (line.isEmpty()) dp(2) else dp(1), 0, dp(1))
+                })
+            }
+            noteMapContainer.addView(noteMapToggle)
+            noteMapContainer.addView(noteMapContent)
+            animChildren += noteMapContainer
         })
 
         // ═══════════════════════════════════════════════════════
