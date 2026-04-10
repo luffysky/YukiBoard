@@ -8,6 +8,8 @@ import android.view.View
 import com.snowrealm.yukiboard.theme.KeyboardTheme
 import kotlin.math.abs
 
+
+
 /**
  * 鍵盤上方工具列 — 現代化水平捲動面板按鈕列。
  *
@@ -85,6 +87,35 @@ class ToolbarView(context: Context) : View(context) {
             invalidate()
         }
 
+    // 動畫背景渲染器
+    private val animRenderer = ToolbarAnimRenderer(density)
+    private var animStyle = ToolbarAnimRenderer.Style.NONE
+    private var animRunning = false
+
+    fun setAnimStyle(styleId: String) {
+        val newStyle = ToolbarAnimRenderer.Style.fromId(styleId)
+        if (newStyle != animStyle) {
+            animStyle = newStyle
+            animRenderer.resetStyle()
+            animRunning = newStyle != ToolbarAnimRenderer.Style.NONE
+            invalidate()
+            if (animRunning) startAnimLoop()
+        }
+    }
+
+    private fun startAnimLoop() {
+        if (!animRunning) return
+        postDelayed(animTickRunnable, 16)
+    }
+
+    private val animTickRunnable = object : Runnable {
+        override fun run() {
+            if (!animRunning || animStyle == ToolbarAnimRenderer.Style.NONE) return
+            invalidate()
+            postDelayed(this, 16)
+        }
+    }
+
     var onPanelSelected: ((PanelType) -> Unit)? = null
     var onPanelLongPressed: ((PanelType) -> Unit)? = null
 
@@ -122,6 +153,11 @@ class ToolbarView(context: Context) : View(context) {
             bgPaint.color = theme.effectiveToolbarColor()
         }
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
+
+        // 動畫背景
+        if (animStyle != ToolbarAnimRenderer.Style.NONE) {
+            animRenderer.draw(canvas, width, height, animStyle, SystemClock.uptimeMillis())
+        }
 
         // 計算按鈕佈局（含捲動偏移）
         btnRects.clear()

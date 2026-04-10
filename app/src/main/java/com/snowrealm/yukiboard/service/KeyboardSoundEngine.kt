@@ -35,24 +35,26 @@ class KeyboardSoundEngine {
     private val DS6 = hz(18);  private val E6  = hz(19)
 
     /**
-     * 按鍵音符對映 — 模擬真實鋼琴鍵盤排列。
+     * 按鍵音符對映 — 完整色彩音階，不重疊。
      *
-     * 數字列：C5 C#5 D5 D#5 E5 F5 F#5 G5 G#5 A5（10 鍵 = 完整色彩音階）
-     * Q 列：  C4 C#4 D4 D#4 E4 F4 F#4 G4 G#4 A4（10 鍵）
-     * A 列：  A3 A#3 B3 C4  C#4 D4 D#4 E4 F4    （9 鍵）
-     * Z 列：  F3 F#3 G3 G#3 A3 A#3 B3           （7 鍵）
+     * Z 列（低音）：F3  F#3 G3  G#3 A3  A#3 B3              — 7 鍵
+     * A 列（中低）：C4  C#4 D4  D#4 E4  F4  F#4 G4  G#4     — 9 鍵
+     * Q 列（中高）：A4  A#4 B4  C5  C#5 D5  D#5 E5  F5  F#5 — 10 鍵
+     * 數字列（高音）：G5 G#5 A5  A#5 B5  C6  C#6 D6  D#6 E6 — 10 鍵
+     *
+     * 全 36 鍵涵蓋 F3→E6 = 3 個完整八度，無重複。
      */
     private val keyNotes: Map<String, Float> by lazy { buildMap {
-        // 數字列 — 第 5 八度色彩音階
-        put("1", C5); put("2", CS5); put("3", D5); put("4", DS5); put("5", E5)
-        put("6", F5); put("7", FS5); put("8", G5); put("9", GS5); put("0", A5)
-        // Q 列 — 第 4 八度色彩音階
-        put("q", C4); put("w", CS4); put("e", D4); put("r", DS4); put("t", E4)
-        put("y", F4); put("u", FS4); put("i", G4); put("o", GS4); put("p", A4)
-        // A 列 — A3 → F4
-        put("a", A3); put("s", AS3); put("d", B3); put("f", C4); put("g", CS4)
-        put("h", D4); put("j", DS4); put("k", E4); put("l", F4)
-        // Z 列 — F3 → B3
+        // 數字列 — 高音區 G5→E6
+        put("1", G5); put("2", GS5); put("3", A5); put("4", AS5); put("5", B5)
+        put("6", C6); put("7", CS6); put("8", D6); put("9", DS6); put("0", E6)
+        // Q 列 — 中高音 A4→F#5
+        put("q", A4); put("w", AS4); put("e", B4); put("r", C5); put("t", CS5)
+        put("y", D5); put("u", DS5); put("i", E5); put("o", F5); put("p", FS5)
+        // A 列 — 中低音 C4→G#4
+        put("a", C4); put("s", CS4); put("d", D4); put("f", DS4); put("g", E4)
+        put("h", F4); put("j", FS4); put("k", G4); put("l", GS4)
+        // Z 列 — 低音 F3→B3
         put("z", F3); put("x", FS3); put("c", G3); put("v", GS3)
         put("b", A3); put("n", AS3); put("m", B3)
         // 注音聲母 — 第 4 八度色彩音階（ㄅ~ㄙ 共 21 鍵）

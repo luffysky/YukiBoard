@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 122
-        versionName "0.9.56"
+        versionCode 123
+        versionName "0.9.57"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,11 +82,11 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 語音辨識靜音閾值 500→1200（過濾背景噪音）\n" +
-                    "- fix: 靜音等待 3s→2s（說完話更快停止）\n" +
-                    "- fix: Whisper locale 不再截斷（保留完整語言標籤）\n" +
-                    "- feat: 語音後處理加 few-shot 範例（改口/重複/專有名詞）\n" +
-                    "- feat: 設定頁靜音偵測靈敏度選擇器（高/標準/低）"
+                    "- feat: 8 款工具列動畫主題（星空/海洋/餘燼/矩陣3D/冰霜/熔岩/彩虹/雷電）\n" +
+                    "- feat: 鋼琴音階完整 F3→E6（36鍵不重複＋黑鍵半音）\n" +
+                    "- feat: 新增吉他/音樂盒/豎琴/風琴/鼓組/電子鼓/Beatbox 音色\n" +
+                    "- feat: 語音辨識混合語言模式 + 品質優化\n" +
+                    "- fix: 手寫混合模式中文辨識修復"
             }
         }
         debug {
@@ -95,11 +95,11 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 語音辨識靜音閾值 500→1200（過濾背景噪音）\n" +
-                    "- fix: 靜音等待 3s→2s（說完話更快停止）\n" +
-                    "- fix: Whisper locale 不再截斷（保留完整語言標籤）\n" +
-                    "- feat: 語音後處理加 few-shot 範例（改口/重複/專有名詞）\n" +
-                    "- feat: 設定頁靜音偵測靈敏度選擇器（高/標準/低）"
+                    "- feat: 8 款工具列動畫主題（星空/海洋/餘燼/矩陣3D/冰霜/熔岩/彩虹/雷電）\n" +
+                    "- feat: 鋼琴音階完整 F3→E6（36鍵不重複＋黑鍵半音）\n" +
+                    "- feat: 新增吉他/音樂盒/豎琴/風琴/鼓組/電子鼓/Beatbox 音色\n" +
+                    "- feat: 語音辨識混合語言模式 + 品質優化\n" +
+                    "- fix: 手寫混合模式中文辨識修復"
             }
         }
     }

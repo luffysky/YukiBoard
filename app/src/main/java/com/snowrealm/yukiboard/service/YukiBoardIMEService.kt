@@ -639,6 +639,7 @@ class YukiBoardIMEService : InputMethodService() {
         val currentTheme = ThemeManager.getInstance(this).currentTheme
         keyboardView.applyTheme(currentTheme)
         toolbarView.theme = currentTheme
+        toolbarView.setAnimStyle(prefs.toolbarAnimStyle)
 
         // 動態粒子覆蓋層（在鍵盤上方、GL 下方）
         val pv = com.snowrealm.yukiboard.animation.KeyboardParticleView(this)
@@ -1897,6 +1898,7 @@ class YukiBoardIMEService : InputMethodService() {
 
     private fun applyTheme(theme: KeyboardTheme) {
         toolbarView.theme = theme
+        toolbarView.setAnimStyle(prefs.toolbarAnimStyle)
         keyboardView.applyTheme(theme)
         glSurfaceView?.setFlowAlpha(theme.flowLightAlpha)
         glSurfaceView?.setFlowColor(theme.flowLightColorInt)

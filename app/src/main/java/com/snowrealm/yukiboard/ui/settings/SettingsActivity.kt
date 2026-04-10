@@ -305,6 +305,41 @@ class SettingsActivity : AppCompatActivity() {
             animChildren += switchRow("按鍵震動", "按鍵時的觸覺回饋", prefs.keyPressVibration) { prefs.keyPressVibration = it }
             animChildren += switchRow("按鍵音效", "按鍵時的聲音回饋", prefs.keySoundEnabled) { prefs.keySoundEnabled = it }
 
+            // 工具列動畫主題選擇
+            val toolbarAnimOptions = arrayOf("無", "星空 Starfield", "海洋 Ocean", "餘燼 Ember", "矩陣 Matrix", "冰霜 Frost", "熔岩 Lava", "彩虹 Rainbow", "雷電 Thunder")
+            val toolbarAnimValues = arrayOf("none", "starfield", "ocean", "ember", "matrix", "frost", "lava", "rainbow", "thunder")
+            val toolbarAnimRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setPadding(0, dp(8), 0, dp(8))
+            }
+            toolbarAnimRow.addView(TextView(this).apply {
+                text = "功能列動畫"
+                setTextColor(0xFFFFFFFF.toInt())
+                textSize = 14f
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            })
+            val toolbarAnimBtn = TextView(this).apply {
+                val curIdx = toolbarAnimValues.indexOf(prefs.toolbarAnimStyle).coerceAtLeast(0)
+                text = toolbarAnimOptions[curIdx]
+                setTextColor(0xFF90CAF9.toInt())
+                textSize = 14f
+                setOnClickListener {
+                    val cur = toolbarAnimValues.indexOf(prefs.toolbarAnimStyle).coerceAtLeast(0)
+                    android.app.AlertDialog.Builder(this@SettingsActivity)
+                        .setTitle("功能列動畫主題")
+                        .setSingleChoiceItems(toolbarAnimOptions, cur) { dialog, which ->
+                            prefs.toolbarAnimStyle = toolbarAnimValues[which]
+                            (it as TextView).text = toolbarAnimOptions[which]
+                            dialog.dismiss()
+                        }
+                        .setNegativeButton("取消", null)
+                        .show()
+                }
+            }
+            toolbarAnimRow.addView(toolbarAnimBtn)
+            animChildren += toolbarAnimRow
+
             // 按鍵音色選擇
             val styleOptions = arrayOf("鋼琴 (Piano)", "木琴 (Marimba)", "柔和 (Soft)", "吉他 (Guitar)", "音樂盒 (Music Box)", "豎琴 (Harp)", "風琴 (Organ)", "鼓組 (Drum)", "電子鼓 (E-Drum)", "Beatbox")
             val styleValues = arrayOf("piano", "marimba", "soft", "guitar", "music_box", "harp", "organ", "drum", "edrum", "beatbox")
@@ -396,25 +431,26 @@ class SettingsActivity : AppCompatActivity() {
             }
             // 對照表內容
             val noteLines = listOf(
-                "── 數字列 ──",
-                "1→C5  2→C#5  3→D5  4→D#5  5→E5",
-                "6→F5  7→F#5  8→G5  9→G#5  0→A5",
+                "── 數字列（高音）──",
+                "1���G5  2→G#5  3→A5  4���A#5  5→B5",
+                "6→C6  7→C#6  8→D6  9→D#6  0→E6",
                 "",
-                "── Q 列 ──",
-                "Q→C4  W→C#4  E→D4  R→D#4  T→E4",
-                "Y→F4  U→F#4  I→G4  O→G#4  P→A4",
+                "── Q 列（中高音）──",
+                "Q→A4  W→A#4  E→B4  R→C5  T→C#5",
+                "Y→D5  U→D#5  I→E5  O→F5  P→F#5",
                 "",
-                "── A 列 ──",
-                "A→A3  S→A#3  D→B3  F→C4  G→C#4",
-                "H→D4  J→D#4  K→E4  L→F4",
+                "── A 列（中低音）──",
+                "A→C4  S→C#4  D→D4  F→D#4  G→E4",
+                "H→F4  J→F#4  K→G4  L→G#4",
                 "",
-                "── Z 列 ──",
+                "── Z 列（低音）──",
                 "Z→F3  X→F#3  C→G3  V→G#3",
-                "B→A3  N→A#3  M→B3",
+                "B���A3  N→A#3  M→B3",
                 "",
                 "── 功能鍵 ──",
                 "空白→C4  ⌫→D#3  換行→E3",
                 "",
+                "完整 F3→E6（3 個八度・36 鍵不重複）",
                 "♯ = 黑鍵（半音）  其餘 = 白鍵"
             )
             noteLines.forEach { line ->
