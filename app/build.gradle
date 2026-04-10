@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 119
-        versionName "0.9.53"
+        versionCode 120
+        versionName "0.9.54"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,9 +82,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
+                    "- feat: 新增 3 種打擊樂音色（鼓組/電子鼓/Beatbox）\n" +
                     "- feat: 語音辨識混合語言模式（自動偵測中英日韓）\n" +
-                    "- feat: 新增 4 種按鍵音色（吉他/音樂盒/豎琴/風琴）\n" +
-                    "- feat: 設定頁語音語言選擇器 + 音階對照表"
+                    "- feat: 共 10 種按鍵音色可選"
             }
         }
         debug {
@@ -93,9 +93,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
+                    "- feat: 新增 3 種打擊樂音色（鼓組/電子鼓/Beatbox）\n" +
                     "- feat: 語音辨識混合語言模式（自動偵測中英日韓）\n" +
-                    "- feat: 新增 4 種按鍵音色（吉他/音樂盒/豎琴/風琴）\n" +
-                    "- feat: 設定頁語音語言選擇器 + 音階對照表"
+                    "- feat: 共 10 種按鍵音色可選"
             }
         }
     }

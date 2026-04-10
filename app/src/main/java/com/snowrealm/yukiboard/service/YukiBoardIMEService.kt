@@ -359,6 +359,9 @@ class YukiBoardIMEService : InputMethodService() {
                     "music_box" -> KeyboardSoundEngine.ToneStyle.MUSIC_BOX
                     "harp"      -> KeyboardSoundEngine.ToneStyle.HARP
                     "organ"     -> KeyboardSoundEngine.ToneStyle.ORGAN
+                    "drum"      -> KeyboardSoundEngine.ToneStyle.DRUM
+                    "edrum"     -> KeyboardSoundEngine.ToneStyle.EDRUM
+                    "beatbox"   -> KeyboardSoundEngine.ToneStyle.BEATBOX
                     else        -> KeyboardSoundEngine.ToneStyle.PIANO
                 }
                 keySoundEngine?.volumeScale = prefs.keySoundVolume

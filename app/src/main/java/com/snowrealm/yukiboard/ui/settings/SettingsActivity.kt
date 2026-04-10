@@ -306,8 +306,8 @@ class SettingsActivity : AppCompatActivity() {
             animChildren += switchRow("按鍵音效", "按鍵時的聲音回饋", prefs.keySoundEnabled) { prefs.keySoundEnabled = it }
 
             // 按鍵音色選擇
-            val styleOptions = arrayOf("鋼琴 (Piano)", "木琴 (Marimba)", "柔和 (Soft)", "吉他 (Guitar)", "音樂盒 (Music Box)", "豎琴 (Harp)", "風琴 (Organ)")
-            val styleValues = arrayOf("piano", "marimba", "soft", "guitar", "music_box", "harp", "organ")
+            val styleOptions = arrayOf("鋼琴 (Piano)", "木琴 (Marimba)", "柔和 (Soft)", "吉他 (Guitar)", "音樂盒 (Music Box)", "豎琴 (Harp)", "風琴 (Organ)", "鼓組 (Drum)", "電子鼓 (E-Drum)", "Beatbox")
+            val styleValues = arrayOf("piano", "marimba", "soft", "guitar", "music_box", "harp", "organ", "drum", "edrum", "beatbox")
             val styleRow = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = android.view.Gravity.CENTER_VERTICAL

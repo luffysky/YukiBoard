@@ -73,9 +73,16 @@ class KeyboardSoundEngine {
         put(" ", C4); put("⌫", DS3); put("\n", E3)
     }}
 
-    enum class ToneStyle { PIANO, MARIMBA, SOFT, GUITAR, MUSIC_BOX, HARP, ORGAN }
+    enum class ToneStyle { PIANO, MARIMBA, SOFT, GUITAR, MUSIC_BOX, HARP, ORGAN, DRUM, EDRUM, BEATBOX }
+
+    /** 鼓類音色 = 噪音+掃頻合成，不使用 keyNotes 音高 */
+    private val isPercussion get() = defaultStyle in setOf(ToneStyle.DRUM, ToneStyle.EDRUM, ToneStyle.BEATBOX)
 
     fun playKeyTone(label: String, durationMs: Int = 85) {
+        if (isPercussion) {
+            scope.launch { try { playPercussion(label, durationMs, defaultStyle) } catch (_: Exception) {} }
+            return
+        }
         val freq = keyNotes[label] ?: keyNotes[label.lowercase()] ?: C4
         scope.launch { try { playTone(freq, durationMs, defaultStyle) } catch (_: Exception) {} }
     }
@@ -91,10 +98,12 @@ class KeyboardSoundEngine {
         val attackSamples = sampleRate * when (style) {
             ToneStyle.PIANO -> 5; ToneStyle.MARIMBA -> 3; ToneStyle.SOFT -> 20
             ToneStyle.GUITAR -> 2; ToneStyle.MUSIC_BOX -> 1; ToneStyle.HARP -> 8; ToneStyle.ORGAN -> 15
+            else -> 5
         } / 1000
         val decayRate = when (style) {
             ToneStyle.PIANO -> 6f; ToneStyle.MARIMBA -> 9f; ToneStyle.SOFT -> 1.5f
             ToneStyle.GUITAR -> 7f; ToneStyle.MUSIC_BOX -> 3f; ToneStyle.HARP -> 4f; ToneStyle.ORGAN -> 0.8f
+            else -> 6f
         }
 
         for (i in samples.indices) {
@@ -126,6 +135,7 @@ class KeyboardSoundEngine {
                     sin(2.0 * PI * freq * 3 * i / sampleRate).toFloat() * 0.3f +
                     sin(2.0 * PI * freq * 5 * i / sampleRate).toFloat() * 0.15f +
                     sin(2.0 * PI * freq * 7 * i / sampleRate).toFloat() * 0.05f
+                else -> s  // 打擊樂不走此路徑
             }
             val env = if (i < attackSamples) i.toFloat() / attackSamples
             else exp(-decayRate * (i - attackSamples).toFloat() / (numSamples - attackSamples))
@@ -148,6 +158,109 @@ class KeyboardSoundEngine {
         delay(dur.toLong() + 15)
         track.stop(); track.release()
     }
+
+    /**
+     * 打擊樂合成 — 用噪音 + 頻率掃描模擬鼓聲。
+     *
+     * 按鍵行列決定鼓件：
+     * 數字列 = Hi-Hat, Q列 = Snare, A列 = Tom, Z列 = Kick
+     * 空白 = Kick, 退格 = Rim Shot, 換行 = Crash
+     */
+    private suspend fun playPercussion(label: String, durationMs: Int, style: ToneStyle) {
+        val key = label.lowercase()
+        val drumType = when {
+            key in "1234567890" -> DrumType.HIHAT
+            key in "qwertyuiop" || "ㄅㄆㄇㄈㄉㄊㄋㄌㄍㄎㄏ".contains(label) -> DrumType.SNARE
+            key in "asdfghjkl" || "ㄐㄑㄒㄓㄔㄕㄖㄗㄘㄙ".contains(label) -> DrumType.TOM
+            key in "zxcvbnm" || "ㄧㄨㄩㄚㄛㄜㄝㄞㄟㄠㄡㄢㄣㄤㄥㄦ".contains(label) -> DrumType.KICK
+            label == " " -> DrumType.KICK
+            label == "⌫" -> DrumType.RIM
+            label == "\n" -> DrumType.CRASH
+            else -> DrumType.SNARE
+        }
+        val dur = when (drumType) {
+            DrumType.KICK -> 100; DrumType.SNARE -> 80; DrumType.HIHAT -> 50
+            DrumType.TOM -> 90; DrumType.RIM -> 40; DrumType.CRASH -> 140
+        }
+        val numSamples = sampleRate * dur / 1000
+        val samples = ShortArray(numSamples)
+        val random = java.util.Random()
+
+        for (i in samples.indices) {
+            val t = i.toFloat() / numSamples
+            val env = exp(-t * when (drumType) {
+                DrumType.KICK -> 4f; DrumType.SNARE -> 8f; DrumType.HIHAT -> 15f
+                DrumType.TOM -> 5f; DrumType.RIM -> 20f; DrumType.CRASH -> 3f
+            })
+            val noise = (random.nextFloat() * 2f - 1f)
+            val tonal = when (drumType) {
+                // Kick: 低頻掃描 150→50 Hz
+                DrumType.KICK -> sin(2.0 * PI * (150 - 100 * t) * i / sampleRate).toFloat()
+                // Tom: 中頻掃描 200→80 Hz
+                DrumType.TOM -> sin(2.0 * PI * (200 - 120 * t) * i / sampleRate).toFloat()
+                // Rim: 高頻短促
+                DrumType.RIM -> sin(2.0 * PI * 800.0 * i / sampleRate).toFloat()
+                else -> 0f
+            }
+            val mix = when (drumType) {
+                DrumType.KICK -> tonal * 0.7f + noise * 0.3f
+                DrumType.SNARE -> tonal * 0.1f + noise * 0.9f
+                DrumType.HIHAT -> noise  // 純噪音
+                DrumType.TOM -> tonal * 0.6f + noise * 0.4f
+                DrumType.RIM -> tonal * 0.8f + noise * 0.2f
+                DrumType.CRASH -> noise * 0.7f + sin(2.0 * PI * 350.0 * i / sampleRate).toFloat() * 0.3f
+            }
+            // 風格調整
+            val styled = when (style) {
+                ToneStyle.DRUM -> mix * env
+                ToneStyle.EDRUM -> {
+                    // 電子鼓：更乾淨的正弦波 + 壓縮噪音
+                    val cleanTonal = when (drumType) {
+                        DrumType.KICK -> sin(2.0 * PI * (120 - 80 * t) * i / sampleRate).toFloat()
+                        DrumType.SNARE -> sin(2.0 * PI * 200.0 * i / sampleRate).toFloat() * 0.4f + noise * 0.6f
+                        DrumType.HIHAT -> noise * (if (t < 0.3f) 1f else 0.3f) // 門控
+                        DrumType.TOM -> sin(2.0 * PI * (180 - 100 * t) * i / sampleRate).toFloat()
+                        DrumType.RIM -> sin(2.0 * PI * 1000.0 * i / sampleRate).toFloat()
+                        DrumType.CRASH -> noise * 0.5f + sin(2.0 * PI * 400.0 * i / sampleRate).toFloat() * 0.5f
+                    }
+                    cleanTonal * env * 1.2f  // 稍微 boost
+                }
+                ToneStyle.BEATBOX -> {
+                    // Beatbox：口技風，更多中高頻 + 嘴巴共振模擬
+                    val formant1 = sin(2.0 * PI * 300.0 * i / sampleRate).toFloat()
+                    val formant2 = sin(2.0 * PI * 700.0 * i / sampleRate).toFloat()
+                    val breathNoise = noise * exp(-t * 12f)
+                    when (drumType) {
+                        DrumType.KICK -> (sin(2.0 * PI * (100 - 60 * t) * i / sampleRate).toFloat() * 0.6f + breathNoise * 0.4f) * env
+                        DrumType.SNARE -> (breathNoise * 0.7f + formant1 * 0.2f + formant2 * 0.1f) * env
+                        DrumType.HIHAT -> (noise * (if (t < 0.15f) 1f else 0.15f) + formant2 * 0.1f) * env  // ts! 聲
+                        DrumType.TOM -> (formant1 * 0.5f + sin(2.0 * PI * (180 - 80 * t) * i / sampleRate).toFloat() * 0.3f + breathNoise * 0.2f) * env
+                        DrumType.RIM -> (formant2 * 0.6f + noise * 0.4f) * exp(-t * 25f)
+                        DrumType.CRASH -> (noise * 0.4f + formant1 * 0.3f + formant2 * 0.3f) * env
+                    }
+                }
+                else -> mix * env  // fallback
+            }
+            samples[i] = (styled * volumeScale * Short.MAX_VALUE)
+                .toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+        }
+        val bufSize = AudioTrack.getMinBufferSize(sampleRate,
+            AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT).coerceAtLeast(numSamples * 2)
+        val track = AudioTrack.Builder()
+            .setAudioAttributes(AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
+            .setAudioFormat(AudioFormat.Builder().setSampleRate(sampleRate)
+                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                .setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
+            .setBufferSizeInBytes(bufSize).setTransferMode(AudioTrack.MODE_STATIC).build()
+        track.write(samples, 0, samples.size)
+        track.play()
+        delay(dur.toLong() + 15)
+        track.stop(); track.release()
+    }
+
+    private enum class DrumType { KICK, SNARE, HIHAT, TOM, RIM, CRASH }
 
     fun destroy() { scope.cancel() }
 }
