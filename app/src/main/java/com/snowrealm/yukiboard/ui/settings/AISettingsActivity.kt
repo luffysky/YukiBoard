@@ -353,11 +353,85 @@ class AISettingsActivity : AppCompatActivity() {
             }
         })
 
+        // ══════════════════════════════════════════════════════════════
+        // Section 4: 帳號同步
+        // ══════════════════════════════════════════════════════════════
+        root.addView(divider())
+        root.addView(sectionTitle("帳號同步"))
         root.addView(TextView(this).apply {
-            text = "\uD83D\uDD12 您的 API Key 使用 Android 系統加密儲存於本機"
+            val auth = com.snowrealm.yukiboard.auth.SnowRealmAuthClient(this@AISettingsActivity)
+            text = if (auth.isLoggedIn) "已登入：${auth.currentDisplayName ?: auth.currentEmail ?: "已登入"}"
+                   else "尚未登入，登入後可同步 API Key 到雲端"
+            textSize = 13f
+            setTextColor(if (auth.isLoggedIn) 0xFF8BC34A.toInt() else 0xFF6688AA.toInt())
+            setPadding(dp(8), dp(4), 0, dp(8))
+        })
+
+        val syncBtnRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(4), dp(4), dp(4), dp(8))
+        }
+        // 上傳按鈕
+        syncBtnRow.addView(Button(this).apply {
+            text = "上傳 Key 到雲端"
+            setTextColor(0xFFFFFFFF.toInt())
+            textSize = 13f
+            background = GradientDrawable().apply {
+                setColor(0xFF2196F3.toInt())
+                cornerRadius = dp(8).toFloat()
+            }
+            setPadding(dp(14), dp(8), dp(14), dp(8))
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginEnd = dp(4)
+            }
+            setOnClickListener { btn ->
+                btn.isEnabled = false
+                (btn as Button).text = "上傳中..."
+                lifecycleScope.launch {
+                    val result = com.snowrealm.yukiboard.claw.provider.ApiKeySync.uploadKeys(this@AISettingsActivity)
+                    btn.isEnabled = true
+                    btn.text = "上傳 Key 到雲端"
+                    val icon = if (result.success) "✅" else "❌"
+                    Toast.makeText(this@AISettingsActivity, "$icon ${result.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        })
+        // 下載按鈕
+        syncBtnRow.addView(Button(this).apply {
+            text = "從雲端還原 Key"
+            setTextColor(0xFFFFFFFF.toInt())
+            textSize = 13f
+            background = GradientDrawable().apply {
+                setColor(0xFF4CAF50.toInt())
+                cornerRadius = dp(8).toFloat()
+            }
+            setPadding(dp(14), dp(8), dp(14), dp(8))
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = dp(4)
+            }
+            setOnClickListener { btn ->
+                btn.isEnabled = false
+                (btn as Button).text = "還原中..."
+                lifecycleScope.launch {
+                    val result = com.snowrealm.yukiboard.claw.provider.ApiKeySync.downloadKeys(this@AISettingsActivity)
+                    btn.isEnabled = true
+                    btn.text = "從雲端還原 Key"
+                    val icon = if (result.success) "✅" else "❌"
+                    Toast.makeText(this@AISettingsActivity, "$icon ${result.message}", Toast.LENGTH_SHORT).show()
+                    if (result.success) {
+                        // 重建 UI 以顯示還原的 Key
+                        recreate()
+                    }
+                }
+            }
+        })
+        root.addView(syncBtnRow)
+
+        root.addView(TextView(this).apply {
+            text = "\uD83D\uDD12 API Key 加密後才上傳（AES-256），只有你的帳號可以解密"
             textSize = 12f
             setTextColor(0xFF6688AA.toInt())
-            setPadding(dp(8), dp(24), dp(8), dp(16))
+            setPadding(dp(8), dp(4), dp(8), dp(16))
             gravity = Gravity.CENTER
         })
 

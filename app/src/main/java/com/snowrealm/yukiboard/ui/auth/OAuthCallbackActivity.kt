@@ -46,6 +46,15 @@ class OAuthCallbackActivity : AppCompatActivity() {
                 val me = authClient.fetchMe()
                 Log.d("OAuthCallback", "fetchMe result: ${me?.displayName}, role=${me?.role}, tenant=${me?.tenantId}")
                 Log.d("OAuthCallback", "isLoggedIn=${authClient.isLoggedIn}, currentUser=${authClient.currentUser}")
+
+                // 登入成功後自動同步 API Key
+                try {
+                    val syncResult = com.snowrealm.yukiboard.claw.provider.ApiKeySync.downloadKeys(this@OAuthCallbackActivity)
+                    Log.d("OAuthCallback", "API Key sync: ${syncResult.message}")
+                } catch (e: Exception) {
+                    Log.w("OAuthCallback", "API Key sync failed: ${e.message}")
+                }
+
                 withContext(Dispatchers.Main) {
                     // 回到 LoginActivity 並通知成功
                     val loginIntent = Intent(this@OAuthCallbackActivity, LoginActivity::class.java).apply {
