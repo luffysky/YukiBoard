@@ -543,18 +543,18 @@ class HandwritingPanelView(
     }
 
     private fun handleButtonUp(tag: String, x: Float, y: Float) {
-        // 語言切換（座標需加回捲動偏移）
+        // 語言切換（DOWN 已驗證位置，UP 只要 tag 匹配即可）
         langButtons.forEachIndexed { i, btn ->
-            if (btn.tag == tag && btn.rect.contains(x + langScrollX, y)) {
+            if (btn.tag == tag) {
                 selectedLangIndex = i
                 applyLanguageSelection()
                 return
             }
         }
 
-        // 操作按鈕
+        // 操作按鈕（DOWN 已驗證位置）
         actionButtons.forEach { btn ->
-            if (btn.tag == tag && btn.rect.contains(x, y)) {
+            if (btn.tag == tag) {
                 when (tag) {
                     "model_mgr" -> toggleModelManager()
                     "undo" -> undoLastStroke()
