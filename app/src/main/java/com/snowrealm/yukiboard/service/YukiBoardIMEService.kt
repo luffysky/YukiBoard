@@ -1550,6 +1550,12 @@ class YukiBoardIMEService : InputMethodService() {
                 }
                 p
             }
+            PanelType.MUSIC -> {
+                val p = MusicPanelView(this)
+                p.theme = theme
+                p.soundEngine = keySoundEngine
+                p
+            }
             PanelType.HANDWRITING -> {
                 if (handwritingEngine == null) {
                     handwritingEngine = com.snowrealm.yukiboard.input.handwriting.HandwritingEngine(this).also { it.init() }

@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 123
-        versionName "0.9.57"
+        versionCode 124
+        versionName "0.9.58"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,11 +82,10 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
+                    "- feat: 音樂面板（鋼琴鍵盤彈奏 + 10 首曲庫 + 錄音回放）\n" +
+                    "- feat: 7 種樂器即時切換（鋼琴/音樂盒/吉他/豎琴/風琴/木琴/柔和）\n" +
                     "- feat: 8 款工具列動畫主題（星空/海洋/餘燼/矩陣3D/冰霜/熔岩/彩虹/雷電）\n" +
-                    "- feat: 鋼琴音階完整 F3→E6（36鍵不重複＋黑鍵半音）\n" +
-                    "- feat: 新增吉他/音樂盒/豎琴/風琴/鼓組/電子鼓/Beatbox 音色\n" +
-                    "- feat: 語音辨識混合語言模式 + 品質優化\n" +
-                    "- fix: 手寫混合模式中文辨識修復"
+                    "- fix: 各樂器音色差異化增強（泛音+衰減+餘韻重新調校）"
             }
         }
         debug {
@@ -95,11 +94,10 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
+                    "- feat: 音樂面板（鋼琴鍵盤彈奏 + 10 首曲庫 + 錄音回放）\n" +
+                    "- feat: 7 種樂器即時切換（鋼琴/音樂盒/吉他/豎琴/風琴/木琴/柔和）\n" +
                     "- feat: 8 款工具列動畫主題（星空/海洋/餘燼/矩陣3D/冰霜/熔岩/彩虹/雷電）\n" +
-                    "- feat: 鋼琴音階完整 F3→E6（36鍵不重複＋黑鍵半音）\n" +
-                    "- feat: 新增吉他/音樂盒/豎琴/風琴/鼓組/電子鼓/Beatbox 音色\n" +
-                    "- feat: 語音辨識混合語言模式 + 品質優化\n" +
-                    "- fix: 手寫混合模式中文辨識修復"
+                    "- fix: 各樂器音色差異化增強（泛音+衰減+餘韻重新調校）"
             }
         }
     }

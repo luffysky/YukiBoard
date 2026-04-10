@@ -80,7 +80,19 @@ class KeyboardSoundEngine {
     /** 鼓類音色 = 噪音+掃頻合成，不使用 keyNotes 音高 */
     private val isPercussion get() = defaultStyle in setOf(ToneStyle.DRUM, ToneStyle.EDRUM, ToneStyle.BEATBOX)
 
-    fun playKeyTone(label: String, durationMs: Int = 85) {
+    /** 給外部（音樂面板）直接用頻率+音色播放 */
+    fun playFreq(freq: Float, durationMs: Int = 300, style: ToneStyle = defaultStyle) {
+        if (style in setOf(ToneStyle.DRUM, ToneStyle.EDRUM, ToneStyle.BEATBOX)) {
+            scope.launch { try { playPercussion(" ", durationMs, style) } catch (_: Exception) {} }
+            return
+        }
+        scope.launch { try { playTone(freq, durationMs, style) } catch (_: Exception) {} }
+    }
+
+    /** 給外部查音符名對應頻率 */
+    fun noteFreq(semitone: Int): Float = hz(semitone)
+
+    fun playKeyTone(label: String, durationMs: Int = 120) {
         if (isPercussion) {
             scope.launch { try { playPercussion(label, durationMs, defaultStyle) } catch (_: Exception) {} }
             return
@@ -91,52 +103,75 @@ class KeyboardSoundEngine {
 
     private suspend fun playTone(freq: Float, durationMs: Int, style: ToneStyle) {
         val dur = when (style) {
-            ToneStyle.MUSIC_BOX -> durationMs + 60  // 音樂盒餘韻長
-            ToneStyle.HARP -> durationMs + 40
+            ToneStyle.MUSIC_BOX -> durationMs + 120 // 音樂盒餘韻長
+            ToneStyle.HARP -> durationMs + 80
+            ToneStyle.ORGAN -> durationMs + 60      // 風琴持續
+            ToneStyle.GUITAR -> durationMs + 50
+            ToneStyle.SOFT -> durationMs + 40
             else -> durationMs
         }
         val numSamples = sampleRate * dur / 1000
         val samples = ShortArray(numSamples)
         val attackSamples = sampleRate * when (style) {
-            ToneStyle.PIANO -> 5; ToneStyle.MARIMBA -> 3; ToneStyle.SOFT -> 20
-            ToneStyle.GUITAR -> 2; ToneStyle.MUSIC_BOX -> 1; ToneStyle.HARP -> 8; ToneStyle.ORGAN -> 15
+            ToneStyle.PIANO -> 5; ToneStyle.MARIMBA -> 2; ToneStyle.SOFT -> 25
+            ToneStyle.GUITAR -> 3; ToneStyle.MUSIC_BOX -> 1; ToneStyle.HARP -> 10; ToneStyle.ORGAN -> 20
             else -> 5
         } / 1000
         val decayRate = when (style) {
-            ToneStyle.PIANO -> 6f; ToneStyle.MARIMBA -> 9f; ToneStyle.SOFT -> 1.5f
-            ToneStyle.GUITAR -> 7f; ToneStyle.MUSIC_BOX -> 3f; ToneStyle.HARP -> 4f; ToneStyle.ORGAN -> 0.8f
-            else -> 6f
+            ToneStyle.PIANO -> 4f; ToneStyle.MARIMBA -> 7f; ToneStyle.SOFT -> 1.2f
+            ToneStyle.GUITAR -> 5f; ToneStyle.MUSIC_BOX -> 2.5f; ToneStyle.HARP -> 3f; ToneStyle.ORGAN -> 0.5f
+            else -> 4f
         }
 
         for (i in samples.indices) {
             val t = i.toDouble() / sampleRate
             val s = sin(2.0 * PI * freq * i / sampleRate).toFloat()
+            val phase = 2.0 * PI * freq * i / sampleRate
             val harmonic = when (style) {
-                ToneStyle.PIANO -> s + sin(2.0 * PI * freq * 2 * i / sampleRate).toFloat() * 0.3f +
-                    sin(2.0 * PI * freq * 3 * i / sampleRate).toFloat() * 0.1f
-                ToneStyle.MARIMBA -> s + sin(2.0 * PI * freq * 2 * i / sampleRate).toFloat() * 0.5f
-                ToneStyle.SOFT -> s
-                // 吉他：豐富泛音 + 輕微失諧模擬弦振動
+                // 鋼琴：基音 + 二三倍頻 + 輕微失諧模擬弦共振
+                ToneStyle.PIANO -> s +
+                    sin(phase * 2).toFloat() * 0.35f +
+                    sin(phase * 3).toFloat() * 0.12f +
+                    sin(phase * 4).toFloat() * 0.04f +
+                    sin(phase * 1.002).toFloat() * 0.02f  // 微失諧 = 鋼琴特有的「搏動」
+                // 木琴：雙倍頻突出 + 快衰減 = 叩擊木質感
+                ToneStyle.MARIMBA -> s * 0.6f +
+                    sin(phase * 2).toFloat() * 0.55f +
+                    sin(phase * 4).toFloat() * 0.15f +
+                    sin(phase * 3.98).toFloat() * 0.08f  // 非整數泛音 = 金屬/木質
+                // 柔和：純正弦 + 輕微二倍頻 = 長笛般
+                ToneStyle.SOFT -> s * 0.9f +
+                    sin(phase * 2).toFloat() * 0.1f
+                // 吉他：豐富泛音 + 失諧弦振動 + 撥弦衰減特徵
                 ToneStyle.GUITAR -> s +
-                    sin(2.0 * PI * freq * 2 * i / sampleRate).toFloat() * 0.4f +
-                    sin(2.0 * PI * freq * 3 * i / sampleRate).toFloat() * 0.2f +
-                    sin(2.0 * PI * freq * 4 * i / sampleRate).toFloat() * 0.08f +
-                    sin(2.0 * PI * freq * 1.001 * i / sampleRate).toFloat() * 0.05f  // 微失諧
-                // 音樂盒：高頻泛音突出 + 金屬感
+                    sin(phase * 2).toFloat() * 0.45f +
+                    sin(phase * 3).toFloat() * 0.25f +
+                    sin(phase * 4).toFloat() * 0.12f +
+                    sin(phase * 5).toFloat() * 0.05f +
+                    sin(phase * 1.0015).toFloat() * 0.06f +  // chorus 效果
+                    sin(phase * 0.999).toFloat() * 0.04f
+                // 音樂盒：高泛音主導 + 金屬共振 = 清脆叮鈴
                 ToneStyle.MUSIC_BOX ->
-                    sin(2.0 * PI * freq * 2 * i / sampleRate).toFloat() * 0.6f +  // 二倍頻為主
-                    s * 0.3f +
-                    sin(2.0 * PI * freq * 3 * i / sampleRate).toFloat() * 0.25f +
-                    sin(2.0 * PI * freq * 5 * i / sampleRate).toFloat() * 0.1f     // 高泛音亮度
-                // 豎琴：柔和泛音 + 緩起音
-                ToneStyle.HARP -> s +
-                    sin(2.0 * PI * freq * 2 * i / sampleRate).toFloat() * 0.25f +
-                    sin(2.0 * PI * freq * 3 * i / sampleRate).toFloat() * 0.08f
-                // 風琴：奇次泛音為主（管風琴特徵）
+                    sin(phase * 2).toFloat() * 0.7f +  // 二倍頻為主音
+                    s * 0.25f +
+                    sin(phase * 3).toFloat() * 0.3f +
+                    sin(phase * 5).toFloat() * 0.2f +
+                    sin(phase * 7).toFloat() * 0.08f +
+                    sin(phase * 4.07).toFloat() * 0.06f  // 非整數 = 金屬共振
+                // 豎琴：柔和泛音 + 緩起音 + 弦共鳴
+                ToneStyle.HARP -> s * 0.8f +
+                    sin(phase * 2).toFloat() * 0.3f +
+                    sin(phase * 3).toFloat() * 0.1f +
+                    sin(phase * 0.998).toFloat() * 0.05f +  // 弦共鳴
+                    sin(phase * 4).toFloat() * 0.03f
+                // 風琴：奇次泛音主導 = 管風琴方波特徵
                 ToneStyle.ORGAN -> s +
-                    sin(2.0 * PI * freq * 3 * i / sampleRate).toFloat() * 0.3f +
-                    sin(2.0 * PI * freq * 5 * i / sampleRate).toFloat() * 0.15f +
-                    sin(2.0 * PI * freq * 7 * i / sampleRate).toFloat() * 0.05f
+                    sin(phase * 2).toFloat() * 0.5f +  // 8' 音管
+                    sin(phase * 3).toFloat() * 0.35f +  // 5⅓'
+                    sin(phase * 4).toFloat() * 0.25f +  // 4'
+                    sin(phase * 5).toFloat() * 0.18f +
+                    sin(phase * 6).toFloat() * 0.1f +
+                    sin(phase * 8).toFloat() * 0.05f    // 2' 亮音
                 else -> s  // 打擊樂不走此路徑
             }
             val env = if (i < attackSamples) i.toFloat() / attackSamples
