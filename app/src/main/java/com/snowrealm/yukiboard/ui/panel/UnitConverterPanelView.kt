@@ -14,6 +14,8 @@ import com.snowrealm.yukiboard.theme.KeyboardTheme
  */
 class UnitConverterPanelView(context: Context) : View(context) {
 
+    init { setWillNotDraw(false) }
+
     var theme: KeyboardTheme = KeyboardTheme.default()
         set(value) { field = value; invalidate() }
 
@@ -234,9 +236,11 @@ class UnitConverterPanelView(context: Context) : View(context) {
                 }
                 // 單位
                 unitRects.firstOrNull { it.first.contains(x, y) }?.let { (_, idx) ->
-                    if (idx == fromIndex) { /* 再次點擊來源無動作 */ }
-                    else if (idx == toIndex) { /* 再次點擊目標無動作 */ }
-                    else { toIndex = idx }
+                    when {
+                        idx == fromIndex -> { /* 再次點擊來源無動作 */ }
+                        idx == toIndex -> { val tmp = fromIndex; fromIndex = toIndex; toIndex = tmp }
+                        else -> toIndex = idx
+                    }
                     invalidate()
                     return true
                 }

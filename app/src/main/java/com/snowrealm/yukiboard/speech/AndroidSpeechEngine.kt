@@ -52,7 +52,11 @@ class AndroidSpeechEngine(context: Context) : SpeechInputEngine {
                 override fun onResults(results: Bundle?) {
                     isListening = false
                     val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                    onFinalResult(matches?.firstOrNull() ?: "")
+                    val scores = results?.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES)
+                    val best = if (scores != null && matches != null) {
+                        matches.getOrNull(scores.indices.maxByOrNull { scores[it] } ?: 0) ?: ""
+                    } else matches?.firstOrNull() ?: ""
+                    onFinalResult(best)
                 }
 
                 override fun onPartialResults(partialResults: Bundle?) {
@@ -79,9 +83,9 @@ class AndroidSpeechEngine(context: Context) : SpeechInputEngine {
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
             // 降低靜音偵測敏感度，避免過早截斷
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 1000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 3500L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 800L)
             // 偏好離線模型（如有）→ 減少延遲
             putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
             // 多語言辨識：除主語言外，也接受其他常用語言

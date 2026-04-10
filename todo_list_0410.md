@@ -595,6 +595,14 @@
 - ✅ 色碼選擇器面板（ColorPickerPanelView — HSV 取色盤 + HEX/RGB/HSL 格式 + 最近使用色 + 插入）
 - ✅ 單位換算面板（UnitConverterPanelView — 長度/重量/溫度/面積 + 台灣單位 + 數字鍵盤 + 插入）
 
+### v0.9.41~v0.9.46 修復 + 新功能（2026-04-10）
+- ~~[ ] 懸浮鍵盤重寫（真正浮動 65% 螢幕 + onComputeInsets）~~ ✅ v0.9.42
+- ~~[ ] 懸浮球模式（縮成雪花球 + 點擊展開 + 拖曳移動 + 呼吸動畫）~~ ✅ v0.9.42
+- ~~[ ] 懸浮鍵盤 resize（右下角拖曳 / ↔ 按鈕調寬度）~~ ✅ v0.9.42
+- ~~[ ] 選圖片/影片改用系統內建相簿（ACTION_PICK + MediaStore）~~ ✅ v0.9.44
+- ~~[ ] 面板收回後自訂背景消失修復（closePanel 恢復背景狀態）~~ ✅ v0.9.46
+- ~~[ ] 切 App 再回來候選字殘留修復（onStartInputView 清候選）~~ ✅ v0.9.46
+
 ### 個人化
 - ✅ **按鍵文字透明度調整** — keyTextOpacity 拉桿 + 設定頁 + KeyboardView 已實作
 - ✅ **鍵盤即時透明度調整** — 長按工具列🎨按鈕叫出浮動滑桿 overlay（背景遮罩/按鍵/文字三段透明度），即時預覽 + 自動儲存
@@ -609,7 +617,7 @@
 - [ ] 皮膚商城（主題/貼圖/表情包）
 
 ### 無障礙
-- [ ] 單手模式（鍵盤縮小靠左/靠右）
+- ~~[ ] 單手模式（鍵盤縮小靠左/靠右）~~ ✅ v0.9.41
 - [ ] 大字模式（放大按鍵 + 高對比度）
 
 ### UI / UX
@@ -629,7 +637,7 @@
 ## 長期目標（v1.0+）
 
 ### 輸入法進階
-- [ ] 手寫辨識（MLKit / Tesseract）
+- ~~[ ] 手寫辨識（MLKit Digital Ink — PR1 基礎 + PR2 撤銷/連續/壓感 + PR3 模型管理）~~ ✅ v0.9.43~v0.9.45
 - [ ] libchewing JNI 整合（替���純 Kotlin 引擎）
 - [ ] AI 語音自動標點（Whisper + Claw 標點模型）
 - [ ] 整句自動完成（ghost text 灰字 + Tab 接受）
@@ -1038,3 +1046,53 @@ Phase 3：上架準備
 - Insight Engine ��後台管理邀請碼 + 貼圖
 - 注音詞庫現有 23 萬行 dict + 4 萬行 phrases（McBopomofo 來源）
 - RIME 詞庫為額外補充��SQLite 約 8-15MB，打包進 assets
+
+
+---
+
+## 0410 新增任務（Complete_Tasks_FINAL + VoiceKey + Handwriting）
+
+> 來源：YukiBoard_Complete_Tasks_FINAL0410 + VoiceKey_Tasks0410 + Handwriting_Tasks0410
+> 排序：根部影響 → 嚴重 Bug → 觸控/UI Bug → 架構改動 → 新功能
+
+### Phase 1：輸入核心 Bug（🔴 嚴重）
+
+- [x] **B1** 英文/注音打字重複送出 — `YukiBoardIMEService.kt` setComposingText("", 0)
+- [x] **B2** 數字/符號按不出來 — `YukiBoardIMEService.kt` beginBatchEdit + setComposingText("", 0)
+- [x] **B3** 注音選字後候選消失 — `InputRouter.kt` updateCandidates 合併 history + continuations
+
+### Phase 2：觸控/UI Bug（🟡 中等）
+
+- [x] **B10** 按鍵有時很難按 — ACTION_CANCEL 補清 candidateTouchActive/candidateLongPress
+- [x] **B5** 候選字要點幾次才反應 — hitTestCandidateIndex 用 candidateDownX
+- [x] **B6** 候選字下拉展開難按 — expandDownX/Y + expandArrowWidth 28→44dp
+- [x] **B7** HandwritingPanelView 崩潰 — pressedBtn!! → ?.let, currentPath!! → ?.let
+- [x] **B4** 換算面板 Tab 按不了 — setWillNotDraw(false) + 單位選擇 when 改
+- [x] **B8** 解密面板佔整個畫面 — 已有 onMeasure 260dp
+- [x] **B9** 面板無法輸入 — 已有 enterInputMode + IMEService 呼叫
+
+### Phase 3：鍵盤 UI 對齊 + 語音/手寫按鈕（合併改 KeyboardState 底行）
+
+- [x] **U1** 鍵盤 UI 對齊（每排置中） — drawKeysInRegion 每排用自己 rowTotalUnits + rowOffset 置中
+- [x] **V1** KEYCODE_VOICE=-12 KEYCODE_HANDWRITING=-13
+- [x] **H0** 手寫模型切換語言自動下載 — applyLanguageSelection 先查 modelStatus + init checkAllModelStatus
+- [x] **H1** 手寫加入韓文 ko-Kore
+- [x] **V2+H3** 各鍵盤底行加 🎤+✍ — QWERTY/注音/數字/符號/拼音/倉頡/日文x3/韓文/橫向 全改
+- [x] **V3** handleKeyPress KEYCODE_VOICE → toggleVoiceInput()
+- [x] **H3b** handleKeyPress KEYCODE_HANDWRITING → togglePanel(HANDWRITING)
+- [x] **H2** 手寫候選字串聯 — onRecognized callback + 候選列選字處理
+- [x] **H4** 手寫連接 InputRouter — onHandwritingCommit + recordUsage
+
+### Phase 4：新功能
+
+- [x] **F5** 候選字常見字優先排序 — 已有 COMMON_WORD_FREQUENCY
+- [x] **F6** AUTO 模式中英混合候選 — 已有 getAutoCombinedCandidates
+- [x] **F7** 候選字長按放大鏡 — 已有 drawCandidateMagnifier
+- [x] **F2** 大小寫轉換（長按 Shift） — CaseConvertType + drawCaseMenu + onCaseConvert
+- [x] **F1** 真正音階音效 — 新增 KeyboardSoundEngine.kt + keySoundStyle/keySoundVolume prefs
+- [x] **F3** 語音辨識三引擎改善 — silence 延長 + confidence scores + temperature=0
+- [x] **F4** 語音後處理 — 新增 VoicePostProcessor.kt + voicePostProcessEnabled pref
+
+### ⚠ 底行合併注意
+
+U1 + V2 + H3 都改 KeyboardState 底行，合併一次做。加 🎤+✍ 後微調 widthWeight 讓每排總計接近一致。

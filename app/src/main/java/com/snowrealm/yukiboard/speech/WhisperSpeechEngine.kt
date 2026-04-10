@@ -40,7 +40,7 @@ class WhisperSpeechEngine(
     private val audioFormat = AudioFormat.ENCODING_PCM_16BIT
 
     // partial 間隔（毫秒）
-    private val partialIntervalMs = 1500L
+    private val partialIntervalMs = 2500L
     // 靜音偵測：連續靜音超過此毫秒數自動停止
     private val silenceThresholdMs = 3000L
     private val silenceAmplitudeThreshold = 500  // PCM 振幅低於此視為靜音
@@ -235,11 +235,18 @@ class WhisperSpeechEngine(
             )
             .addFormDataPart("model", model)
             .addFormDataPart("response_format", "json")
-        // 中文時加 prompt 引導輸出繁體（含上下文提升準確度）
-        if (language == "zh") {
-            bodyBuilder.addFormDataPart("language", "zh")
-            val contextHint = contextText?.takeIf { it.isNotBlank() }?.let { "前文：$it。" } ?: ""
-            bodyBuilder.addFormDataPart("prompt", "${contextHint}以下是繁體中文語音內容。")
+            .addFormDataPart("temperature", "0")
+        val contextHint = contextText?.takeIf { it.isNotBlank() }?.let { "前文：$it。" } ?: ""
+        when {
+            language == "zh" || language.startsWith("zh-") -> {
+                bodyBuilder.addFormDataPart("language", "zh")
+                bodyBuilder.addFormDataPart("prompt", "${contextHint}以下是繁體中文對話，請輸出繁體中文，不要簡體字。")
+            }
+            language == "en" || language.startsWith("en-") -> {
+                bodyBuilder.addFormDataPart("language", "en")
+                if (contextHint.isNotEmpty()) bodyBuilder.addFormDataPart("prompt", contextHint)
+            }
+            language.isNotBlank() -> bodyBuilder.addFormDataPart("language", language.substringBefore("-"))
         }
         val body = bodyBuilder.build()
 

@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 113
-        versionName "0.9.47"
+        versionCode 114
+        versionName "0.9.48"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,9 +82,13 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 色碼/換算面板加入工具列（不再只能長按觸發）\n" +
-                    "- fix: RIME 詞庫 DB 重新生成（98,760 條）\n" +
-                    "- chore: Supabase 邀請碼 + 特權欄位 migration 已推送"
+                    "- feat: 底部工具列新增語音🎤/手寫✍按鈕（全鍵盤佈局）\n" +
+                    "- feat: 按鍵音效引擎（鋼琴/木琴/柔和三種音色）\n" +
+                    "- feat: 語音後處理（AI 自動清除口語贅詞）\n" +
+                    "- feat: Shift 長按大小寫轉換選單\n" +
+                    "- fix: 注音/英文切換殘留 composing 修復\n" +
+                    "- fix: 候選字列觸控精準度 + 手寫面板 null safety\n" +
+                    "- fix: 語音辨識靜音閾值調校 + Whisper temperature=0"
             }
         }
         debug {
@@ -93,9 +97,13 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 色碼/換算面板加入工具列（不再只能長按觸發）\n" +
-                    "- fix: RIME 詞庫 DB 重新生成（98,760 條）\n" +
-                    "- chore: Supabase 邀請碼 + 特權欄位 migration 已推送"
+                    "- feat: 底部工具列新增語音🎤/手寫✍按鈕（全鍵盤佈局）\n" +
+                    "- feat: 按鍵音效引擎（鋼琴/木琴/柔和三種音色）\n" +
+                    "- feat: 語音後處理（AI 自動清除口語贅詞）\n" +
+                    "- feat: Shift 長按大小寫轉換選單\n" +
+                    "- fix: 注音/英文切換殘留 composing 修復\n" +
+                    "- fix: 候選字列觸控精準度 + 手寫面板 null safety\n" +
+                    "- fix: 語音辨識靜音閾值調校 + Whisper temperature=0"
             }
         }
     }

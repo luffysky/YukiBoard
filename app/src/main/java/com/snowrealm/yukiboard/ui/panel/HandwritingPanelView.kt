@@ -45,8 +45,21 @@ class HandwritingPanelView(
     /** 確認/換行回呼 */
     var onConfirm: (() -> Unit)? = null
 
+    /** 辨識結果回呼（同步到候選列） */
+    var onRecognized: ((List<String>) -> Unit)? = null
+
     private val density = resources.displayMetrics.density
     private val handler = Handler(Looper.getMainLooper())
+
+    init {
+        // 面板建立時查模型狀態，讓語言按鈕能正確顯示已下載/未下載
+        engine.checkAllModelStatus { status ->
+            handler.post {
+                modelStatus = status
+                invalidate()
+            }
+        }
+    }
 
     // ── 佈局區域 ──
     private val controlBarRect = RectF()
@@ -108,6 +121,7 @@ class HandwritingPanelView(
         LangOption("zh-Hani-TW", "中"),
         LangOption("en-US", "英"),
         LangOption("ja", "日"),
+        LangOption("ko-Kore", "韓"),
         LangOption("mixed", "混合")
     )
     private var selectedLangIndex = 0
@@ -454,14 +468,14 @@ class HandwritingPanelView(
             MotionEvent.ACTION_UP -> {
                 // 按鈕
                 if (pressedBtn != null) {
-                    handleButtonUp(pressedBtn!!, x, y)
+                    pressedBtn?.let { handleButtonUp(it, x, y) }
                     pressedBtn = null; invalidate(); return true
                 }
 
                 // 完成筆畫
                 if (currentPath != null) {
                     strokeCollector.finishStroke(event)
-                    drawPaths.add(currentPath!!)
+                    currentPath?.let { drawPaths.add(it) }
                     drawWidths.add(getCurrentStrokeWidth())
                     currentPath = null
                     currentPressureSum = 0f
@@ -552,6 +566,11 @@ class HandwritingPanelView(
     private fun onRecognitionResult(results: List<String>) {
         candidates = results
         invalidate()
+
+        // 通知 IMEService 同步到候選列
+        if (results.isNotEmpty()) {
+            onRecognized?.invoke(results)
+        }
 
         if (continuousMode && results.isNotEmpty()) {
             handler.removeCallbacks(autoCommitRunnable)
@@ -645,12 +664,41 @@ class HandwritingPanelView(
 
     private fun applyLanguageSelection() {
         val option = langOptions[selectedLangIndex]
-        if (option.tag == "mixed") {
-            engine.setLanguages(listOf("zh-Hani-TW", "en-US"))
+        val tags = if (option.tag == "mixed") {
+            listOf("zh-Hani-TW", "en-US")
         } else {
-            engine.setLanguages(listOf(option.tag))
+            listOf(option.tag)
         }
-        invalidate()
+
+        // 找出尚未下載的模型
+        val notDownloaded = tags.filter { modelStatus[it] != true }
+
+        if (notDownloaded.isEmpty()) {
+            // 全部已下載 → 直接切換
+            engine.setLanguages(tags)
+            invalidate()
+        } else {
+            // 有未下載的 → 自動下載後切換
+            downloadingTag = notDownloaded.first()
+            invalidate()
+
+            var remaining = notDownloaded.size
+            notDownloaded.forEach { tag ->
+                engine.downloadModel(tag) { success ->
+                    handler.post {
+                        if (success) {
+                            modelStatus = modelStatus.toMutableMap().apply { put(tag, true) }
+                        }
+                        remaining--
+                        if (remaining == 0) {
+                            downloadingTag = null
+                            engine.setLanguages(tags)
+                            invalidate()
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private fun doRecognize() {

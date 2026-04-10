@@ -161,6 +161,8 @@ class YukiBoardIMEService : InputMethodService() {
     // 手寫辨識
     private var handwritingEngine: com.snowrealm.yukiboard.input.handwriting.HandwritingEngine? = null
     private var handwritingPanel: HandwritingPanelView? = null
+    private var keySoundEngine: KeyboardSoundEngine? = null
+    private var voicePostProcessor: com.snowrealm.yukiboard.speech.VoicePostProcessor? = null
 
     // 鍵盤尺寸調整 + 懸浮
     private var resizeHandle: KeyboardResizeHandle? = null
@@ -250,6 +252,7 @@ class YukiBoardIMEService : InputMethodService() {
 
         // Claw AI（自動從 BuildConfig 匯入 API key）
         clawClient = ClawClient(applicationContext)
+        voicePostProcessor = clawClient?.let { com.snowrealm.yukiboard.speech.VoicePostProcessor(it) }
 
         // GIF + 翻譯引擎
         giphyClient = GiphyApiClient()
@@ -343,9 +346,44 @@ class YukiBoardIMEService : InputMethodService() {
             clipToPadding = false
         }
 
+        keySoundEngine = KeyboardSoundEngine()
+
         keyboardView = KeyboardView(this)
         keyboardView.setOnKeyPressListener { keyCode, label ->
+            // 按鍵音效
+            if (prefs.keySoundEnabled) {
+                keySoundEngine?.defaultStyle = when (prefs.keySoundStyle) {
+                    "marimba" -> KeyboardSoundEngine.ToneStyle.MARIMBA
+                    "soft"    -> KeyboardSoundEngine.ToneStyle.SOFT
+                    else      -> KeyboardSoundEngine.ToneStyle.PIANO
+                }
+                keySoundEngine?.volumeScale = prefs.keySoundVolume
+                keySoundEngine?.playKeyTone(label)
+            }
             handleKeyPress(keyCode, label)
+        }
+        keyboardView.onCaseConvert = convert@{ type ->
+            val ic = currentInputConnection ?: return@convert
+            val selected = ic.getSelectedText(0)?.toString()
+            val target = if (!selected.isNullOrEmpty()) selected
+            else {
+                val before = ic.getTextBeforeCursor(100, 0)?.toString() ?: ""
+                val lastSpace = before.lastIndexOf(' ')
+                if (lastSpace >= 0) before.substring(lastSpace + 1) else before
+            }
+            if (target.isEmpty()) return@convert
+            val converted = when (type) {
+                KeyboardView.CaseConvertType.UPPER  -> target.uppercase()
+                KeyboardView.CaseConvertType.LOWER  -> target.lowercase()
+                KeyboardView.CaseConvertType.INVERT -> target.map {
+                    if (it.isUpperCase()) it.lowercase() else it.uppercase()
+                }.joinToString("")
+            }
+            if (converted == target) return@convert
+            ic.beginBatchEdit()
+            if (!selected.isNullOrEmpty()) ic.commitText(converted, 1)
+            else { ic.deleteSurroundingText(target.length, 0); ic.commitText(converted, 1) }
+            ic.endBatchEdit()
         }
         // 長按注音/聲調直接輸出（不走 InputRouter）
         keyboardView.setOnRawCommitListener { text ->
@@ -453,6 +491,16 @@ class YukiBoardIMEService : InputMethodService() {
                 }
                 keyboardView.updateComposingText("")
                 keyboardView.updateCandidates(emptyList())
+                return@setOnCandidateSelectListener
+            }
+
+            // 手寫模式下候選字選取：直接 commit，不走 InputRouter
+            val hwPanel = handwritingPanel
+            if (hwPanel != null && activePanel == PanelType.HANDWRITING) {
+                val text = displayedCandidates.getOrNull(index) ?: return@setOnCandidateSelectListener
+                currentInputConnection?.commitText(text, 1)
+                keyboardView.updateCandidates(emptyList())
+                inputRouter.onHandwritingCommit(text)
                 return@setOnCandidateSelectListener
             }
 
@@ -991,6 +1039,8 @@ class YukiBoardIMEService : InputMethodService() {
         gyroController.unregister()
         gameLoop?.stop()
         speechEngine?.destroy()
+        keySoundEngine?.destroy()
+        voicePostProcessor?.destroy()
         ttsEngine?.destroy()
         btKeyboard?.destroy()
         wifiServer?.destroy()
@@ -1500,6 +1550,17 @@ class YukiBoardIMEService : InputMethodService() {
                 p.theme = theme
                 p.onCandidateSelected = { text ->
                     currentInputConnection?.commitText(text, 1)
+                    keyboardView.updateCandidates(emptyList())
+                    // 通知 InputRouter 學習這個字
+                    inputRouter.onHandwritingCommit(text)
+                }
+                p.onRecognized = { candidates ->
+                    if (candidates.isNotEmpty()) {
+                        val sourceMap = candidates.associateWith {
+                            com.snowrealm.yukiboard.input.router.CandidateSource.DICTIONARY
+                        }
+                        keyboardView.updateCandidates(candidates, sourceMap)
+                    }
                 }
                 p.onBackspace = {
                     currentInputConnection?.deleteSurroundingText(1, 0)
@@ -1954,7 +2015,13 @@ class YukiBoardIMEService : InputMethodService() {
                 if (voiceFinalHandled) return@startListening
                 voiceFinalHandled = true
                 keyboardView.voiceListeningLocale = null
-                if (result.isNotEmpty()) {
+                if (result.isNotEmpty() && prefs.voicePostProcessEnabled) {
+                    voiceOverlay?.showFinal("整理中…")
+                    val lang = if (inputRouter.inputMode == com.snowrealm.yukiboard.input.router.InputMode.ENGLISH) "en" else "zh-TW"
+                    voicePostProcessor?.process(result, lang) { cleaned ->
+                        voiceOverlay?.showFinal(cleaned)
+                    }
+                } else if (result.isNotEmpty()) {
                     voiceOverlay?.showFinal(result)
                 } else {
                     voiceOverlay?.dismiss()
@@ -3002,6 +3069,19 @@ class YukiBoardIMEService : InputMethodService() {
             KeyboardView.KEYCODE_CTRL_Z -> sendCtrlKey(ic, KeyEvent.KEYCODE_Z)
             KeyboardView.KEYCODE_CTRL_Y -> sendCtrlKey(ic, KeyEvent.KEYCODE_Y)
 
+            KeyboardView.KEYCODE_VOICE -> {
+                toggleVoiceInput()
+                return
+            }
+            KeyboardView.KEYCODE_HANDWRITING -> {
+                if (activePanel == PanelType.HANDWRITING) {
+                    closePanel()
+                } else {
+                    handlePanelToggle(PanelType.HANDWRITING)
+                }
+                return
+            }
+
             // 設計者模式
             KeyboardView.KEYCODE_DESIGN_GROUP      -> sendCtrlKey(ic, KeyEvent.KEYCODE_G)
             KeyboardView.KEYCODE_DESIGN_UNGROUP    -> sendCtrlShiftKey(ic, KeyEvent.KEYCODE_G)
@@ -3093,24 +3173,30 @@ class YukiBoardIMEService : InputMethodService() {
                 if (ch != null && !ch.isLetter() && !isBopomofo) {
                     // 先提交正在組合的文字
                     if (inputRouter.composingText.isNotEmpty()) {
-                        // 用 processSpace 觸發引擎轉換（注音→漢字），而非直接 commit 原始注音符號
                         val spaceResult = inputRouter.processSpace()
                         if (spaceResult is InputResult.CommitText) {
-                            // 去掉 processSpace 附帶的空格
                             val trimmed = spaceResult.text.trimEnd()
                             if (trimmed.isNotEmpty()) {
+                                ic.beginBatchEdit()
                                 ic.setComposingText("", 0)
-                                ic.finishComposingText()
                                 ic.commitText(trimmed, 1)
+                                ic.endBatchEdit()
                             }
                         } else {
-                            // processSpace 沒能轉換（如進入候選選字模式），forceCommit
                             val commitResult = inputRouter.getActiveEngine().forceCommit()
                             if (commitResult is InputResult.CommitText) {
-                                applyInputResult(ic, commitResult)
+                                ic.beginBatchEdit()
+                                ic.setComposingText("", 0)
+                                ic.commitText(commitResult.text, 1)
+                                ic.endBatchEdit()
+                            } else {
+                                ic.setComposingText("", 0)
+                                ic.finishComposingText()
                             }
                         }
                         inputRouter.reset()
+                        keyboardView.updateComposingText("")
+                        keyboardView.updateCandidates(emptyList())
                     }
                     ic.commitText(label, 1)
                 } else {
@@ -3390,7 +3476,7 @@ class YukiBoardIMEService : InputMethodService() {
                 }
 
                 ic.beginBatchEdit()
-                ic.setComposingText("", 1)  // 清空 composing 但不 commit，避免重複輸出
+                ic.setComposingText("", 0)  // 0 = 丟棄 composing，不 commit，避免重複輸出
                 ic.commitText(result.text, 1)
                 ic.endBatchEdit()
                 characterView?.playHappy()

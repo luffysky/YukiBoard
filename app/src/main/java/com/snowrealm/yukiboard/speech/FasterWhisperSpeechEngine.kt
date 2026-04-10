@@ -231,12 +231,13 @@ class FasterWhisperSpeechEngine(
                 wavData.toRequestBody("audio/wav".toMediaType())
             )
 
+        bodyBuilder.addFormDataPart("temperature", "0")
         if (!language.isNullOrBlank()) {
             bodyBuilder.addFormDataPart("language", language)
             // 中文時加 prompt 引導輸出繁體
             if (language == "zh") {
                 val contextHint = contextText?.takeIf { it.isNotBlank() }?.let { "前文：$it。" } ?: ""
-                bodyBuilder.addFormDataPart("initial_prompt", "${contextHint}以下是繁體中文語音內容。")
+                bodyBuilder.addFormDataPart("initial_prompt", "${contextHint}以下是繁體中文對話，請輸出繁體中文，不要簡體字。")
             }
         }
         if (apiKey.isNotBlank()) {

@@ -21,6 +21,7 @@ class HandwritingEngine(private val context: Context) {
             "zh-Hani-TW" to "繁體中文",
             "en-US" to "English",
             "ja" to "日本語",
+            "ko-Kore" to "한국어",
             "zh-Hani-CN" to "简体中文"
         )
     }

@@ -19,6 +19,8 @@ class EnglishInputEngine(context: Context? = null) : InputEngine {
     private val dictionary = EnglishDictionary(context)
     private var cachedCandidates: List<String> = emptyList()
 
+    fun getDictionary(): EnglishDictionary = dictionary
+
     override val composingText: String get() = buffer.toString()
 
     override fun processChar(char: String): InputResult {

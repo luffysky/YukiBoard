@@ -110,11 +110,26 @@ class KeyboardView(context: Context) : View(context) {
         const val KEYCODE_SWITCH_ABC     = -502  // 切回字母鍵盤
         const val KEYCODE_TOGGLE_KANA    = -503  // 日語 あ⇔ア 切換
         const val KEYCODE_SWITCH_NUMPAD  = -504  // 切到數字鍵盤（計算機）
+        const val KEYCODE_VOICE         = -12   // 語音輸入
+        const val KEYCODE_HANDWRITING   = -13   // 手寫輸入
 
         private const val LONG_PRESS_DELAY = 400L
         private const val CANDIDATE_BAR_MAX = 6
         private const val EXPAND_GRID_COLS = 5
     }
+
+    // -------------------------------------------------------------------------
+    // 大小寫轉換
+    // -------------------------------------------------------------------------
+    enum class CaseConvertType { UPPER, LOWER, INVERT }
+    var onCaseConvert: ((CaseConvertType) -> Unit)? = null
+    private var caseMenuVisible = false
+    private var caseMenuAnchor = RectF()
+    private val caseMenuItems = listOf(
+        "AA 全大寫" to CaseConvertType.UPPER,
+        "aa 全小寫" to CaseConvertType.LOWER,
+        "Aa 反轉"   to CaseConvertType.INVERT
+    )
 
     // -------------------------------------------------------------------------
     // 回呼
@@ -208,7 +223,7 @@ class KeyboardView(context: Context) : View(context) {
     private var candFixedLeftCache = 0f
     private var candGapCache = 0f
     // 右側展開箭頭���域
-    private val expandArrowWidth by lazy { 28f * density }
+    private val expandArrowWidth by lazy { 44f * density }
     private var hasExpandArrow = false
     /** 是否有自訂背景圖（設為 true 時鍵盤背景變半透明） */
     var hasCustomBackground: Boolean = false
@@ -239,6 +254,8 @@ class KeyboardView(context: Context) : View(context) {
     private var expandTouchStartY: Float = 0f     // 觸控起始 Y（用於滑動偵測）
     private var expandLastTouchY: Float = 0f      // 上一次觸控 Y
     private var expandIsScrolling: Boolean = false // 是否正在滑動中
+    private var expandDownX = 0f                   // 展開面板 DOWN 位置 X
+    private var expandDownY = 0f                   // 展開面板 DOWN 位置 Y
     private var composingText: String = ""
     private var theme: KeyboardTheme = KeyboardTheme.default()
     private var isShifted: Boolean = false
@@ -604,6 +621,13 @@ class KeyboardView(context: Context) : View(context) {
                 vibrateShort()
                 onSpaceLongPressListener?.invoke(true)
             }
+            key.code == KEYCODE_SHIFT -> {
+                isLongPressTriggered = true
+                vibrateShort()
+                caseMenuAnchor = rect
+                caseMenuVisible = true
+                invalidate()
+            }
             key.altChars.isNotEmpty() -> {
                 isLongPressTriggered = true
                 vibrateShort()
@@ -930,6 +954,26 @@ class KeyboardView(context: Context) : View(context) {
         // 候選字長按放大鏡
         if (candidateLongPressActive && candidateLongPressIndex >= 0) {
             drawCandidateMagnifier(canvas, candidateLongPressIndex)
+        }
+        if (caseMenuVisible) drawCaseMenu(canvas)
+    }
+
+    private fun drawCaseMenu(canvas: Canvas) {
+        val itemH = 36f * density; val itemW = 96f * density; val pad = 8f * density
+        val totalH = itemH * caseMenuItems.size + pad * 2
+        val menuLeft = (caseMenuAnchor.centerX() - itemW / 2f).coerceIn(0f, width - itemW)
+        val menuTop = caseMenuAnchor.top - totalH - 4f * density
+        val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = theme.keyColorInt; setShadowLayer(8f * density, 0f, 2f * density, 0x44000000)
+        }
+        canvas.drawRoundRect(RectF(menuLeft - pad, menuTop - pad, menuLeft + itemW + pad, menuTop + totalH + pad),
+            12f * density, 12f * density, bgPaint)
+        caseMenuItems.forEachIndexed { i, (label, _) ->
+            val itemTop = menuTop + pad + i * itemH
+            val tp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                textSize = 13f * density; color = theme.keyLabelColorInt; textAlign = Paint.Align.CENTER
+            }
+            canvas.drawText(label, menuLeft + itemW / 2f, itemTop + itemH / 2f + tp.textSize * 0.35f, tp)
         }
     }
 
@@ -1413,14 +1457,20 @@ class KeyboardView(context: Context) : View(context) {
             labelPaint.textSize = (if (theme.keyFontSizeSp > 0) theme.keyFontSizeSp else 18f) * density
         }
 
-        val totalUnits = rows.maxOfOrNull { row ->
+        // 以最大 widthWeight 總和為基準，計算統一的 unitWidth
+        val maxRowUnits = rows.maxOfOrNull { row ->
             row.sumOf { it.widthWeight.toDouble() }.toFloat()
         } ?: 10f
+        val unitWidth = regionWidth / maxRowUnits
 
         rows.forEachIndexed { rowIndex, row ->
             val top = candidateBarHeight + rowIndex * rh
-            var x = left
-            val unitWidth = regionWidth / totalUnits
+
+            // 每排用自己的 totalUnits 置中排列
+            val rowTotalUnits = row.sumOf { it.widthWeight.toDouble() }.toFloat()
+            val rowActualWidth = rowTotalUnits * unitWidth
+            val rowOffset = (regionWidth - rowActualWidth) / 2f
+            var x = left + rowOffset
 
             // keyScalePercent: 100=正常，70=按鍵縮小（padding 加大），130=按鍵放大（padding 縮小）
             val scaleInv = (200 - keyScalePercent) / 100f  // 130→0.7, 100→1.0, 70→1.3
@@ -2063,6 +2113,8 @@ class KeyboardView(context: Context) : View(context) {
                 if (isCandidateExpanded && y > candidateBarHeight) {
                     expandTouchStartY = y
                     expandLastTouchY = y
+                    expandDownX = x
+                    expandDownY = y
                     expandIsScrolling = false
                     return true
                 }
@@ -2213,6 +2265,23 @@ class KeyboardView(context: Context) : View(context) {
                 }
                 invalidate()
 
+                // 大小寫選單
+                if (caseMenuVisible) {
+                    val itemH = 36f * density; val itemW = 96f * density; val pad = 8f * density
+                    val totalH = itemH * caseMenuItems.size + pad * 2
+                    val menuLeft = (caseMenuAnchor.centerX() - itemW / 2f).coerceIn(0f, width - itemW)
+                    val menuTop = caseMenuAnchor.top - totalH - 4f * density
+                    caseMenuItems.forEachIndexed { i, (_, type) ->
+                        val itemTop = menuTop + pad + i * itemH
+                        if (RectF(menuLeft, itemTop, menuLeft + itemW, itemTop + itemH).contains(x, y)) {
+                            onCaseConvert?.invoke(type)
+                            caseMenuVisible = false; isLongPressTriggered = false
+                            invalidate(); performClick(); return true
+                        }
+                    }
+                    caseMenuVisible = false; isLongPressTriggered = false; invalidate(); return true
+                }
+
                 // Alt popup 放開 → 選字
                 if (altPopupActive) {
                     commitAltPopupSelection()
@@ -2275,8 +2344,10 @@ class KeyboardView(context: Context) : View(context) {
                     val cellHeight = 42f * density
                     val contentPadding = 8f * density
                     val startY = candidateBarHeight + contentPadding - expandScrollOffset
-                    val col = (x / cellWidth).toInt().coerceIn(0, EXPAND_GRID_COLS - 1)
-                    val row = ((y - startY) / cellHeight).toInt()
+                    val selectX = if (expandIsScrolling) x else expandDownX
+                    val selectY = if (expandIsScrolling) y else expandDownY
+                    val col = (selectX / cellWidth).toInt().coerceIn(0, EXPAND_GRID_COLS - 1)
+                    val row = ((selectY - startY) / cellHeight).toInt()
                     if (row >= 0) {
                         val index = row * EXPAND_GRID_COLS + col
                         if (index in allCandidates.indices) {
@@ -2329,8 +2400,8 @@ class KeyboardView(context: Context) : View(context) {
                     }
                     candidateIsDragging = false
 
-                    // 用釋放位置 x 算候選字 index（滑動選字）
-                    val idx = hitTestCandidateIndex(x)
+                    // 用 DOWN 位置選字（避免手指偏移導致選錯）
+                    val idx = hitTestCandidateIndex(if (candidateIsDragging) x else candidateDownX)
                     if (idx >= 0 && idx < candidates.size) {
                         onCandidateSpeakListener?.invoke(candidates[idx])
                         onCandidateSelectListener?.invoke(idx)
@@ -2410,8 +2481,13 @@ class KeyboardView(context: Context) : View(context) {
             MotionEvent.ACTION_CANCEL -> {
                 handler.removeCallbacks(longPressRunnable)
                 handler.removeCallbacks(deleteRepeatRunnable)
+                handler.removeCallbacksAndMessages(null)
                 pressedKey = null
                 isLongPressTriggered = false
+                candidateTouchActive = false
+                candidateLongPressActive = false
+                candidateLongPressIndex = -1
+                caseMenuVisible = false
                 if (altPopupActive) dismissAltPopup()
                 activeRadialView = null
                 if (isSpaceLongPressed) {

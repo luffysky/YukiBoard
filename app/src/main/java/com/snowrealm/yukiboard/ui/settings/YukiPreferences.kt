@@ -66,6 +66,9 @@ class YukiPreferences(context: Context) {
     var keyParticleEffect: Boolean by BoolPref("key_particle", true)
     var keyPressVibration: Boolean by BoolPref("key_vibration", true)
     var keySoundEnabled: Boolean by BoolPref("key_sound", false)
+    var keySoundStyle: String by StringPref("key_sound_style", "piano")
+    var keySoundVolume: Float by FloatPref("key_sound_volume", 0.45f)
+    var voicePostProcessEnabled: Boolean by BoolPref("voice_post_process", true)
 
     // ═════���═══════════════════════════════════════════���═════════
     // 遊戲系統

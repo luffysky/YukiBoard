@@ -585,10 +585,11 @@ class InputRouter(private val context: Context) {
                     for (c in continuations) historySourceMap[c] = CandidateSource.PREDICTION
                     for (h in candidateManager.historyCandidates) historySourceMap[h] = CandidateSource.HISTORY
                     candidateSourceMap = historySourceMap
-                    candidateManager.update(continuations)
+                    candidateManager.update(
+                        continuations + candidateManager.historyCandidates.filter { it !in continuations }
+                    )
                     return
                 }
-                // 真的沒有 → 只顯示歷史候選
                 for (h in candidateManager.historyCandidates) historySourceMap[h] = CandidateSource.HISTORY
                 candidateSourceMap = historySourceMap
                 candidateManager.update(emptyList())
@@ -870,6 +871,12 @@ class InputRouter(private val context: Context) {
     }
 
     /** 記錄提交詞，供智慧輸入各模組學習 */
+    fun onHandwritingCommit(text: String) {
+        val dict = (englishEngine as? EnglishInputEngine)?.getDictionary()
+        if (dict != null) smartInput.adaptiveDictionary.recordUsage(text, dict)
+        onTextCommitted(text)
+    }
+
     private fun onTextCommitted(text: String) {
         val trimmed = text.trim()
         if (trimmed.isBlank()) return

@@ -304,6 +304,69 @@ class SettingsActivity : AppCompatActivity() {
             animChildren += switchRow("按鍵粒子效果", "打字時的粒子動畫", prefs.keyParticleEffect) { prefs.keyParticleEffect = it }
             animChildren += switchRow("按鍵震動", "按鍵時的觸覺回饋", prefs.keyPressVibration) { prefs.keyPressVibration = it }
             animChildren += switchRow("按鍵音效", "按鍵時的聲音回饋", prefs.keySoundEnabled) { prefs.keySoundEnabled = it }
+
+            // 按鍵音色選擇
+            val styleOptions = arrayOf("鋼琴 (Piano)", "木琴 (Marimba)", "柔和 (Soft)")
+            val styleValues = arrayOf("piano", "marimba", "soft")
+            val styleRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setPadding(0, dp(8), 0, dp(8))
+            }
+            val styleLabel = TextView(this).apply {
+                text = "音色風格"
+                setTextColor(0xFFFFFFFF.toInt())
+                textSize = 14f
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            val styleBtn = TextView(this).apply {
+                val currentIdx = styleValues.indexOf(prefs.keySoundStyle).coerceAtLeast(0)
+                text = styleOptions[currentIdx]
+                setTextColor(0xFF90CAF9.toInt())
+                textSize = 14f
+                setOnClickListener {
+                    val cur = styleValues.indexOf(prefs.keySoundStyle).coerceAtLeast(0)
+                    android.app.AlertDialog.Builder(this@SettingsActivity)
+                        .setTitle("選擇音色風格")
+                        .setSingleChoiceItems(styleOptions, cur) { dialog, which ->
+                            prefs.keySoundStyle = styleValues[which]
+                            (it as TextView).text = styleOptions[which]
+                            dialog.dismiss()
+                        }
+                        .setNegativeButton("取消", null)
+                        .show()
+                }
+            }
+            styleRow.addView(styleLabel)
+            styleRow.addView(styleBtn)
+            animChildren += styleRow
+
+            // 按鍵音量滑桿
+            val volRow = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(0, dp(4), 0, dp(8))
+            }
+            volRow.addView(TextView(this).apply {
+                text = "音量：${(prefs.keySoundVolume * 100).toInt()}%"
+                setTextColor(0xFFFFFFFF.toInt())
+                textSize = 14f
+                tag = "volLabel"
+            })
+            volRow.addView(SeekBar(this).apply {
+                max = 100
+                progress = (prefs.keySoundVolume * 100).toInt()
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+                        if (fromUser) {
+                            prefs.keySoundVolume = p / 100f
+                            volRow.findViewWithTag<TextView>("volLabel")?.text = "音量：${p}%"
+                        }
+                    }
+                    override fun onStartTrackingTouch(sb: SeekBar?) {}
+                    override fun onStopTrackingTouch(sb: SeekBar?) {}
+                })
+            })
+            animChildren += volRow
         })
 
         // ═══════════════════════════════════════════════════════
@@ -389,6 +452,7 @@ class SettingsActivity : AppCompatActivity() {
 
             // 語音引擎選擇
             inputChildren += speechEngineSelector()
+            inputChildren += switchRow("語音後處理", "AI 自動清除口語贅詞（嗯、那個…）", prefs.voicePostProcessEnabled) { prefs.voicePostProcessEnabled = it }
         })
 
         // ═══════════════════════════════════════════════════════
