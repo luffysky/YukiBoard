@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 114
-        versionName "0.9.48"
+        versionCode 115
+        versionName "0.9.49"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,13 +82,8 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 底部工具列新增語音🎤/手寫✍按鈕（全鍵盤佈局）\n" +
-                    "- feat: 按鍵音效引擎（鋼琴/木琴/柔和三種音色）\n" +
-                    "- feat: 語音後處理（AI 自動清除口語贅詞）\n" +
-                    "- feat: Shift 長按大小寫轉換選單\n" +
-                    "- fix: 注音/英文切換殘留 composing 修復\n" +
-                    "- fix: 候選字列觸控精準度 + 手寫面板 null safety\n" +
-                    "- fix: 語音辨識靜音閾值調校 + Whisper temperature=0"
+                    "- fix: 手寫面板語言 tab 水平捲動（不再擠在一起）\n" +
+                    "- fix: 設定頁新增音色/音量/語音後處理 UI"
             }
         }
         debug {
@@ -97,13 +92,8 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 底部工具列新增語音🎤/手寫✍按鈕（全鍵盤佈局）\n" +
-                    "- feat: 按鍵音效引擎（鋼琴/木琴/柔和三種音色）\n" +
-                    "- feat: 語音後處理（AI 自動清除口語贅詞）\n" +
-                    "- feat: Shift 長按大小寫轉換選單\n" +
-                    "- fix: 注音/英文切換殘留 composing 修復\n" +
-                    "- fix: 候選字列觸控精準度 + 手寫面板 null safety\n" +
-                    "- fix: 語音辨識靜音閾值調校 + Whisper temperature=0"
+                    "- fix: 手寫面板語言 tab 水平捲動（不再擠在一起）\n" +
+                    "- fix: 設定頁新增音色/音量/語音後處理 UI"
             }
         }
     }

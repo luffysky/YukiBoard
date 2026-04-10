@@ -126,6 +126,14 @@ class HandwritingPanelView(
     )
     private var selectedLangIndex = 0
 
+    // ── 語言列水平捲動 ──
+    private var langScrollX = 0f
+    private var langTotalWidth = 0f
+    private var langVisibleWidth = 0f
+    private var langDragging = false
+    private var langDragStartX = 0f
+    private var langDragStartScroll = 0f
+
     // ── 按壓狀態 ──
     private var pressedBtn: String? = null
 
@@ -165,24 +173,29 @@ class HandwritingPanelView(
             layoutModelButtons(w, modelBarRect)
         }
 
-        // 語言按鈕（左側）
-        langButtons.clear()
-        val btnW = 40 * density
-        val btnH = 28 * density
-        val btnY = (controlH - btnH) / 2f
-        langOptions.forEachIndexed { i, lang ->
-            val x = pad + i * (btnW + 3 * density)
-            langButtons.add(BtnInfo(RectF(x, btnY, x + btnW, btnY + btnH), lang.label, lang.tag))
-        }
-
         // 操作按鈕（右側）：⚙ ↶ 清除 ⌫ ↩
         val actions = listOf("⚙" to "model_mgr", "↶" to "undo", "清除" to "clear", "⌫" to "backspace", "↩" to "confirm")
         actionButtons.clear()
         val aBtnW = 38 * density
+        val btnH = 28 * density
+        val btnY = (controlH - btnH) / 2f
         actions.forEachIndexed { i, (label, tag) ->
             val x = w - pad - (actions.size - i) * (aBtnW + 3 * density)
             actionButtons.add(BtnInfo(RectF(x, btnY, x + aBtnW, btnY + btnH), label, tag))
         }
+
+        // 語言按鈕（左側，可水平捲動）
+        langButtons.clear()
+        val langBtnW = 40 * density
+        val gap = 3 * density
+        langOptions.forEachIndexed { i, lang ->
+            val x = pad + i * (langBtnW + gap)
+            langButtons.add(BtnInfo(RectF(x, btnY, x + langBtnW, btnY + btnH), lang.label, lang.tag))
+        }
+        langTotalWidth = pad + langOptions.size * (langBtnW + gap)
+        // 可視區寬 = 最左操作按鈕的 left - pad
+        langVisibleWidth = if (actionButtons.isNotEmpty()) actionButtons.first().rect.left - pad else w
+        langScrollX = langScrollX.coerceIn(0f, (langTotalWidth - langVisibleWidth).coerceAtLeast(0f))
     }
 
     private fun layoutModelButtons(w: Float, barRect: RectF) {
@@ -231,7 +244,10 @@ class HandwritingPanelView(
         textPaint.textSize = textSize
         val fm = textPaint.fontMetrics
 
-        // 語言按鈕
+        // 語言按鈕（clip + scroll）
+        canvas.save()
+        canvas.clipRect(0f, 0f, langVisibleWidth, controlBarRect.bottom)
+        canvas.translate(-langScrollX, 0f)
         langButtons.forEachIndexed { i, btn ->
             val isSelected = i == selectedLangIndex
             val isPressed = pressedBtn == btn.tag
@@ -247,6 +263,7 @@ class HandwritingPanelView(
             canvas.drawText(btn.label, btn.rect.centerX(),
                 btn.rect.centerY() - (fm.top + fm.bottom) / 2f, textPaint)
         }
+        canvas.restore()
 
         // 操作按鈕
         actionButtons.forEach { btn ->
@@ -407,12 +424,22 @@ class HandwritingPanelView(
 
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
-                // 控制列按鈕
-                langButtons.forEach { btn ->
-                    if (btn.rect.contains(x, y)) {
-                        pressedBtn = btn.tag; invalidate(); return true
+                // 語言列區域 → 可能捲動，記錄起點
+                if (controlBarRect.contains(x, y) && x < langVisibleWidth) {
+                    langDragging = false
+                    langDragStartX = x
+                    langDragStartScroll = langScrollX
+                    // 先標記按鈕（如果在按鈕上）
+                    val scrolledX = x + langScrollX
+                    langButtons.forEach { btn ->
+                        if (btn.rect.contains(scrolledX, y)) {
+                            pressedBtn = btn.tag; invalidate(); return true
+                        }
                     }
+                    // 沒按到按鈕但在語言列區域，也攔截（準備捲動）
+                    return true
                 }
+                // 操作按鈕
                 actionButtons.forEach { btn ->
                     if (btn.rect.contains(x, y)) {
                         pressedBtn = btn.tag; invalidate(); return true
@@ -451,6 +478,20 @@ class HandwritingPanelView(
             }
 
             MotionEvent.ACTION_MOVE -> {
+                // 語言列水平捲動
+                if (pressedBtn != null && langButtons.any { it.tag == pressedBtn }) {
+                    val dx = kotlin.math.abs(x - langDragStartX)
+                    if (dx > 8 * density) {
+                        langDragging = true
+                        pressedBtn = null  // 取消按鈕按壓
+                    }
+                }
+                if (langDragging) {
+                    val maxScroll = (langTotalWidth - langVisibleWidth).coerceAtLeast(0f)
+                    langScrollX = (langDragStartScroll - (x - langDragStartX)).coerceIn(0f, maxScroll)
+                    invalidate()
+                    return true
+                }
                 if (currentPath != null) {
                     // 限制在手寫區域內
                     val clampX = x.coerceIn(writingAreaRect.left, writingAreaRect.right)
@@ -466,6 +507,10 @@ class HandwritingPanelView(
             }
 
             MotionEvent.ACTION_UP -> {
+                // 語言列拖動結束
+                if (langDragging) {
+                    langDragging = false; return true
+                }
                 // 按鈕
                 if (pressedBtn != null) {
                     pressedBtn?.let { handleButtonUp(it, x, y) }
@@ -498,9 +543,9 @@ class HandwritingPanelView(
     }
 
     private fun handleButtonUp(tag: String, x: Float, y: Float) {
-        // 語言切換
+        // 語言切換（座標需加回捲動偏移）
         langButtons.forEachIndexed { i, btn ->
-            if (btn.tag == tag && btn.rect.contains(x, y)) {
+            if (btn.tag == tag && btn.rect.contains(x + langScrollX, y)) {
                 selectedLangIndex = i
                 applyLanguageSelection()
                 return
