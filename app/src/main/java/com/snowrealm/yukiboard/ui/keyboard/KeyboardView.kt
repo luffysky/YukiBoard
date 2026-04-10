@@ -323,24 +323,27 @@ class KeyboardView(context: Context) : View(context) {
         textAlign = Paint.Align.RIGHT
         textSize = 10f * density
     }
+    /** 共用 CJK 字體（只載入一次，避免 OOM） */
+    private val cjkTypeface: android.graphics.Typeface = run {
+        try {
+            android.graphics.Typeface.createFromAsset(
+                context.assets, "fonts/NotoSansCJKtc-Regular.otf"
+            )
+        } catch (e: Exception) {
+            android.util.Log.w("KeyboardView", "Failed to load CJK font: ${e.message}")
+            // 系統 fallback：Android 內建的 sans-serif 通常涵蓋基本 CJK
+            android.graphics.Typeface.DEFAULT
+        }
+    }
     private val candidatePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
         textSize = 15f * density
-        // Noto Sans CJK 完整版：涵蓋 CJK Extension A~F，避免罕用字顯示 □
-        try {
-            typeface = android.graphics.Typeface.createFromAsset(
-                context.assets, "fonts/NotoSansCJKtc-Regular.otf"
-            )
-        } catch (_: Exception) {}
+        typeface = cjkTypeface
     }
     private val composingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.LEFT
         textSize = 14f * density
-        try {
-            typeface = android.graphics.Typeface.createFromAsset(
-                context.assets, "fonts/NotoSansCJKtc-Regular.otf"
-            )
-        } catch (_: Exception) {}
+        typeface = cjkTypeface
         color = Color.CYAN
     }
     private val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {

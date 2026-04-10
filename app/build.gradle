@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 132
-        versionName "0.9.66"
+        versionCode 133
+        versionName "0.9.67"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,10 +82,13 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 8 款全鍵盤動畫主題（星空/海洋/餘燼/矩陣3D/冰霜/熔岩/彩虹/雷電）\n" +
-                    "- feat: 音樂面板（鋼琴鍵盤 + 10 首曲庫 + 錄音回放 + 7 樂器）\n" +
-                    "- feat: 主題面板可直接切換動畫主題\n" +
-                    "- fix: 各樂器音色差異化增強"
+                    "- feat: 語言套件系統（德/法/西/越/義可下載）\n" +
+                    "- feat: 字典面板（15 語言，Free Dictionary + Wiktionary API）\n" +
+                    "- feat: 語言學習面板（查詞/音標/例句/收藏）\n" +
+                    "- feat: 圓環語言選單動態化（從設定抓取）\n" +
+                    "- fix: API Key 同步「請先登入」修復\n" +
+                    "- fix: 韓文 Jamo 候選字修復\n" +
+                    "- fix: 候選字方格子修復（字體載入優化）"
             }
         }
         debug {
@@ -94,10 +97,13 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 8 款全鍵盤動畫主題（星空/海洋/餘燼/矩陣3D/冰霜/熔岩/彩虹/雷電）\n" +
-                    "- feat: 音樂面板（鋼琴鍵盤 + 10 首曲庫 + 錄音回放 + 7 樂器）\n" +
-                    "- feat: 主題面板可直接切換動畫主題\n" +
-                    "- fix: 各樂器音色差異化增強"
+                    "- feat: 語言套件系統（德/法/西/越/義可下載）\n" +
+                    "- feat: 字典面板（15 語言，Free Dictionary + Wiktionary API）\n" +
+                    "- feat: 語言學習面板（查詞/音標/例句/收藏）\n" +
+                    "- feat: 圓環語言選單動態化（從設定抓取）\n" +
+                    "- fix: API Key 同步「請先登入」修復\n" +
+                    "- fix: 韓文 Jamo 候選字修復\n" +
+                    "- fix: 候選字方格子修復（字體載入優化）"
             }
         }
     }

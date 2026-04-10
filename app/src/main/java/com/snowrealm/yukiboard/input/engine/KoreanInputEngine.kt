@@ -253,7 +253,11 @@ class KoreanInputEngine(context: Context? = null) : InputEngine {
         }
 
         val key = char[0]
-        val jamo = KEY_TO_JAMO[key]
+        // 先嘗試 Latin→Jamo 對照表，再嘗試直接是 Jamo 字元
+        val jamo = KEY_TO_JAMO[key] ?: run {
+            // 直接是 Jamo 字元（韓文鍵盤佈局直接發送 ㅂㅈㄷ 等）
+            if (isConsonant(key) || isVowel(key)) key else null
+        }
 
         if (jamo == null) {
             // Not a Korean key; commit current composing and pass through the character
