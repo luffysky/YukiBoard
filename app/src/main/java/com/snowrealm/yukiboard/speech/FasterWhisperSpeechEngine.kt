@@ -34,6 +34,9 @@ class FasterWhisperSpeechEngine(
     /** 外部可設定上下文文字，提升辨識準確度 */
     var contextText: String? = null
 
+    /** 靜音振幅閾值（可從設定調整） */
+    var silenceAmplitudeThreshold: Int = DEFAULT_SILENCE_AMPLITUDE_THRESHOLD
+
     private var audioRecord: AudioRecord? = null
     private var recordingJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -108,7 +111,7 @@ class FasterWhisperSpeechEngine(
                         val maxAmplitude = (0 until read)
                             .maxOfOrNull { kotlin.math.abs(buffer[it].toInt()) } ?: 0
                         val silenceNow = System.currentTimeMillis()
-                        if (maxAmplitude < SILENCE_AMPLITUDE_THRESHOLD) {
+                        if (maxAmplitude < silenceAmplitudeThreshold) {
                             if (silenceStartTime == 0L) silenceStartTime = silenceNow
                             else if (silenceNow - silenceStartTime >= SILENCE_THRESHOLD_MS
                                      && pcmStream.size() > sampleRate * 2) {
@@ -269,7 +272,7 @@ class FasterWhisperSpeechEngine(
         const val ERROR_NO_PERMISSION = 201
         const val ERROR_AUDIO_INIT = 202
         const val ERROR_NETWORK = 203
-        private const val SILENCE_AMPLITUDE_THRESHOLD = 500
-        private const val SILENCE_THRESHOLD_MS = 3000L
+        private const val DEFAULT_SILENCE_AMPLITUDE_THRESHOLD = 1200
+        private const val SILENCE_THRESHOLD_MS = 2000L
     }
 }

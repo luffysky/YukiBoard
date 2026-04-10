@@ -515,6 +515,7 @@ class SettingsActivity : AppCompatActivity() {
             // 語音引擎選擇
             inputChildren += speechEngineSelector()
             inputChildren += speechLanguageSelector()
+            inputChildren += voiceSilenceSensitivitySelector()
             inputChildren += switchRow("語音後處理", "AI 自動清除口語贅詞（嗯、那個…）", prefs.voicePostProcessEnabled) { prefs.voicePostProcessEnabled = it }
         })
 
@@ -2085,6 +2086,59 @@ class SettingsActivity : AppCompatActivity() {
                     .setSingleChoiceItems(langLabels, cur) { dialog, which ->
                         prefs.speechLanguage = langValues[which]
                         (it as TextView).text = langLabels[which]
+                        dialog.dismiss()
+                    }
+                    .show()
+            }
+        }
+        row.addView(btnLabel)
+        return row
+    }
+
+    /** 語音靜音偵測靈敏度選擇器 */
+    private fun voiceSilenceSensitivitySelector(): LinearLayout {
+        val labels = arrayOf("高靈敏（安靜環境）", "標準（預設）", "低靈敏（嘈雜環境）")
+        val currentIdx = prefs.voiceSilenceSensitivity.coerceIn(0, 2)
+
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(dp(8), dp(6), dp(8), dp(6))
+        }
+
+        val textCol = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        textCol.addView(TextView(this).apply {
+            text = "靜音偵測靈敏度"
+            textSize = 14f
+            setTextColor(0xFFE8F4FF.toInt())
+        })
+        textCol.addView(TextView(this).apply {
+            text = "嘈雜環境選「低」避免被截斷"
+            textSize = 11f
+            setTextColor(0xFF6688AA.toInt())
+        })
+        row.addView(textCol)
+
+        val btnLabel = TextView(this).apply {
+            text = labels[currentIdx]
+            textSize = 13f
+            setTextColor(0xFF9ECFFF.toInt())
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xFF1A2744.toInt())
+                cornerRadius = dp(6).toFloat()
+                setStroke(1, 0xFF3A5580.toInt())
+            }
+            setOnClickListener {
+                val cur = prefs.voiceSilenceSensitivity.coerceIn(0, 2)
+                android.app.AlertDialog.Builder(this@SettingsActivity, android.R.style.Theme_Material_Dialog_Alert)
+                    .setTitle("選擇靜音偵測靈敏度")
+                    .setSingleChoiceItems(labels, cur) { dialog, which ->
+                        prefs.voiceSilenceSensitivity = which
+                        (it as TextView).text = labels[which]
                         dialog.dismiss()
                     }
                     .show()

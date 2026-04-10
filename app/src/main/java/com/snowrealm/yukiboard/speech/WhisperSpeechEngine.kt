@@ -42,8 +42,8 @@ class WhisperSpeechEngine(
     // partial 間隔（毫秒）
     private val partialIntervalMs = 2500L
     // 靜音偵測：連續靜音超過此毫秒數自動停止
-    private val silenceThresholdMs = 3000L
-    private val silenceAmplitudeThreshold = 500  // PCM 振幅低於此視為靜音
+    private val silenceThresholdMs = 2000L  // 2 秒靜音自動停止
+    var silenceAmplitudeThreshold = 1200  // PCM 振幅低於此視為靜音（可從外部調整）
 
     /** 外部可設定上下文文字，提升 Whisper 辨識準確度 */
     var contextText: String? = null
@@ -82,7 +82,7 @@ class WhisperSpeechEngine(
         isListening = true
         audioRecord?.startRecording()
 
-        val whisperLocale = locale.substringBefore("-") // "zh-TW" → "zh"
+        val whisperLocale = locale  // 保留完整 locale，transcribe() 內部處理截斷
         android.util.Log.i("WhisperEngine", "▶ startListening: apiKey=${apiKey.take(8)}..., locale=$whisperLocale")
 
         recordingJob = scope.launch {

@@ -2012,10 +2012,21 @@ class YukiBoardIMEService : InputMethodService() {
 
         keyboardView.voiceListeningLocale = "auto"
 
-        // 設定上下文文字提升 Whisper 辨識準確度
+        // 設定上下文文字 + 靜音偵測靈敏度
         val textBefore = currentInputConnection?.getTextBeforeCursor(200, 0)?.toString()
-        (speechEngine as? WhisperSpeechEngine)?.contextText = textBefore
-        (speechEngine as? FasterWhisperSpeechEngine)?.contextText = textBefore
+        val silenceThreshold = when (prefs.voiceSilenceSensitivity) {
+            0 -> 800    // 高靈敏（安靜環境）
+            2 -> 2000   // 低靈敏（嘈雜環境）
+            else -> 1200 // 標準
+        }
+        (speechEngine as? WhisperSpeechEngine)?.let {
+            it.contextText = textBefore
+            it.silenceAmplitudeThreshold = silenceThreshold
+        }
+        (speechEngine as? FasterWhisperSpeechEngine)?.let {
+            it.contextText = textBefore
+            it.silenceAmplitudeThreshold = silenceThreshold
+        }
 
         speechEngine?.startListening(
             locale = localeHint,
