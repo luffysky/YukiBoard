@@ -14,37 +14,63 @@ class KeyboardSoundEngine {
 
     private fun hz(semitone: Int) = 440f * 2f.pow(semitone / 12f)
 
-    private val C3 = hz(-21); private val G3 = hz(-14); private val A3 = hz(-12)
-    private val B3 = hz(-10); private val GS3 = hz(-13)
-    private val C4 = hz(-9);  private val D4 = hz(-7);  private val E4 = hz(-5)
-    private val F4 = hz(-4);  private val G4 = hz(-2);  private val A4 = hz(0)
-    private val B4 = hz(2);   private val C5 = hz(3);   private val D5 = hz(5)
-    private val E5 = hz(7);   private val F5 = hz(8);   private val G5 = hz(10)
-    private val A5 = hz(12);  private val B5 = hz(14);  private val C6 = hz(15)
-    private val D6 = hz(17);  private val E6 = hz(19)
+    // 完整色彩音階（含黑鍵半音）
+    // 第 3 八度
+    private val C3  = hz(-21); private val CS3 = hz(-20); private val D3  = hz(-19)
+    private val DS3 = hz(-18); private val E3  = hz(-17); private val F3  = hz(-16)
+    private val FS3 = hz(-15); private val G3  = hz(-14); private val GS3 = hz(-13)
+    private val A3  = hz(-12); private val AS3 = hz(-11); private val B3  = hz(-10)
+    // 第 4 八度
+    private val C4  = hz(-9);  private val CS4 = hz(-8);  private val D4  = hz(-7)
+    private val DS4 = hz(-6);  private val E4  = hz(-5);  private val F4  = hz(-4)
+    private val FS4 = hz(-3);  private val G4  = hz(-2);  private val GS4 = hz(-1)
+    private val A4  = hz(0);   private val AS4 = hz(1);   private val B4  = hz(2)
+    // 第 5 八度
+    private val C5  = hz(3);   private val CS5 = hz(4);   private val D5  = hz(5)
+    private val DS5 = hz(6);   private val E5  = hz(7);   private val F5  = hz(8)
+    private val FS5 = hz(9);   private val G5  = hz(10);  private val GS5 = hz(11)
+    private val A5  = hz(12);  private val AS5 = hz(13);  private val B5  = hz(14)
+    // 第 6 八度
+    private val C6  = hz(15);  private val CS6 = hz(16);  private val D6  = hz(17)
+    private val DS6 = hz(18);  private val E6  = hz(19)
 
+    /**
+     * 按鍵音符對映 — 模擬真實鋼琴鍵盤排列。
+     *
+     * 數字列：C5 C#5 D5 D#5 E5 F5 F#5 G5 G#5 A5（10 鍵 = 完整色彩音階）
+     * Q 列：  C4 C#4 D4 D#4 E4 F4 F#4 G4 G#4 A4（10 鍵）
+     * A 列：  A3 A#3 B3 C4  C#4 D4 D#4 E4 F4    （9 鍵）
+     * Z 列：  F3 F#3 G3 G#3 A3 A#3 B3           （7 鍵）
+     */
     private val keyNotes: Map<String, Float> by lazy { buildMap {
-        put("1", C5); put("2", D5); put("3", E5); put("4", F5); put("5", G5)
-        put("6", A5); put("7", B5); put("8", C6); put("9", D6); put("0", E6)
-        put("q", C4); put("w", D4); put("e", E4); put("r", F4); put("t", G4)
-        put("y", A4); put("u", B4); put("i", C5); put("o", D5); put("p", E4)
-        put("a", A3); put("s", B3); put("d", C4); put("f", D4); put("g", E4)
-        put("h", F4); put("j", G4); put("k", A4); put("l", B4)
-        put("z", G3); put("x", A3); put("c", B3); put("v", C4)
-        put("b", D4); put("n", E4); put("m", G3)
-        // 注音
-        put("ㄅ", C4); put("ㄆ", D4); put("ㄇ", E4); put("ㄈ", F4)
-        put("ㄉ", G4); put("ㄊ", A4); put("ㄋ", B4); put("ㄌ", C5)
-        put("ㄍ", D5); put("ㄎ", E5); put("ㄏ", F5)
-        put("ㄐ", G5); put("ㄑ", A5); put("ㄒ", B5)
-        put("ㄓ", C4); put("ㄔ", D4); put("ㄕ", E4); put("ㄖ", F4)
-        put("ㄗ", G4); put("ㄘ", A4); put("ㄙ", B4)
-        put("ㄧ", D5); put("ㄨ", E5); put("ㄩ", G5)
-        put("ㄚ", A5); put("ㄛ", B5); put("ㄜ", C5); put("ㄝ", D5)
-        put("ㄞ", E5); put("ㄟ", F5); put("ㄠ", G5); put("ㄡ", A5)
-        put("ㄢ", B5); put("ㄣ", C6); put("ㄤ", D6); put("ㄥ", E6); put("ㄦ", G5)
-        put("ˊ", E5); put("ˇ", C5); put("ˋ", A4); put("˙", G4)
-        put(" ", C4); put("⌫", GS3); put("\n", G4)
+        // 數字列 — 第 5 八度色彩音階
+        put("1", C5); put("2", CS5); put("3", D5); put("4", DS5); put("5", E5)
+        put("6", F5); put("7", FS5); put("8", G5); put("9", GS5); put("0", A5)
+        // Q 列 — 第 4 八度色彩音階
+        put("q", C4); put("w", CS4); put("e", D4); put("r", DS4); put("t", E4)
+        put("y", F4); put("u", FS4); put("i", G4); put("o", GS4); put("p", A4)
+        // A 列 — A3 → F4
+        put("a", A3); put("s", AS3); put("d", B3); put("f", C4); put("g", CS4)
+        put("h", D4); put("j", DS4); put("k", E4); put("l", F4)
+        // Z 列 — F3 → B3
+        put("z", F3); put("x", FS3); put("c", G3); put("v", GS3)
+        put("b", A3); put("n", AS3); put("m", B3)
+        // 注音聲母 — 第 4 八度色彩音階（ㄅ~ㄙ 共 21 鍵）
+        put("ㄅ", C4); put("ㄆ", CS4); put("ㄇ", D4); put("ㄈ", DS4)
+        put("ㄉ", E4); put("ㄊ", F4);  put("ㄋ", FS4); put("ㄌ", G4)
+        put("ㄍ", GS4); put("ㄎ", A4); put("ㄏ", AS4)
+        put("ㄐ", B4);  put("ㄑ", C5); put("ㄒ", CS5)
+        put("ㄓ", D5);  put("ㄔ", DS5); put("ㄕ", E5); put("ㄖ", F5)
+        put("ㄗ", FS5); put("ㄘ", G5);  put("ㄙ", GS5)
+        // 注音韻母 — 第 5 八度
+        put("ㄧ", A5);  put("ㄨ", AS5); put("ㄩ", B5)
+        put("ㄚ", C5);  put("ㄛ", CS5); put("ㄜ", D5); put("ㄝ", DS5)
+        put("ㄞ", E5);  put("ㄟ", F5);  put("ㄠ", FS5); put("ㄡ", G5)
+        put("ㄢ", GS5); put("ㄣ", A5);  put("ㄤ", AS5); put("ㄥ", B5); put("ㄦ", C6)
+        // 聲調
+        put("ˊ", CS5); put("ˇ", DS5); put("ˋ", FS4); put("˙", GS4)
+        // 功能鍵
+        put(" ", C4); put("⌫", DS3); put("\n", E3)
     }}
 
     enum class ToneStyle { PIANO, MARIMBA, SOFT }

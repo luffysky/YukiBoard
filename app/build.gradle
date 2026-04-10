@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 115
-        versionName "0.9.49"
+        versionCode 116
+        versionName "0.9.50"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,8 +82,8 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 手寫面板語言 tab 水平捲動（不再擠在一起）\n" +
-                    "- fix: 設定頁新增音色/音量/語音後處理 UI"
+                    "- fix: 按鍵音效加入黑鍵半音（完整色彩音階 C3~E6）\n" +
+                    "- fix: 手寫面板語言 tab 水平捲動"
             }
         }
         debug {
@@ -92,8 +92,8 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 手寫面板語言 tab 水平捲動（不再擠在一起）\n" +
-                    "- fix: 設定頁新增音色/音量/語音後處理 UI"
+                    "- fix: 按鍵音效加入黑鍵半音（完整色彩音階 C3~E6）\n" +
+                    "- fix: 手寫面板語言 tab 水平捲動"
             }
         }
     }
