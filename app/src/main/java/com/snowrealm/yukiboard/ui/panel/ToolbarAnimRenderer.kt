@@ -83,7 +83,7 @@ class ToolbarAnimRenderer(private val density: Float) {
      * 繪製動畫背景到 [canvas]。回傳 true 表示需要持續 invalidate 動畫。
      */
     fun draw(canvas: Canvas, w: Int, h: Int, style: Style, timeMs: Long): Boolean {
-        if (style == Style.NONE) return false
+        if (style == Style.NONE || w <= 0 || h <= 0) return false
         if (!initialized || lastW != w || lastH != h) {
             initParticles(w, h, style)
             lastW = w; lastH = h; initialized = true

@@ -94,23 +94,17 @@ class ToolbarView(context: Context) : View(context) {
 
     fun setAnimStyle(styleId: String) {
         val newStyle = ToolbarAnimRenderer.Style.fromId(styleId)
-        if (newStyle != animStyle) {
-            animStyle = newStyle
-            animRenderer.resetStyle()
-            animRunning = newStyle != ToolbarAnimRenderer.Style.NONE
-            invalidate()
-            if (animRunning) startAnimLoop()
-        }
-    }
-
-    private fun startAnimLoop() {
-        if (!animRunning) return
-        postDelayed(animTickRunnable, 16)
+        animStyle = newStyle
+        animRenderer.resetStyle()
+        removeCallbacks(animTickRunnable)
+        animRunning = newStyle != ToolbarAnimRenderer.Style.NONE
+        invalidate()
+        if (animRunning) post(animTickRunnable)
     }
 
     private val animTickRunnable = object : Runnable {
         override fun run() {
-            if (!animRunning || animStyle == ToolbarAnimRenderer.Style.NONE) return
+            if (!animRunning || animStyle == ToolbarAnimRenderer.Style.NONE || !isAttachedToWindow) return
             invalidate()
             postDelayed(this, 16)
         }

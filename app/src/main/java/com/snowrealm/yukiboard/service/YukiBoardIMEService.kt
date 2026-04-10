@@ -85,7 +85,9 @@ class YukiBoardIMEService : InputMethodService() {
     private var lastFraudScanText: String? = null  // 避免重複掃描同一段文字
     private var fraudScanCommitCount = 0  // 每 N 次提交重新掃描
     private val fraudDetectRunnable = Runnable {
-        (panelContainer.getChildAt(0) as? ClawPanelView)?.triggerSkill("fraud_detect")
+        if (::panelContainer.isInitialized && panelContainer.childCount > 0) {
+            (panelContainer.getChildAt(0) as? ClawPanelView)?.triggerSkill("fraud_detect")
+        }
     }
 
     // 面板
@@ -825,6 +827,10 @@ class YukiBoardIMEService : InputMethodService() {
         if (prefs.characterAnimEnabled) {
             characterView?.resumeAnimation()
         }
+
+        // 同步動畫主題（設定頁/主題面板可能已更改）
+        toolbarView.setAnimStyle(prefs.toolbarAnimStyle)
+        keyboardView.setAnimStyle(prefs.toolbarAnimStyle)
 
         // 同步角色動畫顯示偏好（設定頁可能已更改）
         characterView?.visibility = if (prefs.characterAnimEnabled) View.VISIBLE else View.GONE

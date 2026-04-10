@@ -265,28 +265,26 @@ class KeyboardView(context: Context) : View(context) {
     private var animRunning = false
     private val animTick = object : Runnable {
         override fun run() {
-            if (!animRunning) return
+            if (!animRunning || !isAttachedToWindow) return
             invalidate()
             postDelayed(this, 16)
         }
     }
     fun setAnimStyle(styleId: String) {
         val newStyle = com.snowrealm.yukiboard.ui.panel.ToolbarAnimRenderer.Style.fromId(styleId)
-        if (newStyle != animStyle) {
-            animStyle = newStyle
-            if (newStyle != com.snowrealm.yukiboard.ui.panel.ToolbarAnimRenderer.Style.NONE) {
-                if (animRenderer == null) {
-                    animRenderer = com.snowrealm.yukiboard.ui.panel.ToolbarAnimRenderer(density)
-                }
-                animRenderer?.resetStyle()
-                animRunning = true
-                post(animTick)
-            } else {
-                animRunning = false
-                removeCallbacks(animTick)
+        animStyle = newStyle
+        removeCallbacks(animTick)
+        if (newStyle != com.snowrealm.yukiboard.ui.panel.ToolbarAnimRenderer.Style.NONE) {
+            if (animRenderer == null) {
+                animRenderer = com.snowrealm.yukiboard.ui.panel.ToolbarAnimRenderer(density)
             }
-            invalidate()
+            animRenderer?.resetStyle()
+            animRunning = true
+            post(animTick)
+        } else {
+            animRunning = false
         }
+        invalidate()
     }
     private var isShifted: Boolean = false
     private var isCapsLock: Boolean = false
@@ -616,7 +614,7 @@ class KeyboardView(context: Context) : View(context) {
     private var deleteRepeatCount = 0
     private val deleteRepeatRunnable = object : Runnable {
         override fun run() {
-            if (pressedKey?.code != KEYCODE_DELETE) return
+            if (!isAttachedToWindow || pressedKey?.code != KEYCODE_DELETE) return
             deleteRepeatCount++
             onKeyPressListener?.invoke(KEYCODE_DELETE, "⌫")
             if (hapticEnabled && deleteRepeatCount % 3 == 0) vibrateShort()

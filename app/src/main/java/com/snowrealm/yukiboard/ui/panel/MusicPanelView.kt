@@ -36,6 +36,17 @@ class MusicPanelView(context: Context) : View(context) {
         set(value) { field = value; invalidate() }
 
     var soundEngine: KeyboardSoundEngine? = null
+    var onImportMidi: (() -> Unit)? = null
+
+    /** 從外部匯入的曲目 */
+    private val importedSongs = mutableListOf<Song>()
+
+    fun addImportedSong(song: Song) {
+        importedSongs.add(0, song)
+        invalidate()
+    }
+
+    private fun allSongs(): List<Song> = importedSongs + songLibrary
 
     // ── Tab ──
     private enum class Tab { PLAY, LIBRARY }
@@ -57,8 +68,8 @@ class MusicPanelView(context: Context) : View(context) {
     // ── 鋼琴鍵盤 ──
     // 一個八度 = 7 白鍵 + 5 黑鍵
     // 顯示 2 個八度（14 白鍵），可左右滑動換八度
-    private var baseOctave = 4  // C4 開始（中央C）
-    private val visibleOctaves = 2
+    private var baseOctave = 3  // C3 開始（比中央C低一個八度，涵蓋更多低音）
+    private val visibleOctaves = 3
     private val whiteKeysVisible get() = visibleOctaves * 7
 
     // 每個白鍵的音符偏移（相對 C 的半音數）
@@ -118,13 +129,19 @@ class MusicPanelView(context: Context) : View(context) {
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec).let { if (it > 0) it else resources.displayMetrics.widthPixels }
-        val h = (resources.displayMetrics.heightPixels * 0.38f).toInt()
+        val screenH = resources.displayMetrics.heightPixels
+        val isLandscape = resources.configuration.orientation ==
+                android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        // 橫向時使用固定 dp 避免太高擠壓應用，直向時用比例
+        val h = if (isLandscape) dp(180).coerceAtMost((screenH * 0.55f).toInt())
+                else (screenH * 0.38f).toInt()
         setMeasuredDimension(w, h)
     }
 
     override fun onDraw(canvas: Canvas) {
         val w = width.toFloat()
         val h = height.toFloat()
+        if (w <= 0f || h <= 0f) return
 
         // 背景
         bgPaint.color = theme.effectivePanelBackground()
@@ -223,7 +240,7 @@ class MusicPanelView(context: Context) : View(context) {
         textPaint.textSize = dpf(11f)
 
         // 左：八度 -
-        textPaint.color = if (baseOctave > 1) theme.effectiveToolbarIconColor() else (theme.effectiveToolbarIconColor() and 0x00FFFFFF or 0x40000000)
+        textPaint.color = if (baseOctave > 0) theme.effectiveToolbarIconColor() else (theme.effectiveToolbarIconColor() and 0x00FFFFFF or 0x40000000)
         canvas.drawText("◀", dpf(20f), y + controlBarH / 2 + textPaint.textSize * 0.35f, textPaint)
 
         // 中：顯示八度
@@ -232,7 +249,7 @@ class MusicPanelView(context: Context) : View(context) {
         canvas.drawText(octaveLabel, w * 0.3f, y + controlBarH / 2 + textPaint.textSize * 0.35f, textPaint)
 
         // 右：八度 +
-        textPaint.color = if (baseOctave < 7) theme.effectiveToolbarIconColor() else (theme.effectiveToolbarIconColor() and 0x00FFFFFF or 0x40000000)
+        textPaint.color = if (baseOctave + visibleOctaves < 8) theme.effectiveToolbarIconColor() else (theme.effectiveToolbarIconColor() and 0x00FFFFFF or 0x40000000)
         canvas.drawText("▶", dpf(60f) + textPaint.measureText(octaveLabel), y + controlBarH / 2 + textPaint.textSize * 0.35f, textPaint)
 
         // 錄音按鈕
@@ -365,12 +382,16 @@ class MusicPanelView(context: Context) : View(context) {
         val listTop = tabBarH
         val listH = h - listTop
 
-        // 標題
+        // 標題 + 匯入按鈕
         bgPaint.color = darken(theme.effectivePanelBackground(), 0.9f)
         canvas.drawRect(0f, listTop, w, listTop + dpf(28f), bgPaint)
         textPaint.textSize = dpf(12f)
         textPaint.color = theme.effectiveToolbarIconColor()
-        canvas.drawText("選擇一首歌曲自動彈奏", w / 2, listTop + dpf(18f), textPaint)
+        canvas.drawText("選擇歌曲自動彈奏", w * 0.4f, listTop + dpf(18f), textPaint)
+        // 匯入 MIDI 按鈕
+        textPaint.color = theme.effectiveAccentColor()
+        textPaint.textSize = dpf(11f)
+        canvas.drawText("📂 匯入MIDI", w - dpf(50f), listTop + dpf(18f), textPaint)
 
         // 歌曲列表
         val itemH = dpf(52f)
@@ -380,7 +401,7 @@ class MusicPanelView(context: Context) : View(context) {
         canvas.clipRect(0f, contentTop, w, h)
         canvas.translate(0f, -libraryScrollY)
 
-        songLibrary.forEachIndexed { i, song ->
+        allSongs().forEachIndexed { i, song ->
             val y = contentTop + i * itemH
             val isPlaying = playingSong == song
 
@@ -587,7 +608,7 @@ class MusicPanelView(context: Context) : View(context) {
         val w = width.toFloat()
         // 八度 ◀
         if (px < dpf(40f)) {
-            if (baseOctave > 1) { baseOctave--; invalidate() }
+            if (baseOctave > 0) { baseOctave--; invalidate() }
             return
         }
         // 八度 ▶（約在 octave label 右邊）
@@ -595,7 +616,7 @@ class MusicPanelView(context: Context) : View(context) {
             // 對照表區域的右邊
         }
         if (px > dpf(80f) && px < dpf(140f)) {
-            if (baseOctave < 7) { baseOctave++; invalidate() }
+            if (baseOctave + visibleOctaves < 8) { baseOctave++; invalidate() }
             return
         }
 
@@ -628,14 +649,20 @@ class MusicPanelView(context: Context) : View(context) {
     // ═══════════════════════════════════════════════════════════
 
     private fun handleLibraryTap(px: Float, py: Float) {
+        // 匯入按鈕（標題列右邊）
+        if (py < tabBarH + dpf(28f) && px > width * 0.65f) {
+            onImportMidi?.invoke()
+            return
+        }
         val contentTop = tabBarH + dpf(28f)
         val itemH = dpf(52f)
         val adjustedY = py + libraryScrollY - contentTop
         if (adjustedY < 0) return
         val idx = (adjustedY / itemH).toInt()
-        if (idx < 0 || idx >= songLibrary.size) return
+        val songs = allSongs()
+        if (idx < 0 || idx >= songs.size) return
 
-        val song = songLibrary[idx]
+        val song = songs[idx]
         if (playingSong == song) {
             stopSong()
         } else {
@@ -664,7 +691,7 @@ class MusicPanelView(context: Context) : View(context) {
         val delay = (note.startMs - elapsed).coerceAtLeast(0)
 
         songHandler.postDelayed({
-            if (playingSong != song) return@postDelayed
+            if (!isAttachedToWindow || playingSong != song) return@postDelayed
             playNote(note.semitone)
             songNoteIndex++
             scheduleSongNote()
@@ -683,7 +710,7 @@ class MusicPanelView(context: Context) : View(context) {
         val startTime = SystemClock.uptimeMillis()
         recordedNotes.forEachIndexed { _, note ->
             songHandler.postDelayed({
-                if (!isPlayingRecording) return@postDelayed
+                if (!isAttachedToWindow || !isPlayingRecording) return@postDelayed
                 playNote(note.semitone)
             }, note.startMs)
         }
@@ -714,98 +741,128 @@ class MusicPanelView(context: Context) : View(context) {
     // ═══════════════════════════════════════════════════════════
 
     private fun buildSongLibrary(): List<Song> {
-        // semitone 相對 A4(440Hz)：C4=-9, D4=-7, E4=-5, F4=-4, G4=-2, A4=0, B4=2, C5=3
-        val c4=-9; val d4=-7; val e4=-5; val f4=-4; val g4=-2; val a4=0; val b4=2
-        val c5=3; val d5=5; val e5=7; val f5=8; val g5=10; val a5=12
+        // semitone 相對 A4(440Hz)=0：C4=-9, D4=-7, E4=-5, F4=-4, G4=-2, A4=0, B4=2
+        // C5=3, D5=5, E5=7, F5=8, G5=10, A5=12, B5=14
+        // Eb4=-6, Bb4=1, F#4=-3, Ab4=-1, Gb5=9
+        val c4=-9; val d4=-7; val eb4=-6; val e4=-5; val f4=-4; val fs4=-3
+        val g4=-2; val ab4=-1; val a4=0; val bb4=1; val b4=2
+        val c5=3; val d5=5; val eb5=6; val e5=7; val f5=8
+        val g5=10; val a5=12
+
+        fun n(semi: Int, beats: Float) = semi to beats
 
         fun seq(bpm: Int, notes: List<Pair<Int, Float>>): List<SongNote> {
             val beatMs = 60000L / bpm
             var t = 0L
             return notes.map { (semi, beats) ->
-                val dur = (beatMs * beats).toLong()
-                SongNote(semi, t, dur).also { t += dur }
+                val dur = (beatMs * beats * 0.9f).toLong()  // 留 10% 間隔避免黏音
+                val gap = (beatMs * beats).toLong()
+                SongNote(semi, t, dur).also { t += gap }
             }
         }
 
         return listOf(
-            Song("小星星", "Mozart", 100, seq(100, listOf(
-                c4 to 1f, c4 to 1f, g4 to 1f, g4 to 1f, a4 to 1f, a4 to 1f, g4 to 2f,
-                f4 to 1f, f4 to 1f, e4 to 1f, e4 to 1f, d4 to 1f, d4 to 1f, c4 to 2f,
-                g4 to 1f, g4 to 1f, f4 to 1f, f4 to 1f, e4 to 1f, e4 to 1f, d4 to 2f,
-                g4 to 1f, g4 to 1f, f4 to 1f, f4 to 1f, e4 to 1f, e4 to 1f, d4 to 2f,
-                c4 to 1f, c4 to 1f, g4 to 1f, g4 to 1f, a4 to 1f, a4 to 1f, g4 to 2f,
-                f4 to 1f, f4 to 1f, e4 to 1f, e4 to 1f, d4 to 1f, d4 to 1f, c4 to 2f,
+            // 1. 小星星（完整）
+            Song("小星星", "Mozart", 110, seq(110, listOf(
+                n(c4,1f), n(c4,1f), n(g4,1f), n(g4,1f), n(a4,1f), n(a4,1f), n(g4,2f),
+                n(f4,1f), n(f4,1f), n(e4,1f), n(e4,1f), n(d4,1f), n(d4,1f), n(c4,2f),
+                n(g4,1f), n(g4,1f), n(f4,1f), n(f4,1f), n(e4,1f), n(e4,1f), n(d4,2f),
+                n(g4,1f), n(g4,1f), n(f4,1f), n(f4,1f), n(e4,1f), n(e4,1f), n(d4,2f),
+                n(c4,1f), n(c4,1f), n(g4,1f), n(g4,1f), n(a4,1f), n(a4,1f), n(g4,2f),
+                n(f4,1f), n(f4,1f), n(e4,1f), n(e4,1f), n(d4,1f), n(d4,1f), n(c4,2f),
             ))),
-            Song("生日快樂", "Traditional", 120, seq(120, listOf(
-                c4 to 0.75f, c4 to 0.25f, d4 to 1f, c4 to 1f, f4 to 1f, e4 to 2f,
-                c4 to 0.75f, c4 to 0.25f, d4 to 1f, c4 to 1f, g4 to 1f, f4 to 2f,
-                c4 to 0.75f, c4 to 0.25f, c5 to 1f, a4 to 1f, f4 to 1f, e4 to 1f, d4 to 2f,
-                b4 to 0.75f, b4 to 0.25f, a4 to 1f, f4 to 1f, g4 to 1f, f4 to 2f,
+            // 2. 生日快樂（完整，3/4拍）
+            Song("生日快樂", "Traditional", 140, seq(140, listOf(
+                n(g4,0.5f), n(g4,0.5f), n(a4,1f), n(g4,1f), n(c5,1f), n(b4,2f),
+                n(g4,0.5f), n(g4,0.5f), n(a4,1f), n(g4,1f), n(d5,1f), n(c5,2f),
+                n(g4,0.5f), n(g4,0.5f), n(g5,1f), n(e5,1f), n(c5,1f), n(b4,1f), n(a4,2f),
+                n(f5,0.5f), n(f5,0.5f), n(e5,1f), n(c5,1f), n(d5,1f), n(c5,2f),
             ))),
-            Song("小蜜蜂", "German Folk", 110, seq(110, listOf(
-                g4 to 1f, e4 to 1f, e4 to 2f, f4 to 1f, d4 to 1f, d4 to 2f,
-                c4 to 1f, d4 to 1f, e4 to 1f, f4 to 1f, g4 to 1f, g4 to 1f, g4 to 2f,
-                g4 to 1f, e4 to 1f, e4 to 2f, f4 to 1f, d4 to 1f, d4 to 2f,
-                c4 to 1f, e4 to 1f, g4 to 1f, g4 to 1f, c4 to 4f,
+            // 3. 小蜜蜂（完整）
+            Song("小蜜蜂", "German Folk", 120, seq(120, listOf(
+                n(e5,1f), n(d5,1f), n(c5,1f), n(d5,1f), n(e5,1f), n(e5,1f), n(e5,2f),
+                n(d5,1f), n(d5,1f), n(d5,2f), n(e5,1f), n(g5,1f), n(g5,2f),
+                n(e5,1f), n(d5,1f), n(c5,1f), n(d5,1f), n(e5,1f), n(e5,1f), n(e5,1f), n(e5,1f),
+                n(d5,1f), n(d5,1f), n(e5,1f), n(d5,1f), n(c5,4f),
             ))),
-            Song("瑪莉有隻小綿羊", "Traditional", 120, seq(120, listOf(
-                e4 to 1f, d4 to 1f, c4 to 1f, d4 to 1f, e4 to 1f, e4 to 1f, e4 to 2f,
-                d4 to 1f, d4 to 1f, d4 to 2f, e4 to 1f, g4 to 1f, g4 to 2f,
-                e4 to 1f, d4 to 1f, c4 to 1f, d4 to 1f, e4 to 1f, e4 to 1f, e4 to 1f, e4 to 1f,
-                d4 to 1f, d4 to 1f, e4 to 1f, d4 to 1f, c4 to 4f,
+            // 4. 瑪莉有隻小綿羊（完整）
+            Song("瑪莉有隻小綿羊", "Traditional", 130, seq(130, listOf(
+                n(e5,1f), n(d5,1f), n(c5,1f), n(d5,1f), n(e5,1f), n(e5,1f), n(e5,2f),
+                n(d5,1f), n(d5,1f), n(d5,2f), n(e5,1f), n(e5,1f), n(e5,2f),
+                n(e5,1f), n(d5,1f), n(c5,1f), n(d5,1f), n(e5,1f), n(e5,1f), n(e5,1f), n(e5,1f),
+                n(d5,1f), n(d5,1f), n(e5,1f), n(d5,1f), n(c5,4f),
             ))),
-            Song("歡樂頌", "Beethoven", 108, seq(108, listOf(
-                e4 to 1f, e4 to 1f, f4 to 1f, g4 to 1f, g4 to 1f, f4 to 1f, e4 to 1f, d4 to 1f,
-                c4 to 1f, c4 to 1f, d4 to 1f, e4 to 1f, e4 to 1.5f, d4 to 0.5f, d4 to 2f,
-                e4 to 1f, e4 to 1f, f4 to 1f, g4 to 1f, g4 to 1f, f4 to 1f, e4 to 1f, d4 to 1f,
-                c4 to 1f, c4 to 1f, d4 to 1f, e4 to 1f, d4 to 1.5f, c4 to 0.5f, c4 to 2f,
+            // 5. 歡樂頌（完整兩段）
+            Song("歡樂頌", "Beethoven", 120, seq(120, listOf(
+                n(e5,1f), n(e5,1f), n(f5,1f), n(g5,1f), n(g5,1f), n(f5,1f), n(e5,1f), n(d5,1f),
+                n(c5,1f), n(c5,1f), n(d5,1f), n(e5,1f), n(e5,1.5f), n(d5,0.5f), n(d5,2f),
+                n(e5,1f), n(e5,1f), n(f5,1f), n(g5,1f), n(g5,1f), n(f5,1f), n(e5,1f), n(d5,1f),
+                n(c5,1f), n(c5,1f), n(d5,1f), n(e5,1f), n(d5,1.5f), n(c5,0.5f), n(c5,2f),
+                n(d5,1f), n(d5,1f), n(e5,1f), n(c5,1f), n(d5,1f), n(e5,0.5f), n(f5,0.5f), n(e5,1f), n(c5,1f),
+                n(d5,1f), n(e5,0.5f), n(f5,0.5f), n(e5,1f), n(d5,1f), n(c5,1f), n(d5,1f), n(g4,2f),
+                n(e5,1f), n(e5,1f), n(f5,1f), n(g5,1f), n(g5,1f), n(f5,1f), n(e5,1f), n(d5,1f),
+                n(c5,1f), n(c5,1f), n(d5,1f), n(e5,1f), n(d5,1.5f), n(c5,0.5f), n(c5,2f),
             ))),
+            // 6. 天空之城（正確旋律，兩段）
+            Song("天空之城", "久石讓", 80, seq(80, listOf(
+                n(a4,0.5f), n(b4,0.5f),
+                n(c5,1.5f), n(b4,0.5f), n(c5,1f), n(e5,1f),
+                n(b4,3f), n(e4,0.5f), n(e4,0.5f),
+                n(a4,1.5f), n(g4,0.5f), n(a4,1f), n(c5,1f),
+                n(g4,3f), n(e4,0.5f), n(e4,0.5f),
+                n(f4,1.5f), n(e4,0.5f), n(f4,1f), n(c5,1f),
+                n(e4,3f), n(c4,0.5f), n(c4,0.5f),
+                n(d4,1.5f), n(c4,0.5f), n(d4,1f), n(b4,1f),
+                n(c4,3f),
+                n(a4,0.5f), n(b4,0.5f),
+                n(c5,1.5f), n(b4,0.5f), n(c5,1f), n(e5,1f),
+                n(b4,3f), n(e4,0.5f), n(e4,0.5f),
+                n(a4,1.5f), n(g4,0.5f), n(a4,1f), n(c5,1f),
+                n(g4,3f),
+            ))),
+            // 7. 夢中的婚禮（Für Elise 主題）
+            Song("乖乖聽話", "Beethoven", 72, seq(72, listOf(
+                n(e5,0.5f), n(eb5,0.5f), n(e5,0.5f), n(eb5,0.5f), n(e5,0.5f), n(b4,0.5f), n(d5,0.5f), n(c5,0.5f),
+                n(a4,1.5f), n(c4,0.5f), n(e4,0.5f), n(a4,0.5f),
+                n(b4,1.5f), n(e4,0.5f), n(ab4,0.5f), n(b4,0.5f),
+                n(c5,1.5f), n(e4,0.5f), n(e5,0.5f), n(eb5,0.5f),
+                n(e5,0.5f), n(eb5,0.5f), n(e5,0.5f), n(b4,0.5f), n(d5,0.5f), n(c5,0.5f),
+                n(a4,1.5f), n(c4,0.5f), n(e4,0.5f), n(a4,0.5f),
+                n(b4,1.5f), n(e4,0.5f), n(c5,0.5f), n(b4,0.5f),
+                n(a4,3f),
+            ))),
+            // 8. 卡農（Pachelbel 正確旋律）
+            Song("卡農", "Pachelbel", 68, seq(68, listOf(
+                n(e5,1f), n(d5,1f), n(c5,1f), n(b4,1f),
+                n(a4,1f), n(g4,1f), n(a4,1f), n(b4,1f),
+                n(c5,1f), n(b4,1f), n(a4,1f), n(g4,1f),
+                n(f4,1f), n(e4,1f), n(f4,1f), n(g4,1f),
+                n(a4,0.5f), n(g4,0.5f), n(a4,0.5f), n(b4,0.5f), n(c5,0.5f), n(b4,0.5f), n(c5,0.5f), n(d5,0.5f),
+                n(e5,0.5f), n(d5,0.5f), n(e5,0.5f), n(c5,0.5f), n(d5,0.5f), n(c5,0.5f), n(d5,0.5f), n(b4,0.5f),
+                n(c5,0.5f), n(b4,0.5f), n(c5,0.5f), n(a4,0.5f), n(b4,0.5f), n(a4,0.5f), n(b4,0.5f), n(g4,0.5f),
+                n(a4,0.5f), n(g4,0.5f), n(a4,0.5f), n(f4,0.5f), n(g4,0.5f), n(f4,0.5f), n(g4,0.5f), n(a4,0.5f),
+            ))),
+            // 9. 兩隻老虎
+            Song("兩隻老虎", "French Folk", 130, seq(130, listOf(
+                n(c5,1f), n(d5,1f), n(e5,1f), n(c5,1f),
+                n(c5,1f), n(d5,1f), n(e5,1f), n(c5,1f),
+                n(e5,1f), n(f5,1f), n(g5,2f),
+                n(e5,1f), n(f5,1f), n(g5,2f),
+                n(g5,0.5f), n(a5,0.5f), n(g5,0.5f), n(f5,0.5f), n(e5,1f), n(c5,1f),
+                n(g5,0.5f), n(a5,0.5f), n(g5,0.5f), n(f5,0.5f), n(e5,1f), n(c5,1f),
+                n(c5,1f), n(g4,1f), n(c5,2f),
+                n(c5,1f), n(g4,1f), n(c5,2f),
+            ))),
+            // 10. 小步舞曲 G 大調
             Song("小步舞曲", "Bach", 120, seq(120, listOf(
-                d5 to 1f, g4 to 0.5f, a4 to 0.5f, b4 to 0.5f, c5 to 0.5f, d5 to 1f,
-                g4 to 1f, g4 to 1f,
-                e5 to 1f, c5 to 0.5f, d5 to 0.5f, e5 to 0.5f, f5 to 0.5f, g5 to 1f,
-                g4 to 1f, g4 to 1f,
-                c5 to 1f, d5 to 0.5f, c5 to 0.5f, b4 to 0.5f, a4 to 0.5f,
-                b4 to 1f, c5 to 0.5f, b4 to 0.5f, a4 to 0.5f, g4 to 0.5f,
-                f4 to 1f, g4 to 0.5f, a4 to 0.5f, b4 to 0.5f, g4 to 0.5f,
-                a4 to 3f,
-            ))),
-            Song("卡農", "Pachelbel", 72, seq(72, listOf(
-                f5 to 1f, e5 to 1f, d5 to 1f, c5 to 1f,
-                b4 to 1f, a4 to 1f, b4 to 1f, c5 to 1f,
-                f5 to 1f, e5 to 1f, d5 to 1f, c5 to 1f,
-                b4 to 1f, a4 to 1f, b4 to 1f, c5 to 1f,
-                d5 to 0.5f, c5 to 0.5f, d5 to 0.5f, e5 to 0.5f,
-                c5 to 0.5f, b4 to 0.5f, c5 to 0.5f, d5 to 0.5f,
-                b4 to 0.5f, a4 to 0.5f, b4 to 0.5f, c5 to 0.5f,
-                a4 to 0.5f, g4 to 0.5f, a4 to 0.5f, b4 to 0.5f,
-            ))),
-            Song("夢中的婚禮", "Clayderman", 66, seq(66, listOf(
-                e5 to 0.5f, d5 to 0.5f, e5 to 0.5f, d5 to 0.5f, e5 to 0.5f, b4 to 0.5f, d5 to 0.5f, c5 to 0.5f,
-                a4 to 2f, c4 to 0.5f, e4 to 0.5f, a4 to 0.5f, b4 to 0.5f,
-                e4 to 2f, e4 to 0.5f, g4 to 0.5f, b4 to 0.5f, c5 to 0.5f,
-                a4 to 2f,
-                e5 to 0.5f, d5 to 0.5f, e5 to 0.5f, d5 to 0.5f, e5 to 0.5f, b4 to 0.5f, d5 to 0.5f, c5 to 0.5f,
-                a4 to 2f, c4 to 0.5f, e4 to 0.5f, a4 to 0.5f, b4 to 0.5f,
-                e4 to 2f,
-            ))),
-            Song("天空之城", "Hisaishi", 80, seq(80, listOf(
-                a4 to 0.5f, b4 to 0.5f, c5 to 1.5f, b4 to 0.5f, c5 to 1f, e5 to 1f,
-                b4 to 3f, e4 to 0.5f, e4 to 0.5f,
-                a4 to 1.5f, g4 to 0.5f, a4 to 1f, c5 to 1f,
-                g4 to 3f,
-                f4 to 0.5f, f4 to 0.5f, e4 to 1.5f, c4 to 0.5f, e4 to 1f, f4 to 1f,
-                e4 to 3f,
-            ))),
-            Song("River Flows in You", "Yiruma", 68, seq(68, listOf(
-                a4 to 0.5f, b4 to 0.5f, a4 to 0.5f, e4 to 0.5f,
-                a4 to 0.5f, b4 to 0.5f, a4 to 0.5f, c5 to 0.5f,
-                b4 to 0.5f, a4 to 0.5f, g4 to 0.5f, a4 to 0.5f,
-                e4 to 2f,
-                a4 to 0.5f, b4 to 0.5f, a4 to 0.5f, e4 to 0.5f,
-                a4 to 0.5f, b4 to 0.5f, a4 to 0.5f, e5 to 0.5f,
-                d5 to 0.5f, c5 to 0.5f, b4 to 0.5f, a4 to 0.5f,
-                a4 to 2f,
+                n(d5,1f), n(g4,0.5f), n(a4,0.5f), n(b4,0.5f), n(c5,0.5f),
+                n(d5,1f), n(g4,1f), n(g4,1f),
+                n(e5,1f), n(c5,0.5f), n(d5,0.5f), n(e5,0.5f), n(f5,0.5f),
+                n(g5,1f), n(g4,1f), n(g4,1f),
+                n(c5,1f), n(d5,0.5f), n(c5,0.5f), n(b4,0.5f), n(a4,0.5f),
+                n(b4,1f), n(c5,0.5f), n(b4,0.5f), n(a4,0.5f), n(g4,0.5f),
+                n(a4,1f), n(b4,0.5f), n(a4,0.5f), n(g4,0.5f), n(fs4,0.5f),
+                n(g4,3f),
             ))),
         )
     }
@@ -827,6 +884,11 @@ class MusicPanelView(context: Context) : View(context) {
         val b = ((Color.blue(c1) * (1 - ratio) + Color.blue(c2) * ratio)).toInt()
         val a = ((Color.alpha(c1) * (1 - ratio) + Color.alpha(c2) * ratio)).toInt()
         return Color.argb(a, r, g, b)
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        destroy()
     }
 
     fun destroy() {
