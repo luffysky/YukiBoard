@@ -865,7 +865,7 @@ class MusicPanelView(context: Context) : View(context) {
                 n(a4,1.5f), n(g4,0.5f), n(a4,1f), n(c5,1f),
                 n(g4,3f),
             ))),
-            // 7. 夢中的婚禮（Für Elise 主題）
+            // 7. 乖乖聽話（Für Elise 主題）
             Song("乖乖聽話", "Beethoven", 72, seq(72, listOf(
                 n(e5,0.5f), n(eb5,0.5f), n(e5,0.5f), n(eb5,0.5f), n(e5,0.5f), n(b4,0.5f), n(d5,0.5f), n(c5,0.5f),
                 n(a4,1.5f), n(c4,0.5f), n(e4,0.5f), n(a4,0.5f),
@@ -908,6 +908,153 @@ class MusicPanelView(context: Context) : View(context) {
                 n(b4,1f), n(c5,0.5f), n(b4,0.5f), n(a4,0.5f), n(g4,0.5f),
                 n(a4,1f), n(b4,0.5f), n(a4,0.5f), n(g4,0.5f), n(fs4,0.5f),
                 n(g4,3f),
+            ))),
+            // 11. 搖籃曲 (Brahms)
+            Song("搖籃曲", "Brahms", 72, seq(72, listOf(
+                n(e5,0.5f), n(e5,1f), n(g5,1.5f), n(e5,0.5f), n(e5,1f), n(g5,1.5f),
+                n(e5,0.5f), n(g5,1f), n(c5+12,1f), n(b4+12,0.5f), n(a5,1.5f),
+                n(d5,0.5f), n(d5,1f), n(f5,1.5f), n(d5,0.5f), n(d5,1f), n(f5,1.5f),
+                n(d5,0.5f), n(f5,1f), n(b4+12,1f), n(a5,0.5f), n(g5,1.5f),
+            ))),
+            // 12. 倫敦鐵橋
+            Song("倫敦鐵橋", "English Folk", 120, seq(120, listOf(
+                n(g5,1f), n(a5,0.5f), n(g5,0.5f), n(f5,1f), n(e5,1f),
+                n(f5,1f), n(g5,1f), n(d5,2f),
+                n(e5,1f), n(f5,1f), n(f5,1f), n(g5,1f),
+                n(g5,1f), n(a5,0.5f), n(g5,0.5f), n(f5,1f), n(e5,1f),
+                n(f5,1f), n(g5,1f), n(d5,1f), n(d5,1f),
+                n(g5,1f), n(e5,1f), n(c5,2f),
+            ))),
+            // 13. 當我們同在一起
+            Song("當我們同在一起", "German Folk", 120, seq(120, listOf(
+                n(c5,1f), n(e5,1f), n(e5,1f), n(e5,1f), n(d5,1f), n(f5,1f),
+                n(f5,1f), n(f5,1f), n(e5,1f), n(g5,1f), n(g5,1f), n(g5,1f),
+                n(f5,1f), n(e5,1f), n(d5,1f), n(c5,2f),
+                n(d5,1f), n(d5,1f), n(d5,1f), n(d5,1f), n(d5,1f), n(e5,1f), n(f5,2f),
+                n(e5,1f), n(e5,1f), n(e5,1f), n(e5,1f), n(e5,1f), n(f5,1f), n(g5,2f),
+                n(c5,1f), n(e5,1f), n(e5,1f), n(e5,1f), n(d5,1f), n(f5,1f),
+                n(f5,1f), n(f5,1f), n(e5,1f), n(g5,1f), n(g5,1f), n(g5,1f),
+                n(f5,1f), n(e5,1f), n(d5,1f), n(c5,2f),
+            ))),
+            // 14. 小毛驢
+            Song("小毛驢", "Chinese Folk", 120, seq(120, listOf(
+                n(c5,1f), n(c5,0.5f), n(c5,0.5f), n(d5,1f), n(e5,1f),
+                n(e5,1f), n(d5,0.5f), n(e5,0.5f), n(f5,1f), n(e5,1f),
+                n(d5,1f), n(c5,0.5f), n(d5,0.5f), n(e5,1f), n(c5,1f),
+                n(d5,1f), n(c5,0.5f), n(d5,0.5f), n(e5,1f), n(d5,1f),
+                n(c5,1f), n(c5,0.5f), n(c5,0.5f), n(d5,1f), n(e5,1f),
+                n(e5,1f), n(d5,0.5f), n(e5,0.5f), n(f5,1f), n(e5,1f),
+                n(d5,1f), n(c5,0.5f), n(d5,0.5f), n(e5,1f), n(d5,1f),
+                n(c5,4f),
+            ))),
+            // 15. 世界真細小 (It's a Small World)
+            Song("世界真細小", "R. Sherman", 120, seq(120, listOf(
+                n(g4,1f), n(g4,0.5f), n(a4,0.5f), n(b4,1f), n(b4,1f),
+                n(b4,1f), n(b4,0.5f), n(c5,0.5f), n(d5,1f), n(d5,1f),
+                n(d5,1f), n(d5,0.5f), n(e5,0.5f), n(f5,1f), n(e5,1f),
+                n(d5,1f), n(c5,1f), n(b4,1f), n(g4,1f),
+                n(g4,1f), n(g4,0.5f), n(a4,0.5f), n(b4,1f), n(b4,1f),
+                n(b4,1f), n(a4,1f), n(a4,1f), n(a4,1f),
+                n(a4,1f), n(a4,0.5f), n(b4,0.5f), n(c5,1f), n(c5,1f),
+                n(c5,1f), n(b4,1f), n(a4,1f), n(b4,1f), n(g4,2f),
+            ))),
+            // 16. Do-Re-Mi (Sound of Music)
+            Song("Do-Re-Mi", "R. Rodgers", 130, seq(130, listOf(
+                n(c5,1.5f), n(d5,0.5f), n(e5,1.5f), n(c5,0.5f), n(e5,1f), n(c5,1f), n(e5,2f),
+                n(d5,1.5f), n(e5,0.5f), n(f5,0.5f), n(f5,0.5f), n(e5,0.5f), n(d5,0.5f), n(f5,4f),
+                n(e5,1.5f), n(f5,0.5f), n(g5,1.5f), n(e5,0.5f), n(g5,1f), n(e5,1f), n(g5,2f),
+                n(f5,1.5f), n(g5,0.5f), n(a5,0.5f), n(a5,0.5f), n(g5,0.5f), n(f5,0.5f), n(a5,4f),
+            ))),
+            // 17. 茉莉花
+            Song("茉莉花", "Chinese Traditional", 76, seq(76, listOf(
+                n(e5,1f), n(e5,1f), n(f5,1f), n(g5,1f), n(a5,1f), n(a5,1f), n(g5,2f),
+                n(e5,1f), n(e5,1f), n(f5,1f), n(g5,1f), n(g5,1f), n(f5,0.5f), n(e5,0.5f), n(f5,2f),
+                n(g5,1f), n(g5,1f), n(e5,1f), n(f5,1f), n(e5,1f), n(d5,1f), n(c5,2f),
+                n(d5,1f), n(e5,1f), n(d5,1f), n(c5,0.5f), n(d5,0.5f), n(e5,1f), n(d5,1f), n(c5,2f),
+            ))),
+            // 18. 小夜曲 (Schubert Serenade 主題)
+            Song("小夜曲", "Schubert", 66, seq(66, listOf(
+                n(d5,1f), n(d5,0.5f), n(d5,0.5f), n(f5,1.5f), n(e5,0.5f),
+                n(d5,1.5f), n(c5,0.5f), n(bb4,1.5f), n(a4,0.5f),
+                n(a4,1f), n(a4,0.5f), n(a4,0.5f), n(d5,1.5f), n(c5,0.5f),
+                n(bb4,1.5f), n(a4,0.5f), n(g4,2f),
+                n(g4,1f), n(g4,0.5f), n(g4,0.5f), n(bb4,1.5f), n(a4,0.5f),
+                n(g4,1.5f), n(f4,0.5f), n(e4,1.5f), n(d4,0.5f),
+                n(d4,4f),
+            ))),
+            // 19. 聖誕鈴聲 (Jingle Bells)
+            Song("聖誕鈴聲", "J. Pierpont", 140, seq(140, listOf(
+                n(e5,1f), n(e5,1f), n(e5,2f),
+                n(e5,1f), n(e5,1f), n(e5,2f),
+                n(e5,1f), n(g5,1f), n(c5,1f), n(d5,1f), n(e5,4f),
+                n(f5,1f), n(f5,1f), n(f5,1f), n(f5,1f),
+                n(f5,1f), n(e5,1f), n(e5,1f), n(e5,0.5f), n(e5,0.5f),
+                n(e5,1f), n(d5,1f), n(d5,1f), n(e5,1f), n(d5,2f), n(g5,2f),
+            ))),
+            // 20. 蝴蝶（胡桃鉗 Sugar Plum 主題簡化）
+            Song("糖梅仙子之舞", "Tchaikovsky", 100, seq(100, listOf(
+                n(e5,0.5f), n(eb5,0.5f), n(e5,0.5f), n(c5,0.5f),
+                n(a4,1f), n(e4,0.5f), n(a4,0.5f), n(c5,1f),
+                n(b4,0.5f), n(a4,0.5f), n(b4,0.5f), n(e5,0.5f),
+                n(d5,1f), n(c5,0.5f), n(b4,0.5f), n(a4,1f),
+                n(e5,0.5f), n(eb5,0.5f), n(e5,0.5f), n(c5,0.5f),
+                n(a4,1f), n(e4,0.5f), n(a4,0.5f), n(c5,1f),
+                n(b4,0.5f), n(c5,0.5f), n(d5,0.5f), n(e5,0.5f),
+                n(a5,2f),
+            ))),
+            // 21. 春神來了
+            Song("春神來了", "Chinese Folk", 100, seq(100, listOf(
+                n(e5,1f), n(e5,0.5f), n(d5,0.5f), n(c5,1f), n(d5,1f),
+                n(e5,1f), n(e5,1f), n(g5,2f),
+                n(a5,1f), n(g5,1f), n(e5,1f), n(g5,1f),
+                n(a5,1f), n(g5,1f), n(e5,2f),
+                n(d5,1f), n(d5,1f), n(e5,1f), n(d5,1f),
+                n(c5,1f), n(c5,1f), n(a4,2f),
+                n(c5,1f), n(d5,1f), n(e5,1f), n(d5,1f),
+                n(c5,4f),
+            ))),
+            // 22. 月光曲第一樂章 (Moonlight Sonata 簡化)
+            Song("月光曲", "Beethoven", 54, seq(54, listOf(
+                n(ab4,0.5f), n(c5,0.5f), n(e5,0.5f), n(ab4,0.5f), n(c5,0.5f), n(e5,0.5f),
+                n(ab4,0.5f), n(c5,0.5f), n(e5,0.5f), n(ab4,0.5f), n(c5,0.5f), n(e5,0.5f),
+                n(a4,0.5f), n(c5,0.5f), n(e5,0.5f), n(a4,0.5f), n(c5,0.5f), n(e5,0.5f),
+                n(a4,0.5f), n(c5,0.5f), n(e5,0.5f), n(a4,0.5f), n(c5,0.5f), n(e5,0.5f),
+                n(ab4,0.5f), n(b4,0.5f), n(e5,0.5f), n(ab4,0.5f), n(b4,0.5f), n(e5,0.5f),
+                n(ab4,0.5f), n(b4,0.5f), n(e5,0.5f), n(ab4,0.5f), n(b4,0.5f), n(e5,0.5f),
+                n(a4,0.5f), n(c5,0.5f), n(e5,0.5f), n(a4,0.5f), n(c5,0.5f), n(e5,0.5f),
+                n(a4,0.5f), n(c5,0.5f), n(e5,0.5f), n(a4,0.5f), n(c5,0.5f), n(e5,0.5f),
+            ))),
+            // 23. 野玫瑰 (Heidenröslein)
+            Song("野玫瑰", "Schubert", 100, seq(100, listOf(
+                n(c5,1f), n(e5,1f), n(g5,1f), n(g5,1f),
+                n(a5,0.5f), n(g5,0.5f), n(f5,1f), n(e5,2f),
+                n(d5,1f), n(e5,1f), n(f5,1f), n(f5,1f),
+                n(f5,0.5f), n(e5,0.5f), n(d5,1f), n(c5,2f),
+                n(c5,1f), n(e5,1f), n(g5,1f), n(g5,1f),
+                n(a5,0.5f), n(g5,0.5f), n(f5,1f), n(e5,2f),
+                n(f5,1f), n(e5,0.5f), n(d5,0.5f), n(c5,2f),
+            ))),
+            // 24. 大象（聖桑 動物狂歡節）
+            Song("大象", "Saint-Saëns", 60, seq(60, listOf(
+                n(c4,2f), n(e4,1f), n(g4,1f),
+                n(c5,2f), n(g4,1f), n(e4,1f),
+                n(c4,2f), n(d4,1f), n(e4,1f),
+                n(f4,4f),
+                n(e4,2f), n(g4,1f), n(b4,1f),
+                n(d5,2f), n(b4,1f), n(g4,1f),
+                n(e4,2f), n(f4,1f), n(e4,1f),
+                n(c4,4f),
+            ))),
+            // 25. 哆啦A夢 (主題曲副歌)
+            Song("哆啦A夢", "菊池俊輔", 140, seq(140, listOf(
+                n(f5,0.5f), n(g5,0.5f), n(a5,1f), n(g5,1f),
+                n(f5,0.5f), n(g5,0.5f), n(a5,1f), n(g5,1f),
+                n(f5,1f), n(d5,1f), n(f5,1f), n(e5,2f),
+                n(e5,0.5f), n(f5,0.5f), n(g5,1f), n(f5,1f),
+                n(e5,0.5f), n(f5,0.5f), n(g5,1f), n(f5,1f),
+                n(e5,1f), n(c5,1f), n(e5,1f), n(d5,2f),
+                n(d5,0.5f), n(e5,0.5f), n(f5,1f), n(e5,1f),
+                n(d5,1f), n(c5,1f), n(d5,1f), n(c5,2f),
             ))),
         )
     }
