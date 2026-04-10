@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 120
-        versionName "0.9.54"
+        versionCode 121
+        versionName "0.9.55"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,9 +82,8 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 新增 3 種打擊樂音色（鼓組/電子鼓/Beatbox）\n" +
-                    "- feat: 語音辨識混合語言模式（自動偵測中英日韓）\n" +
-                    "- feat: 共 10 種按鍵音色可選"
+                    "- fix: 手寫混合模式中文辨識失靈（score null 導致排序錯誤）\n" +
+                    "- fix: ML Kit null score 改用排名推算分數"
             }
         }
         debug {
@@ -93,9 +92,8 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 新增 3 種打擊樂音色（鼓組/電子鼓/Beatbox）\n" +
-                    "- feat: 語音辨識混合語言模式（自動偵測中英日韓）\n" +
-                    "- feat: 共 10 種按鍵音色可選"
+                    "- fix: 手寫混合模式中文辨識失靈（score null 導致排序錯誤）\n" +
+                    "- fix: ML Kit null score 改用排名推算分數"
             }
         }
     }

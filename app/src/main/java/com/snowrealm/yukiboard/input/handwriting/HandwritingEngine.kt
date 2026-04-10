@@ -136,8 +136,10 @@ class HandwritingEngine(private val context: Context) {
             recognizer.recognize(ink)
                 .addOnSuccessListener { result ->
                     synchronized(allCandidates) {
-                        result.candidates.forEach { c ->
-                            val score = c.score ?: 0f
+                        result.candidates.forEachIndexed { idx, c ->
+                            // ML Kit 中文模型常回傳 null score，用排名推算分數
+                            // 第 1 候選 = 1.0, 第 2 = 0.8, 第 3 = 0.6 ...
+                            val score = c.score ?: (1f - idx * 0.2f).coerceAtLeast(0.1f)
                             allCandidates.add(c.text to score)
                         }
                         remaining--
