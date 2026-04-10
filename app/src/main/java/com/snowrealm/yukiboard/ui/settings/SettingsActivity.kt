@@ -306,8 +306,8 @@ class SettingsActivity : AppCompatActivity() {
             animChildren += switchRow("按鍵音效", "按鍵時的聲音回饋", prefs.keySoundEnabled) { prefs.keySoundEnabled = it }
 
             // 按鍵音色選擇
-            val styleOptions = arrayOf("鋼琴 (Piano)", "木琴 (Marimba)", "柔和 (Soft)")
-            val styleValues = arrayOf("piano", "marimba", "soft")
+            val styleOptions = arrayOf("鋼琴 (Piano)", "木琴 (Marimba)", "柔和 (Soft)", "吉他 (Guitar)", "音樂盒 (Music Box)", "豎琴 (Harp)", "風琴 (Organ)")
+            val styleValues = arrayOf("piano", "marimba", "soft", "guitar", "music_box", "harp", "organ")
             val styleRow = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = android.view.Gravity.CENTER_VERTICAL
@@ -514,6 +514,7 @@ class SettingsActivity : AppCompatActivity() {
 
             // 語音引擎選擇
             inputChildren += speechEngineSelector()
+            inputChildren += speechLanguageSelector()
             inputChildren += switchRow("語音後處理", "AI 自動清除口語贅詞（嗯、那個…）", prefs.voicePostProcessEnabled) { prefs.voicePostProcessEnabled = it }
         })
 
@@ -2030,6 +2031,67 @@ class SettingsActivity : AppCompatActivity() {
         outer.addView(testStatus)
 
         return outer
+    }
+
+    /** 語音辨識語言選擇器 */
+    private fun speechLanguageSelector(): LinearLayout {
+        val langLabels = arrayOf(
+            "自動（依輸入模式）",
+            "混合語言（自動偵測）",
+            "中文（繁體）",
+            "英文",
+            "日文",
+            "韓文"
+        )
+        val langValues = arrayOf("auto", "mixed", "zh-TW", "en-US", "ja-JP", "ko-KR")
+        val currentIdx = langValues.indexOf(prefs.speechLanguage).coerceAtLeast(0)
+
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(dp(8), dp(6), dp(8), dp(6))
+        }
+
+        val textCol = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        textCol.addView(TextView(this).apply {
+            text = "語音辨識語言"
+            textSize = 14f
+            setTextColor(0xFFE8F4FF.toInt())
+        })
+        textCol.addView(TextView(this).apply {
+            text = "混合語言 = Whisper 自動偵測（中英日韓混說）"
+            textSize = 11f
+            setTextColor(0xFF6688AA.toInt())
+        })
+        row.addView(textCol)
+
+        val btnLabel = TextView(this).apply {
+            text = langLabels[currentIdx]
+            textSize = 13f
+            setTextColor(0xFF9ECFFF.toInt())
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xFF1A2744.toInt())
+                cornerRadius = dp(6).toFloat()
+                setStroke(1, 0xFF3A5580.toInt())
+            }
+            setOnClickListener {
+                val cur = langValues.indexOf(prefs.speechLanguage).coerceAtLeast(0)
+                android.app.AlertDialog.Builder(this@SettingsActivity, android.R.style.Theme_Material_Dialog_Alert)
+                    .setTitle("選擇語音辨識語言")
+                    .setSingleChoiceItems(langLabels, cur) { dialog, which ->
+                        prefs.speechLanguage = langValues[which]
+                        (it as TextView).text = langLabels[which]
+                        dialog.dismiss()
+                    }
+                    .show()
+            }
+        }
+        row.addView(btnLabel)
+        return row
     }
 
     private fun testFasterWhisperConnection(serverUrl: String, statusView: TextView) {

@@ -110,6 +110,7 @@ class YukiPreferences(context: Context) {
 
     /** 語音引擎：0=Android 內建, 1=OpenAI Whisper, 2=Faster-Whisper（自架） */
     var speechEngineType: Int by IntPref("speech_engine_type", 0)
+    var speechLanguage: String by StringPref("speech_language", "auto")  // auto/mixed/zh-TW/en-US/ja-JP/ko-KR
     /** Faster-Whisper Server URL */
     var fasterWhisperServerUrl: String
         get() = prefs.getString("faster_whisper_server_url", "https://stt.snowrealm.pet") ?: "https://stt.snowrealm.pet"

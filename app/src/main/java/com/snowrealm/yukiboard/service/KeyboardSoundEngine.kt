@@ -73,7 +73,7 @@ class KeyboardSoundEngine {
         put(" ", C4); put("⌫", DS3); put("\n", E3)
     }}
 
-    enum class ToneStyle { PIANO, MARIMBA, SOFT }
+    enum class ToneStyle { PIANO, MARIMBA, SOFT, GUITAR, MUSIC_BOX, HARP, ORGAN }
 
     fun playKeyTone(label: String, durationMs: Int = 85) {
         val freq = keyNotes[label] ?: keyNotes[label.lowercase()] ?: C4
@@ -81,18 +81,51 @@ class KeyboardSoundEngine {
     }
 
     private suspend fun playTone(freq: Float, durationMs: Int, style: ToneStyle) {
-        val numSamples = sampleRate * durationMs / 1000
+        val dur = when (style) {
+            ToneStyle.MUSIC_BOX -> durationMs + 60  // 音樂盒餘韻長
+            ToneStyle.HARP -> durationMs + 40
+            else -> durationMs
+        }
+        val numSamples = sampleRate * dur / 1000
         val samples = ShortArray(numSamples)
-        val attackSamples = sampleRate * when (style) { ToneStyle.PIANO -> 5; ToneStyle.MARIMBA -> 3; ToneStyle.SOFT -> 20 } / 1000
-        val decayRate = when (style) { ToneStyle.PIANO -> 6f; ToneStyle.MARIMBA -> 9f; ToneStyle.SOFT -> 1.5f }
+        val attackSamples = sampleRate * when (style) {
+            ToneStyle.PIANO -> 5; ToneStyle.MARIMBA -> 3; ToneStyle.SOFT -> 20
+            ToneStyle.GUITAR -> 2; ToneStyle.MUSIC_BOX -> 1; ToneStyle.HARP -> 8; ToneStyle.ORGAN -> 15
+        } / 1000
+        val decayRate = when (style) {
+            ToneStyle.PIANO -> 6f; ToneStyle.MARIMBA -> 9f; ToneStyle.SOFT -> 1.5f
+            ToneStyle.GUITAR -> 7f; ToneStyle.MUSIC_BOX -> 3f; ToneStyle.HARP -> 4f; ToneStyle.ORGAN -> 0.8f
+        }
 
         for (i in samples.indices) {
+            val t = i.toDouble() / sampleRate
             val s = sin(2.0 * PI * freq * i / sampleRate).toFloat()
             val harmonic = when (style) {
                 ToneStyle.PIANO -> s + sin(2.0 * PI * freq * 2 * i / sampleRate).toFloat() * 0.3f +
                     sin(2.0 * PI * freq * 3 * i / sampleRate).toFloat() * 0.1f
                 ToneStyle.MARIMBA -> s + sin(2.0 * PI * freq * 2 * i / sampleRate).toFloat() * 0.5f
                 ToneStyle.SOFT -> s
+                // 吉他：豐富泛音 + 輕微失諧模擬弦振動
+                ToneStyle.GUITAR -> s +
+                    sin(2.0 * PI * freq * 2 * i / sampleRate).toFloat() * 0.4f +
+                    sin(2.0 * PI * freq * 3 * i / sampleRate).toFloat() * 0.2f +
+                    sin(2.0 * PI * freq * 4 * i / sampleRate).toFloat() * 0.08f +
+                    sin(2.0 * PI * freq * 1.001 * i / sampleRate).toFloat() * 0.05f  // 微失諧
+                // 音樂盒：高頻泛音突出 + 金屬感
+                ToneStyle.MUSIC_BOX ->
+                    sin(2.0 * PI * freq * 2 * i / sampleRate).toFloat() * 0.6f +  // 二倍頻為主
+                    s * 0.3f +
+                    sin(2.0 * PI * freq * 3 * i / sampleRate).toFloat() * 0.25f +
+                    sin(2.0 * PI * freq * 5 * i / sampleRate).toFloat() * 0.1f     // 高泛音亮度
+                // 豎琴：柔和泛音 + 緩起音
+                ToneStyle.HARP -> s +
+                    sin(2.0 * PI * freq * 2 * i / sampleRate).toFloat() * 0.25f +
+                    sin(2.0 * PI * freq * 3 * i / sampleRate).toFloat() * 0.08f
+                // 風琴：奇次泛音為主（管風琴特徵）
+                ToneStyle.ORGAN -> s +
+                    sin(2.0 * PI * freq * 3 * i / sampleRate).toFloat() * 0.3f +
+                    sin(2.0 * PI * freq * 5 * i / sampleRate).toFloat() * 0.15f +
+                    sin(2.0 * PI * freq * 7 * i / sampleRate).toFloat() * 0.05f
             }
             val env = if (i < attackSamples) i.toFloat() / attackSamples
             else exp(-decayRate * (i - attackSamples).toFloat() / (numSamples - attackSamples))
@@ -112,7 +145,7 @@ class KeyboardSoundEngine {
             .setBufferSizeInBytes(bufSize).setTransferMode(AudioTrack.MODE_STATIC).build()
         track.write(samples, 0, samples.size)
         track.play()
-        delay(durationMs.toLong() + 15)
+        delay(dur.toLong() + 15)
         track.stop(); track.release()
     }
 

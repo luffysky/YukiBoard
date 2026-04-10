@@ -353,9 +353,13 @@ class YukiBoardIMEService : InputMethodService() {
             // 按鍵音效
             if (prefs.keySoundEnabled) {
                 keySoundEngine?.defaultStyle = when (prefs.keySoundStyle) {
-                    "marimba" -> KeyboardSoundEngine.ToneStyle.MARIMBA
-                    "soft"    -> KeyboardSoundEngine.ToneStyle.SOFT
-                    else      -> KeyboardSoundEngine.ToneStyle.PIANO
+                    "marimba"   -> KeyboardSoundEngine.ToneStyle.MARIMBA
+                    "soft"      -> KeyboardSoundEngine.ToneStyle.SOFT
+                    "guitar"    -> KeyboardSoundEngine.ToneStyle.GUITAR
+                    "music_box" -> KeyboardSoundEngine.ToneStyle.MUSIC_BOX
+                    "harp"      -> KeyboardSoundEngine.ToneStyle.HARP
+                    "organ"     -> KeyboardSoundEngine.ToneStyle.ORGAN
+                    else        -> KeyboardSoundEngine.ToneStyle.PIANO
                 }
                 keySoundEngine?.volumeScale = prefs.keySoundVolume
                 keySoundEngine?.playKeyTone(label)
@@ -1990,11 +1994,17 @@ class YukiBoardIMEService : InputMethodService() {
         }
         voiceOverlay?.show(engineName)
 
-        // 中文一律用 zh-TW（繁體優先）
-        val localeHint = when (inputRouter.inputMode) {
-            com.snowrealm.yukiboard.input.router.InputMode.JAPANESE -> "ja-JP"
-            com.snowrealm.yukiboard.input.router.InputMode.KOREAN -> "ko-KR"
-            else -> "zh-TW"
+        // 語言選擇：auto=依輸入模式推斷, mixed=不指定(引擎自動偵測), 其餘=指定語言
+        val speechLang = prefs.speechLanguage
+        val localeHint = when (speechLang) {
+            "auto" -> when (inputRouter.inputMode) {
+                com.snowrealm.yukiboard.input.router.InputMode.JAPANESE -> "ja-JP"
+                com.snowrealm.yukiboard.input.router.InputMode.KOREAN -> "ko-KR"
+                com.snowrealm.yukiboard.input.router.InputMode.ENGLISH -> "en-US"
+                else -> "zh-TW"
+            }
+            "mixed" -> ""  // 空字串 = 不指定，引擎自動偵測
+            else -> speechLang
         }
 
         keyboardView.voiceListeningLocale = "auto"
@@ -2017,7 +2027,7 @@ class YukiBoardIMEService : InputMethodService() {
                 keyboardView.voiceListeningLocale = null
                 if (result.isNotEmpty() && prefs.voicePostProcessEnabled) {
                     voiceOverlay?.showFinal("整理中…")
-                    val lang = if (inputRouter.inputMode == com.snowrealm.yukiboard.input.router.InputMode.ENGLISH) "en" else "zh-TW"
+                    val lang = localeHint  // 與辨識使用相同語言設定（空字串=混合模式）
                     voicePostProcessor?.process(result, lang) { cleaned ->
                         voiceOverlay?.showFinal(cleaned)
                     }

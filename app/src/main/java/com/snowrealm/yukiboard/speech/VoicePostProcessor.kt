@@ -26,8 +26,8 @@ class VoicePostProcessor(private val clawClient: ClawClient) {
         }
     }
 
-    private fun buildPrompt(raw: String, language: String) =
-        if (language.startsWith("zh")) """
+    private fun buildPrompt(raw: String, language: String) = when {
+        language.startsWith("zh") -> """
 清理以下語音辨識文字：
 1. 移除填充詞（嗯、那個、就是、然後、對對對）
 2. 移除明顯重複
@@ -37,12 +37,22 @@ class VoicePostProcessor(private val clawClient: ClawClient) {
 6. 只輸出處理後文字
 
 原始文字：$raw""".trimIndent()
-        else """Clean up this voice transcription:
+        language.isBlank() -> """
+清理以下多語言語音辨識文字：
+1. 移除各語言的填充詞（中：嗯/那個/就是，英：um/uh/like，日：えーと/あの，韓：음/그）
+2. 移除重複，保留最後意圖
+3. 中文統一繁體，其他語言保持原文
+4. 保持語言切換的原有順序和語氣
+5. 只輸出處理後文字
+
+原始文字：$raw""".trimIndent()
+        else -> """Clean up this voice transcription:
 1. Remove filler words (um, uh, like, you know)
 2. Remove repetitions; keep final intent if speaker corrects themselves
 3. Keep original tone; output cleaned text only
 
 Raw: $raw""".trimIndent()
+    }
 
     fun destroy() { scope.cancel() }
 }

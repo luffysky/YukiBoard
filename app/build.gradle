@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 118
-        versionName "0.9.52"
+        versionCode 119
+        versionName "0.9.53"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,8 +82,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 設定頁音階對照表（可展開收合）\n" +
-                    "- fix: 手寫面板語言 tab 點選修復"
+                    "- feat: 語音辨識混合語言模式（自動偵測中英日韓）\n" +
+                    "- feat: 新增 4 種按鍵音色（吉他/音樂盒/豎琴/風琴）\n" +
+                    "- feat: 設定頁語音語言選擇器 + 音階對照表"
             }
         }
         debug {
@@ -92,8 +93,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 設定頁音階對照表（可展開收合）\n" +
-                    "- fix: 手寫面板語言 tab 點選修復"
+                    "- feat: 語音辨識混合語言模式（自動偵測中英日韓）\n" +
+                    "- feat: 新增 4 種按鍵音色（吉他/音樂盒/豎琴/風琴）\n" +
+                    "- feat: 設定頁語音語言選擇器 + 音階對照表"
             }
         }
     }
