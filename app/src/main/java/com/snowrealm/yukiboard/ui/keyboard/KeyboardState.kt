@@ -942,6 +942,133 @@ data class KeyboardState(
             )
         )
 
+        // =================================================================
+        // 語言套件鍵盤佈局（QWERTY + 語言專屬長按替代字元）
+        // =================================================================
+
+        /** 德文鍵盤 */
+        fun germanRows(): List<List<KeyModel>> = latinQwertyRows(
+            altE = listOf("é", "è", "ê", "ë"),
+            altA = listOf("ä", "à", "á", "â"),
+            altO = listOf("ö", "ó", "ò", "ô"),
+            altU = listOf("ü", "ú", "ù", "û"),
+            altS = listOf("ß", "š"),
+            altN = listOf("ñ"),
+            langLabel = "DE"
+        )
+
+        /** 法文鍵盤 */
+        fun frenchRows(): List<List<KeyModel>> = latinQwertyRows(
+            altE = listOf("é", "è", "ê", "ë"),
+            altA = listOf("à", "â", "æ", "á"),
+            altO = listOf("ô", "œ", "ó"),
+            altU = listOf("ù", "û", "ü", "ú"),
+            altS = listOf("ß"),
+            altN = listOf("ñ"),
+            altC = listOf("ç"),
+            altI = listOf("î", "ï", "í"),
+            altY = listOf("ÿ"),
+            langLabel = "FR"
+        )
+
+        /** 西班牙文鍵盤 */
+        fun spanishRows(): List<List<KeyModel>> = latinQwertyRows(
+            altE = listOf("é", "è", "ê"),
+            altA = listOf("á", "à", "â"),
+            altO = listOf("ó", "ò", "ô"),
+            altU = listOf("ú", "ù", "ü", "û"),
+            altS = listOf("ß"),
+            altN = listOf("ñ"),
+            altI = listOf("í", "ì", "î"),
+            langLabel = "ES",
+            periodAltChars = listOf("。", "¿", "¡", "…", "～")
+        )
+
+        /** 越南文鍵盤 */
+        fun vietnameseRows(): List<List<KeyModel>> = latinQwertyRows(
+            altE = listOf("è", "é", "ẻ", "ẽ", "ẹ", "ê", "ế", "ề", "ể", "ễ", "ệ"),
+            altA = listOf("à", "á", "ả", "ã", "ạ", "ă", "ắ", "ằ", "ẳ", "ẵ", "ặ", "â", "ấ", "ầ", "ẩ", "ẫ", "ậ"),
+            altO = listOf("ò", "ó", "ỏ", "õ", "ọ", "ô", "ố", "ồ", "ổ", "ỗ", "ộ", "ơ", "ớ", "ờ", "ở", "ỡ", "ợ"),
+            altU = listOf("ù", "ú", "ủ", "ũ", "ụ", "ư", "ứ", "ừ", "ử", "ữ", "ự"),
+            altD = listOf("đ"),
+            altI = listOf("ì", "í", "ỉ", "ĩ", "ị"),
+            altY = listOf("ỳ", "ý", "ỷ", "ỹ", "ỵ"),
+            langLabel = "VI"
+        )
+
+        /** 義大利文鍵盤 */
+        fun italianRows(): List<List<KeyModel>> = latinQwertyRows(
+            altE = listOf("è", "é", "ê"),
+            altA = listOf("à", "á", "â"),
+            altO = listOf("ò", "ó", "ô"),
+            altU = listOf("ù", "ú", "û"),
+            altI = listOf("ì", "í", "î"),
+            langLabel = "IT"
+        )
+
+        /** 共用拉丁字母 QWERTY 佈局產生器 */
+        private fun latinQwertyRows(
+            altE: List<String> = emptyList(),
+            altA: List<String> = emptyList(),
+            altO: List<String> = emptyList(),
+            altU: List<String> = emptyList(),
+            altS: List<String> = emptyList(),
+            altN: List<String> = emptyList(),
+            altC: List<String> = emptyList(),
+            altI: List<String> = emptyList(),
+            altY: List<String> = emptyList(),
+            altD: List<String> = emptyList(),
+            langLabel: String = "EN",
+            periodAltChars: List<String> = listOf("。", "！", "？", "…", "～", "·")
+        ): List<List<KeyModel>> = listOf(
+            // 數字行
+            listOf(
+                KeyModel.char("1"), KeyModel.char("2"), KeyModel.char("3"),
+                KeyModel.char("4"), KeyModel.char("5"), KeyModel.char("6"),
+                KeyModel.char("7"), KeyModel.char("8"), KeyModel.char("9"),
+                KeyModel.char("0")
+            ),
+            listOf(
+                KeyModel.char("q"), KeyModel.char("w"),
+                KeyModel.char("e", altChars = altE),
+                KeyModel.char("r"), KeyModel.char("t"),
+                KeyModel.char("y", altChars = altY),
+                KeyModel.char("u", altChars = altU),
+                KeyModel.char("i", altChars = altI),
+                KeyModel.char("o", altChars = altO),
+                KeyModel.char("p")
+            ),
+            listOf(
+                KeyModel.char("a", altChars = altA),
+                KeyModel.char("s", altChars = altS),
+                KeyModel.char("d", altChars = altD),
+                KeyModel.char("f"), KeyModel.char("g"),
+                KeyModel.char("h"), KeyModel.char("j"), KeyModel.char("k"),
+                KeyModel.char("l")
+            ),
+            listOf(
+                KeyModel.special("⇧", KeyboardView.KEYCODE_SHIFT, widthWeight = 1.5f),
+                KeyModel.char("z"), KeyModel.char("x"),
+                KeyModel.char("c", altChars = altC),
+                KeyModel.char("v"), KeyModel.char("b"),
+                KeyModel.char("n", altChars = altN),
+                KeyModel.char("m"),
+                KeyModel.special("⌫", KeyboardView.KEYCODE_DELETE, widthWeight = 1.5f)
+            ),
+            listOf(
+                KeyModel.special("Ctrl", KeyboardView.KEYCODE_CTRL, widthWeight = 0.8f),
+                KeyModel.special("Tab", KeyboardView.KEYCODE_TAB, widthWeight = 0.8f),
+                KeyModel.special("?123", KeyboardView.KEYCODE_SWITCH_NUMBERS, widthWeight = 1.0f),
+                KeyModel.special("切換", KeyboardView.KEYCODE_SWITCH_LANG, widthWeight = 1.0f),
+                KeyModel.special(",", KeyboardView.KEYCODE_COMMA, altChars = listOf("，", "、", "；", "：", "「", "」")),
+                KeyModel.special(" ", KeyboardView.KEYCODE_SPACE, widthWeight = 1.5f),
+                KeyModel.special(".", KeyboardView.KEYCODE_PERIOD, altChars = periodAltChars),
+                KeyModel.special("🎤", KeyboardView.KEYCODE_VOICE, widthWeight = 0.8f),
+                KeyModel.special("✍", KeyboardView.KEYCODE_HANDWRITING, widthWeight = 0.8f),
+                KeyModel.special("↵", KeyboardView.KEYCODE_ENTER, widthWeight = 1.3f)
+            )
+        )
+
         /**
          * 橫向開發者模式主鍵盤：符號 + 運算子（工具在側邊面板）
          */

@@ -8,6 +8,8 @@ import android.graphics.RectF
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.OvershootInterpolator
+import com.snowrealm.yukiboard.input.langpack.LanguagePack
+import com.snowrealm.yukiboard.input.langpack.LanguagePackManager
 import com.snowrealm.yukiboard.input.router.InputMode
 import com.snowrealm.yukiboard.theme.KeyboardTheme
 import kotlin.math.atan2
@@ -70,23 +72,39 @@ class RadialLanguageMenu(
         style = Paint.Style.STROKE
     }
 
-    // 8 個選項：7 語言 + Emoji
     data class SectorItem(
         val option: LanguageOption,
         val icon: String,
         val label: String
     )
 
-    private val items = listOf(
-        SectorItem(LanguageOption.Language(InputMode.AUTO), "⚡", "自動"),
-        SectorItem(LanguageOption.Language(InputMode.ENGLISH), "EN", "English"),
-        SectorItem(LanguageOption.Language(InputMode.BOPOMOFO), "注", "注音"),
-        SectorItem(LanguageOption.Language(InputMode.PINYIN), "拼", "拼音"),
-        SectorItem(LanguageOption.Language(InputMode.CANGJIE), "倉", "倉頡"),
-        SectorItem(LanguageOption.Language(InputMode.JAPANESE), "あ", "日本語"),
-        SectorItem(LanguageOption.Language(InputMode.KOREAN), "한", "한국어"),
-        SectorItem(LanguageOption.Emoji, "😀", "Emoji"),
-    )
+    /**
+     * 動態建構語言選項：
+     * - 自動（固定）
+     * - 從 LanguagePackManager 已啟用的輸入法列表取得
+     * - Emoji（固定）
+     */
+    private val items: List<SectorItem> = buildItems(context)
+
+    private fun buildItems(ctx: Context): List<SectorItem> {
+        val result = mutableListOf<SectorItem>()
+        // 固定：自動模式
+        result.add(SectorItem(LanguageOption.Language(InputMode.AUTO), "⚡", "自動"))
+
+        // 從 LanguagePackManager 取得已啟用的輸入法
+        val mgr = LanguagePackManager.getInstance(ctx)
+        val enabled = mgr.getEnabledInputMethods()
+        for (pack in enabled) {
+            val mode = try {
+                InputMode.valueOf(pack.inputModeName)
+            } catch (_: Exception) { continue }
+            result.add(SectorItem(LanguageOption.Language(mode), pack.icon, pack.displayName))
+        }
+
+        // 固定：Emoji
+        result.add(SectorItem(LanguageOption.Emoji, "😀", "Emoji"))
+        return result
+    }
 
     private val sectorCount = items.size
     private val sweepAngle = 360f / sectorCount

@@ -20,6 +20,7 @@ import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import kotlinx.coroutines.*
+import androidx.lifecycle.lifecycleScope
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import com.snowrealm.yukiboard.R
@@ -663,6 +664,7 @@ class SettingsActivity : AppCompatActivity() {
         root.addView(buildBackgroundCard())
         root.addView(buildAppearanceCard())
         root.addView(buildLanguageCard())
+        root.addView(buildLanguagePackCard())
 
         // ═══════════════════════════════════════════════════════
         // 輸入法測試
@@ -1898,6 +1900,150 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         card.addView(group)
+        return card
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 語言套件管理卡片
+    // ─────────────────────────────────────────────────────────
+
+    private fun buildLanguagePackCard(): LinearLayout {
+        val card = simpleCard(tr("語言套件 / Language Packs"))
+        val langPackMgr = com.snowrealm.yukiboard.input.langpack.LanguagePackManager.getInstance(this)
+        val allPacks = com.snowrealm.yukiboard.input.langpack.LanguagePack.ALL
+        val contentLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(4), 0, dp(4), dp(8))
+        }
+
+        fun refreshContent() {
+            contentLayout.removeAllViews()
+
+            // ── 已啟用的輸入法 ──
+            val enabledTitle = TextView(this).apply {
+                text = tr("已啟用的輸入法")
+                setTextColor(0xFF90CAF9.toInt())
+                textSize = 13f
+                setPadding(dp(8), dp(8), 0, dp(4))
+            }
+            contentLayout.addView(enabledTitle)
+
+            val enabledIds = langPackMgr.getEnabledInputMethods().map { it.id }.toSet()
+            for (pack in allPacks) {
+                if (!langPackMgr.isInstalled(pack.id)) continue
+
+                val row = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+                    setPadding(dp(8), dp(6), dp(8), dp(6))
+                }
+
+                val cb = android.widget.CheckBox(this).apply {
+                    isChecked = pack.id in enabledIds
+                    buttonTintList = android.content.res.ColorStateList.valueOf(0xFF64B5F6.toInt())
+                    setOnCheckedChangeListener { _, checked ->
+                        langPackMgr.toggleInputMethod(pack.id, checked)
+                    }
+                }
+                row.addView(cb)
+
+                val label = TextView(this).apply {
+                    text = "${pack.icon} ${pack.displayName}"
+                    setTextColor(0xFFE0E8F0.toInt())
+                    textSize = 14f
+                    setPadding(dp(8), 0, 0, 0)
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                }
+                row.addView(label)
+
+                // 內建語言不顯示刪除按鈕
+                if (!langPackMgr.isBuiltin(pack.id)) {
+                    val delBtn = TextView(this).apply {
+                        text = tr("移除")
+                        setTextColor(0xFFEF5350.toInt())
+                        textSize = 12f
+                        setPadding(dp(8), dp(4), dp(8), dp(4))
+                        setOnClickListener {
+                            langPackMgr.uninstall(pack.id)
+                            langPackMgr.toggleInputMethod(pack.id, false)
+                            refreshContent()
+                        }
+                    }
+                    row.addView(delBtn)
+                }
+
+                contentLayout.addView(row)
+            }
+
+            // ── 可下載的語言套件 ──
+            val available = langPackMgr.getAvailablePacks()
+            if (available.isNotEmpty()) {
+                val downloadTitle = TextView(this).apply {
+                    text = tr("可下載的語言套件")
+                    setTextColor(0xFF90CAF9.toInt())
+                    textSize = 13f
+                    setPadding(dp(8), dp(16), 0, dp(4))
+                }
+                contentLayout.addView(downloadTitle)
+
+                for (pack in available) {
+                    val row = LinearLayout(this).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = android.view.Gravity.CENTER_VERTICAL
+                        setPadding(dp(8), dp(6), dp(8), dp(6))
+                    }
+
+                    val info = TextView(this).apply {
+                        text = "${pack.icon} ${pack.displayName} (${pack.nativeName})"
+                        setTextColor(0xFFB0BEC5.toInt())
+                        textSize = 14f
+                        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                    }
+                    row.addView(info)
+
+                    val sizeInfo = TextView(this).apply {
+                        text = "${pack.dictWordCount / 1000}K 詞"
+                        setTextColor(0xFF78909C.toInt())
+                        textSize = 11f
+                        setPadding(0, 0, dp(8), 0)
+                    }
+                    row.addView(sizeInfo)
+
+                    val dlBtn = TextView(this).apply {
+                        text = tr("下載")
+                        setTextColor(0xFF42A5F5.toInt())
+                        textSize = 13f
+                        setPadding(dp(12), dp(6), dp(12), dp(6))
+                        background = android.graphics.drawable.GradientDrawable().apply {
+                            setStroke(dp(1), 0xFF42A5F5.toInt())
+                            cornerRadius = dp(6).toFloat()
+                        }
+                        setOnClickListener { btn ->
+                            btn.isEnabled = false
+                            (btn as TextView).text = tr("下載中…")
+                            lifecycleScope.launch {
+                                val result = langPackMgr.downloadAndInstall(pack.id)
+                                if (result.success) {
+                                    langPackMgr.toggleInputMethod(pack.id, true)
+                                }
+                                android.widget.Toast.makeText(
+                                    this@SettingsActivity,
+                                    result.message,
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                                refreshContent()
+                            }
+                        }
+                    }
+                    row.addView(dlBtn)
+
+                    contentLayout.addView(row)
+                }
+            }
+        }
+
+        refreshContent()
+        card.addView(contentLayout)
         return card
     }
 

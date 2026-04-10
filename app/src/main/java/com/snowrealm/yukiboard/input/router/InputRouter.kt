@@ -36,6 +36,13 @@ class InputRouter(private val context: Context) {
     private val japaneseEngine: InputEngine by lazy { JapaneseInputEngine(context) }
     private val koreanEngine: InputEngine by lazy { KoreanInputEngine(context) }
 
+    // 語言套件引擎（lazy，僅在安裝對應套件後才載入）
+    private val germanEngine: InputEngine by lazy { LatinInputEngine(context, "de") }
+    private val frenchEngine: InputEngine by lazy { LatinInputEngine(context, "fr") }
+    private val spanishEngine: InputEngine by lazy { LatinInputEngine(context, "es") }
+    private val vietnameseEngine: InputEngine by lazy { LatinInputEngine(context, "vi") }
+    private val italianEngine: InputEngine by lazy { LatinInputEngine(context, "it") }
+
     val candidateManager = CandidateManager()
     val smartInput = SmartInputManager(context)
 
@@ -196,6 +203,11 @@ class InputRouter(private val context: Context) {
         InputMode.SPEED_CANGJIE -> speedCangjieEngine
         InputMode.JAPANESE -> japaneseEngine
         InputMode.KOREAN -> koreanEngine
+        InputMode.GERMAN -> germanEngine
+        InputMode.FRENCH -> frenchEngine
+        InputMode.SPANISH -> spanishEngine
+        InputMode.VIETNAMESE -> vietnameseEngine
+        InputMode.ITALIAN -> italianEngine
         // AUTO 模式預設注音引擎（使用者打英文時自動切換）
         InputMode.AUTO -> bopomofoEngine
     }
@@ -964,6 +976,11 @@ enum class InputMode(val displayName: String, val shortLabel: String) {
     SPEED_CANGJIE("速成", "速"),
     JAPANESE("日本語", "あ"),
     KOREAN("한국어", "한"),
+    GERMAN("Deutsch", "DE"),
+    FRENCH("Français", "FR"),
+    SPANISH("Español", "ES"),
+    VIETNAMESE("Tiếng Việt", "VI"),
+    ITALIAN("Italiano", "IT"),
     AUTO("自動", "A"),
 }
 

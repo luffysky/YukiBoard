@@ -3507,6 +3507,11 @@ class YukiBoardIMEService : InputMethodService() {
         com.snowrealm.yukiboard.input.router.InputMode.SPEED_CANGJIE -> KeyboardState.cangjieRows()
         com.snowrealm.yukiboard.input.router.InputMode.JAPANESE -> KeyboardState.japaneseRows()
         com.snowrealm.yukiboard.input.router.InputMode.KOREAN -> KeyboardState.koreanRows()
+        com.snowrealm.yukiboard.input.router.InputMode.GERMAN -> KeyboardState.germanRows()
+        com.snowrealm.yukiboard.input.router.InputMode.FRENCH -> KeyboardState.frenchRows()
+        com.snowrealm.yukiboard.input.router.InputMode.SPANISH -> KeyboardState.spanishRows()
+        com.snowrealm.yukiboard.input.router.InputMode.VIETNAMESE -> KeyboardState.vietnameseRows()
+        com.snowrealm.yukiboard.input.router.InputMode.ITALIAN -> KeyboardState.italianRows()
         // AUTO 模式：根據使用者選擇的佈局顯示
         com.snowrealm.yukiboard.input.router.InputMode.AUTO -> rowsForAutoLayout()
         else -> KeyboardState.defaultQwertyRows()

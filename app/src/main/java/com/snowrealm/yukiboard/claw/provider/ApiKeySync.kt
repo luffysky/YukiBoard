@@ -35,7 +35,7 @@ object ApiKeySync {
      * 上傳目前的 API Key 到雲端（加密）
      */
     suspend fun uploadKeys(context: Context): SyncResult = withContext(Dispatchers.IO) {
-        val auth = SnowRealmAuthClient(context)
+        val auth = SnowRealmAuthClient.getInstance(context)
         if (!auth.isLoggedIn) return@withContext SyncResult(false, "請先登入帳號")
         val userId = auth.currentUserId ?: return@withContext SyncResult(false, "無法取得用戶 ID")
         val token = auth.getToken() ?: return@withContext SyncResult(false, "Token 無效")
@@ -91,7 +91,7 @@ object ApiKeySync {
      * 從雲端下載 API Key 並還原到本機
      */
     suspend fun downloadKeys(context: Context): SyncResult = withContext(Dispatchers.IO) {
-        val auth = SnowRealmAuthClient(context)
+        val auth = SnowRealmAuthClient.getInstance(context)
         if (!auth.isLoggedIn) return@withContext SyncResult(false, "請先登入帳號")
         val userId = auth.currentUserId ?: return@withContext SyncResult(false, "無法取得用戶 ID")
         val token = auth.getToken() ?: return@withContext SyncResult(false, "Token 無效")

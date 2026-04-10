@@ -219,6 +219,14 @@ object SettingsStrings {
         "木琴" to "Marimba",
         "柔和" to "Soft",
         "選擇語言" to "Select Language",
+
+        // 語言套件
+        "語言套件 / Language Packs" to "Language Packs",
+        "已啟用的輸入法" to "Enabled Input Methods",
+        "可下載的語言套件" to "Available Language Packs",
+        "下載" to "Download",
+        "下載中…" to "Downloading…",
+        "移除" to "Remove",
     )
 
     // ═════════════════════════════════════════════════════════
@@ -396,6 +404,14 @@ object SettingsStrings {
         "木琴" to "マリンバ",
         "柔和" to "ソフト",
         "選擇語言" to "言語を選択",
+
+        // 語言套件
+        "語言套件 / Language Packs" to "言語パック",
+        "已啟用的輸入法" to "有効な入力方式",
+        "可下載的語言套件" to "ダウンロード可能な言語パック",
+        "下載" to "ダウンロード",
+        "下載中…" to "ダウンロード中…",
+        "移除" to "削除",
     )
 
     // ═════════════════════════════════════════════════════════
@@ -573,5 +589,13 @@ object SettingsStrings {
         "木琴" to "마림바",
         "柔和" to "소프트",
         "選擇語言" to "언어 선택",
+
+        // 語言套件
+        "語言套件 / Language Packs" to "언어 팩",
+        "已啟用的輸入法" to "활성화된 입력 방식",
+        "可下載的語言套件" to "다운로드 가능한 언어 팩",
+        "下載" to "다운로드",
+        "下載中…" to "다운로드 중…",
+        "移除" to "삭제",
     )
 }
