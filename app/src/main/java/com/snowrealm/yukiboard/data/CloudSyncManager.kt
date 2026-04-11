@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.util.Log
 import com.snowrealm.yukiboard.auth.SnowRealmAuthClient
 import com.snowrealm.yukiboard.input.dictionary.UserDictionary
+import com.snowrealm.yukiboard.input.smart.*
 import com.snowrealm.yukiboard.ui.settings.YukiPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -17,6 +18,14 @@ import kotlinx.serialization.json.*
  * 1. 偏好設定（YukiPreferences → user_settings）
  * 2. 自訂詞庫（UserDictionary → user_dictionary）
  * 3. 主題設定（背景/流光/角色 → user_themes）
+ * 4. 學習資料（7 種智慧輸入系統 → user_learning_data）
+ *    - AdaptiveDictionary（詞頻學習）
+ *    - PersonalDictionary（三層自動學詞）
+ *    - PhrasePredictor（bigram/trigram）
+ *    - SentencePredictor（整句預測）
+ *    - StyleProfiler（語氣風格）
+ *    - TypingHabitTracker（打字習慣）
+ *    - CorrectionLearnManager（校正學習）
  *
  * 帳號系統綁定 Insight Engine（SnowRealmAuthClient）。
  * 資料存 Supabase（SupabaseClient）。
@@ -56,7 +65,7 @@ class CloudSyncManager(private val context: Context) {
     // 上傳（本地 → 雲端）
     // ─────────────────────────────────────────
 
-    /** 全量上傳（偏好 + 詞庫 + 主題） */
+    /** 全量上傳（偏好 + 詞庫 + 主題 + 學習資料） */
     suspend fun uploadAll(): SyncResult = withContext(Dispatchers.IO) {
         val userId = auth.currentUserId ?: return@withContext SyncResult.NotLoggedIn
         if (!supabase.isConfigured) return@withContext SyncResult.Error("Supabase 未設定")
@@ -66,13 +75,15 @@ class CloudSyncManager(private val context: Context) {
             val r1 = uploadSettings(userId, token)
             val r2 = uploadDictionary(userId, token)
             val r3 = uploadThemes(userId, token)
+            val r4 = uploadLearningData(userId, token)
 
             metaPrefs.edit().putLong(PREF_LAST_SYNC, System.currentTimeMillis()).apply()
 
             val errors = listOfNotNull(
                 (r1 as? SyncResult.Error)?.message,
                 (r2 as? SyncResult.Error)?.message,
-                (r3 as? SyncResult.Error)?.message
+                (r3 as? SyncResult.Error)?.message,
+                (r4 as? SyncResult.Error)?.message
             )
             if (errors.isEmpty()) SyncResult.Success
             else SyncResult.Error("部分失敗: ${errors.joinToString()}")
@@ -137,7 +148,7 @@ class CloudSyncManager(private val context: Context) {
     // 下載（雲端 → 本地）
     // ─────────────────────────────────────────
 
-    /** 全量下載（偏好 + 詞庫 + 主題） */
+    /** 全量下載（偏好 + 詞庫 + 主題 + 學習資料） */
     suspend fun downloadAll(): SyncResult = withContext(Dispatchers.IO) {
         val userId = auth.currentUserId ?: return@withContext SyncResult.NotLoggedIn
         if (!supabase.isConfigured) return@withContext SyncResult.Error("Supabase 未設定")
@@ -147,13 +158,15 @@ class CloudSyncManager(private val context: Context) {
             val r1 = downloadSettings(userId, token)
             val r2 = downloadDictionary(userId, token)
             val r3 = downloadThemes(userId, token)
+            val r4 = downloadLearningData(userId, token)
 
             metaPrefs.edit().putLong(PREF_LAST_SYNC, System.currentTimeMillis()).apply()
 
             val errors = listOfNotNull(
                 (r1 as? SyncResult.Error)?.message,
                 (r2 as? SyncResult.Error)?.message,
-                (r3 as? SyncResult.Error)?.message
+                (r3 as? SyncResult.Error)?.message,
+                (r4 as? SyncResult.Error)?.message
             )
             if (errors.isEmpty()) SyncResult.Success
             else SyncResult.Error("部分失敗: ${errors.joinToString()}")
@@ -339,6 +352,306 @@ class CloudSyncManager(private val context: Context) {
         obj["bg_rotation"]?.jsonPrimitive?.intOrNull?.let { prefs.bgRotation = it }
         obj["keyboard_height_ratio"]?.jsonPrimitive?.floatOrNull?.let { prefs.keyboardHeightRatio = it }
         obj["toolbar_anim_style"]?.jsonPrimitive?.contentOrNull?.let { prefs.toolbarAnimStyle = it }
+    }
+
+    // ─────────────────────────────────────────
+    // 學習資料 上傳/下載
+    // ─────────────────────────────────────────
+
+    /** 上傳所有學習資料（7 種系統合併為一筆） */
+    private suspend fun uploadLearningData(userId: String, token: String?): SyncResult {
+        val data = buildJsonObject {
+            put("user_id", userId)
+            put("adaptive_dict", exportAdaptiveDict())
+            put("personal_dict", exportPersonalDict())
+            put("phrase_predict", exportPhrasePredict())
+            put("sentence_predict", exportSentencePredict())
+            put("style_profile", exportStyleProfile())
+            put("typing_habits", exportTypingHabits())
+            put("correction_learn", exportCorrectionLearn())
+            put("updated_at", JsonPrimitive("now()"))
+        }
+        return upsert("user_learning_data", "user_id=eq.$userId", data, token)
+    }
+
+    /** 下載所有學習資料 */
+    private suspend fun downloadLearningData(userId: String, token: String?): SyncResult {
+        val rows = supabase.select(
+            "user_learning_data",
+            "user_id=eq.$userId",
+            token
+        )
+        val row = rows?.firstOrNull()?.jsonObject ?: return SyncResult.Success
+
+        row["adaptive_dict"]?.jsonObject?.let { importAdaptiveDict(it) }
+        row["personal_dict"]?.jsonObject?.let { importPersonalDict(it) }
+        row["phrase_predict"]?.jsonObject?.let { importPhrasePredict(it) }
+        row["sentence_predict"]?.jsonObject?.let { importSentencePredict(it) }
+        row["style_profile"]?.jsonObject?.let { importStyleProfile(it) }
+        row["typing_habits"]?.jsonObject?.let { importTypingHabits(it) }
+        row["correction_learn"]?.jsonObject?.let { importCorrectionLearn(it) }
+
+        return SyncResult.Success
+    }
+
+    // ─────────────────────────────────────────
+    // AdaptiveDictionary ↔ JSON
+    // ─────────────────────────────────────────
+
+    private fun exportAdaptiveDict(): JsonObject {
+        val sp = context.getSharedPreferences("yukiboard_adaptive_dict", Context.MODE_PRIVATE)
+        val index = sp.getString("_ad_index", null)?.split(",") ?: return buildJsonObject {}
+        return buildJsonObject {
+            for (word in index) {
+                if (word.isBlank()) continue
+                sp.getString("ad_$word", null)?.let { put(word, it) }
+            }
+        }
+    }
+
+    private fun importAdaptiveDict(obj: JsonObject) {
+        val sp = context.getSharedPreferences("yukiboard_adaptive_dict", Context.MODE_PRIVATE)
+        val editor = sp.edit()
+        val keys = mutableListOf<String>()
+        for ((word, value) in obj) {
+            val raw = value.jsonPrimitive.contentOrNull ?: continue
+            editor.putString("ad_$word", raw)
+            keys.add(word)
+        }
+        // 合併既有 index
+        val existing = sp.getString("_ad_index", null)?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+        val merged = (existing + keys).distinct()
+        editor.putString("_ad_index", merged.joinToString(","))
+        editor.apply()
+    }
+
+    // ─────────────────────────────────────────
+    // PersonalDictionary ↔ JSON
+    // ─────────────────────────────────────────
+
+    private fun exportPersonalDict(): JsonObject {
+        val sp = context.getSharedPreferences("yukiboard_personal_dict", Context.MODE_PRIVATE)
+        val index = sp.getString("_pd_index", null)?.split(",") ?: return buildJsonObject {}
+        return buildJsonObject {
+            for (word in index) {
+                if (word.isBlank()) continue
+                sp.getString("pd_$word", null)?.let { put(word, it) }
+            }
+        }
+    }
+
+    private fun importPersonalDict(obj: JsonObject) {
+        val sp = context.getSharedPreferences("yukiboard_personal_dict", Context.MODE_PRIVATE)
+        val editor = sp.edit()
+        val keys = mutableListOf<String>()
+        for ((word, value) in obj) {
+            val raw = value.jsonPrimitive.contentOrNull ?: continue
+            editor.putString("pd_$word", raw)
+            keys.add(word)
+        }
+        val existing = sp.getString("_pd_index", null)?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+        val merged = (existing + keys).distinct()
+        editor.putString("_pd_index", merged.joinToString(","))
+        editor.apply()
+    }
+
+    // ─────────────────────────────────────────
+    // PhrasePredictor ↔ JSON
+    // ─────────────────────────────────────────
+
+    private fun exportPhrasePredict(): JsonObject {
+        val sp = context.getSharedPreferences("yukiboard_phrase_predict", Context.MODE_PRIVATE)
+        return buildJsonObject {
+            // bigrams
+            put("bi_keys", sp.getString("_bi_keys", "") ?: "")
+            val biKeys = sp.getString("_bi_keys", null)?.split(",") ?: emptyList()
+            for (key in biKeys) {
+                if (key.isBlank()) continue
+                sp.getString("bi_$key", null)?.let { put("bi_$key", it) }
+            }
+            // trigrams
+            put("tri_keys", sp.getString("_tri_keys", "") ?: "")
+            val triKeys = sp.getString("_tri_keys", null)?.split(",") ?: emptyList()
+            for (key in triKeys) {
+                if (key.isBlank()) continue
+                sp.getString("tri_$key", null)?.let { put("tri_$key", it) }
+            }
+        }
+    }
+
+    private fun importPhrasePredict(obj: JsonObject) {
+        val sp = context.getSharedPreferences("yukiboard_phrase_predict", Context.MODE_PRIVATE)
+        val editor = sp.edit()
+        for ((key, value) in obj) {
+            val raw = value.jsonPrimitive.contentOrNull ?: continue
+            if (key == "bi_keys") {
+                val existing = sp.getString("_bi_keys", null)?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+                val incoming = raw.split(",").filter { it.isNotBlank() }
+                editor.putString("_bi_keys", (existing + incoming).distinct().joinToString(","))
+            } else if (key == "tri_keys") {
+                val existing = sp.getString("_tri_keys", null)?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+                val incoming = raw.split(",").filter { it.isNotBlank() }
+                editor.putString("_tri_keys", (existing + incoming).distinct().joinToString(","))
+            } else {
+                // bi_xxx or tri_xxx — 直接覆寫（雲端為主）
+                editor.putString(key, raw)
+            }
+        }
+        editor.apply()
+    }
+
+    // ─────────────────────────────────────────
+    // SentencePredictor ↔ JSON
+    // ─────────────────────────────────────────
+
+    private fun exportSentencePredict(): JsonObject {
+        val sp = context.getSharedPreferences("yukiboard_sentence_predict", Context.MODE_PRIVATE)
+        return buildJsonObject {
+            put("sb_keys", sp.getString("_sb_keys", "") ?: "")
+            val sbKeys = sp.getString("_sb_keys", null)?.split(";;") ?: emptyList()
+            for (key in sbKeys) {
+                if (key.isBlank()) continue
+                sp.getString("sb_$key", null)?.let { put("sb_$key", it) }
+            }
+            put("sp_keys", sp.getString("_sp_keys", "") ?: "")
+            val spKeys = sp.getString("_sp_keys", null)?.split(";;") ?: emptyList()
+            for (key in spKeys) {
+                if (key.isBlank()) continue
+                sp.getString("sp_$key", null)?.let { put("sp_$key", it) }
+            }
+        }
+    }
+
+    private fun importSentencePredict(obj: JsonObject) {
+        val sp = context.getSharedPreferences("yukiboard_sentence_predict", Context.MODE_PRIVATE)
+        val editor = sp.edit()
+        for ((key, value) in obj) {
+            val raw = value.jsonPrimitive.contentOrNull ?: continue
+            if (key == "sb_keys") {
+                val existing = sp.getString("_sb_keys", null)?.split(";;")?.filter { it.isNotBlank() } ?: emptyList()
+                val incoming = raw.split(";;").filter { it.isNotBlank() }
+                editor.putString("_sb_keys", (existing + incoming).distinct().joinToString(";;"))
+            } else if (key == "sp_keys") {
+                val existing = sp.getString("_sp_keys", null)?.split(";;")?.filter { it.isNotBlank() } ?: emptyList()
+                val incoming = raw.split(";;").filter { it.isNotBlank() }
+                editor.putString("_sp_keys", (existing + incoming).distinct().joinToString(";;"))
+            } else {
+                editor.putString(key, raw)
+            }
+        }
+        editor.apply()
+    }
+
+    // ─────────────────────────────────────────
+    // StyleProfiler ↔ JSON
+    // ─────────────────────────────────────────
+
+    private fun exportStyleProfile(): JsonObject {
+        val sp = context.getSharedPreferences("yukiboard_style", Context.MODE_PRIVATE)
+        return buildJsonObject {
+            sp.getString("_suffixes", null)?.let { put("suffixes", it) }
+            sp.getString("_global_style", null)?.let { put("global_style", it) }
+            val appKeys = sp.getString("_app_keys", null)
+            appKeys?.let { put("app_keys", it) }
+            appKeys?.split(",")?.forEach { pkg ->
+                if (pkg.isBlank()) return@forEach
+                sp.getString("app_style_$pkg", null)?.let { put("app_style_$pkg", it) }
+            }
+        }
+    }
+
+    private fun importStyleProfile(obj: JsonObject) {
+        val sp = context.getSharedPreferences("yukiboard_style", Context.MODE_PRIVATE)
+        val editor = sp.edit()
+        obj["suffixes"]?.jsonPrimitive?.contentOrNull?.let { editor.putString("_suffixes", it) }
+        obj["global_style"]?.jsonPrimitive?.contentOrNull?.let { editor.putString("_global_style", it) }
+        obj["app_keys"]?.jsonPrimitive?.contentOrNull?.let { keys ->
+            val existing = sp.getString("_app_keys", null)?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+            val incoming = keys.split(",").filter { it.isNotBlank() }
+            editor.putString("_app_keys", (existing + incoming).distinct().joinToString(","))
+        }
+        for ((key, value) in obj) {
+            if (key.startsWith("app_style_")) {
+                value.jsonPrimitive.contentOrNull?.let { editor.putString(key, it) }
+            }
+        }
+        editor.apply()
+    }
+
+    // ─────────────────────────────────────────
+    // TypingHabitTracker ↔ JSON
+    // ─────────────────────────────────────────
+
+    private fun exportTypingHabits(): JsonObject {
+        val sp = context.getSharedPreferences("yukiboard_habits", Context.MODE_PRIVATE)
+        return buildJsonObject {
+            // period buckets
+            val periodKeys = sp.getString("_period_keys", null)
+            periodKeys?.let { put("period_keys", it) }
+            periodKeys?.split(",")?.forEach { key ->
+                if (key.isBlank()) return@forEach
+                sp.getString("period_$key", null)?.let { put("period_$key", it) }
+            }
+            // app buckets
+            val appKeys = sp.getString("_app_keys", null)
+            appKeys?.let { put("app_keys", it) }
+            appKeys?.split(",")?.forEach { key ->
+                if (key.isBlank()) return@forEach
+                sp.getString("app_$key", null)?.let { put("app_$key", it) }
+            }
+        }
+    }
+
+    private fun importTypingHabits(obj: JsonObject) {
+        val sp = context.getSharedPreferences("yukiboard_habits", Context.MODE_PRIVATE)
+        val editor = sp.edit()
+        obj["period_keys"]?.jsonPrimitive?.contentOrNull?.let { keys ->
+            val existing = sp.getString("_period_keys", null)?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+            val incoming = keys.split(",").filter { it.isNotBlank() }
+            editor.putString("_period_keys", (existing + incoming).distinct().joinToString(","))
+        }
+        obj["app_keys"]?.jsonPrimitive?.contentOrNull?.let { keys ->
+            val existing = sp.getString("_app_keys", null)?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+            val incoming = keys.split(",").filter { it.isNotBlank() }
+            editor.putString("_app_keys", (existing + incoming).distinct().joinToString(","))
+        }
+        for ((key, value) in obj) {
+            if (key.startsWith("period_") && key != "period_keys" ||
+                key.startsWith("app_") && key != "app_keys") {
+                value.jsonPrimitive.contentOrNull?.let { editor.putString(key, it) }
+            }
+        }
+        editor.apply()
+    }
+
+    // ─────────────────────────────────────────
+    // CorrectionLearnManager ↔ JSON
+    // ─────────────────────────────────────────
+
+    private fun exportCorrectionLearn(): JsonObject {
+        val sp = context.getSharedPreferences("yukiboard_correction_learn", Context.MODE_PRIVATE)
+        val index = sp.getString("_cl_index", null)?.split(",") ?: return buildJsonObject {}
+        return buildJsonObject {
+            for (typed in index) {
+                if (typed.isBlank()) continue
+                sp.getString("cl_$typed", null)?.let { put(typed, it) }
+            }
+        }
+    }
+
+    private fun importCorrectionLearn(obj: JsonObject) {
+        val sp = context.getSharedPreferences("yukiboard_correction_learn", Context.MODE_PRIVATE)
+        val editor = sp.edit()
+        val keys = mutableListOf<String>()
+        for ((typed, value) in obj) {
+            val raw = value.jsonPrimitive.contentOrNull ?: continue
+            editor.putString("cl_$typed", raw)
+            keys.add(typed)
+        }
+        val existing = sp.getString("_cl_index", null)?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+        val merged = (existing + keys).distinct()
+        editor.putString("_cl_index", merged.joinToString(","))
+        editor.apply()
     }
 
     // ─────────────────────────────────────────

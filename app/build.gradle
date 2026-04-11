@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 159
-        versionName "0.9.93"
+        versionCode 160
+        versionName "0.9.94"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,9 +82,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 背景旋轉統一修正（四區域邏輯一致）\n" +
-                    "- fix: 旋轉後用有效寬高計算 scale（90°/270° 不露邊界）\n" +
-                    "- fix: 功能列預覽加旋轉 + 整張塞入旋轉修正"
+                    "- feat: 雲端同步（偏好+詞庫+主題+7種學習資料）\n" +
+                    "- feat: 設定頁新增雲端同步卡片（上傳/下載/開關）\n" +
+                    "- feat: Supabase user_learning_data 表（綁 Insight 帳號）"
             }
         }
         debug {
@@ -93,9 +93,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 背景旋轉統一修正（四區域邏輯一致）\n" +
-                    "- fix: 旋轉後用有效寬高計算 scale（90°/270° 不露邊界）\n" +
-                    "- fix: 功能列預覽加旋轉 + 整張塞入旋轉修正"
+                    "- feat: 雲端同步（偏好+詞庫+主題+7種學習資料）\n" +
+                    "- feat: 設定頁新增雲端同步卡片（上傳/下載/開關）\n" +
+                    "- feat: Supabase user_learning_data 表（綁 Insight 帳號）"
             }
         }
     }

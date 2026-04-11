@@ -689,6 +689,11 @@ class SettingsActivity : AppCompatActivity() {
         })
 
         // ═══════════════════════════════════════════════════════
+        // 雲端同步（帳號綁定所有學習資料）
+        // ═══════════════════════════════════════════════════════
+        root.addView(buildCloudSyncCard())
+
+        // ═══════════════════════════════════════════════════════
         // 主題 / 外觀 / 語言 / 背景（獨立卡片）
         // ═══════════════════════════════════════════════════════
         root.addView(buildThemeCard())
@@ -832,6 +837,137 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
 
+        return card
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 雲端同步卡片
+    // ─────────────────────────────────────────────────────────
+
+    private fun buildCloudSyncCard(): LinearLayout {
+        val card = simpleCard(tr("雲端同步"))
+        val syncManager = com.snowrealm.yukiboard.data.CloudSyncManager.getInstance(this)
+        val auth = com.snowrealm.yukiboard.auth.SnowRealmAuthClient.getInstance(this)
+
+        // 帳號狀態
+        card.addView(TextView(this).apply {
+            text = if (auth.isLoggedIn) tr("已登入：${auth.currentDisplayName ?: auth.currentUserId}")
+                   else tr("尚未登入（請先在 Insight 登入）")
+            textSize = 13f
+            setTextColor(if (auth.isLoggedIn) 0xFF66BB6A.toInt() else 0xFFFF8A65.toInt())
+            setPadding(dp(4), dp(4), 0, dp(8))
+        })
+
+        // 同步開關
+        card.addView(switchRow(tr("啟用雲端同步"), tr("偏好/詞庫/主題/學習資料全量同步"), syncManager.isSyncEnabled) {
+            syncManager.setSyncEnabled(it)
+        })
+
+        // 上次同步時間
+        val lastSyncLabel = TextView(this).apply {
+            textSize = 12f
+            setTextColor(0xFF9E9E9E.toInt())
+            setPadding(dp(16), dp(4), 0, dp(8))
+            val ts = syncManager.lastSyncTime
+            text = if (ts > 0) {
+                val sdf = java.text.SimpleDateFormat("yyyy/MM/dd HH:mm", java.util.Locale.getDefault())
+                tr("上次同步：${sdf.format(java.util.Date(ts))}")
+            } else tr("尚未同步")
+        }
+        card.addView(lastSyncLabel)
+
+        // 同步內容說明
+        card.addView(TextView(this).apply {
+            text = tr("同步內容：偏好設定、自訂詞庫、主題、自適應字典、個人詞庫、語句預測、整句預測、語氣風格、打字習慣、校正學習")
+            textSize = 11f
+            setTextColor(0xFF78909C.toInt())
+            setPadding(dp(16), 0, dp(16), dp(8))
+        })
+
+        // 按鈕列
+        val btnRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(8), dp(4), dp(8), dp(4))
+        }
+
+        // 上傳按鈕
+        btnRow.addView(Button(this).apply {
+            text = tr("上傳到雲端")
+            textSize = 13f
+            setTextColor(0xFFFFFFFF.toInt())
+            background = GradientDrawable().apply {
+                setColor(0xFF1565C0.toInt())
+                cornerRadius = dp(8).toFloat()
+            }
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                setMargins(dp(4), 0, dp(4), 0)
+            }
+            setOnClickListener {
+                if (!auth.isLoggedIn) {
+                    android.widget.Toast.makeText(this@SettingsActivity, tr("請先登入 Insight 帳號"), android.widget.Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                isEnabled = false
+                text = tr("上傳中...")
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                    val result = syncManager.uploadAll()
+                    isEnabled = true
+                    text = tr("上傳到雲端")
+                    val msg = when (result) {
+                        is com.snowrealm.yukiboard.data.CloudSyncManager.SyncResult.Success -> tr("上傳成功")
+                        is com.snowrealm.yukiboard.data.CloudSyncManager.SyncResult.NotLoggedIn -> tr("未登入")
+                        is com.snowrealm.yukiboard.data.CloudSyncManager.SyncResult.Error -> result.message
+                    }
+                    android.widget.Toast.makeText(this@SettingsActivity, msg, android.widget.Toast.LENGTH_SHORT).show()
+                    // 更新同步時間
+                    val ts = syncManager.lastSyncTime
+                    if (ts > 0) {
+                        val sdf = java.text.SimpleDateFormat("yyyy/MM/dd HH:mm", java.util.Locale.getDefault())
+                        lastSyncLabel.text = tr("上次同步：${sdf.format(java.util.Date(ts))}")
+                    }
+                }
+            }
+        })
+
+        // 下載按鈕
+        btnRow.addView(Button(this).apply {
+            text = tr("從雲端下載")
+            textSize = 13f
+            setTextColor(0xFFFFFFFF.toInt())
+            background = GradientDrawable().apply {
+                setColor(0xFF2E7D32.toInt())
+                cornerRadius = dp(8).toFloat()
+            }
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                setMargins(dp(4), 0, dp(4), 0)
+            }
+            setOnClickListener {
+                if (!auth.isLoggedIn) {
+                    android.widget.Toast.makeText(this@SettingsActivity, tr("請先登入 Insight 帳號"), android.widget.Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                isEnabled = false
+                text = tr("下載中...")
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                    val result = syncManager.downloadAll()
+                    isEnabled = true
+                    text = tr("從雲端下載")
+                    val msg = when (result) {
+                        is com.snowrealm.yukiboard.data.CloudSyncManager.SyncResult.Success -> tr("下載成功，重啟鍵盤生效")
+                        is com.snowrealm.yukiboard.data.CloudSyncManager.SyncResult.NotLoggedIn -> tr("未登入")
+                        is com.snowrealm.yukiboard.data.CloudSyncManager.SyncResult.Error -> result.message
+                    }
+                    android.widget.Toast.makeText(this@SettingsActivity, msg, android.widget.Toast.LENGTH_SHORT).show()
+                    val ts = syncManager.lastSyncTime
+                    if (ts > 0) {
+                        val sdf = java.text.SimpleDateFormat("yyyy/MM/dd HH:mm", java.util.Locale.getDefault())
+                        lastSyncLabel.text = tr("上次同步：${sdf.format(java.util.Date(ts))}")
+                    }
+                }
+            }
+        })
+
+        card.addView(btnRow)
         return card
     }
 

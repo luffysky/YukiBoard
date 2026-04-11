@@ -70,3 +70,36 @@ CREATE POLICY "user_themes_insert" ON user_themes FOR INSERT
 
 CREATE POLICY "user_themes_update" ON user_themes FOR UPDATE
     USING (auth.uid()::text = user_id OR user_id = current_setting('request.jwt.claims', true)::json->>'userId');
+
+-- ────────────────────────────────────────────
+-- 4. 學習資料同步（7 種智慧輸入系統）
+-- ────────────────────────────────────────────
+-- adaptive_dict    — 自適應字典（詞頻學習）
+-- personal_dict    — 個人詞庫（三層自動學詞）
+-- phrase_predict   — 語句預測（bigram/trigram）
+-- sentence_predict — 整句預測（句子 bigram + 片段接續）
+-- style_profile    — 語氣風格（語尾詞 + App 維度風格分數）
+-- typing_habits    — 打字習慣（時段/App 詞頻 + 速度）
+-- correction_learn — 校正學習（接受/拒絕統計）
+CREATE TABLE IF NOT EXISTS user_learning_data (
+    user_id           TEXT PRIMARY KEY,
+    adaptive_dict     JSONB NOT NULL DEFAULT '{}',
+    personal_dict     JSONB NOT NULL DEFAULT '{}',
+    phrase_predict    JSONB NOT NULL DEFAULT '{}',
+    sentence_predict  JSONB NOT NULL DEFAULT '{}',
+    style_profile     JSONB NOT NULL DEFAULT '{}',
+    typing_habits     JSONB NOT NULL DEFAULT '{}',
+    correction_learn  JSONB NOT NULL DEFAULT '{}',
+    updated_at        TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE user_learning_data ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "user_learning_data_select" ON user_learning_data FOR SELECT
+    USING (auth.uid()::text = user_id OR user_id = current_setting('request.jwt.claims', true)::json->>'userId');
+
+CREATE POLICY "user_learning_data_insert" ON user_learning_data FOR INSERT
+    WITH CHECK (auth.uid()::text = user_id OR user_id = current_setting('request.jwt.claims', true)::json->>'userId');
+
+CREATE POLICY "user_learning_data_update" ON user_learning_data FOR UPDATE
+    USING (auth.uid()::text = user_id OR user_id = current_setting('request.jwt.claims', true)::json->>'userId');
