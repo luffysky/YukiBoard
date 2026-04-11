@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 134
-        versionName "0.9.68"
+        versionCode 135
+        versionName "0.9.69"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,12 +82,11 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 面板輸入修復（字典/學習面板可直接打字搜尋）\n" +
-                    "- feat: 日文即時候選字（打字時顯示漢字候選）\n" +
-                    "- feat: 設定頁多語言擴充（德/法/西/越/義）\n" +
-                    "- feat: 系統語言自動偵測（Locale → 預設設定語言）\n" +
-                    "- feat: 5 語言詞庫擴充（2700-2900 詞）\n" +
-                    "- fix: 面板動態上移（有搜尋框自動不擋鍵盤）"
+                    "- refactor: 語言系統動態化（新增語言只需 LanguagePack + 詞庫）\n" +
+                    "- refactor: InputRouter 動態引擎載入\n" +
+                    "- refactor: KeyboardState 從 LanguagePack altChars 生成佈局\n" +
+                    "- feat: 設定頁 9 語言切換（含 Locale 自動偵測）\n" +
+                    "- feat: 面板輸入修復 + 日文即時候選字"
             }
         }
         debug {
@@ -96,12 +95,11 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 面板輸入修復（字典/學習面板可直接打字搜尋）\n" +
-                    "- feat: 日文即時候選字（打字時顯示漢字候選）\n" +
-                    "- feat: 設定頁多語言擴充（德/法/西/越/義）\n" +
-                    "- feat: 系統語言自動偵測（Locale → 預設設定語言）\n" +
-                    "- feat: 5 語言詞庫擴充（2700-2900 詞）\n" +
-                    "- fix: 面板動態上移（有搜尋框自動不擋鍵盤）"
+                    "- refactor: 語言系統動態化（新增語言只需 LanguagePack + 詞庫）\n" +
+                    "- refactor: InputRouter 動態引擎載入\n" +
+                    "- refactor: KeyboardState 從 LanguagePack altChars 生成佈局\n" +
+                    "- feat: 設定頁 9 語言切換（含 Locale 自動偵測）\n" +
+                    "- feat: 面板輸入修復 + 日文即時候選字"
             }
         }
     }

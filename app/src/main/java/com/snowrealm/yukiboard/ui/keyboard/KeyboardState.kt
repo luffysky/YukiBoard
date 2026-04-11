@@ -947,64 +947,37 @@ data class KeyboardState(
         // =================================================================
 
         /** 德文鍵盤 */
-        fun germanRows(): List<List<KeyModel>> = latinQwertyRows(
-            altE = listOf("é", "è", "ê", "ë"),
-            altA = listOf("ä", "à", "á", "â"),
-            altO = listOf("ö", "ó", "ò", "ô"),
-            altU = listOf("ü", "ú", "ù", "û"),
-            altS = listOf("ß", "š"),
-            altN = listOf("ñ"),
-            langLabel = "DE"
-        )
+        fun germanRows(): List<List<KeyModel>> = latinRowsFromPack("de")
+        fun frenchRows(): List<List<KeyModel>> = latinRowsFromPack("fr")
+        fun spanishRows(): List<List<KeyModel>> = latinRowsFromPack("es")
+        fun vietnameseRows(): List<List<KeyModel>> = latinRowsFromPack("vi")
+        fun italianRows(): List<List<KeyModel>> = latinRowsFromPack("it")
 
-        /** 法文鍵盤 */
-        fun frenchRows(): List<List<KeyModel>> = latinQwertyRows(
-            altE = listOf("é", "è", "ê", "ë"),
-            altA = listOf("à", "â", "æ", "á"),
-            altO = listOf("ô", "œ", "ó"),
-            altU = listOf("ù", "û", "ü", "ú"),
-            altS = listOf("ß"),
-            altN = listOf("ñ"),
-            altC = listOf("ç"),
-            altI = listOf("î", "ï", "í"),
-            altY = listOf("ÿ"),
-            langLabel = "FR"
-        )
-
-        /** 西班牙文鍵盤 */
-        fun spanishRows(): List<List<KeyModel>> = latinQwertyRows(
-            altE = listOf("é", "è", "ê"),
-            altA = listOf("á", "à", "â"),
-            altO = listOf("ó", "ò", "ô"),
-            altU = listOf("ú", "ù", "ü", "û"),
-            altS = listOf("ß"),
-            altN = listOf("ñ"),
-            altI = listOf("í", "ì", "î"),
-            langLabel = "ES",
-            periodAltChars = listOf("。", "¿", "¡", "…", "～")
-        )
-
-        /** 越南文鍵盤 */
-        fun vietnameseRows(): List<List<KeyModel>> = latinQwertyRows(
-            altE = listOf("è", "é", "ẻ", "ẽ", "ẹ", "ê", "ế", "ề", "ể", "ễ", "ệ"),
-            altA = listOf("à", "á", "ả", "ã", "ạ", "ă", "ắ", "ằ", "ẳ", "ẵ", "ặ", "â", "ấ", "ầ", "ẩ", "ẫ", "ậ"),
-            altO = listOf("ò", "ó", "ỏ", "õ", "ọ", "ô", "ố", "ồ", "ổ", "ỗ", "ộ", "ơ", "ớ", "ờ", "ở", "ỡ", "ợ"),
-            altU = listOf("ù", "ú", "ủ", "ũ", "ụ", "ư", "ứ", "ừ", "ử", "ữ", "ự"),
-            altD = listOf("đ"),
-            altI = listOf("ì", "í", "ỉ", "ĩ", "ị"),
-            altY = listOf("ỳ", "ý", "ỷ", "ỹ", "ỵ"),
-            langLabel = "VI"
-        )
-
-        /** 義大利文鍵盤 */
-        fun italianRows(): List<List<KeyModel>> = latinQwertyRows(
-            altE = listOf("è", "é", "ê"),
-            altA = listOf("à", "á", "â"),
-            altO = listOf("ò", "ó", "ô"),
-            altU = listOf("ù", "ú", "û"),
-            altI = listOf("ì", "í", "î"),
-            langLabel = "IT"
-        )
+        /**
+         * 從 LanguagePack 動態生成拉丁字母鍵盤佈局。
+         * 新增語言只需在 LanguagePack.ALL 加一個 entry（含 altChars），
+         * 不需要在此處新增任何程式碼。
+         */
+        fun latinRowsFromPack(langId: String): List<List<KeyModel>> {
+            val pack = com.snowrealm.yukiboard.input.langpack.LanguagePack.getById(langId)
+            val alt = pack?.altChars ?: emptyMap()
+            val label = pack?.shortLabel ?: langId.uppercase()
+            val periodAlt = if (langId == "es") listOf("。", "¿", "¡", "…", "～") else listOf("。", "！", "？", "…", "～", "·")
+            return latinQwertyRows(
+                altE = alt['e'] ?: emptyList(),
+                altA = alt['a'] ?: emptyList(),
+                altO = alt['o'] ?: emptyList(),
+                altU = alt['u'] ?: emptyList(),
+                altS = alt['s'] ?: emptyList(),
+                altN = alt['n'] ?: emptyList(),
+                altC = alt['c'] ?: emptyList(),
+                altI = alt['i'] ?: emptyList(),
+                altY = alt['y'] ?: emptyList(),
+                altD = alt['d'] ?: emptyList(),
+                langLabel = label,
+                periodAltChars = periodAlt
+            )
+        }
 
         /** 共用拉丁字母 QWERTY 佈局產生器 */
         private fun latinQwertyRows(

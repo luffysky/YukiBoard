@@ -22,7 +22,7 @@ data class LanguagePack(
     val altChars: Map<Char, List<String>> = emptyMap()
 ) {
     /** 是否為拉丁字母語言（使用 LatinInputEngine + Trie 詞庫） */
-    val isLatinScript: Boolean get() = id in setOf("en", "de", "fr", "es", "vi", "it")
+    val isLatinScript: Boolean get() = id !in setOf("zh_bopomofo", "zh_pinyin", "zh_cangjie", "zh_speed", "ja", "ko")
 
     /** 對應的 InputMode name */
     val inputModeName: String get() = when (id) {

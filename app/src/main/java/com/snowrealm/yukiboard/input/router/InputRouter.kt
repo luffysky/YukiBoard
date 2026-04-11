@@ -36,12 +36,10 @@ class InputRouter(private val context: Context) {
     private val japaneseEngine: InputEngine by lazy { JapaneseInputEngine(context) }
     private val koreanEngine: InputEngine by lazy { KoreanInputEngine(context) }
 
-    // 語言套件引擎（lazy，僅在安裝對應套件後才載入）
-    private val germanEngine: InputEngine by lazy { LatinInputEngine(context, "de") }
-    private val frenchEngine: InputEngine by lazy { LatinInputEngine(context, "fr") }
-    private val spanishEngine: InputEngine by lazy { LatinInputEngine(context, "es") }
-    private val vietnameseEngine: InputEngine by lazy { LatinInputEngine(context, "vi") }
-    private val italianEngine: InputEngine by lazy { LatinInputEngine(context, "it") }
+    // 語言套件引擎（動態，僅在使用對應語言時才 lazy 載入）
+    private val latinEngines = mutableMapOf<String, InputEngine>()
+    private fun getLatinEngine(langId: String): InputEngine =
+        latinEngines.getOrPut(langId) { LatinInputEngine(context, langId) }
 
     val candidateManager = CandidateManager()
     val smartInput = SmartInputManager(context)
@@ -203,13 +201,10 @@ class InputRouter(private val context: Context) {
         InputMode.SPEED_CANGJIE -> speedCangjieEngine
         InputMode.JAPANESE -> japaneseEngine
         InputMode.KOREAN -> koreanEngine
-        InputMode.GERMAN -> germanEngine
-        InputMode.FRENCH -> frenchEngine
-        InputMode.SPANISH -> spanishEngine
-        InputMode.VIETNAMESE -> vietnameseEngine
-        InputMode.ITALIAN -> italianEngine
         // AUTO 模式預設注音引擎（使用者打英文時自動切換）
         InputMode.AUTO -> bopomofoEngine
+        // 所有拉丁語系語言 → 動態載入引擎（新增語言不需改此處）
+        else -> getLatinEngine(mode.langId ?: mode.name.lowercase())
     }
 
     // -------------------------------------------------------------------------
@@ -968,20 +963,34 @@ enum class CandidateSource {
     HISTORY,      // 歷史候選字（前面詞段未選的）
 }
 
-enum class InputMode(val displayName: String, val shortLabel: String) {
-    ENGLISH("English", "EN"),
-    BOPOMOFO("注音", "注"),
-    PINYIN("拼音", "拼"),
-    CANGJIE("倉頡", "倉"),
-    SPEED_CANGJIE("速成", "速"),
-    JAPANESE("日本語", "あ"),
-    KOREAN("한국어", "한"),
-    GERMAN("Deutsch", "DE"),
-    FRENCH("Français", "FR"),
-    SPANISH("Español", "ES"),
-    VIETNAMESE("Tiếng Việt", "VI"),
-    ITALIAN("Italiano", "IT"),
-    AUTO("自動", "A"),
+enum class InputMode(val displayName: String, val shortLabel: String, val langId: String? = null) {
+    ENGLISH("English", "EN", "en"),
+    BOPOMOFO("注音", "注", "zh_bopomofo"),
+    PINYIN("拼音", "拼", "zh_pinyin"),
+    CANGJIE("倉頡", "倉", "zh_cangjie"),
+    SPEED_CANGJIE("速成", "速", "zh_speed"),
+    JAPANESE("日本語", "あ", "ja"),
+    KOREAN("한국어", "한", "ko"),
+    GERMAN("Deutsch", "DE", "de"),
+    FRENCH("Français", "FR", "fr"),
+    SPANISH("Español", "ES", "es"),
+    VIETNAMESE("Tiếng Việt", "VI", "vi"),
+    ITALIAN("Italiano", "IT", "it"),
+    AUTO("自動", "A");
+
+    companion object {
+        /**
+         * 從語言套件 ID 取得對應 InputMode。
+         * 若已有 enum entry 則返回，否則嘗試從 LanguagePack 建立對應。
+         * 新增語言不需修改此 enum —— 只要 LanguagePack 有定義即可。
+         */
+        fun fromLangId(langId: String): InputMode? =
+            entries.find { it.langId == langId }
+                ?: com.snowrealm.yukiboard.input.langpack.LanguagePack.getById(langId)?.let { pack ->
+                    // 動態語言：用最接近的 enum entry 或回傳 null（由外層處理）
+                    entries.find { it.name == pack.inputModeName }
+                }
+    }
 }
 
 /**
