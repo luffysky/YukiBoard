@@ -238,14 +238,11 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
      * @param file 影片檔案路徑
      */
     fun setVideoBackground(file: File) {
-        // 保留 path/type 以便 resume() 能重建
-        val savePath = file.absolutePath
         clearBackground()
         currentType = BackgroundType.VIDEO
-        currentLoadedPath = savePath
+        currentLoadedPath = file.absolutePath
 
-        // 使用 Uri.fromFile — 與原始可用版本一致，避免 setDataSource(String) 的權限問題
-        val fileUri = Uri.fromFile(file)
+        val filePath = file.absolutePath
 
         val tv = TextureView(context).apply {
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
@@ -254,26 +251,22 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
         tv.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
             override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) {
                 try {
-                    val mp = MediaPlayer()
-                    mp.setDataSource(context, fileUri)
-                    mp.setSurface(Surface(st))
-                    mp.isLooping = true
-                    mp.setVolume(0f, 0f)
-                    mp.setOnErrorListener { _, what, extra ->
-                        android.util.Log.e("KeyboardBgView", "MediaPlayer error: what=$what extra=$extra")
-                        releaseMediaPlayer()
-                        true
+                    val mp = MediaPlayer().apply {
+                        setDataSource(filePath)
+                        setSurface(Surface(st))
+                        isLooping = true
+                        setVolume(0f, 0f)
+                        setOnPreparedListener { player ->
+                            this@KeyboardBackgroundView.videoWidth = player.videoWidth
+                            this@KeyboardBackgroundView.videoHeight = player.videoHeight
+                            applyVideoTransform()
+                            player.start()
+                        }
+                        prepareAsync()
                     }
-                    mp.setOnPreparedListener { player ->
-                        this@KeyboardBackgroundView.videoWidth = player.videoWidth
-                        this@KeyboardBackgroundView.videoHeight = player.videoHeight
-                        applyVideoTransform()
-                        player.start()
-                    }
-                    mp.prepareAsync()
                     mediaPlayer = mp
                 } catch (e: Exception) {
-                    android.util.Log.e("KeyboardBgView", "Video playback failed: $savePath", e)
+                    android.util.Log.e("KeyboardBgView", "Video playback failed: $filePath", e)
                 }
             }
 
@@ -281,9 +274,8 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
                 applyVideoTransform()
             }
             override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
-                // 回傳 false 保留 SurfaceTexture，IME 視窗隱藏/顯示時不需重建 MediaPlayer
-                mediaPlayer?.pause()
-                return false
+                releaseMediaPlayer()
+                return true
             }
             override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
         }
@@ -291,37 +283,6 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
         addView(tv)
         textureView = tv
         addOverlay()
-
-        // 若影片播放失敗，提取首幀作為靜態背景
-        bgScope.launch(Dispatchers.IO) {
-            kotlinx.coroutines.delay(3000)  // 等 3 秒看是否有 MediaPlayer
-            if (mediaPlayer == null && currentType == BackgroundType.VIDEO) {
-                // MediaPlayer 建立失敗，用首幀當靜態背景
-                try {
-                    val retriever = android.media.MediaMetadataRetriever()
-                    retriever.setDataSource(savePath)
-                    val frame = retriever.getFrameAtTime(0)
-                    retriever.release()
-                    if (frame != null) {
-                        withContext(Dispatchers.Main) {
-                            clearBackground()
-                            currentType = BackgroundType.IMAGE
-                            currentLoadedPath = savePath
-                            val iv = ImageView(context).apply {
-                                scaleType = ImageView.ScaleType.MATRIX
-                                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
-                            }
-                            iv.setImageBitmap(frame)
-                            initCenterCropMatrix(iv, frame.width, frame.height)
-                            addView(iv)
-                            imageView = iv
-                            addOverlay()
-                            android.util.Log.w("KeyboardBgView", "Video playback failed, using first frame as static background")
-                        }
-                    }
-                } catch (_: Exception) { }
-            }
-        }
     }
 
     /**

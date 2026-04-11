@@ -979,6 +979,7 @@ class SettingsActivity : AppCompatActivity() {
             bgPreviewLabel?.visibility = View.VISIBLE
             fullPreviewBgBitmap = null
             fullPreviewView?.invalidate()
+            sendBroadcast(Intent("com.snowrealm.yukiboard.ACTION_BG_UPDATED").setPackage(packageName))
             Toast.makeText(this, "已清除背景", Toast.LENGTH_SHORT).show()
         }.apply {
             layoutParams = LinearLayout.LayoutParams(0, dp(40), 0.7f).apply { marginStart = dp(4) }
@@ -1243,15 +1244,6 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun startVideoPreview(filePath: String) {
         val container = bgPreviewContainer ?: return
-
-        // 先驗證檔案可用
-        val file = java.io.File(filePath)
-        if (!file.exists() || file.length() == 0L) {
-            bgPreviewLabel?.text = tr("影片檔案不存在")
-            bgPreviewLabel?.visibility = View.VISIBLE
-            return
-        }
-
         val tv = android.view.TextureView(this).apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -1262,32 +1254,36 @@ class SettingsActivity : AppCompatActivity() {
 
         tv.surfaceTextureListener = object : android.view.TextureView.SurfaceTextureListener {
             override fun onSurfaceTextureAvailable(st: android.graphics.SurfaceTexture, w: Int, h: Int) {
-                try {
-                    val mp = android.media.MediaPlayer()
-                    mp.setDataSource(this@SettingsActivity, android.net.Uri.fromFile(java.io.File(filePath)))
-                    mp.setSurface(android.view.Surface(st))
-                    mp.isLooping = true
-                    mp.setVolume(0f, 0f)
-                    mp.setOnErrorListener { _, what, extra ->
-                        android.util.Log.e("SettingsBgVideo", "MediaPlayer error: what=$what extra=$extra")
-                        bgPreviewLabel?.text = tr("影片格式不支援")
-                        bgPreviewLabel?.visibility = View.VISIBLE
-                        true
+                activityScope.launch(Dispatchers.IO) {
+                    try {
+                        val mp = android.media.MediaPlayer().apply {
+                            setDataSource(filePath)
+                        }
+                        withContext(Dispatchers.Main) {
+                            try {
+                                mp.setSurface(android.view.Surface(st))
+                                mp.isLooping = true
+                                mp.setVolume(0f, 0f)
+                                mp.setOnPreparedListener { player ->
+                                    bgVideoWidth = player.videoWidth
+                                    bgVideoHeight = player.videoHeight
+                                    updateVideoPreviewTransform()
+                                    player.start()
+                                }
+                                mp.prepareAsync()
+                                bgVideoPlayer = mp
+                            } catch (e: Exception) {
+                                bgPreviewLabel?.text = tr("影片播放失敗")
+                                bgPreviewLabel?.visibility = View.VISIBLE
+                                try { mp.release() } catch (_: Exception) {}
+                            }
+                        }
+                    } catch (e: Exception) {
+                        withContext(Dispatchers.Main) {
+                            bgPreviewLabel?.text = tr("影片載入失敗")
+                            bgPreviewLabel?.visibility = View.VISIBLE
+                        }
                     }
-                    mp.setOnPreparedListener { player ->
-                        bgVideoWidth = player.videoWidth
-                        bgVideoHeight = player.videoHeight
-                        updateVideoPreviewTransform()
-                        player.start()
-                    }
-                    mp.prepareAsync()
-                    bgVideoPlayer = mp
-                } catch (e: Exception) {
-                    android.util.Log.e("SettingsBgVideo", "Video init failed: $filePath", e)
-                    bgPreviewLabel?.text = tr("影片載入失敗")
-                    bgPreviewLabel?.visibility = View.VISIBLE
-                    // fallback: 顯示影片第一幀
-                    showVideoFirstFrame(filePath)
                 }
             }
             override fun onSurfaceTextureSizeChanged(st: android.graphics.SurfaceTexture, w: Int, h: Int) {
@@ -3339,7 +3335,9 @@ class SettingsActivity : AppCompatActivity() {
             }
             prefs.useCustomBackground = true
             refreshBgPreview()
-            Toast.makeText(this, "背景已設定，重新開啟鍵盤生效", Toast.LENGTH_SHORT).show()
+            // 通知 IME 即時更新背景
+            sendBroadcast(Intent("com.snowrealm.yukiboard.ACTION_BG_UPDATED").setPackage(packageName))
+            Toast.makeText(this, "背景已設定", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
             Toast.makeText(this, "背景設定失敗: ${e.message}", Toast.LENGTH_SHORT).show()
         }
