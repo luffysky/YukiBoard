@@ -87,6 +87,9 @@ class ThemePanelView(context: Context) : View(context) {
     private var scaleCropRect: RectF? = null
     private var scaleFitRect: RectF? = null
 
+    // 旋轉按鈕
+    private var rotBtnRects = arrayOfNulls<RectF>(4)  // 0°, 90°, 180°, 270°
+
     // 透明鍵盤切換按鈕
     private var transparentToggleRect: RectF? = null
 
@@ -174,6 +177,7 @@ class ThemePanelView(context: Context) : View(context) {
         perKeyRects.clear()
         pickImgRect = null; pickVideoRect = null; clearBgRect = null
         scaleCropRect = null; scaleFitRect = null
+        rotBtnRects = arrayOfNulls(4)
         transparentToggleRect = null
         resetAllKeySizeRect = null; resetSelectedKeySizeRect = null
         sliders.forEach { it.trackRect.setEmpty() }
@@ -428,6 +432,27 @@ class ThemePanelView(context: Context) : View(context) {
         btnTextPaint.color = if (!isCrop) 0xFF111827.toInt() else theme.candidateTextColorInt
         canvas.drawText("整張塞入", rf.centerX(), rf.centerY() + btnTextPaint.textSize / 3f, btnTextPaint)
 
+        y += btnH + 8 * density
+
+        // 影片旋轉按鈕
+        textPaint.textAlign = Paint.Align.LEFT
+        canvas.drawText("影片旋轉:", pad + 4 * density, y + textPaint.textSize, textPaint)
+        textPaint.textAlign = Paint.Align.CENTER
+        y += textPaint.textSize + 4 * density
+
+        val rotLabels = arrayOf("0°", "90°", "180°", "270°")
+        val rotDegs = intArrayOf(0, 90, 180, 270)
+        val rotBtnW = (width - pad * 2 - 4 * density * 3) / 4f
+        for (i in 0..3) {
+            val rx = pad + i * (rotBtnW + 4 * density)
+            val rect = RectF(rx, y, rx + rotBtnW, y + btnH)
+            rotBtnRects[i] = rect
+            val selected = prefs.bgRotation == rotDegs[i]
+            cardPaint.color = if (selected) theme.effectiveAccentColor() else theme.keyColorInt
+            canvas.drawRoundRect(rect, btnR, btnR, cardPaint)
+            btnTextPaint.color = if (selected) 0xFF111827.toInt() else theme.candidateTextColorInt
+            canvas.drawText(rotLabels[i], rect.centerX(), rect.centerY() + btnTextPaint.textSize / 3f, btnTextPaint)
+        }
         y += btnH + 8 * density
 
         y = drawSliderRow(canvas, y, "水平位置 X", SliderId.OFFSET_X,
@@ -935,6 +960,18 @@ class ThemePanelView(context: Context) : View(context) {
                         prefs.bgScaleMode = 1
                         onBackgroundSettingsChanged?.invoke()
                         invalidate(); performClick(); return true
+                    }
+                }
+
+                // 旋轉按鈕
+                val rotDegs = intArrayOf(0, 90, 180, 270)
+                for (i in 0..3) {
+                    rotBtnRects[i]?.let {
+                        if (it.contains(cx, cy)) {
+                            prefs.bgRotation = rotDegs[i]
+                            onBackgroundSettingsChanged?.invoke()
+                            invalidate(); performClick(); return true
+                        }
                     }
                 }
 

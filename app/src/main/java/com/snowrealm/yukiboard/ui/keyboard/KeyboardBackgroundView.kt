@@ -56,6 +56,15 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
 
     private var currentType = BackgroundType.NONE
     private var currentLoadedPath: String? = null
+    private var currentLoadedLastModified: Long = 0L
+
+    // 旋轉角度（0, 90, 180, 270）
+    var bgRotation: Int = 0
+        set(value) {
+            field = value
+            applyVideoTransform()
+            applyOffset()
+        }
 
     // ── 雙指縮放相關 ──
     private var imageMatrix = Matrix()
@@ -110,6 +119,7 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
         clearBackground()
         currentType = BackgroundType.IMAGE
         currentLoadedPath = file.absolutePath
+        currentLoadedLastModified = file.lastModified()
 
         val iv = ImageView(context).apply {
             scaleType = ImageView.ScaleType.MATRIX
@@ -204,7 +214,7 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
         iv.imageMatrix = imageMatrix
     }
 
-    /** 影片背景的 transform（scale + offset） */
+    /** 影片背景的 transform（scale + offset + rotation） */
     private fun applyVideoTransform() {
         val tv = textureView ?: return
         val vw = tv.width.toFloat()
@@ -212,21 +222,34 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
         if (vw <= 0 || vh <= 0 || videoWidth <= 0 || videoHeight <= 0) return
 
         val matrix = Matrix()
+        val isRotated90or270 = bgRotation == 90 || bgRotation == 270
+        val effectiveW = if (isRotated90or270) videoHeight.toFloat() else videoWidth.toFloat()
+        val effectiveH = if (isRotated90or270) videoWidth.toFloat() else videoHeight.toFloat()
 
         if (scaleMode == 1) {
-            // 整張塞入：拉伸填滿
-            matrix.setScale(vw / videoWidth, vh / videoHeight)
+            matrix.setScale(vw / effectiveW, vh / effectiveH)
         } else {
-            // 保持比例：center-crop + offset
-            val scale = maxOf(vw / videoWidth, vh / videoHeight)
-            val scaledW = videoWidth * scale
-            val scaledH = videoHeight * scale
+            val scale = maxOf(vw / effectiveW, vh / effectiveH)
+            val scaledW = effectiveW * scale
+            val scaledH = effectiveH * scale
             val maxDx = (scaledW - vw).coerceAtLeast(0f)
             val maxDy = (scaledH - vh).coerceAtLeast(0f)
             val dx = -maxDx * offsetX
             val dy = -maxDy * offsetY
             matrix.setScale(scale, scale)
             matrix.postTranslate(dx, dy)
+        }
+
+        if (bgRotation != 0) {
+            val cx = vw / 2f
+            val cy = vh / 2f
+            val rotMatrix = Matrix()
+            rotMatrix.setRotate(bgRotation.toFloat(), cx, cy)
+            if (isRotated90or270) {
+                val extraScale = if (vw / vh > 1f) vw / vh else vh / vw
+                rotMatrix.postScale(extraScale, extraScale, cx, cy)
+            }
+            matrix.postConcat(rotMatrix)
         }
 
         tv.setTransform(matrix)
@@ -240,6 +263,7 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
         clearBackground()
         currentType = BackgroundType.VIDEO
         currentLoadedPath = file.absolutePath
+        currentLoadedLastModified = file.lastModified()
 
         val filePath = file.absolutePath
 
@@ -346,15 +370,17 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
             return false
         }
 
-        // 同一檔案才跳過重載（不同檔案要重新載入）
+        // 同一檔案才跳過重載（比對路徑 + lastModified）
         if (currentType == BackgroundType.VIDEO && isVideoFile(savedBg)
             && currentLoadedPath == savedBg.absolutePath
+            && currentLoadedLastModified == savedBg.lastModified()
             && mediaPlayer != null) {
             applyVideoTransform()
             return true
         }
         if (currentType == BackgroundType.IMAGE && isImageFile(savedBg) && imageView != null
-            && currentLoadedPath == savedBg.absolutePath) {
+            && currentLoadedPath == savedBg.absolutePath
+            && currentLoadedLastModified == savedBg.lastModified()) {
             applyOffset()
             return true
         }
@@ -379,6 +405,7 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
     fun clearBackground() {
         currentType = BackgroundType.NONE
         currentLoadedPath = null
+        currentLoadedLastModified = 0L
         releaseMediaPlayer()
         removeAllViews()
         imageView = null

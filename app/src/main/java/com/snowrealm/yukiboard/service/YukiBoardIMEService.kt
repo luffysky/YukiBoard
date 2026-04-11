@@ -58,6 +58,7 @@ import kotlinx.coroutines.withContext
 class YukiBoardIMEService : InputMethodService() {
 
     private lateinit var rootContainer: LinearLayout
+    private var outerFrame: FrameLayout? = null
     private lateinit var toolbarView: ToolbarView
     private lateinit var panelContainer: FrameLayout
     private lateinit var topPanelContainer: FrameLayout
@@ -589,6 +590,7 @@ class YukiBoardIMEService : InputMethodService() {
             prefs.floatingModeEnabled = !prefs.floatingModeEnabled
             // 重建前清理面板狀態，避免洩漏舊引用
             closePanel()
+            outerFrame = null
             backgroundView?.destroy()
             backgroundView = null
             setInputView(onCreateInputView())
@@ -621,13 +623,8 @@ class YukiBoardIMEService : InputMethodService() {
                 bgView.setImageBackground(savedBg)
             }
         }
-        // 背景用螢幕完整寬度，避免鍵盤縮窄時露出黑色
-        val screenW = resources.displayMetrics.widthPixels
-        keyboardContainer.addView(bgView, FrameLayout.LayoutParams(
-            screenW,
-            FrameLayout.LayoutParams.MATCH_PARENT
-        ))
         backgroundView = bgView
+        // bgView 稍後加進 outerFrame，不加進 keyboardContainer
 
         keyboardContainer.addView(keyboardView, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
@@ -766,7 +763,20 @@ class YukiBoardIMEService : InputMethodService() {
         val bgFilter = android.content.IntentFilter("com.snowrealm.yukiboard.ACTION_BG_UPDATED")
         registerReceiver(bgUpdateReceiver, bgFilter, android.content.Context.RECEIVER_NOT_EXPORTED)
 
-        return rootContainer
+        // 建立外層 FrameLayout，讓背景可以全螢幕
+        val frame = FrameLayout(this).also { outerFrame = it }
+        frame.addView(bgView, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ))
+        frame.addView(rootContainer, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            gravity = android.view.Gravity.BOTTOM
+        })
+
+        return frame
     }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
@@ -877,6 +887,7 @@ class YukiBoardIMEService : InputMethodService() {
         backgroundView?.scaleMode = prefs.bgScaleMode
         backgroundView?.offsetX = prefs.bgOffsetX
         backgroundView?.offsetY = prefs.bgOffsetY
+        backgroundView?.bgRotation = prefs.bgRotation
         val bgHas = backgroundView?.reloadFromStorage() ?: false
         val useCustomBg = prefs.useCustomBackground && bgHas
         // 透明模式也啟用玻璃按鍵風格
@@ -1590,6 +1601,7 @@ class YukiBoardIMEService : InputMethodService() {
                         bg.scaleMode = prefs.bgScaleMode
                         bg.offsetX = prefs.bgOffsetX
                         bg.offsetY = prefs.bgOffsetY
+                        bg.bgRotation = prefs.bgRotation
                         bg.reloadFromStorage()
                     }
                     keyboardView.invalidate()
@@ -1612,6 +1624,7 @@ class YukiBoardIMEService : InputMethodService() {
                 p.onKeyboardHeightChanged = {
                     // 重建前清理面板狀態
                     closePanel()
+                    outerFrame = null
                     backgroundView?.destroy()
                     backgroundView = null
                     setInputView(onCreateInputView())
@@ -2617,6 +2630,7 @@ class YukiBoardIMEService : InputMethodService() {
             prefs.floatingX = -1
             prefs.floatingY = -1
             closePanel()
+            this@YukiBoardIMEService.outerFrame = null
             backgroundView?.destroy()
             backgroundView = null
             setInputView(onCreateInputView())

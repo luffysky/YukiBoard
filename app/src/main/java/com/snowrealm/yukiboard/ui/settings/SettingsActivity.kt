@@ -881,6 +881,7 @@ class SettingsActivity : AppCompatActivity() {
     private var bgOverlayLabel: TextView? = null
     private var bgBtnCrop: android.widget.Button? = null
     private var bgBtnFit: android.widget.Button? = null
+    private var bgRotBtns = mutableListOf<android.widget.Button>()
     private var bgOffsetXSeekBar: SeekBar? = null
     private var bgOffsetXLabel: TextView? = null
     private var bgOffsetYSeekBar: SeekBar? = null
@@ -1079,6 +1080,48 @@ class SettingsActivity : AppCompatActivity() {
         scaleModeRow.addView(btnCrop)
         scaleModeRow.addView(btnFit)
         card.addView(scaleModeRow)
+
+        // ── 影片旋轉 ──
+        bgRotBtns.clear()
+        val rotationRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(12), dp(8), dp(12), dp(4))
+        }
+        rotationRow.addView(TextView(this).apply {
+            text = tr("影片旋轉:")
+            textSize = 12f
+            setTextColor(0xFF7FD8FF.toInt())
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.MATCH_PARENT
+            )
+        })
+        listOf(0 to "0°", 90 to "90°", 180 to "180°", 270 to "270°").forEach { (deg, label) ->
+            val btn = android.widget.Button(this).apply {
+                text = label
+                textSize = 11f
+                setPadding(dp(6), 0, dp(6), 0)
+                layoutParams = LinearLayout.LayoutParams(0, dp(32), 1f).apply { marginStart = dp(4) }
+                setOnClickListener {
+                    prefs.bgRotation = deg
+                    bgRotBtns.forEachIndexed { i, b ->
+                        val d = listOf(0, 90, 180, 270)[i]
+                        b.setTextColor(if (prefs.bgRotation == d) 0xFF111827.toInt() else 0xFFE8F4FF.toInt())
+                        b.setBackgroundColor(if (prefs.bgRotation == d) 0xFF7FD8FF.toInt() else 0xFF2A3A5C.toInt())
+                    }
+                    updateVideoPreviewTransform()
+                    fullPreviewView?.invalidate()
+                    sendBroadcast(Intent("com.snowrealm.yukiboard.ACTION_BG_UPDATED").setPackage(packageName))
+                }
+            }
+            val selected = prefs.bgRotation == deg
+            btn.setTextColor(if (selected) 0xFF111827.toInt() else 0xFFE8F4FF.toInt())
+            btn.setBackgroundColor(if (selected) 0xFF7FD8FF.toInt() else 0xFF2A3A5C.toInt())
+            bgRotBtns.add(btn)
+            rotationRow.addView(btn)
+        }
+        card.addView(rotationRow)
 
         // ── 背景位置 X 拉桿 ──
         val xLabel = TextView(this).apply {
@@ -1403,17 +1446,35 @@ class SettingsActivity : AppCompatActivity() {
         if (vw <= 0 || vh <= 0 || bgVideoWidth <= 0 || bgVideoHeight <= 0) return
 
         val matrix = android.graphics.Matrix()
+        val rotation = prefs.bgRotation
+        val isRotated90or270 = rotation == 90 || rotation == 270
+        val effectiveW = if (isRotated90or270) bgVideoHeight.toFloat() else bgVideoWidth.toFloat()
+        val effectiveH = if (isRotated90or270) bgVideoWidth.toFloat() else bgVideoHeight.toFloat()
+
         if (prefs.bgScaleMode == 1) {
-            matrix.setScale(vw / bgVideoWidth, vh / bgVideoHeight)
+            matrix.setScale(vw / effectiveW, vh / effectiveH)
         } else {
-            val scale = maxOf(vw / bgVideoWidth, vh / bgVideoHeight)
-            val scaledW = bgVideoWidth * scale
-            val scaledH = bgVideoHeight * scale
+            val scale = maxOf(vw / effectiveW, vh / effectiveH)
+            val scaledW = effectiveW * scale
+            val scaledH = effectiveH * scale
             val maxDx = (scaledW - vw).coerceAtLeast(0f)
             val maxDy = (scaledH - vh).coerceAtLeast(0f)
             matrix.setScale(scale, scale)
             matrix.postTranslate(-maxDx * prefs.bgOffsetX, -maxDy * prefs.bgOffsetY)
         }
+
+        if (rotation != 0) {
+            val cx = vw / 2f
+            val cy = vh / 2f
+            val rotMatrix = android.graphics.Matrix()
+            rotMatrix.setRotate(rotation.toFloat(), cx, cy)
+            if (isRotated90or270) {
+                val extraScale = if (vw / vh > 1f) vw / vh else vh / vw
+                rotMatrix.postScale(extraScale, extraScale, cx, cy)
+            }
+            matrix.postConcat(rotMatrix)
+        }
+
         tv.setTransform(matrix)
         tv.invalidate()
     }
@@ -3453,6 +3514,12 @@ class SettingsActivity : AppCompatActivity() {
         bgOffsetXLabel?.text = tr("水平位置 X: %d%%").format((prefs.bgOffsetX * 100).toInt())
         bgOffsetYSeekBar?.progress = (prefs.bgOffsetY * 100).toInt()
         bgOffsetYLabel?.text = tr("垂直位置 Y: %d%%").format((prefs.bgOffsetY * 100).toInt())
+        bgRotBtns.forEachIndexed { i, btn ->
+            val d = listOf(0, 90, 180, 270)[i]
+            val selected = prefs.bgRotation == d
+            btn.setTextColor(if (selected) 0xFF111827.toInt() else 0xFFE8F4FF.toInt())
+            btn.setBackgroundColor(if (selected) 0xFF7FD8FF.toInt() else 0xFF2A3A5C.toInt())
+        }
         updateBgPreviewMatrix()
         updateVideoPreviewTransform()
         fullPreviewView?.invalidate()
