@@ -876,6 +876,16 @@ class SettingsActivity : AppCompatActivity() {
     private var bgPreviewContainer: FrameLayout? = null
     private var bgVideoPlayer: android.media.MediaPlayer? = null
     private var bgVideoTexture: android.view.TextureView? = null
+    // 背景同步用的 UI 元件引用
+    private var bgOverlaySeekBar: SeekBar? = null
+    private var bgOverlayLabel: TextView? = null
+    private var bgBtnCrop: android.widget.Button? = null
+    private var bgBtnFit: android.widget.Button? = null
+    private var bgOffsetXSeekBar: SeekBar? = null
+    private var bgOffsetXLabel: TextView? = null
+    private var bgOffsetYSeekBar: SeekBar? = null
+    private var bgOffsetYLabel: TextView? = null
+    private var bgSyncReceiver: android.content.BroadcastReceiver? = null
     private var bgVideoWidth = 0
     private var bgVideoHeight = 0
     private var fullPreviewView: View? = null
@@ -1000,18 +1010,21 @@ class SettingsActivity : AppCompatActivity() {
             setTextColor(0xFF7FD8FF.toInt())
             setPadding(dp(12), dp(8), 0, dp(4))
         }
+        bgOverlayLabel = alphaLabel
         card.addView(alphaLabel)
 
         card.addView(SeekBar(this).apply {
             max = 255
             progress = prefs.bgOverlayAlpha
             setPadding(dp(12), dp(4), dp(12), dp(8))
+            bgOverlaySeekBar = this
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
                     prefs.bgOverlayAlpha = p
                     alphaLabel.text = tr("遮罩深度: %d%%").format((p * 100) / 255)
                     bgPreviewOverlay?.setBackgroundColor(android.graphics.Color.argb(p, 0, 0, 0))
                     fullPreviewView?.invalidate()
+                    sendBroadcast(Intent("com.snowrealm.yukiboard.ACTION_BG_UPDATED").setPackage(packageName))
                 }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
                 override fun onStopTrackingTouch(sb: SeekBar?) {}
@@ -1047,17 +1060,21 @@ class SettingsActivity : AppCompatActivity() {
             setPadding(dp(8), 0, dp(8), 0)
             layoutParams = LinearLayout.LayoutParams(0, dp(32), 1f).apply { marginStart = dp(4) }
         }
+        bgBtnCrop = btnCrop
+        bgBtnFit = btnFit
         btnCrop.setOnClickListener {
             prefs.bgScaleMode = 0
             btnCrop.setTextColor(0xFF111827.toInt()); btnCrop.setBackgroundColor(0xFF7FD8FF.toInt())
             btnFit.setTextColor(0xFFE8F4FF.toInt()); btnFit.setBackgroundColor(0xFF2A3A5C.toInt())
             updateBgPreviewMatrix(); updateVideoPreviewTransform(); fullPreviewView?.invalidate()
+            sendBroadcast(Intent("com.snowrealm.yukiboard.ACTION_BG_UPDATED").setPackage(packageName))
         }
         btnFit.setOnClickListener {
             prefs.bgScaleMode = 1
             btnFit.setTextColor(0xFF111827.toInt()); btnFit.setBackgroundColor(0xFF7FD8FF.toInt())
             btnCrop.setTextColor(0xFFE8F4FF.toInt()); btnCrop.setBackgroundColor(0xFF2A3A5C.toInt())
             updateBgPreviewMatrix(); updateVideoPreviewTransform(); fullPreviewView?.invalidate()
+            sendBroadcast(Intent("com.snowrealm.yukiboard.ACTION_BG_UPDATED").setPackage(packageName))
         }
         scaleModeRow.addView(btnCrop)
         scaleModeRow.addView(btnFit)
@@ -1070,11 +1087,13 @@ class SettingsActivity : AppCompatActivity() {
             setTextColor(0xFF7FD8FF.toInt())
             setPadding(dp(12), dp(8), 0, dp(4))
         }
+        bgOffsetXLabel = xLabel
         card.addView(xLabel)
         card.addView(SeekBar(this).apply {
             max = 100
             progress = (prefs.bgOffsetX * 100).toInt()
             setPadding(dp(12), dp(4), dp(12), dp(4))
+            bgOffsetXSeekBar = this
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
                     prefs.bgOffsetX = p / 100f
@@ -1082,7 +1101,9 @@ class SettingsActivity : AppCompatActivity() {
                     updateBgPreviewMatrix(); updateVideoPreviewTransform(); fullPreviewView?.invalidate()
                 }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
-                override fun onStopTrackingTouch(sb: SeekBar?) {}
+                override fun onStopTrackingTouch(sb: SeekBar?) {
+                    sendBroadcast(Intent("com.snowrealm.yukiboard.ACTION_BG_UPDATED").setPackage(packageName))
+                }
             })
         })
 
@@ -1093,11 +1114,13 @@ class SettingsActivity : AppCompatActivity() {
             setTextColor(0xFF7FD8FF.toInt())
             setPadding(dp(12), dp(4), 0, dp(4))
         }
+        bgOffsetYLabel = yLabel
         card.addView(yLabel)
         card.addView(SeekBar(this).apply {
             max = 100
             progress = (prefs.bgOffsetY * 100).toInt()
             setPadding(dp(12), dp(4), dp(12), dp(8))
+            bgOffsetYSeekBar = this
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
                     prefs.bgOffsetY = p / 100f
@@ -1105,7 +1128,9 @@ class SettingsActivity : AppCompatActivity() {
                     updateBgPreviewMatrix(); updateVideoPreviewTransform(); fullPreviewView?.invalidate()
                 }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
-                override fun onStopTrackingTouch(sb: SeekBar?) {}
+                override fun onStopTrackingTouch(sb: SeekBar?) {
+                    sendBroadcast(Intent("com.snowrealm.yukiboard.ACTION_BG_UPDATED").setPackage(packageName))
+                }
             })
         })
 
@@ -3373,6 +3398,26 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        bgSyncReceiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+                refreshBgPreview()
+                syncBgSliders()
+            }
+        }
+        val filter = android.content.IntentFilter("com.snowrealm.yukiboard.ACTION_BG_UPDATED")
+        registerReceiver(bgSyncReceiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        bgSyncReceiver?.let {
+            try { unregisterReceiver(it) } catch (_: Exception) {}
+        }
+        bgSyncReceiver = null
+    }
+
     override fun onPause() {
         super.onPause()
         bgVideoPlayer?.pause()
@@ -3387,5 +3432,30 @@ class SettingsActivity : AppCompatActivity() {
         stopVideoPreview()
         super.onDestroy()
         activityScope.cancel()
+    }
+
+    private fun syncBgSliders() {
+        bgOverlaySeekBar?.progress = prefs.bgOverlayAlpha
+        bgOverlayLabel?.text = tr("遮罩深度: %d%%").format((prefs.bgOverlayAlpha * 100) / 255)
+        bgPreviewOverlay?.setBackgroundColor(
+            android.graphics.Color.argb(prefs.bgOverlayAlpha, 0, 0, 0)
+        )
+        bgBtnCrop?.let { btn ->
+            val selected = prefs.bgScaleMode == 0
+            btn.setTextColor(if (selected) 0xFF111827.toInt() else 0xFFE8F4FF.toInt())
+            btn.setBackgroundColor(if (selected) 0xFF7FD8FF.toInt() else 0xFF2A3A5C.toInt())
+        }
+        bgBtnFit?.let { btn ->
+            val selected = prefs.bgScaleMode == 1
+            btn.setTextColor(if (selected) 0xFF111827.toInt() else 0xFFE8F4FF.toInt())
+            btn.setBackgroundColor(if (selected) 0xFF7FD8FF.toInt() else 0xFF2A3A5C.toInt())
+        }
+        bgOffsetXSeekBar?.progress = (prefs.bgOffsetX * 100).toInt()
+        bgOffsetXLabel?.text = tr("水平位置 X: %d%%").format((prefs.bgOffsetX * 100).toInt())
+        bgOffsetYSeekBar?.progress = (prefs.bgOffsetY * 100).toInt()
+        bgOffsetYLabel?.text = tr("垂直位置 Y: %d%%").format((prefs.bgOffsetY * 100).toInt())
+        updateBgPreviewMatrix()
+        updateVideoPreviewTransform()
+        fullPreviewView?.invalidate()
     }
 }

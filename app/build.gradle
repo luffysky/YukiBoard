@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 143
-        versionName "0.9.77"
+        versionCode 144
+        versionName "0.9.78"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,9 +82,8 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 影片背景 resume 重寫（Surface 失效偵測 + 自動重建）\n" +
-                    "- fix: onStartInputView 移除重複 resume，由 reloadFromStorage 統一處理\n" +
-                    "- fix: setInputView 重建前先 destroy 舊 backgroundView 避免資源洩漏"
+                    "- fix: 影片背景最小改動修復（return true + 清空 pause/resume）\n" +
+                    "- feat: 設定頁↔功能列背景雙向即時同步（遮罩/比例/位置）"
             }
         }
         debug {
@@ -93,9 +92,8 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 影片背景 resume 重寫（Surface 失效偵測 + 自動重建）\n" +
-                    "- fix: onStartInputView 移除重複 resume，由 reloadFromStorage 統一處理\n" +
-                    "- fix: setInputView 重建前先 destroy 舊 backgroundView 避免資源洩漏"
+                    "- fix: 影片背景最小改動修復（return true + 清空 pause/resume）\n" +
+                    "- feat: 設定頁↔功能列背景雙向即時同步（遮罩/比例/位置）"
             }
         }
     }

@@ -274,10 +274,8 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
                 applyVideoTransform()
             }
             override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
-                // return false = 自己管理 SurfaceTexture，不讓系統釋放
-                // IME 視窗隱藏/顯示時不需重建 MediaPlayer
-                mediaPlayer?.pause()
-                return false
+                releaseMediaPlayer()
+                return true
             }
             override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
         }
@@ -328,8 +326,8 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
                 applyVideoTransform()
             }
             override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
-                mediaPlayer?.pause()
-                return false
+                releaseMediaPlayer()
+                return true
             }
             override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
         }
@@ -352,9 +350,8 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
         // 同一檔案才跳過重載（不同檔案要重新載入）
         if (currentType == BackgroundType.VIDEO && isVideoFile(savedBg)
             && currentLoadedPath == savedBg.absolutePath
-            && textureView != null) {
+            && mediaPlayer != null) {
             applyVideoTransform()
-            resume()
             return true
         }
         if (currentType == BackgroundType.IMAGE && !isVideoFile(savedBg) && imageView != null
@@ -400,44 +397,11 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
     }
 
     fun pause() {
-        mediaPlayer?.let { mp ->
-            if (mp.isPlaying) mp.pause()
-        }
+        // SurfaceTexture 由系統管理（return true），不需要手動暫停
     }
 
     fun resume() {
-        val tv = textureView
-        val mp = mediaPlayer
-        val path = currentLoadedPath
-
-        when {
-            // Surface 可用且 MediaPlayer 存在 → 直接播放
-            tv != null && tv.isAvailable && mp != null -> {
-                if (!mp.isPlaying) {
-                    try {
-                        mp.start()
-                    } catch (_: Exception) {
-                        if (path != null) {
-                            releaseMediaPlayer()
-                            setVideoBackground(File(path))
-                        }
-                    }
-                }
-            }
-
-            // Surface 不可用（IME window 重新顯示，Surface 失效）→ 重建 TextureView
-            tv != null && !tv.isAvailable && path != null -> {
-                releaseMediaPlayer()
-                removeView(tv)
-                textureView = null
-                setVideoBackground(File(path))
-            }
-
-            // MediaPlayer 不存在但有路徑 → 重建
-            mp == null && path != null && currentType == BackgroundType.VIDEO -> {
-                setVideoBackground(File(path))
-            }
-        }
+        // SurfaceTexture 重建由 onSurfaceTextureAvailable 自動處理
     }
 
     fun destroy() {
