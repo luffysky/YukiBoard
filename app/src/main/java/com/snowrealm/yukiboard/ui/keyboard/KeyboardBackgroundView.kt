@@ -39,13 +39,13 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
 
     // 背景位置偏移（0.0~1.0，0.5=置中）
     var offsetX: Float = 0.5f
-        set(value) { field = value.coerceIn(0f, 1f); applyOffset() }
+        set(value) { field = value.coerceIn(0f, 1f); applyOffset(); applyVideoTransform() }
     var offsetY: Float = 0.5f
-        set(value) { field = value.coerceIn(0f, 1f); applyOffset() }
+        set(value) { field = value.coerceIn(0f, 1f); applyOffset(); applyVideoTransform() }
 
-    // 0=保持比例(center-crop) 1=整張塞入(fit-xy stretch)
+    // 0=保持比例(fit-inside) 1=整張塞入(stretch)
     var scaleMode: Int = 0
-        set(value) { field = value; applyOffset() }
+        set(value) { field = value; applyOffset(); applyVideoTransform() }
 
     private var bmpWidth = 0
     private var bmpHeight = 0
@@ -188,24 +188,35 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
         val iv = imageView ?: return
         val vw = iv.width.toFloat()
         val vh = iv.height.toFloat()
-        if (vw <= 0 || vh <= 0 || bmpWidth <= 0 || bmpHeight <= 0) return
+
+        if (vw <= 0 || vh <= 0 || bmpWidth <= 0 || bmpHeight <= 0) {
+            iv.viewTreeObserver.addOnGlobalLayoutListener(object :
+                android.view.ViewTreeObserver.OnGlobalLayoutListener {
+                override fun onGlobalLayout() {
+                    iv.viewTreeObserver.removeOnGlobalLayoutListener(this)
+                    applyOffset()
+                }
+            })
+            return
+        }
 
         imageMatrix.reset()
 
         if (scaleMode == 1) {
-            // 整張塞入（FIT_XY）：拉伸填滿，忽略比例
+            // 整張塞入：拉伸填滿
             val sx = vw / bmpWidth
             val sy = vh / bmpHeight
             imageMatrix.setScale(sx, sy)
         } else {
-            // 保持比例（CENTER_CROP）：等比縮放 + 偏移裁切
-            val scale = maxOf(vw / bmpWidth, vh / bmpHeight) * scaleFactor
+            // 保持比例，完整顯示在鍵盤內（fit-inside）
+            val scale = minOf(vw / bmpWidth, vh / bmpHeight)
             val scaledW = bmpWidth * scale
             val scaledH = bmpHeight * scale
-            val maxDx = (scaledW - vw).coerceAtLeast(0f)
-            val maxDy = (scaledH - vh).coerceAtLeast(0f)
-            val dx = -maxDx * offsetX
-            val dy = -maxDy * offsetY
+            // 剩餘空間，X/Y 控制圖片在其中的位置（0=靠左上，1=靠右下，0.5=置中）
+            val remainX = (vw - scaledW).coerceAtLeast(0f)
+            val remainY = (vh - scaledH).coerceAtLeast(0f)
+            val dx = remainX * offsetX
+            val dy = remainY * offsetY
             imageMatrix.setScale(scale, scale)
             imageMatrix.postTranslate(dx, dy)
         }
@@ -214,42 +225,51 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
         iv.imageMatrix = imageMatrix
     }
 
-    /** 影片背景的 transform（scale + offset + rotation） */
+    /** 影片背景的 transform（rotation + fit-inside + offset） */
     private fun applyVideoTransform() {
         val tv = textureView ?: return
         val vw = tv.width.toFloat()
         val vh = tv.height.toFloat()
         if (vw <= 0 || vh <= 0 || videoWidth <= 0 || videoHeight <= 0) return
 
-        val matrix = Matrix()
-        val isRotated90or270 = bgRotation == 90 || bgRotation == 270
-        val effectiveW = if (isRotated90or270) videoHeight.toFloat() else videoWidth.toFloat()
-        val effectiveH = if (isRotated90or270) videoWidth.toFloat() else videoHeight.toFloat()
+        val vW = videoWidth.toFloat()
+        val vH = videoHeight.toFloat()
+        val cx = vw / 2f
+        val cy = vh / 2f
 
-        if (scaleMode == 1) {
-            matrix.setScale(vw / effectiveW, vh / effectiveH)
-        } else {
-            val scale = maxOf(vw / effectiveW, vh / effectiveH)
-            val scaledW = effectiveW * scale
-            val scaledH = effectiveH * scale
-            val maxDx = (scaledW - vw).coerceAtLeast(0f)
-            val maxDy = (scaledH - vh).coerceAtLeast(0f)
-            val dx = -maxDx * offsetX
-            val dy = -maxDy * offsetY
-            matrix.setScale(scale, scale)
-            matrix.postTranslate(dx, dy)
+        // 旋轉後的有效寬高（影片旋轉 90/270 時寬高對調）
+        val isRotated = bgRotation == 90 || bgRotation == 270
+        val effectiveW = if (isRotated) vH else vW
+        val effectiveH = if (isRotated) vW else vH
+
+        val matrix = Matrix()
+
+        // Step 1：影片原點移到 View 中心
+        matrix.setTranslate(cx - vW / 2f, cy - vH / 2f)
+
+        // Step 2：以 View 中心旋轉
+        if (bgRotation != 0) {
+            matrix.postRotate(bgRotation.toFloat(), cx, cy)
         }
 
-        if (bgRotation != 0) {
-            val cx = vw / 2f
-            val cy = vh / 2f
-            val rotMatrix = Matrix()
-            rotMatrix.setRotate(bgRotation.toFloat(), cx, cy)
-            if (isRotated90or270) {
-                val extraScale = if (vw / vh > 1f) vw / vh else vh / vw
-                rotMatrix.postScale(extraScale, extraScale, cx, cy)
-            }
-            matrix.postConcat(rotMatrix)
+        // Step 3：縮放
+        if (scaleMode == 1) {
+            val sx = vw / effectiveW
+            val sy = vh / effectiveH
+            matrix.postScale(sx, sy, cx, cy)
+        } else {
+            // fit-inside
+            val scale = minOf(vw / effectiveW, vh / effectiveH)
+            matrix.postScale(scale, scale, cx, cy)
+
+            // Step 4：X/Y 偏移（在 fit-inside 的剩餘空間內移動）
+            val scaledW = effectiveW * scale
+            val scaledH = effectiveH * scale
+            val remainX = (vw - scaledW).coerceAtLeast(0f)
+            val remainY = (vh - scaledH).coerceAtLeast(0f)
+            val dx = remainX * offsetX - remainX * 0.5f
+            val dy = remainY * offsetY - remainY * 0.5f
+            matrix.postTranslate(dx, dy)
         }
 
         tv.setTransform(matrix)

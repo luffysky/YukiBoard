@@ -1445,34 +1445,42 @@ class SettingsActivity : AppCompatActivity() {
         val vh = tv.height.toFloat()
         if (vw <= 0 || vh <= 0 || bgVideoWidth <= 0 || bgVideoHeight <= 0) return
 
-        val matrix = android.graphics.Matrix()
+        val vW = bgVideoWidth.toFloat()
+        val vH = bgVideoHeight.toFloat()
+        val cx = vw / 2f
+        val cy = vh / 2f
         val rotation = prefs.bgRotation
-        val isRotated90or270 = rotation == 90 || rotation == 270
-        val effectiveW = if (isRotated90or270) bgVideoHeight.toFloat() else bgVideoWidth.toFloat()
-        val effectiveH = if (isRotated90or270) bgVideoWidth.toFloat() else bgVideoHeight.toFloat()
+        val isRotated = rotation == 90 || rotation == 270
+        val effectiveW = if (isRotated) vH else vW
+        val effectiveH = if (isRotated) vW else vH
 
-        if (prefs.bgScaleMode == 1) {
-            matrix.setScale(vw / effectiveW, vh / effectiveH)
-        } else {
-            val scale = maxOf(vw / effectiveW, vh / effectiveH)
-            val scaledW = effectiveW * scale
-            val scaledH = effectiveH * scale
-            val maxDx = (scaledW - vw).coerceAtLeast(0f)
-            val maxDy = (scaledH - vh).coerceAtLeast(0f)
-            matrix.setScale(scale, scale)
-            matrix.postTranslate(-maxDx * prefs.bgOffsetX, -maxDy * prefs.bgOffsetY)
+        val matrix = android.graphics.Matrix()
+
+        // Step 1：影片原點移到 View 中心
+        matrix.setTranslate(cx - vW / 2f, cy - vH / 2f)
+
+        // Step 2：以 View 中心旋轉
+        if (rotation != 0) {
+            matrix.postRotate(rotation.toFloat(), cx, cy)
         }
 
-        if (rotation != 0) {
-            val cx = vw / 2f
-            val cy = vh / 2f
-            val rotMatrix = android.graphics.Matrix()
-            rotMatrix.setRotate(rotation.toFloat(), cx, cy)
-            if (isRotated90or270) {
-                val extraScale = if (vw / vh > 1f) vw / vh else vh / vw
-                rotMatrix.postScale(extraScale, extraScale, cx, cy)
-            }
-            matrix.postConcat(rotMatrix)
+        // Step 3：縮放
+        if (prefs.bgScaleMode == 1) {
+            val sx = vw / effectiveW
+            val sy = vh / effectiveH
+            matrix.postScale(sx, sy, cx, cy)
+        } else {
+            val scale = minOf(vw / effectiveW, vh / effectiveH)
+            matrix.postScale(scale, scale, cx, cy)
+
+            // Step 4：X/Y 偏移
+            val scaledW = effectiveW * scale
+            val scaledH = effectiveH * scale
+            val remainX = (vw - scaledW).coerceAtLeast(0f)
+            val remainY = (vh - scaledH).coerceAtLeast(0f)
+            val dx = remainX * prefs.bgOffsetX - remainX * 0.5f
+            val dy = remainY * prefs.bgOffsetY - remainY * 0.5f
+            matrix.postTranslate(dx, dy)
         }
 
         tv.setTransform(matrix)
