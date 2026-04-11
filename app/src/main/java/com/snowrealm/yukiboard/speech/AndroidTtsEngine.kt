@@ -157,7 +157,7 @@ class AndroidTtsEngine(context: Context, private val onInitDone: ((Boolean) -> U
     ) {
         val engine = tts ?: return
         if (!isReady) {
-            Log.w(tag, "TTS not ready, skipping: ${text.take(30)}")
+            Log.w(tag, "TTS not ready, skipping text (${text.length} chars)")
             return
         }
         if (text.isBlank()) {
@@ -172,7 +172,7 @@ class AndroidTtsEngine(context: Context, private val onInitDone: ((Boolean) -> U
             if (engine.voice?.name != currentVoiceName) {
                 applyVoiceByName(currentVoiceName)
             }
-            Log.i(tag, "speak: using custom voice=${engine.voice?.name}, text=${text.take(30)}")
+            Log.i(tag, "speak: using custom voice=${engine.voice?.name}, len=${text.length}")
         } else {
             val javaLocale = locale?.let { parseLocale(it) } ?: detectLocale(text)
             val langResult = engine.setLanguage(javaLocale)
@@ -180,7 +180,7 @@ class AndroidTtsEngine(context: Context, private val onInitDone: ((Boolean) -> U
                 Log.w(tag, "Language not supported: $javaLocale (result=$langResult), falling back to default")
                 engine.setLanguage(Locale.getDefault())
             }
-            Log.i(tag, "speak: locale=$javaLocale, langResult=$langResult, text=${text.take(30)}")
+            Log.i(tag, "speak: locale=$javaLocale, langResult=$langResult, len=${text.length}")
         }
 
         // 設定語速

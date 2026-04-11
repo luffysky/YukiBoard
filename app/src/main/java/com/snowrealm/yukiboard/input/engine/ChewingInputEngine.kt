@@ -103,6 +103,9 @@ class ChewingInputEngine(
     // ─── 最後提交的字（用於連續預測） ───
     private var lastCommittedChar: String = ""
 
+    // 使用者是否明確按了一聲（因字典不用 ˉ 標記一聲，需特殊處理）
+    private var explicitTone1 = false
+
     // ─── 聲調符號 ───
     private val toneMarks = setOf(
         '\u02C9', // ˉ 一聲（macron, 有時省略）
@@ -168,7 +171,7 @@ class ChewingInputEngine(
                     }
                 }
                 val tone = when (ch) {
-                    '1' -> null        // 一聲：不加標記，直接查無調版
+                    '1' -> '\u02C9'    // ˉ 一聲（macron）
                     '2' -> '\u02CA'
                     '3' -> '\u02C7'
                     '4' -> '\u02CB'
@@ -176,6 +179,8 @@ class ChewingInputEngine(
                     else -> null
                 }
                 if (tone != null) bopomofoBuffer.append(tone)
+                // 標記使用者明確指定了聲調
+                explicitTone1 = (ch == '1')
                 updateCandidatesFromBuffer()
                 InputResult.ComposingUpdated(composingText)
             }
@@ -223,7 +228,7 @@ class ChewingInputEngine(
             // 空白鍵 = 確認第一候選，累積到 selectedBuffer
             val selected = currentCandidates[0]
             selectedBuffer.append(selected)
-            bopomofoBuffer.clear()
+            bopomofoBuffer.clear(); explicitTone1 = false
             isSelectingCandidate = false
             lastCommittedChar = selected
             // 沒有更多注音 → commit 整句
@@ -283,7 +288,7 @@ class ChewingInputEngine(
             } else {
                 // 真的查不到：把注音原文加入（最後手段）
                 selectedBuffer.append(bopomofoBuffer)
-                bopomofoBuffer.clear()
+                bopomofoBuffer.clear(); explicitTone1 = false
             }
         }
     }
@@ -377,20 +382,39 @@ class ChewingInputEngine(
         // 合併 + 聲調排序：精確聲調匹配的排最前面
         val hasTone = bopomofo.isNotEmpty() && bopomofo.last() in toneMarks
 
-        if (hasTone) {
-            // 有聲調：精確匹配優先
-            val exact = dict[bopomofo] ?: emptyList()
-            seen.addAll(exact)
+        if (hasTone && explicitTone1) {
+            // 使用者明確按了一聲：字典無 ˉ key，需從無標記 key 扣除其他聲調的字
+            val bareKey = stripped  // ㄅㄤ
+            val allChars = dict[bareKey] ?: emptyList()
+            // 收集二聲~輕聲的字
+            val otherToneChars = mutableSetOf<String>()
+            for (tone in listOf('\u02CA', '\u02C7', '\u02CB', '\u02D9')) {
+                val withTone = bareKey + tone
+                dict[withTone]?.let { otherToneChars.addAll(it) }
+            }
+            // 一聲字 = 全部字 - 其他聲調字（排前面）
+            val tone1Chars = allChars.filter { it !in otherToneChars }
+            val otherChars = allChars.filter { it in otherToneChars }
+            seen.addAll(tone1Chars)
+            seen.addAll(otherChars)
+            singleChars.forEach { if (it !in seen) seen.add(it) }
+        } else if (hasTone) {
+            // 有聲調（二~輕聲）：精確匹配優先
+            val exactResult = dict[bopomofo] ?: emptyList()
+            seen.addAll(exactResult)
             singleChars.forEach { if (it !in seen) seen.add(it) }
         } else if (stripped.isNotEmpty()) {
-            // 無聲調：按一聲→二聲→三聲→四聲→輕聲排列
-            val toneOrder = listOf('ˉ', 'ˊ', 'ˇ', 'ˋ', '˙')
-            for (tone in toneOrder) {
+            // 無聲調（空白鍵/未選聲調）：從無標記 key 取全部字，常用字優先
+            val baseChars = dict[stripped] ?: emptyList()
+            // 按常用字頻率排序
+            val sorted = baseChars.sortedByDescending { if (it.length == 1) COMMON_CHAR_FREQ[it[0]] ?: 0 else 0 }
+            seen.addAll(sorted)
+            // 補入各聲調查詢結果
+            for (tone in listOf('\u02CA', '\u02C7', '\u02CB', '\u02D9')) {
                 val withTone = stripped + tone
                 val chars = dict[withTone] ?: continue
                 chars.forEach { if (it !in seen) seen.add(it) }
             }
-            // 補入無聲調直接查詢的結果
             singleChars.forEach { if (it !in seen) seen.add(it) }
         } else {
             seen.addAll(singleChars)
@@ -478,20 +502,34 @@ class ChewingInputEngine(
 
     private fun buildNextCharIndex(): Map<String, List<String>> {
         val index = mutableMapOf<String, MutableMap<String, Int>>()
+
+        // 從詞組字典建立
         for ((_, words) in phraseDict) {
             for (word in words) {
                 if (word.length < 2) continue
                 for (i in 0 until word.length - 1) {
                     val ch = word[i].toString()
-                    val next = word.substring(i + 1)
                     val map = index.getOrPut(ch) { mutableMapOf() }
-                    // 短的下一字優先計數
                     val nextChar = word[i + 1].toString()
                     map[nextChar] = (map[nextChar] ?: 0) + 1
-                    // 也記錄完整後綴（如果不超過 3 字）
+                    // 也記錄完整後綴（2~3 字）
+                    val next = word.substring(i + 1)
                     if (next.length in 2..3 && next !in map) {
                         map[next] = 1
                     }
+                }
+            }
+        }
+
+        // 從主字典的多字詞條也建立（提高覆蓋率）
+        for ((_, entries) in dict) {
+            for (word in entries) {
+                if (word.length < 2) continue
+                for (i in 0 until word.length - 1) {
+                    val ch = word[i].toString()
+                    val map = index.getOrPut(ch) { mutableMapOf() }
+                    val nextChar = word[i + 1].toString()
+                    map[nextChar] = (map[nextChar] ?: 0) + 1
                 }
             }
         }
@@ -699,7 +737,7 @@ class ChewingInputEngine(
             val first = currentCandidates[0]
             selectedBuffer.append(first)
             lastCommittedChar = first.last().toString()
-            bopomofoBuffer.clear()
+            bopomofoBuffer.clear(); explicitTone1 = false
             currentCandidates = emptyList()
             isSelectingCandidate = false
         }
@@ -918,6 +956,53 @@ class ChewingInputEngine(
             '住' to 50, '坐' to 45, '站' to 40, '睡' to 40, '醒' to 35,
             '輸' to 35, '贏' to 30, '死' to 40, '活' to 40, '愛' to 55,
             '恨' to 30, '怕' to 35, '哭' to 30, '笑' to 35, '玩' to 40,
+            // 高頻動詞補充
+            '幫' to 70, '忙' to 60, '教' to 55, '學' to 42, '帶' to 50,
+            '送' to 50, '接' to 50, '拿' to 55, '放' to 50, '拉' to 45,
+            '推' to 40, '關' to 55, '開' to 14, '換' to 50, '選' to 45,
+            '穿' to 40, '洗' to 45, '切' to 35, '煮' to 35, '烤' to 30,
+            '借' to 40, '還' to 28, '修' to 40, '裝' to 40, '搬' to 35,
+            '丟' to 35, '撿' to 30, '抓' to 35, '摸' to 30, '踢' to 25,
+            '跑' to 45, '飛' to 35, '跳' to 35, '游' to 35, '爬' to 30,
+            '說' to 81, '講' to 55, '叫' to 50, '告' to 45, '訴' to 40,
+            '記' to 50, '忘' to 45, '想' to 9, '猜' to 30, '懂' to 40,
+            '試' to 45, '用' to 57, '需' to 45, '要' to 79, '該' to 45,
+            '配' to 35, '加' to 50, '減' to 35, '算' to 40, '數' to 40,
+            // 名詞高頻
+            '人' to 94, '話' to 60, '錢' to 55, '車' to 50, '房' to 45,
+            '路' to 45, '門' to 40, '水' to 50, '飯' to 45, '菜' to 40,
+            '肉' to 35, '魚' to 35, '果' to 40, '花' to 35, '樹' to 30,
+            '書' to 45, '字' to 50, '名' to 50, '題' to 40, '課' to 35,
+            '班' to 35, '校' to 35, '店' to 40, '市' to 40, '區' to 35,
+            '山' to 35, '海' to 35, '河' to 30, '風' to 35, '雨' to 30,
+            '雪' to 25, '光' to 40, '色' to 35, '聲' to 35, '氣' to 40,
+            '手' to 50, '頭' to 45, '眼' to 40, '口' to 40, '身' to 40,
+            '腳' to 35, '臉' to 35, '耳' to 25, '鼻' to 25, '嘴' to 30,
+            '電' to 50, '話' to 60, '機' to 50, '網' to 50, '視' to 40,
+            // 形容詞
+            '大' to 88, '小' to 25, '多' to 47, '少' to 40, '高' to 40,
+            '低' to 30, '長' to 40, '短' to 30, '快' to 45, '慢' to 35,
+            '新' to 45, '舊' to 30, '老' to 45, '遠' to 35, '近' to 30,
+            '熱' to 35, '冷' to 35, '亮' to 30, '暗' to 25, '重' to 35,
+            '輕' to 30, '厚' to 25, '薄' to 25, '深' to 30, '淺' to 25,
+            '真' to 55, '假' to 35, '對' to 74, '錯' to 35, '難' to 40,
+            '易' to 25, '苦' to 25, '甜' to 25, '酸' to 20, '辣' to 20,
+            '美' to 40, '醜' to 20, '乾' to 30, '濕' to 20, '硬' to 20,
+            '軟' to 20, '黑' to 30, '白' to 35, '紅' to 30, '藍' to 25,
+            '綠' to 25, '黃' to 25,
+            // 時間/位置
+            '今' to 50, '明' to 45, '昨' to 35, '早' to 40, '晚' to 35,
+            '先' to 40, '再' to 45, '已' to 40, '剛' to 35, '才' to 40,
+            '正' to 40, '又' to 40, '太' to 45, '更' to 40, '最' to 45,
+            '比' to 40, '另' to 25, '每' to 30, '各' to 25, '整' to 25,
+            '裡' to 58, '外' to 40, '左' to 30, '右' to 30, '東' to 30,
+            '西' to 35, '南' to 30, '北' to 30,
+            // 連接詞/語助詞
+            '而' to 45, '且' to 35, '或' to 40, '卻' to 35, '倒' to 30,
+            '雖' to 30, '然' to 53, '但' to 13, '若' to 25, '除' to 25,
+            '像' to 35, '跟' to 70, '及' to 30, '與' to 30,
+            // 綁/棒/榜 — 避免與「幫」混淆（降低排名）
+            '綁' to 15, '棒' to 20, '榜' to 15,
         )
     }
 }

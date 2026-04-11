@@ -362,7 +362,7 @@ class KeyboardView(context: Context) : View(context) {
         get() = keyEntries.map { it.touchRect to it.key }
 
     // 佈局常數
-    private val candidateBarHeight = 40f * density
+    private val candidateBarHeight = 44f * density
     private val keyPaddingH = 5f * density
     private val keyPaddingV = 6f * density
     private val keyCornerRadius = 8f * density
@@ -1190,10 +1190,10 @@ class KeyboardView(context: Context) : View(context) {
         // 候選字區域（橫向捲動）
         if (candidates.isEmpty()) return
 
-        val candPadH = 14f * density
-        val candGap = 2f * density
+        val candPadH = 16f * density
+        val candGap = 6f * density
         candidatePaint.textAlign = Paint.Align.CENTER
-        candidatePaint.textSize = 15f * density
+        candidatePaint.textSize = 16f * density
 
         // 計算每個候選字寬度並快取（供 touch 用，含前綴）
         val candWidths = candidates.mapIndexed { i, text ->

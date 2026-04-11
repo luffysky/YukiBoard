@@ -238,11 +238,13 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
      * @param file 影片檔案路徑
      */
     fun setVideoBackground(file: File) {
+        // 保留 path/type 以便 resume() 能重建
+        val savePath = file.absolutePath
         clearBackground()
         currentType = BackgroundType.VIDEO
-        currentLoadedPath = file.absolutePath
+        currentLoadedPath = savePath
 
-        val filePath = file.absolutePath
+        val filePath = savePath
 
         val tv = TextureView(context).apply {
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
@@ -280,8 +282,9 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
                 applyVideoTransform()
             }
             override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
-                releaseMediaPlayer()
-                return true
+                // 回傳 false 保留 SurfaceTexture，IME 視窗隱藏/顯示時不需重建 MediaPlayer
+                mediaPlayer?.pause()
+                return false
             }
             override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
         }
@@ -289,6 +292,37 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
         addView(tv)
         textureView = tv
         addOverlay()
+
+        // 若影片播放失敗，提取首幀作為靜態背景
+        bgScope.launch(Dispatchers.IO) {
+            kotlinx.coroutines.delay(3000)  // 等 3 秒看是否有 MediaPlayer
+            if (mediaPlayer == null && currentType == BackgroundType.VIDEO) {
+                // MediaPlayer 建立失敗，用首幀當靜態背景
+                try {
+                    val retriever = android.media.MediaMetadataRetriever()
+                    retriever.setDataSource(filePath)
+                    val frame = retriever.getFrameAtTime(0)
+                    retriever.release()
+                    if (frame != null) {
+                        withContext(Dispatchers.Main) {
+                            clearBackground()
+                            currentType = BackgroundType.IMAGE
+                            currentLoadedPath = savePath
+                            val iv = ImageView(context).apply {
+                                scaleType = ImageView.ScaleType.MATRIX
+                                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+                            }
+                            iv.setImageBitmap(frame)
+                            initCenterCropMatrix(iv, frame.width, frame.height)
+                            addView(iv)
+                            imageView = iv
+                            addOverlay()
+                            android.util.Log.w("KeyboardBgView", "Video playback failed, using first frame as static background")
+                        }
+                    }
+                } catch (_: Exception) { }
+            }
+        }
     }
 
     /**
@@ -333,8 +367,8 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
                 applyVideoTransform()
             }
             override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
-                releaseMediaPlayer()
-                return true
+                mediaPlayer?.pause()
+                return false
             }
             override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
         }
@@ -411,6 +445,11 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
     }
 
     fun resume() {
+        if (mediaPlayer == null && currentType == BackgroundType.VIDEO && currentLoadedPath != null) {
+            // MediaPlayer 已被 onSurfaceTextureDestroyed 釋放，重新建立
+            setVideoBackground(File(currentLoadedPath!!))
+            return
+        }
         mediaPlayer?.let { mp ->
             if (!mp.isPlaying) {
                 try { mp.start() } catch (_: Exception) {

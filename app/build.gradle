@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 138
-        versionName "0.9.72"
+        versionCode 139
+        versionName "0.9.73"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -68,9 +68,9 @@ android {
     signingConfigs {
         release {
             storeFile file("${rootProject.projectDir}/keystore/yukiboard-release.jks")
-            storePassword "yukiboard2026"
-            keyAlias "yukiboard"
-            keyPassword "yukiboard2026"
+            storePassword localProps.getProperty('KEYSTORE_PASSWORD', System.getenv('KEYSTORE_PASSWORD') ?: 'yukiboard2026')
+            keyAlias localProps.getProperty('KEY_ALIAS', System.getenv('KEY_ALIAS') ?: 'yukiboard')
+            keyPassword localProps.getProperty('KEY_PASSWORD', System.getenv('KEY_PASSWORD') ?: 'yukiboard2026')
         }
     }
 
@@ -82,11 +82,12 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 剪貼簿搜尋改面板直接輸入（取代 AlertDialog）\n" +
-                    "- fix: 詞庫新增改 inline 輸入模式\n" +
-                    "- fix: 字典/學語言面板注音組字提示修復\n" +
-                    "- feat: 字典 + 學語言面板 TTS 朗讀（9 語言）\n" +
-                    "- fix: 語音辨識 auto 模式擴充至 11 種語言映射"
+                    "- fix: 注音一聲候選字修復（按 1 正確出現一聲字）\n" +
+                    "- fix: 常用字/詞頻率排序（幫我>綁我）+ 擴充 350+ 字頻\n" +
+                    "- fix: 候選字列間距加大 + 文字放大\n" +
+                    "- fix: 選字後延續預測改善（主字典+詞組雙來源）\n" +
+                    "- fix: 影片背景修復（硬體加速+Surface 保留+首幀 fallback）\n" +
+                    "- fix: 隱私安全加固（log 脫敏/HTTPS/簽名外部化/法律頁面）"
             }
         }
         debug {
@@ -95,11 +96,12 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 剪貼簿搜尋改面板直接輸入（取代 AlertDialog）\n" +
-                    "- fix: 詞庫新增改 inline 輸入模式\n" +
-                    "- fix: 字典/學語言面板注音組字提示修復\n" +
-                    "- feat: 字典 + 學語言面板 TTS 朗讀（9 語言）\n" +
-                    "- fix: 語音辨識 auto 模式擴充至 11 種語言映射"
+                    "- fix: 注音一聲候選字修復（按 1 正確出現一聲字）\n" +
+                    "- fix: 常用字/詞頻率排序（幫我>綁我）+ 擴充 350+ 字頻\n" +
+                    "- fix: 候選字列間距加大 + 文字放大\n" +
+                    "- fix: 選字後延續預測改善（主字典+詞組雙來源）\n" +
+                    "- fix: 影片背景修復（硬體加速+Surface 保留+首幀 fallback）\n" +
+                    "- fix: 隱私安全加固（log 脫敏/HTTPS/簽名外部化/法律頁面）"
             }
         }
     }

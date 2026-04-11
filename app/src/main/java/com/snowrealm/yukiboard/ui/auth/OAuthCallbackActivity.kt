@@ -40,7 +40,7 @@ class OAuthCallbackActivity : AppCompatActivity() {
         val authClient = SnowRealmAuthClient.getInstance(this)
         authClient.saveTokenDirectly(token)
 
-        Log.d("OAuthCallback", "Token received: ${token.take(20)}...")
+        Log.d("OAuthCallback", "Token received: [REDACTED]")
         scope.launch {
             try {
                 val me = authClient.fetchMe()

@@ -297,6 +297,12 @@ class YukiBoardIMEService : InputMethodService() {
     override fun onShowInputRequested(flags: Int, configChange: Boolean): Boolean = true
 
     override fun onCreateInputView(): View {
+        // 確保 IME window 啟用硬體加速（TextureView 影片背景需要）
+        window?.window?.let { w ->
+            @Suppress("DEPRECATION")
+            w.addFlags(android.view.WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED)
+        }
+
         // 垂直佈局：工具列 → 面板容器 → 鍵盤容器
         rootContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL

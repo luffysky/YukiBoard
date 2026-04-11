@@ -83,7 +83,7 @@ class WhisperSpeechEngine(
         audioRecord?.startRecording()
 
         val whisperLocale = locale  // 保留完整 locale，transcribe() 內部處理截斷
-        android.util.Log.i("WhisperEngine", "▶ startListening: apiKey=${apiKey.take(8)}..., locale=$whisperLocale")
+        android.util.Log.i("WhisperEngine", "▶ startListening: apiKey=${if (apiKey.isNotBlank()) "[SET]" else "[EMPTY]"}, locale=$whisperLocale")
 
         recordingJob = scope.launch {
             val pcmStream = ByteArrayOutputStream()

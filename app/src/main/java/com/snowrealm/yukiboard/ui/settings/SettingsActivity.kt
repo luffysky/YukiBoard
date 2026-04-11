@@ -695,6 +695,45 @@ class SettingsActivity : AppCompatActivity() {
         root.addView(buildLanguagePackCard())
 
         // ═══════════════════════════════════════════════════════
+        // 法律與隱私
+        // ═══════════════════════════════════════════════════════
+        val legalChildren = mutableListOf<View>()
+        root.addView(cardGroup(tr("法律與隱私"), null, null, legalChildren) {
+            legalChildren += Button(this).apply {
+                text = tr("隱私權政策")
+                setTextColor(0xFF90CAF9.toInt())
+                textSize = 14f
+                background = null
+                setOnClickListener {
+                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://yukiboard.snowrealm.pet/privacy"))
+                    try { startActivity(intent) } catch (_: Exception) {
+                        showPrivacyPolicyDialog()
+                    }
+                }
+            }
+            legalChildren += Button(this).apply {
+                text = tr("服務條款")
+                setTextColor(0xFF90CAF9.toInt())
+                textSize = 14f
+                background = null
+                setOnClickListener {
+                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://yukiboard.snowrealm.pet/terms"))
+                    try { startActivity(intent) } catch (_: Exception) {}
+                }
+            }
+            legalChildren += Button(this).apply {
+                text = tr("開源授權")
+                setTextColor(0xFF90CAF9.toInt())
+                textSize = 14f
+                background = null
+                setOnClickListener {
+                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://yukiboard.snowrealm.pet/licenses"))
+                    try { startActivity(intent) } catch (_: Exception) {}
+                }
+            }
+        })
+
+        // ═══════════════════════════════════════════════════════
         // 輸入法測試
         // ═══════════════════════════════════════════════════════
         root.addView(Button(this).apply {
@@ -2427,6 +2466,38 @@ class SettingsActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun showPrivacyPolicyDialog() {
+        android.app.AlertDialog.Builder(this)
+            .setTitle("YukiBoard 隱私權政策")
+            .setMessage(
+                "最後更新：2026-04-11\n\n" +
+                "1. 資料收集\n" +
+                "YukiBoard 是一款在裝置上運行的輸入法。我們重視你的隱私：\n" +
+                "- 打字內容：所有打字內容僅在裝置本地處理，不會上傳至任何伺服器\n" +
+                "- 學習詞庫：儲存在裝置本地 SharedPreferences，不會同步至雲端（除非你主動開啟設定同步）\n" +
+                "- AI 功能：僅在你主動使用 AI Skill 時，將你選定的文字傳送至你選擇的 AI 服務商（OpenAI/Anthropic/Gemini/Groq）。傳送前會明確提示\n" +
+                "- 防詐偵測：本地規則引擎分析，不上傳原文。匿名回報需你明確同意（opt-in）\n" +
+                "- 語音輸入：音訊僅用於辨識，不儲存、不上傳（Android 內建引擎在裝置本地處理；Whisper 引擎會傳送至你設定的伺服器）\n\n" +
+                "2. 我們不會做的事\n" +
+                "❌ 不會記錄你的打字內容\n" +
+                "❌ 不會蒐集密碼或信用卡號\n" +
+                "❌ 不會在背景偷傳資料\n" +
+                "❌ 不會出售任何個人資料\n\n" +
+                "3. 權限用途\n" +
+                "- 輸入法權限：提供鍵盤功能（必要）\n" +
+                "- 麥克風：語音輸入（選用）\n" +
+                "- 藍牙：遠端鍵盤功能（選用）\n" +
+                "- 網路：AI 功能、GIF 搜尋、雲端同步（選用）\n" +
+                "- 位置：天氣面板（選用）\n\n" +
+                "4. 使用者權利\n" +
+                "你可以隨時：查詢資料、刪除詞庫、關閉所有雲端功能、解除安裝。\n" +
+                "聯繫：privacy@snowrealm.pet\n\n" +
+                "本政策依台灣《個資法》、GDPR、CCPA 撰寫。"
+            )
+            .setPositiveButton("了解") { d, _ -> d.dismiss() }
+            .show()
     }
 
     private fun testWhisperConnection(statusView: TextView) {

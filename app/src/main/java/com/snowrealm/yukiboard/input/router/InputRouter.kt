@@ -977,13 +977,41 @@ class InputRouter(private val context: Context) {
     companion object {
         const val MAX_LATIN_ENGINES = 10
         private val COMMON_WORD_FREQUENCY = mapOf(
+            // 單字高頻
             "的" to 40f, "是" to 38f, "在" to 35f, "了" to 34f, "我" to 33f,
             "他" to 32f, "她" to 32f, "你" to 32f, "們" to 30f, "不" to 30f,
             "有" to 29f, "這" to 28f, "那" to 28f, "也" to 27f, "就" to 26f,
             "都" to 25f, "說" to 25f, "要" to 24f, "會" to 24f, "來" to 23f,
-            "去" to 23f, "可以" to 28f, "沒有" to 27f, "知道" to 25f,
-            "覺得" to 24f, "喜歡" to 23f, "謝謝" to 22f, "好的" to 22f,
-            "OK" to 20f, "ok" to 20f, "嗯" to 18f, "哈哈" to 17f,
+            "去" to 23f, "對" to 22f, "但" to 20f, "被" to 20f, "把" to 20f,
+            "讓" to 19f, "給" to 19f, "很" to 22f, "太" to 20f, "更" to 18f,
+            // 雙字詞（日常口語）
+            "可以" to 28f, "沒有" to 27f, "知道" to 25f, "覺得" to 24f,
+            "喜歡" to 23f, "謝謝" to 22f, "好的" to 22f, "因為" to 22f,
+            "所以" to 21f, "如果" to 21f, "但是" to 20f, "可能" to 20f,
+            "應該" to 20f, "已經" to 20f, "還是" to 19f, "雖然" to 18f,
+            "不過" to 19f, "然後" to 19f, "而且" to 18f, "或者" to 17f,
+            "什麼" to 25f, "怎麼" to 22f, "為什麼" to 21f, "這樣" to 20f,
+            "那個" to 20f, "這個" to 20f, "一個" to 20f, "現在" to 20f,
+            "今天" to 19f, "明天" to 18f, "昨天" to 17f, "時候" to 18f,
+            "地方" to 17f, "東西" to 17f, "朋友" to 18f, "工作" to 18f,
+            "問題" to 17f, "公司" to 16f, "學校" to 16f, "電話" to 16f,
+            "手機" to 17f, "一起" to 18f, "一下" to 19f, "一點" to 18f,
+            // 幫我/幫忙 — 高頻口語
+            "幫我" to 22f, "幫忙" to 21f, "幫你" to 20f, "幫他" to 19f,
+            "告訴" to 18f, "認為" to 17f, "希望" to 18f, "需要" to 19f,
+            "想要" to 19f, "喜歡" to 23f, "擔心" to 16f, "害怕" to 15f,
+            "開心" to 17f, "快樂" to 16f, "生氣" to 15f, "難過" to 15f,
+            // 三字詞
+            "沒問題" to 18f, "不知道" to 19f, "對不起" to 18f, "沒關係" to 17f,
+            "怎麼辦" to 17f, "來不及" to 15f, "等一下" to 17f, "不好意思" to 17f,
+            // 禮貌/社交
+            "你好" to 20f, "再見" to 16f, "拜拜" to 16f, "早安" to 15f,
+            "晚安" to 15f, "辛苦了" to 15f, "加油" to 16f, "恭喜" to 15f,
+            "生日快樂" to 14f, "新年快樂" to 13f,
+            // 英文
+            "OK" to 20f, "ok" to 20f,
+            // 語助
+            "嗯" to 18f, "哈哈" to 17f, "嘻嘻" to 14f,
         )
     }
 }
