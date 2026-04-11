@@ -82,11 +82,11 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- refactor: 語言系統動態化（新增語言只需 LanguagePack + 詞庫）\n" +
-                    "- refactor: InputRouter 動態引擎載入\n" +
-                    "- refactor: KeyboardState 從 LanguagePack altChars 生成佈局\n" +
-                    "- feat: 設定頁 9 語言切換（含 Locale 自動偵測）\n" +
-                    "- feat: 面板輸入修復 + 日文即時候選字"
+                    "- fix: 剪貼簿搜尋改面板直接輸入（取代 AlertDialog）\n" +
+                    "- fix: 詞庫新增改 inline 輸入模式\n" +
+                    "- fix: 字典/學語言面板注音組字提示修復\n" +
+                    "- feat: 字典 + 學語言面板 TTS 朗讀（9 語言）\n" +
+                    "- fix: 語音辨識 auto 模式擴充至 11 種語言映射"
             }
         }
         debug {
@@ -95,11 +95,11 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- refactor: 語言系統動態化（新增語言只需 LanguagePack + 詞庫）\n" +
-                    "- refactor: InputRouter 動態引擎載入\n" +
-                    "- refactor: KeyboardState 從 LanguagePack altChars 生成佈局\n" +
-                    "- feat: 設定頁 9 語言切換（含 Locale 自動偵測）\n" +
-                    "- feat: 面板輸入修復 + 日文即時候選字"
+                    "- fix: 剪貼簿搜尋改面板直接輸入（取代 AlertDialog）\n" +
+                    "- fix: 詞庫新增改 inline 輸入模式\n" +
+                    "- fix: 字典/學語言面板注音組字提示修復\n" +
+                    "- feat: 字典 + 學語言面板 TTS 朗讀（9 語言）\n" +
+                    "- fix: 語音辨識 auto 模式擴充至 11 種語言映射"
             }
         }
     }
