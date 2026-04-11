@@ -752,9 +752,11 @@ class ThemePanelView(context: Context) : View(context) {
                 val maxDx = (sw - pvW).coerceAtLeast(0f)
                 val maxDy = (sh - pvH).coerceAtLeast(0f)
                 previewBgMatrix.setScale(scale, scale)
+                val tx = (-maxDx * (1.0f - prefs.bgOffsetX)).coerceIn(-maxDx, 0f)
+                val ty = (-maxDy * (1.0f - prefs.bgOffsetY)).coerceIn(-maxDy, 0f)
                 previewBgMatrix.postTranslate(
-                    pvRect.left - maxDx * prefs.bgOffsetX,
-                    pvRect.top - maxDy * prefs.bgOffsetY
+                    pvRect.left + tx,
+                    pvRect.top + ty
                 )
             }
             // 旋轉（以預覽區域中心）— 與 buildFullKeyboardPreview 一致

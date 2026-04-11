@@ -216,7 +216,9 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
             val maxDx = (scaledW - vw).coerceAtLeast(0f)
             val maxDy = (scaledH - vh).coerceAtLeast(0f)
             imageMatrix.setScale(scale, scale)
-            imageMatrix.postTranslate(-maxDx * offsetX, -maxDy * offsetY)
+            val tx = (-maxDx * (1.0f - offsetX)).coerceIn(-maxDx, 0f)
+            val ty = (-maxDy * (1.0f - offsetY)).coerceIn(-maxDy, 0f)
+            imageMatrix.postTranslate(tx, ty)
         }
         if (bgRotation != 0) {
             imageMatrix.postRotate(bgRotation.toFloat(), vw / 2f, vh / 2f)
@@ -263,8 +265,10 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
             if (bgRotation != 0) matrix.postRotate(bgRotation.toFloat(), cx, cy)
             // 3. 縮放（以 View 中心）
             matrix.postScale(scale, scale, cx, cy)
-            // 4. 偏移裁切
-            matrix.postTranslate(-maxDx * offsetX, -maxDy * offsetY)
+            // 4. 偏移裁切（clamp 防止超出邊界）
+            val tx = (-maxDx * (1.0f - offsetX)).coerceIn(-maxDx, 0f)
+            val ty = (-maxDy * (1.0f - offsetY)).coerceIn(-maxDy, 0f)
+            matrix.postTranslate(tx, ty)
         }
 
         tv.setTransform(matrix)
