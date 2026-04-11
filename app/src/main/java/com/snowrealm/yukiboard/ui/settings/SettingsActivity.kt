@@ -1434,6 +1434,10 @@ class SettingsActivity : AppCompatActivity() {
                 matrix.setScale(scale, scale)
                 matrix.postTranslate(dx, dy)
             }
+            // 旋轉（以 View 中心）
+            if (prefs.bgRotation != 0) {
+                matrix.postRotate(prefs.bgRotation.toFloat(), vw / 2f, vh / 2f)
+            }
             iv.imageMatrix = matrix
         }
     }

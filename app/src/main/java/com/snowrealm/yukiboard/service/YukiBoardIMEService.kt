@@ -1593,6 +1593,8 @@ class YukiBoardIMEService : InputMethodService() {
                         bg.reloadFromStorage()
                     }
                     keyboardView.invalidate()
+                    // 通知 SettingsActivity 同步 UI
+                    sendBroadcast(android.content.Intent("com.snowrealm.yukiboard.ACTION_BG_UPDATED").setPackage(packageName))
                 }
                 p.onKeySettingsChanged = {
                     keyboardView.keyScalePercent = prefs.keyScalePercent

@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 149
-        versionName "0.9.83"
+        versionCode 150
+        versionName "0.9.84"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,9 +82,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 背景縮放改回 center-crop（填滿鍵盤，裁切超出）\n" +
-                    "- fix: 影片旋轉 + center-crop 正確順序\n" +
-                    "- fix: 設定頁預覽圖片加旋轉支援"
+                    "- fix: 設定頁背景預覽加旋轉（updateBgPreviewMatrix）\n" +
+                    "- fix: 功能列→設定頁同步（onBackgroundSettingsChanged 加 sendBroadcast）\n" +
+                    "- fix: 四個背景預覽區域旋轉/縮放/偏移完全一致"
             }
         }
         debug {
@@ -93,9 +93,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 背景縮放改回 center-crop（填滿鍵盤，裁切超出）\n" +
-                    "- fix: 影片旋轉 + center-crop 正確順序\n" +
-                    "- fix: 設定頁預覽圖片加旋轉支援"
+                    "- fix: 設定頁背景預覽加旋轉（updateBgPreviewMatrix）\n" +
+                    "- fix: 功能列→設定頁同步（onBackgroundSettingsChanged 加 sendBroadcast）\n" +
+                    "- fix: 四個背景預覽區域旋轉/縮放/偏移完全一致"
             }
         }
     }
