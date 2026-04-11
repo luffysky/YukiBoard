@@ -1400,7 +1400,8 @@ class SettingsActivity : AppCompatActivity() {
                         setOnPreparedListener { player ->
                             bgVideoWidth = player.videoWidth
                             bgVideoHeight = player.videoHeight
-                            updateVideoPreviewTransform()
+                            // tv 可能還沒 layout，用 post 確保 width/height 已就緒
+                            tv.post { updateVideoPreviewTransform() }
                             player.start()
                         }
                         prepareAsync()
