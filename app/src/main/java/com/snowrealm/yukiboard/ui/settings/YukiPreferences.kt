@@ -101,6 +101,7 @@ class YukiPreferences(context: Context) {
     var toneDetection: Boolean by BoolPref("tone_detection", true)
     var rawBopomofoMode: Boolean by BoolPref("raw_bopomofo", false)
     var swipeTrailEnabled: Boolean by BoolPref("swipe_trail", true)
+    var showTouchArea: Boolean by BoolPref("show_touch_area", false)
     var rimeDictEnabled: Boolean by BoolPref("rime_dict", true)
     var swipeSelfLearn: Boolean by BoolPref("swipe_self_learn", true)
     var correctionSelfLearn: Boolean by BoolPref("correction_self_learn", true)
@@ -156,6 +157,30 @@ class YukiPreferences(context: Context) {
     // 連線功能
     // ══════��══════════���══════════════════════════════��══════════
     var remoteKeyboardEnabled: Boolean by BoolPref("remote_keyboard", true)
+
+    // ═══════════════════════════════════════════════════════════
+    // 功能列項目顯示（預設全開，使用者可關閉個別功能）
+    // ═══════════════════════════════════════════════════════════
+    var toolbarVoice: Boolean by BoolPref("toolbar_voice", true)
+    var toolbarTranslate: Boolean by BoolPref("toolbar_translate", true)
+    var toolbarGif: Boolean by BoolPref("toolbar_gif", true)
+    var toolbarEmoji: Boolean by BoolPref("toolbar_emoji", true)
+    var toolbarKaomoji: Boolean by BoolPref("toolbar_kaomoji", true)
+    var toolbarSticker: Boolean by BoolPref("toolbar_sticker", true)
+    var toolbarClipboard: Boolean by BoolPref("toolbar_clipboard", true)
+    var toolbarRemote: Boolean by BoolPref("toolbar_remote", true)
+    var toolbarClaw: Boolean by BoolPref("toolbar_claw", true)
+    var toolbarCalculator: Boolean by BoolPref("toolbar_calculator", true)
+    var toolbarPhrase: Boolean by BoolPref("toolbar_phrase", true)
+    var toolbarUserDict: Boolean by BoolPref("toolbar_user_dict", true)
+    var toolbarDecrypt: Boolean by BoolPref("toolbar_decrypt", true)
+    var toolbarColorPicker: Boolean by BoolPref("toolbar_color_picker", true)
+    var toolbarUnitConverter: Boolean by BoolPref("toolbar_unit_converter", true)
+    var toolbarHandwriting: Boolean by BoolPref("toolbar_handwriting", true)
+    var toolbarMusic: Boolean by BoolPref("toolbar_music", true)
+    var toolbarDictionary: Boolean by BoolPref("toolbar_dictionary", true)
+    var toolbarLangLearn: Boolean by BoolPref("toolbar_lang_learn", true)
+    var toolbarTheme: Boolean by BoolPref("toolbar_theme", true)
 
     // ═══════════════════════════════════════════════════════════
     // Insight 整合

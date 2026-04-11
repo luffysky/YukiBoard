@@ -243,6 +243,7 @@ class SmartInputManager(context: Context) {
         styleProfiler.save()
         swipeLearnManager.save()
         correctionLearnManager.save()
+        adaptiveDictionary.persist()
     }
 
     /** 定期清理過期資料 */

@@ -537,6 +537,7 @@ class SettingsActivity : AppCompatActivity() {
             inputChildren += switchRow(tr("智慧中英切換"), tr("自動判斷注音/英文意圖（免手動切換）"), prefs.autoInputMode) { prefs.autoInputMode = it }
             inputChildren += switchRow(tr("滑動輸入"), tr("滑動手勢輸入"), prefs.swipeInput) { prefs.swipeInput = it }
             inputChildren += switchRow(tr("滑動軌跡特效"), tr("滑動時顯示紫色光暈路徑"), prefs.swipeTrailEnabled) { prefs.swipeTrailEnabled = it }
+            inputChildren += switchRow(tr("顯示觸控面積"), tr("打字時顯示手指接觸範圍，方便確認是否按到"), prefs.showTouchArea) { prefs.showTouchArea = it }
             inputChildren += switchRow(tr("自動更正"), tr("英文自動更正"), prefs.autoCorrect) { prefs.autoCorrect = it }
             inputChildren += switchRow(tr("RIME 詞庫"), tr("啟用 RIME 大型注音詞庫（更準確的候選字）"), prefs.rimeDictEnabled) { prefs.rimeDictEnabled = it }
             inputChildren += switchRow(tr("滑動自我學習"), tr("記住你選過的滑動候選，越用越準"), prefs.swipeSelfLearn) { prefs.swipeSelfLearn = it }
@@ -596,6 +597,33 @@ class SettingsActivity : AppCompatActivity() {
             inputChildren += speechLanguageSelector()
             inputChildren += voiceSilenceSensitivitySelector()
             inputChildren += switchRow(tr("語音後處理"), tr("AI 自動清除口語贅詞（嗯、那個…）"), prefs.voicePostProcessEnabled) { prefs.voicePostProcessEnabled = it }
+        })
+
+        // ═══════════════════════════════════════════════════════
+        // 功能列項目
+        // ═══════════════════════════════════════════════════════
+        val toolbarChildren = mutableListOf<View>()
+        root.addView(cardGroup(tr("功能列"), null, null, toolbarChildren) {
+            toolbarChildren += switchRow("🐾 Claw AI", tr("AI 對話助手"), prefs.toolbarClaw) { prefs.toolbarClaw = it }
+            toolbarChildren += switchRow("🎤 ${tr("語音")}", tr("語音輸入"), prefs.toolbarVoice) { prefs.toolbarVoice = it }
+            toolbarChildren += switchRow("🌐 ${tr("翻譯")}", tr("即時翻譯面板"), prefs.toolbarTranslate) { prefs.toolbarTranslate = it }
+            toolbarChildren += switchRow("✍ ${tr("手寫")}", tr("手寫辨識輸入"), prefs.toolbarHandwriting) { prefs.toolbarHandwriting = it }
+            toolbarChildren += switchRow("📚 ${tr("字典")}", tr("字典查詢面板"), prefs.toolbarDictionary) { prefs.toolbarDictionary = it }
+            toolbarChildren += switchRow("🎓 ${tr("學語言")}", tr("語言學習面板"), prefs.toolbarLangLearn) { prefs.toolbarLangLearn = it }
+            toolbarChildren += switchRow("😀 ${tr("表情")}", tr("Emoji 表情面板"), prefs.toolbarEmoji) { prefs.toolbarEmoji = it }
+            toolbarChildren += switchRow("顔 ${tr("顔文字")}", tr("日式顔文字面板"), prefs.toolbarKaomoji) { prefs.toolbarKaomoji = it }
+            toolbarChildren += switchRow("🖼 ${tr("貼圖")}", tr("貼圖面板"), prefs.toolbarSticker) { prefs.toolbarSticker = it }
+            toolbarChildren += switchRow("GIF", tr("GIF 搜尋面板"), prefs.toolbarGif) { prefs.toolbarGif = it }
+            toolbarChildren += switchRow("📋 ${tr("剪貼簿")}", tr("剪貼簿歷史面板"), prefs.toolbarClipboard) { prefs.toolbarClipboard = it }
+            toolbarChildren += switchRow("🧮 ${tr("計算機")}", tr("快速計算機"), prefs.toolbarCalculator) { prefs.toolbarCalculator = it }
+            toolbarChildren += switchRow("💬 ${tr("常用語")}", tr("常用語快貼"), prefs.toolbarPhrase) { prefs.toolbarPhrase = it }
+            toolbarChildren += switchRow("📖 ${tr("詞庫")}", tr("使用者自訂詞庫"), prefs.toolbarUserDict) { prefs.toolbarUserDict = it }
+            toolbarChildren += switchRow("🔐 ${tr("解密")}", tr("私房話解密面板"), prefs.toolbarDecrypt) { prefs.toolbarDecrypt = it }
+            toolbarChildren += switchRow("🎯 ${tr("色碼")}", tr("色碼選取器"), prefs.toolbarColorPicker) { prefs.toolbarColorPicker = it }
+            toolbarChildren += switchRow("📏 ${tr("換算")}", tr("單位換算工具"), prefs.toolbarUnitConverter) { prefs.toolbarUnitConverter = it }
+            toolbarChildren += switchRow("🎹 ${tr("音樂")}", tr("音樂鍵盤"), prefs.toolbarMusic) { prefs.toolbarMusic = it }
+            toolbarChildren += switchRow("🔗 ${tr("遠端")}", tr("遠端鍵盤連線"), prefs.toolbarRemote) { prefs.toolbarRemote = it }
+            toolbarChildren += switchRow("🎨 ${tr("主題")}", tr("主題瀏覽切換"), prefs.toolbarTheme) { prefs.toolbarTheme = it }
         })
 
         // ═══════════════════════════════════════════════════════

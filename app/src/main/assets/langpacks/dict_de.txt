@@ -1822,7 +1822,6 @@ Ministerium
 Institut
 Einrichtung
 Stiftung
-Verband
 Gewerkschaft
 Abstimmung
 Referendum
@@ -2535,14 +2534,12 @@ Verarbeitung
 Verbreitung
 Verdacht
 Vergütung
-Verlag
 Vermittlung
 Vernunft
 Verpflichtung
 Verschwendung
 Verteilung
 Vertretung
-Verwaltung
 Verwandtschaft
 Verwendung
 Verzögerung
@@ -2556,7 +2553,6 @@ Vorrecht
 Vorsatz
 Vorschau
 Vorsorge
-Vortrag
 Waffe
 Wahrscheinlichkeit
 Wechsel
@@ -2774,8 +2770,6 @@ beherrschen
 begreifen
 begrüßen
 begünstigen
-behaupten
-beherrschen
 beherbergen
 beibehalten
 beistehen
@@ -2814,11 +2808,9 @@ bestimmen
 bestrafen
 beteiligen
 betonen
-betrachten
 betrügen
 beurteilen
 bewältigen
-bewegen
 bewirken
 bewohnen
 bezeugen
@@ -2931,9 +2923,7 @@ gelangen
 gelten
 genießen
 geraten
-geschehen
 gesellen
-gestatten
 gestehen
 gewährleisten
 haften
@@ -2941,11 +2931,9 @@ hämmern
 handeln
 häufen
 heiraten
-heizen
 herausfordern
 herausgeben
 herausstellen
-herrschen
 hervorbringen
 hervorheben
 hervorrufen
@@ -3082,7 +3070,6 @@ stimulieren
 stolpern
 stören
 strukturieren
-studieren
 subtrahieren
 symbolisieren
 tagen
@@ -3135,7 +3122,6 @@ unterdrücken
 untergehen
 untergraben
 unterliegen
-unternehmen
 unterordnen
 unterrichten
 untersagen
@@ -3153,7 +3139,6 @@ veranschaulichen
 veranschlagen
 veranlassen
 verantworten
-verbessern
 verbiegen
 verbieten
 verblüffen
@@ -3172,7 +3157,6 @@ verfälschen
 verfehlen
 verfluchen
 verfügen
-vergessen
 vergewissern
 vergiften
 vergraben
@@ -3193,7 +3177,6 @@ verlängern
 verlegen
 verletzen
 verleugnen
-verlieren
 vermeiden
 vermieten
 vermindern
@@ -3300,7 +3283,6 @@ zerbrechen
 zerlegen
 zerreißen
 zersetzen
-zerstören
 zielen
 zitieren
 zuführen

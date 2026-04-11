@@ -493,6 +493,22 @@ class KeyboardView(context: Context) : View(context) {
     var swipeTrailEnabled = true
     /** 外部設定：是否啟用滑動輸入（滑動產生文字） */
     var swipeInputEnabled = true
+    /** 外部設定：是否顯示觸控接觸面積 */
+    var showTouchAreaEnabled = false
+
+    // ─── 觸控面積視覺 ───
+    private var touchAreaX = 0f
+    private var touchAreaY = 0f
+    private var touchAreaSize = 0f  // 接觸面積（MotionEvent.getSize）
+    private var touchAreaPressure = 0f
+    private var touchAreaActive = false
+    private val touchAreaPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 2f
+    }
+    private val touchAreaFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
 
     // ─── 滑動停頓偵測 ───
     private var swipeDwellKey: KeyModel? = null
@@ -974,6 +990,11 @@ class KeyboardView(context: Context) : View(context) {
         // 滑動路徑
         if (swipePoints.size >= 2 || (swipePoints.size == 1 && isSwipingActive)) {
             drawSwipeTrail(canvas)
+        }
+
+        // 觸控面積視覺
+        if (showTouchAreaEnabled && touchAreaActive) {
+            drawTouchArea(canvas)
         }
 
         // 連擊粒子特效
@@ -2026,6 +2047,39 @@ class KeyboardView(context: Context) : View(context) {
         }
     }
 
+    /** 繪製觸控接觸面積圓圈 */
+    private fun drawTouchArea(canvas: Canvas) {
+        // touchAreaSize 是 0.0~1.0 的正規化值，映射到畫面上的半徑
+        val minRadius = 12f * density
+        val maxRadius = 60f * density
+        val radius = minRadius + touchAreaSize * (maxRadius - minRadius)
+
+        // 壓力值決定顏色（輕→藍、中→綠、重→紅）
+        val color = when {
+            touchAreaPressure < 0.3f -> 0xFF42A5F5.toInt()  // 淺藍
+            touchAreaPressure < 0.7f -> 0xFF66BB6A.toInt()  // 綠
+            else -> 0xFFEF5350.toInt()                       // 紅
+        }
+
+        // 半透明填充
+        touchAreaFillPaint.color = color
+        touchAreaFillPaint.alpha = 40
+        canvas.drawCircle(touchAreaX, touchAreaY, radius, touchAreaFillPaint)
+
+        // 邊框
+        touchAreaPaint.color = color
+        touchAreaPaint.alpha = 180
+        touchAreaPaint.strokeWidth = 2f * density
+        canvas.drawCircle(touchAreaX, touchAreaY, radius, touchAreaPaint)
+
+        // 中心十字
+        val crossSize = 4f * density
+        touchAreaPaint.alpha = 220
+        touchAreaPaint.strokeWidth = 1.5f * density
+        canvas.drawLine(touchAreaX - crossSize, touchAreaY, touchAreaX + crossSize, touchAreaY, touchAreaPaint)
+        canvas.drawLine(touchAreaX, touchAreaY - crossSize, touchAreaX, touchAreaY + crossSize, touchAreaPaint)
+    }
+
     // -------------------------------------------------------------------------
     // 環形模式選單
     // -------------------------------------------------------------------------
@@ -2131,11 +2185,29 @@ class KeyboardView(context: Context) : View(context) {
         val x = event.x
         val y = event.y
 
+        // 觸控面積追蹤
+        if (showTouchAreaEnabled) {
+            when (event.action) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
+                    touchAreaX = x
+                    touchAreaY = y
+                    touchAreaSize = event.size
+                    touchAreaPressure = event.pressure
+                    touchAreaActive = true
+                    invalidate()
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    touchAreaActive = false
+                    invalidate()
+                }
+            }
+        }
+
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 // 候選列觸控（含展開箭頭）
-                // 候選列攔截只在中間區域生效（不含最底部 8dp，讓給第一排按鍵上緣）
-                val candidateHitZone = candidateBarHeight - 8f * density
+                // 候選列攔截只在中間區域生效（不含最底部 4dp，讓給第一排按鍵上緣）
+                val candidateHitZone = candidateBarHeight - 4f * density
                 if (y < candidateHitZone && candidates.isNotEmpty()) {
                     candidateLastTouchX = x
                     candidateDownX = x
@@ -2216,7 +2288,7 @@ class KeyboardView(context: Context) : View(context) {
                 if (candidateTouchActive && candidates.isNotEmpty()) {
                     handler.removeCallbacks(candidateLongPressRunnable)
                     val dx = candidateLastTouchX - x
-                    if (!candidateIsDragging && Math.abs(dx) > 8 * density) {
+                    if (!candidateIsDragging && Math.abs(dx) > 16 * density) {
                         candidateIsDragging = true
                     }
                     if (candidateIsDragging) {
@@ -2411,11 +2483,17 @@ class KeyboardView(context: Context) : View(context) {
                     candidateTouchActive = false
 
                     if (candidateLongPressActive) {
+                        val lpIdx = candidateLongPressIndex
                         candidateLongPressActive = false
                         candidateLongPressIndex = -1
                         invalidate()
+                        // 長按放開 → 選擇放大鏡顯示的候選字（而非只取消放大鏡）
+                        if (lpIdx >= 0 && lpIdx < candidates.size) {
+                            onCandidateSpeakListener?.invoke(candidates[lpIdx])
+                            onCandidateSelectListener?.invoke(lpIdx)
+                        }
                         performClick()
-                        return true  // 長按：不選字，只取消放大鏡
+                        return true
                     }
 
                     val totalDragX = Math.abs(x - candidateDownX)

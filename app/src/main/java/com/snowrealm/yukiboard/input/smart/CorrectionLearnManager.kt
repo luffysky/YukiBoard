@@ -20,7 +20,7 @@ class CorrectionLearnManager(context: Context) {
         context.getSharedPreferences("yukiboard_correction_learn", Context.MODE_PRIVATE)
 
     // typed → (candidate → CorrectionEntry)
-    private val entries = mutableMapOf<String, MutableMap<String, CorrectionEntry>>()
+    private val entries = java.util.concurrent.ConcurrentHashMap<String, MutableMap<String, CorrectionEntry>>()
 
     init { loadAll() }
 

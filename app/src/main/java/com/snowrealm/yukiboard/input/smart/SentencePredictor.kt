@@ -21,10 +21,10 @@ class SentencePredictor(context: Context) {
         context.getSharedPreferences("yukiboard_sentence_predict", Context.MODE_PRIVATE)
 
     // 學習的句子 bigram：前句 → { 回覆句 → 次數 }
-    private val sentenceBigrams = mutableMapOf<String, MutableMap<String, Int>>()
+    private val sentenceBigrams = java.util.concurrent.ConcurrentHashMap<String, MutableMap<String, Int>>()
 
     // 句子片段接續：句首 → { 完整句 → 次數 }
-    private val sentencePrefixes = mutableMapOf<String, MutableMap<String, Int>>()
+    private val sentencePrefixes = java.util.concurrent.ConcurrentHashMap<String, MutableMap<String, Int>>()
 
     // 最近提交的句子（用於學習 bigram）
     private var lastCommittedSentence: String = ""

@@ -256,6 +256,12 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
                         setSurface(Surface(st))
                         isLooping = true
                         setVolume(0f, 0f)
+                        setOnErrorListener { _, what, extra ->
+                            android.util.Log.e("KeyboardBgView", "MediaPlayer error: what=$what extra=$extra")
+                            // 錯誤後釋放資源，避免卡在錯誤狀態
+                            releaseMediaPlayer()
+                            true
+                        }
                         prepareAsync()
                         setOnPreparedListener { player ->
                             this@KeyboardBackgroundView.videoWidth = player.videoWidth
@@ -304,6 +310,11 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
                         setSurface(Surface(st))
                         isLooping = true
                         setVolume(0f, 0f)
+                        setOnErrorListener { _, what, extra ->
+                            android.util.Log.e("KeyboardBgView", "MediaPlayer error: what=$what extra=$extra")
+                            releaseMediaPlayer()
+                            true
+                        }
                         prepareAsync()
                         setOnPreparedListener { player ->
                             this@KeyboardBackgroundView.videoWidth = player.videoWidth
@@ -347,6 +358,8 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
         if (currentType == BackgroundType.VIDEO && isVideoFile(savedBg) && mediaPlayer != null
             && currentLoadedPath == savedBg.absolutePath) {
             applyVideoTransform()
+            // 確保影片在播放中（可能被 pause 或錯誤中斷）
+            resume()
             return true
         }
         if (currentType == BackgroundType.IMAGE && !isVideoFile(savedBg) && imageView != null
@@ -400,7 +413,14 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
     fun resume() {
         mediaPlayer?.let { mp ->
             if (!mp.isPlaying) {
-                try { mp.start() } catch (_: Exception) {}
+                try { mp.start() } catch (_: Exception) {
+                    // MediaPlayer 狀態異常，嘗試重新載入
+                    val path = currentLoadedPath
+                    if (path != null && currentType == BackgroundType.VIDEO) {
+                        releaseMediaPlayer()
+                        setVideoBackground(File(path))
+                    }
+                }
             }
         }
     }

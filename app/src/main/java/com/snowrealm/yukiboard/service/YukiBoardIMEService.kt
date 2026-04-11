@@ -510,7 +510,15 @@ class YukiBoardIMEService : InputMethodService() {
                 return@setOnCandidateSelectListener
             }
 
-            val result = inputRouter.selectCandidate(index)
+            // 如果是 Service 端附加的候選（如 AUTO 雙語候選），Router 不認識 → 直接 commit
+            val isExtraCand = displayedText != null && index >= inputRouter.candidates.size
+            val result = if (isExtraCand) {
+                // 先清掉 composing，然後 directCommit
+                inputRouter.reset()
+                InputResult.CommitText(displayedText!!)
+            } else {
+                inputRouter.selectCandidate(index)
+            }
             // 面板輸入模式：選字提交到面板而非目標 App
             val activeTarget = activePanelInputTarget()
             if (activeTarget != null && result is InputResult.CommitText) {
@@ -548,10 +556,17 @@ class YukiBoardIMEService : InputMethodService() {
                         // 手動選了其他語言 → 關閉 AUTO
                         prefs.autoInputMode = false
                     }
-                    inputRouter.switchTo(mode)
+                    val switchResult = inputRouter.switchTo(mode)
+                    // 切換前引擎的未提交文字 → commit 到 InputConnection
+                    if (switchResult is InputResult.CommitText) {
+                        currentInputConnection?.commitText(switchResult.text, 1)
+                    }
+                    currentInputConnection?.finishComposingText()
                     characterView?.playSwitchLang()
                     keyboardView.currentInputMode = mode
                     keyboardView.updateKeyRows(rowsForInputMode(mode))
+                    keyboardView.updateComposingText("")
+                    keyboardView.updateCandidates(emptyList())
                     keyboardView.showToast(if (mode == InputMode.AUTO) "⚡ 已啟動智慧輸入法" else mode.displayName)
                 }
                 is RadialLanguageMenu.LanguageOption.Emoji -> {
@@ -564,7 +579,8 @@ class YukiBoardIMEService : InputMethodService() {
 
         keyboardView.setOnFloatingToggleListener {
             prefs.floatingModeEnabled = !prefs.floatingModeEnabled
-            // 重新載入鍵盤以套用懸浮模式
+            // 重建前清理面板狀態，避免洩漏舊引用
+            closePanel()
             setInputView(onCreateInputView())
         }
 
@@ -616,6 +632,7 @@ class YukiBoardIMEService : InputMethodService() {
         keyboardView.hapticEnabled = prefs.keyPressVibration
         keyboardView.swipeTrailEnabled = prefs.swipeTrailEnabled
         keyboardView.swipeInputEnabled = prefs.swipeInput
+        keyboardView.showTouchAreaEnabled = prefs.showTouchArea
 
         // 單手模式
         keyboardView.oneHandSide = try {
@@ -630,6 +647,7 @@ class YukiBoardIMEService : InputMethodService() {
         keyboardView.applyTheme(currentTheme)
         toolbarView.theme = currentTheme
         toolbarView.setAnimStyle(prefs.toolbarAnimStyle)
+        toolbarView.hiddenPanels = buildHiddenPanelSet()
         keyboardView.setAnimStyle(prefs.toolbarAnimStyle)
 
         // 動態粒子覆蓋層（在鍵盤上方、GL 下方）
@@ -762,9 +780,10 @@ class YukiBoardIMEService : InputMethodService() {
             }
         }
 
-        // AUTO 模式啟動
+        // AUTO 模式啟動（onStartInputView 已 reset，不需處理 switchTo 回傳的 commitResult）
         if (prefs.autoInputMode && inputRouter.inputMode != InputMode.AUTO) {
-            inputRouter.switchTo(InputMode.AUTO)
+            val sr = inputRouter.switchTo(InputMode.AUTO)
+            if (sr is InputResult.CommitText) currentInputConnection?.commitText(sr.text, 1)
         }
 
         // 同步鍵盤顯示的語言（保留使用者上次選擇的輸入法）
@@ -818,6 +837,7 @@ class YukiBoardIMEService : InputMethodService() {
 
         // 同步動畫主題（設定頁/主題面板可能已更改）
         toolbarView.setAnimStyle(prefs.toolbarAnimStyle)
+        toolbarView.hiddenPanels = buildHiddenPanelSet()
         keyboardView.setAnimStyle(prefs.toolbarAnimStyle)
 
         // 同步角色動畫顯示偏好（設定頁可能已更改）
@@ -869,6 +889,7 @@ class YukiBoardIMEService : InputMethodService() {
         keyboardView.hapticEnabled = prefs.keyPressVibration
         keyboardView.swipeTrailEnabled = prefs.swipeTrailEnabled
         keyboardView.swipeInputEnabled = prefs.swipeInput
+        keyboardView.showTouchAreaEnabled = prefs.showTouchArea
 
         // 影片背景耗電提示（僅顯示一次）
         val savedBg = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getSavedBackground(this)
@@ -993,6 +1014,8 @@ class YukiBoardIMEService : InputMethodService() {
 
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
+        aiCandidateJob?.cancel()
+        aiCandidateJob = null
         inputRouter.smartInput.persist()
         inputRouter.reset()
         shakeDetector.stop()
@@ -1153,6 +1176,32 @@ class YukiBoardIMEService : InputMethodService() {
         }
     }
 
+    /** 根據 YukiPreferences 建構要隱藏的功能列項目集合 */
+    private fun buildHiddenPanelSet(): Set<PanelType> {
+        val hidden = mutableSetOf<PanelType>()
+        if (!prefs.toolbarVoice) hidden += PanelType.VOICE
+        if (!prefs.toolbarTranslate) hidden += PanelType.TRANSLATE
+        if (!prefs.toolbarGif) hidden += PanelType.GIF
+        if (!prefs.toolbarEmoji) hidden += PanelType.EMOJI
+        if (!prefs.toolbarKaomoji) hidden += PanelType.KAOMOJI
+        if (!prefs.toolbarSticker) hidden += PanelType.STICKER
+        if (!prefs.toolbarClipboard) hidden += PanelType.CLIPBOARD
+        if (!prefs.toolbarRemote) hidden += PanelType.REMOTE
+        if (!prefs.toolbarClaw) hidden += PanelType.CLAW
+        if (!prefs.toolbarCalculator) hidden += PanelType.CALCULATOR
+        if (!prefs.toolbarPhrase) hidden += PanelType.PHRASE
+        if (!prefs.toolbarUserDict) hidden += PanelType.USER_DICT
+        if (!prefs.toolbarDecrypt) hidden += PanelType.DECRYPT
+        if (!prefs.toolbarColorPicker) hidden += PanelType.COLOR_PICKER
+        if (!prefs.toolbarUnitConverter) hidden += PanelType.UNIT_CONVERTER
+        if (!prefs.toolbarHandwriting) hidden += PanelType.HANDWRITING
+        if (!prefs.toolbarMusic) hidden += PanelType.MUSIC
+        if (!prefs.toolbarDictionary) hidden += PanelType.DICTIONARY
+        if (!prefs.toolbarLangLearn) hidden += PanelType.LANG_LEARN
+        if (!prefs.toolbarTheme) hidden += PanelType.THEME
+        return hidden
+    }
+
     private fun handlePanelToggle(panel: PanelType) {
         // 再次點擊同一面板 → 關閉
         if (activePanel == panel) {
@@ -1160,21 +1209,25 @@ class YukiBoardIMEService : InputMethodService() {
             return
         }
 
-        activePanel = panel
-        toolbarView.activePanel = panel
-
         when (panel) {
             PanelType.VOICE -> {
-                closePanel()
+                // VOICE/SETTINGS 不是真正的面板，不呼叫 closePanel 以免殺掉 composing text
+                activePanel = null
+                toolbarView.activePanel = null
                 toggleVoiceInput()
                 return
             }
             PanelType.SETTINGS -> {
-                closePanel()
+                activePanel = null
+                toolbarView.activePanel = null
                 openSettings()
                 return
             }
-            else -> showPanel(panel)
+            else -> {
+                activePanel = panel
+                toolbarView.activePanel = panel
+                showPanel(panel)
+            }
         }
     }
 
@@ -1425,7 +1478,8 @@ class YukiBoardIMEService : InputMethodService() {
                     keyboardView.invalidate()
                 }
                 p.onKeyboardHeightChanged = {
-                    // 重建鍵盤高度需要重新設定 InputView
+                    // 重建前清理面板狀態
+                    closePanel()
                     setInputView(onCreateInputView())
                 }
                 p
@@ -2417,6 +2471,7 @@ class YukiBoardIMEService : InputMethodService() {
             prefs.floatingModeEnabled = false
             prefs.floatingX = -1
             prefs.floatingY = -1
+            closePanel()
             setInputView(onCreateInputView())
         }
 
@@ -2914,248 +2969,18 @@ class YukiBoardIMEService : InputMethodService() {
             swipeInputCandidates = emptyList()
             swipeAccumulated.clear()
         }
-        // 翻譯面板輸入模式：CJK 走 InputRouter，英文直接輸入
-        val tp = translatePanel
-        if (tp != null && tp.isInInputMode) {
-            val isCjk = inputRouter.inputMode != InputMode.ENGLISH
-            when (keyCode) {
-                KeyboardView.KEYCODE_DELETE -> {
-                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
-                        inputRouter.processDelete()
-                        keyboardView.updateComposingText(inputRouter.composingText)
-                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
-                    } else {
-                        tp.onDeleteInput()
-                    }
-                }
-                KeyboardView.KEYCODE_ENTER -> {
-                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
-                        tp.onComposedTextInput(inputRouter.composingText)
-                        inputRouter.reset()
-                        keyboardView.updateComposingText("")
-                        keyboardView.updateCandidates(emptyList())
-                    }
-                    tp.onEnterInput()
-                }
-                KeyboardView.KEYCODE_SPACE -> {
-                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
-                        val result = inputRouter.processSpace()
-                        if (result is InputResult.CommitText) {
-                            tp.onComposedTextInput(result.text)
-                        }
-                        keyboardView.updateComposingText(inputRouter.composingText)
-                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
-                    } else {
-                        tp.onSpaceInput()
-                    }
-                }
-                KeyboardView.KEYCODE_SWITCH_LANG -> handleSwitchLang()
-                KeyboardView.KEYCODE_SHIFT, KeyboardView.KEYCODE_CTRL -> { }
-                else -> if (label.isNotEmpty() && keyCode >= 0) {
-                    if (isCjk) {
-                        val result = inputRouter.processInput(label)
-                        if (result is InputResult.CommitText) {
-                            tp.onComposedTextInput(result.text)
-                        }
-                        keyboardView.updateComposingText(inputRouter.composingText)
-                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
-                        tp.updateComposingHint(inputRouter.composingText)
-                    } else {
-                        tp.onCharInput(label)
-                    }
-                }
-            }
-            return
-        }
-
-        // GIF 面板輸入模式：攔截鍵盤輸入到搜尋框
-        val gp = gifPanel
-        if (gp != null && gp.isInInputMode) {
-            val isCjk = inputRouter.inputMode != InputMode.ENGLISH
-            when (keyCode) {
-                KeyboardView.KEYCODE_DELETE -> {
-                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
-                        inputRouter.processDelete()
-                        keyboardView.updateComposingText(inputRouter.composingText)
-                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
-                    } else {
-                        gp.onDeleteInput()
-                    }
-                }
-                KeyboardView.KEYCODE_ENTER -> {
-                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
-                        // 先提交組字到搜尋框
-                        gp.onComposedTextInput(inputRouter.composingText)
-                        inputRouter.reset()
-                        keyboardView.updateComposingText("")
-                        keyboardView.updateCandidates(emptyList())
-                    }
-                    gp.onEnterInput()
-                }
-                KeyboardView.KEYCODE_SPACE -> {
-                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
-                        val result = inputRouter.processSpace()
-                        if (result is InputResult.CommitText) {
-                            gp.onComposedTextInput(result.text)
-                        }
-                        keyboardView.updateComposingText(inputRouter.composingText)
-                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
-                    } else {
-                        gp.onSpaceInput()
-                    }
-                }
-                KeyboardView.KEYCODE_SWITCH_LANG -> handleSwitchLang()
-                KeyboardView.KEYCODE_SHIFT, KeyboardView.KEYCODE_CTRL -> { }
-                else -> if (label.isNotEmpty() && keyCode >= 0) {
-                    if (isCjk) {
-                        val result = inputRouter.processInput(label)
-                        if (result is InputResult.CommitText) {
-                            gp.onComposedTextInput(result.text)
-                        }
-                        keyboardView.updateComposingText(inputRouter.composingText)
-                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
-                        gp.updateComposingHint(inputRouter.composingText)
-                    } else {
-                        gp.onCharInput(label)
-                    }
-                }
-            }
-            return
-        }
-
-        // 使用者詞庫面板輸入模式：攔截鍵盤輸入到搜尋框
-        val udp = userDictPanel
-        if (udp != null && udp.isInInputMode) {
-            val isCjk = inputRouter.inputMode != InputMode.ENGLISH
-            when (keyCode) {
-                KeyboardView.KEYCODE_DELETE -> {
-                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
-                        inputRouter.processDelete()
-                        keyboardView.updateComposingText(inputRouter.composingText)
-                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
-                    } else udp.onDeleteInput()
-                }
-                KeyboardView.KEYCODE_ENTER -> {
-                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
-                        udp.onComposedTextInput(inputRouter.composingText)
-                        inputRouter.reset()
-                        keyboardView.updateComposingText("")
-                        keyboardView.updateCandidates(emptyList())
-                    }
-                    udp.onEnterInput()
-                }
-                KeyboardView.KEYCODE_SPACE -> {
-                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
-                        val result = inputRouter.processSpace()
-                        if (result is InputResult.CommitText) udp.onComposedTextInput(result.text)
-                        keyboardView.updateComposingText(inputRouter.composingText)
-                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
-                    } else udp.onSpaceInput()
-                }
-                KeyboardView.KEYCODE_SWITCH_LANG -> handleSwitchLang()
-                KeyboardView.KEYCODE_SHIFT, KeyboardView.KEYCODE_CTRL -> { }
-                else -> if (label.isNotEmpty() && keyCode >= 0) {
-                    if (isCjk) {
-                        val result = inputRouter.processInput(label)
-                        if (result is InputResult.CommitText) udp.onComposedTextInput(result.text)
-                        keyboardView.updateComposingText(inputRouter.composingText)
-                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
-                        udp.updateComposingHint(inputRouter.composingText)
-                    } else udp.onCharInput(label)
-                }
-            }
-            return
-        }
-
-        // 解密面板輸入模式：攔截鍵盤輸入到密碼/密文欄
-        val dp = decryptPanel
-        if (dp != null && dp.isInInputMode) {
-            val isCjk = inputRouter.inputMode != InputMode.ENGLISH
-            when (keyCode) {
-                KeyboardView.KEYCODE_DELETE -> {
-                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
-                        inputRouter.processDelete()
-                        keyboardView.updateComposingText(inputRouter.composingText)
-                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
-                    } else dp.onDeleteInput()
-                }
-                KeyboardView.KEYCODE_ENTER -> {
-                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
-                        dp.onComposedTextInput(inputRouter.composingText)
-                        inputRouter.reset()
-                        keyboardView.updateComposingText("")
-                        keyboardView.updateCandidates(emptyList())
-                    }
-                    dp.onEnterInput()
-                }
-                KeyboardView.KEYCODE_SPACE -> {
-                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
-                        val result = inputRouter.processSpace()
-                        if (result is InputResult.CommitText) dp.onComposedTextInput(result.text)
-                        keyboardView.updateComposingText(inputRouter.composingText)
-                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
-                    } else dp.onSpaceInput()
-                }
-                KeyboardView.KEYCODE_SWITCH_LANG -> handleSwitchLang()
-                KeyboardView.KEYCODE_SHIFT, KeyboardView.KEYCODE_CTRL -> { }
-                else -> if (label.isNotEmpty() && keyCode >= 0) {
-                    if (isCjk) {
-                        val result = inputRouter.processInput(label)
-                        if (result is InputResult.CommitText) dp.onComposedTextInput(result.text)
-                        keyboardView.updateComposingText(inputRouter.composingText)
-                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
-                        dp.updateComposingHint(inputRouter.composingText)
-                    } else dp.onCharInput(label)
-                }
-            }
-            return
-        }
-
-        // 字典 / 語言學習面板輸入模式：通用 PanelInputTarget 路由
-        val genericPanel: PanelInputTarget? = when {
+        // 面板輸���模式：統一路由所有實作 PanelInputTarget 的面板
+        val activeTarget: PanelInputTarget? = when {
+            translatePanel?.isInInputMode == true -> translatePanel
+            gifPanel?.isInInputMode == true -> gifPanel
+            userDictPanel?.isInInputMode == true -> userDictPanel
+            decryptPanel?.isInInputMode == true -> decryptPanel
             dictionaryPanel?.isInInputMode == true -> dictionaryPanel
             langLearnPanel?.isInInputMode == true -> langLearnPanel
             else -> null
         }
-        if (genericPanel != null) {
-            val isCjk = inputRouter.inputMode != InputMode.ENGLISH
-            when (keyCode) {
-                KeyboardView.KEYCODE_DELETE -> {
-                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
-                        inputRouter.processDelete()
-                        keyboardView.updateComposingText(inputRouter.composingText)
-                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
-                    } else genericPanel.onDeleteInput()
-                }
-                KeyboardView.KEYCODE_ENTER -> {
-                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
-                        genericPanel.onComposedTextInput(inputRouter.composingText)
-                        inputRouter.reset()
-                        keyboardView.updateComposingText("")
-                        keyboardView.updateCandidates(emptyList())
-                    }
-                    genericPanel.onEnterInput()
-                }
-                KeyboardView.KEYCODE_SPACE -> {
-                    if (isCjk && inputRouter.composingText.isNotEmpty()) {
-                        val result = inputRouter.processSpace()
-                        if (result is InputResult.CommitText) genericPanel.onComposedTextInput(result.text)
-                        keyboardView.updateComposingText(inputRouter.composingText)
-                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
-                    } else genericPanel.onSpaceInput()
-                }
-                KeyboardView.KEYCODE_SWITCH_LANG -> handleSwitchLang()
-                KeyboardView.KEYCODE_SHIFT, KeyboardView.KEYCODE_CTRL -> { }
-                else -> if (label.isNotEmpty() && keyCode >= 0) {
-                    if (isCjk) {
-                        val result = inputRouter.processInput(label)
-                        if (result is InputResult.CommitText) genericPanel.onComposedTextInput(result.text)
-                        keyboardView.updateComposingText(inputRouter.composingText)
-                        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
-                        genericPanel.updateComposingHint(inputRouter.composingText)
-                    } else genericPanel.onCharInput(label)
-                }
-            }
+        if (activeTarget != null) {
+            routeKeyToPanel(activeTarget, keyCode, label)
             return
         }
 
@@ -3180,20 +3005,21 @@ class YukiBoardIMEService : InputMethodService() {
         inputRouter.contextBeforeCursor = ic.getTextBeforeCursor(200, 0)?.toString() ?: ""
 
         ic.beginBatchEdit()
+        var needsPostUpdate = true  // 是否需要在 when 結束後更新 composing/candidates
         try {
         when (keyCode) {
-            KeyboardView.KEYCODE_SHIFT, KeyboardView.KEYCODE_CTRL -> { }
+            KeyboardView.KEYCODE_SHIFT, KeyboardView.KEYCODE_CTRL -> { needsPostUpdate = false }
 
-            KeyboardView.KEYCODE_TAB         -> handleTab(ic)
-            KeyboardView.KEYCODE_ARROW_LEFT  -> sendArrow(ic, KeyEvent.KEYCODE_DPAD_LEFT)
-            KeyboardView.KEYCODE_ARROW_RIGHT -> sendArrow(ic, KeyEvent.KEYCODE_DPAD_RIGHT)
-            KeyboardView.KEYCODE_ARROW_UP    -> sendArrow(ic, KeyEvent.KEYCODE_DPAD_UP)
-            KeyboardView.KEYCODE_ARROW_DOWN  -> sendArrow(ic, KeyEvent.KEYCODE_DPAD_DOWN)
+            KeyboardView.KEYCODE_TAB         -> { handleTab(ic); needsPostUpdate = false }
+            KeyboardView.KEYCODE_ARROW_LEFT  -> { sendArrow(ic, KeyEvent.KEYCODE_DPAD_LEFT); needsPostUpdate = false }
+            KeyboardView.KEYCODE_ARROW_RIGHT -> { sendArrow(ic, KeyEvent.KEYCODE_DPAD_RIGHT); needsPostUpdate = false }
+            KeyboardView.KEYCODE_ARROW_UP    -> { sendArrow(ic, KeyEvent.KEYCODE_DPAD_UP); needsPostUpdate = false }
+            KeyboardView.KEYCODE_ARROW_DOWN  -> { sendArrow(ic, KeyEvent.KEYCODE_DPAD_DOWN); needsPostUpdate = false }
 
-            KeyboardView.KEYCODE_DELETE      -> handleDelete(ic)
-            KeyboardView.KEYCODE_ENTER       -> handleEnter(ic)
-            KeyboardView.KEYCODE_SPACE       -> handleSpace(ic)
-            KeyboardView.KEYCODE_SWITCH_LANG -> handleSwitchLang()
+            KeyboardView.KEYCODE_DELETE      -> { handleDelete(ic); needsPostUpdate = false }
+            KeyboardView.KEYCODE_ENTER       -> { handleEnter(ic); needsPostUpdate = false }
+            KeyboardView.KEYCODE_SPACE       -> { handleSpace(ic); needsPostUpdate = false }
+            KeyboardView.KEYCODE_SWITCH_LANG -> { handleSwitchLang(); needsPostUpdate = false }
 
             KeyboardView.KEYCODE_CTRL_C -> ic.performContextMenuAction(android.R.id.copy)
             KeyboardView.KEYCODE_CTRL_V -> ic.performContextMenuAction(android.R.id.paste)
@@ -3342,6 +3168,11 @@ class YukiBoardIMEService : InputMethodService() {
         // 觸發角色打字動畫（節流：每 N 次按鍵才播放，避免拖慢輸入）
         characterView?.onKeystroke()
 
+        // Delete/Enter/Space 等已在 handler 內自行更新 UI，避免重複
+        if (!needsPostUpdate) {
+            requestAICandidates()
+        } else {
+
         keyboardView.updateComposingText(inputRouter.composingText)
 
         // 候選列為空時，僅在開發者模式且有高信心預測時顯示提示
@@ -3373,6 +3204,8 @@ class YukiBoardIMEService : InputMethodService() {
 
         // AI 候選字 debounce：有組字或上下文時觸發
         requestAICandidates()
+
+        } // end needsPostUpdate else
 
         } finally {
             ic.endBatchEdit()
@@ -3585,6 +3418,63 @@ class YukiBoardIMEService : InputMethodService() {
             val langId = mode.langId ?: mode.name.lowercase()
             KeyboardState.latinRowsFromPack(langId)
         }
+    }
+
+    /**
+     * 面板輸入路由：將鍵盤按鍵轉發給面板的 PanelInputTarget。
+     * CJK 語言走 InputRouter（注音/拼音/倉頡/日韓需要組字），拉丁語系直接送字元。
+     * @return true 表示已處理，呼叫端應 return
+     */
+    private fun routeKeyToPanel(panel: PanelInputTarget, keyCode: Int, label: String): Boolean {
+        val isCjk = inputRouter.isCurrentCjk()
+        when (keyCode) {
+            KeyboardView.KEYCODE_DELETE -> {
+                if (isCjk && inputRouter.composingText.isNotEmpty()) {
+                    inputRouter.processDelete()
+                    keyboardView.updateComposingText(inputRouter.composingText)
+                    keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
+                } else {
+                    panel.onDeleteInput()
+                }
+            }
+            KeyboardView.KEYCODE_ENTER -> {
+                if (isCjk && inputRouter.composingText.isNotEmpty()) {
+                    panel.onComposedTextInput(inputRouter.composingText)
+                    inputRouter.reset()
+                    keyboardView.updateComposingText("")
+                    keyboardView.updateCandidates(emptyList())
+                }
+                panel.onEnterInput()
+            }
+            KeyboardView.KEYCODE_SPACE -> {
+                if (isCjk && inputRouter.composingText.isNotEmpty()) {
+                    val result = inputRouter.processSpace()
+                    if (result is InputResult.CommitText) {
+                        panel.onComposedTextInput(result.text)
+                    }
+                    keyboardView.updateComposingText(inputRouter.composingText)
+                    keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
+                } else {
+                    panel.onSpaceInput()
+                }
+            }
+            KeyboardView.KEYCODE_SWITCH_LANG -> handleSwitchLang()
+            KeyboardView.KEYCODE_SHIFT, KeyboardView.KEYCODE_CTRL -> { }
+            else -> if (label.isNotEmpty() && keyCode >= 0) {
+                if (isCjk) {
+                    val result = inputRouter.processInput(label)
+                    if (result is InputResult.CommitText) {
+                        panel.onComposedTextInput(result.text)
+                    }
+                    keyboardView.updateComposingText(inputRouter.composingText)
+                    keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
+                    panel.updateComposingHint(inputRouter.composingText)
+                } else {
+                    panel.onCharInput(label)
+                }
+            }
+        }
+        return true
     }
 
     private fun applyInputResult(ic: InputConnection, result: InputResult) {

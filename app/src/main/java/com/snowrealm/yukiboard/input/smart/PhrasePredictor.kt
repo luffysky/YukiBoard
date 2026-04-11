@@ -21,9 +21,9 @@ class PhrasePredictor(context: Context) {
         context.getSharedPreferences("yukiboard_phrase_predict", Context.MODE_PRIVATE)
 
     // bigram: "hello" → { "world":5, "there":3 }
-    private val bigrams = mutableMapOf<String, MutableMap<String, Int>>()
+    private val bigrams = java.util.concurrent.ConcurrentHashMap<String, MutableMap<String, Int>>()
     // trigram: "how are" → { "you":10, "things":2 }
-    private val trigrams = mutableMapOf<String, MutableMap<String, Int>>()
+    private val trigrams = java.util.concurrent.ConcurrentHashMap<String, MutableMap<String, Int>>()
 
     private val recentWords = ArrayDeque<String>(3)
 
@@ -178,18 +178,29 @@ class PhrasePredictor(context: Context) {
         map[next] = (map[next] ?: 0) + 1
         // 防止 map 過大
         if (map.size > MAX_ENTRIES_PER_KEY) pruneMap(map)
+        // 防止 top-level key 無限增長
+        if (bigrams.size > MAX_TOP_KEYS) pruneTopKeys(bigrams)
     }
 
     private fun incrementTrigram(key: String, next: String) {
         val map = trigrams.getOrPut(key) { mutableMapOf() }
         map[next] = (map[next] ?: 0) + 1
         if (map.size > MAX_ENTRIES_PER_KEY) pruneMap(map)
+        if (trigrams.size > MAX_TOP_KEYS) pruneTopKeys(trigrams)
     }
 
     private fun pruneMap(map: MutableMap<String, Int>) {
         val sorted = map.entries.sortedBy { it.value }
         val toRemove = sorted.take(map.size - MAX_ENTRIES_PER_KEY + 10)
         for (entry in toRemove) map.remove(entry.key)
+    }
+
+    /** 淘汰 top-level key 最少使用的條目 */
+    private fun pruneTopKeys(data: MutableMap<String, MutableMap<String, Int>>) {
+        val scored = data.entries.map { (k, v) -> k to v.values.sum() }
+            .sortedBy { it.second }
+        val toRemove = scored.take(data.size - MAX_TOP_KEYS + 50)
+        for ((key, _) in toRemove) data.remove(key)
     }
 
     private fun loadAll() {
@@ -225,5 +236,6 @@ class PhrasePredictor(context: Context) {
         const val BIGRAM_WEIGHT = 1.0f
         const val TRIGRAM_WEIGHT = 2.5f
         const val MAX_ENTRIES_PER_KEY = 50
+        const val MAX_TOP_KEYS = 2000
     }
 }

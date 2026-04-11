@@ -112,10 +112,12 @@ class AdaptiveDictionary(context: Context) {
 
     // ─────────────── 序列化 ───────────────
 
+    @Volatile private var indexDirty = false
+
     private fun save(entry: WordEntry) {
         val value = "${entry.frequency}|${entry.lastUsedMs}|${if (entry.isStandard) 1 else 0}|${if (entry.promoted) 1 else 0}"
         prefs.edit().putString("ad_${entry.word}", value).apply()
-        updateIndex()
+        indexDirty = true  // 延遲到 persist() 才寫入索引，避免每次按鍵都序列化全部 key
     }
 
     private fun loadAll() {
@@ -138,6 +140,12 @@ class AdaptiveDictionary(context: Context) {
 
     private fun updateIndex() {
         prefs.edit().putString("_ad_index", entries.keys.joinToString(",")).apply()
+        indexDirty = false
+    }
+
+    /** 持久化（onFinishInputView 時呼叫），將延遲的索引寫入磁碟 */
+    fun persist() {
+        if (indexDirty) updateIndex()
     }
 
     data class WordEntry(

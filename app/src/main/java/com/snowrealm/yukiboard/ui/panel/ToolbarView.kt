@@ -39,13 +39,25 @@ class ToolbarView(context: Context) : View(context) {
         strokeWidth = 1f * density
     }
 
-    // 面板按鈕分組
-    private val groups: List<List<PanelType>> = listOf(
+    // 面板按鈕分組（原始定義）
+    private val allGroups: List<List<PanelType>> = listOf(
         listOf(PanelType.CLAW, PanelType.VOICE, PanelType.TRANSLATE, PanelType.HANDWRITING, PanelType.DICTIONARY, PanelType.LANG_LEARN),        // AI 工具
         listOf(PanelType.EMOJI, PanelType.KAOMOJI, PanelType.STICKER, PanelType.GIF), // 內容
         listOf(PanelType.CLIPBOARD, PanelType.CALCULATOR, PanelType.PHRASE, PanelType.USER_DICT, PanelType.DECRYPT, PanelType.COLOR_PICKER, PanelType.UNIT_CONVERTER, PanelType.MUSIC, PanelType.REMOTE, PanelType.THEME, PanelType.SETTINGS), // 系統
     )
-    private val flatPanels = groups.flatten()
+
+    /** 被使用者隱藏的面板（SETTINGS 永遠顯示） */
+    var hiddenPanels: Set<PanelType> = emptySet()
+        set(value) { field = value; rebuildGroups(); invalidate() }
+
+    private var groups: List<List<PanelType>> = allGroups
+    private var flatPanels = groups.flatten()
+
+    private fun rebuildGroups() {
+        groups = allGroups.map { group -> group.filter { it !in hiddenPanels } }
+            .filter { it.isNotEmpty() }
+        flatPanels = groups.flatten()
+    }
 
     // 按鈕幾何
     private val btnPadH = 8f * density    // 按鈕水平內邊距

@@ -36,10 +36,19 @@ class InputRouter(private val context: Context) {
     private val japaneseEngine: InputEngine by lazy { JapaneseInputEngine(context) }
     private val koreanEngine: InputEngine by lazy { KoreanInputEngine(context) }
 
-    // 語言套件引擎（動態，僅在使用對應語言時才 lazy 載入）
-    private val latinEngines = mutableMapOf<String, InputEngine>()
-    private fun getLatinEngine(langId: String): InputEngine =
-        latinEngines.getOrPut(langId) { LatinInputEngine(context, langId) }
+    // 語言套件引擎（動態，僅在使用對應語言時才 lazy 載入，LRU 淘汰避免無限增長）
+    private val latinEngines = LinkedHashMap<String, InputEngine>(8, 0.75f, true)
+    private fun getLatinEngine(langId: String): InputEngine {
+        latinEngines[langId]?.let { return it }
+        if (latinEngines.size >= MAX_LATIN_ENGINES) {
+            val oldest = latinEngines.keys.first()
+            latinEngines.remove(oldest)
+        }
+        val engine = LatinInputEngine(context, langId)
+        latinEngines[langId] = engine
+        return engine
+    }
+    // MAX_LATIN_ENGINES 在 companion object 中定義
 
     val candidateManager = CandidateManager()
     val smartInput = SmartInputManager(context)
@@ -137,6 +146,18 @@ class InputRouter(private val context: Context) {
     val inputMode: InputMode get() = currentMode
     fun getActiveEngine(): InputEngine = activeEngine
 
+    /**
+     * 當前輸入是否使用 CJK 引擎（面板輸入路由用）。
+     * AUTO 模式根據實際啟動的引擎判斷，拉丁語系視為非 CJK。
+     */
+    fun isCurrentCjk(): Boolean = when (currentMode) {
+        InputMode.ENGLISH -> false
+        InputMode.AUTO -> activeEngine !is EnglishInputEngine && activeEngine !is LatinInputEngine
+        InputMode.BOPOMOFO, InputMode.PINYIN, InputMode.CANGJIE,
+        InputMode.SPEED_CANGJIE, InputMode.JAPANESE, InputMode.KOREAN -> true
+        else -> activeEngine !is EnglishInputEngine && activeEngine !is LatinInputEngine
+    }
+
     private val bopomofoDecoder = com.snowrealm.yukiboard.input.swipe.BopomofoSwipeDecoder()
     private val swipeRanker by lazy {
         com.snowrealm.yukiboard.input.swipe.SwipeCandidateRanker(
@@ -175,22 +196,26 @@ class InputRouter(private val context: Context) {
     // -------------------------------------------------------------------------
 
     /** 循環切換到下一個已啟用的輸入法 */
-    fun toggleLanguage() {
-        if (enabledModes.size <= 1) return
+    fun toggleLanguage(): InputResult {
+        if (enabledModes.size <= 1) return InputResult.Idle
         val currentIndex = enabledModes.indexOf(currentMode)
-        if (currentIndex < 0) return
+        if (currentIndex < 0) return InputResult.Idle
         val nextIndex = (currentIndex + 1) % enabledModes.size
-        switchTo(enabledModes[nextIndex])
+        return switchTo(enabledModes[nextIndex])
     }
 
-    /** 直接切換到指定模式 */
-    fun switchTo(mode: InputMode) {
-        if (mode == currentMode) return
-        // 切換前先提交當前 composing
+    /** 直接切換到指定模式。回傳切換前引擎的 forceCommit 結果，呼叫端必須 commit 到 IC。 */
+    fun switchTo(mode: InputMode): InputResult {
+        if (mode == currentMode) return InputResult.Idle
+        // 切換前先提交當前 composing（回傳給 Service 層 commit 到 InputConnection）
         val commitResult = activeEngine.forceCommit()
         currentMode = mode
         activeEngine = engineForMode(mode)
         candidateManager.clear()
+        // 清除 AUTO 模式的雙重解讀緩衝
+        autoQwertyBuffer.clear()
+        autoBopomofoBuffer.clear()
+        return commitResult
     }
 
     private fun engineForMode(mode: InputMode): InputEngine = when (mode) {
@@ -241,6 +266,16 @@ class InputRouter(private val context: Context) {
 
     fun processDelete(): InputResult {
         val result = activeEngine.processDelete()
+        // AUTO 模式：同步移除雙重解讀緩衝的最後一個字元
+        if (currentMode == InputMode.AUTO) {
+            if (autoQwertyBuffer.isNotEmpty()) autoQwertyBuffer.deleteCharAt(autoQwertyBuffer.lastIndex)
+            if (autoBopomofoBuffer.isNotEmpty()) autoBopomofoBuffer.removeLastOrNull()
+            // 引擎緩衝清空時，完全清除 auto 緩衝避免殘留
+            if (activeEngine.composingText.isEmpty()) {
+                autoQwertyBuffer.clear()
+                autoBopomofoBuffer.clear()
+            }
+        }
         updateCandidates()
         return result
     }
@@ -263,12 +298,14 @@ class InputRouter(private val context: Context) {
         val result = activeEngine.processEnter()
         if (result is InputResult.CommitText) {
             onTextCommitted(result.text)
-            // Enter = 句子結束，學習整句模式
-            smartInput.onSentenceCommitted(result.text)
+            // 整句學習由 Service 的 sentenceBuffer 統一呼叫，此處不重複呼叫
         }
         candidateManager.clear()
         smartInput.resetContext()
         lastCommittedWord = null  // Enter = 句子結束，不再顯示接續候選
+        // Enter 一律清除 auto 緩衝（不論有無 commit）
+        autoQwertyBuffer.clear()
+        autoBopomofoBuffer.clear()
         return result
     }
 
@@ -372,6 +409,9 @@ class InputRouter(private val context: Context) {
     fun reset() {
         activeEngine.reset()
         candidateManager.clear()
+        // AUTO 模式的雙重解讀緩衝也要清除，否則殘留字元會在下次輸入時被重播
+        autoQwertyBuffer.clear()
+        autoBopomofoBuffer.clear()
     }
 
     /** 預熱注音引擎索引（在 IO 執行緒呼叫） */
@@ -935,6 +975,7 @@ class InputRouter(private val context: Context) {
     }
 
     companion object {
+        const val MAX_LATIN_ENGINES = 10
         private val COMMON_WORD_FREQUENCY = mapOf(
             "的" to 40f, "是" to 38f, "在" to 35f, "了" to 34f, "我" to 33f,
             "他" to 32f, "她" to 32f, "你" to 32f, "們" to 30f, "不" to 30f,

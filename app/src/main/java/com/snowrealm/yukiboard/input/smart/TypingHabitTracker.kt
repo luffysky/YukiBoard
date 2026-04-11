@@ -20,9 +20,9 @@ class TypingHabitTracker(context: Context) {
         context.getSharedPreferences("yukiboard_habits", Context.MODE_PRIVATE)
 
     // 時段詞頻: "morning" → { "good":20, "coffee":5 }
-    private val periodWords = mutableMapOf<String, MutableMap<String, Int>>()
+    private val periodWords = java.util.concurrent.ConcurrentHashMap<String, MutableMap<String, Int>>()
     // App 詞頻: "com.linecorp.LINE" → { "哈哈":15, "OK":10 }
-    private val appWords = mutableMapOf<String, MutableMap<String, Int>>()
+    private val appWords = java.util.concurrent.ConcurrentHashMap<String, MutableMap<String, Int>>()
 
     // 打字速度追蹤
     private var lastKeystrokeMs = 0L
