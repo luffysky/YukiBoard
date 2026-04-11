@@ -183,11 +183,9 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
         }
     }
 
-    /** 根據 offsetX/offsetY + scaleMode + bgRotation 重新計算 matrix。
-     *
-     * 旋轉後需要用旋轉後的有效寬高來計算 scale，
-     * 確保旋轉後依然能填滿 View 而不露出邊界。
-     * 順序：scale → 置中 → 旋轉 → 偏移
+    /**
+     * 與 buildFullKeyboardPreview onDraw 完全相同的 Matrix。
+     * ImageView(MATRIX, MATCH_PARENT) 自動 clip，不需要特殊處理。
      */
     private fun applyOffset() {
         val iv = imageView ?: return
@@ -206,41 +204,22 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
         }
 
         imageMatrix.reset()
-        val cx = vw / 2f
-        val cy = vh / 2f
         val bw = bmpWidth.toFloat()
         val bh = bmpHeight.toFloat()
 
-        val isRotated = bgRotation == 90 || bgRotation == 270
-
         if (scaleMode == 1) {
-            // 整張塞入：旋轉後有效尺寸對齊 View
-            if (isRotated) {
-                imageMatrix.setTranslate(cx - bw / 2f, cy - bh / 2f)
-                imageMatrix.postRotate(bgRotation.toFloat(), cx, cy)
-                imageMatrix.postScale(vw / bh, vh / bw, cx, cy)
-            } else {
-                imageMatrix.setScale(vw / bw, vh / bh)
-                if (bgRotation == 180) {
-                    imageMatrix.postRotate(180f, cx, cy)
-                }
-            }
+            imageMatrix.setScale(vw / bw, vh / bh)
         } else {
-            // 保持比例 center-crop：用旋轉後的有效寬高
-            val effW = if (isRotated) bh else bw
-            val effH = if (isRotated) bw else bh
-
-            val scale = maxOf(vw / effW, vh / effH)
-            val maxDx = (effW * scale - vw).coerceAtLeast(0f)
-            val maxDy = (effH * scale - vh).coerceAtLeast(0f)
-
-            // scale → 置中 → 旋轉 → 偏移
+            val scale = maxOf(vw / bw, vh / bh)
+            val scaledW = bw * scale
+            val scaledH = bh * scale
+            val maxDx = (scaledW - vw).coerceAtLeast(0f)
+            val maxDy = (scaledH - vh).coerceAtLeast(0f)
             imageMatrix.setScale(scale, scale)
-            imageMatrix.postTranslate(cx - bw * scale / 2f, cy - bh * scale / 2f)
-            if (bgRotation != 0) {
-                imageMatrix.postRotate(bgRotation.toFloat(), cx, cy)
-            }
             imageMatrix.postTranslate(-maxDx * offsetX, -maxDy * offsetY)
+        }
+        if (bgRotation != 0) {
+            imageMatrix.postRotate(bgRotation.toFloat(), vw / 2f, vh / 2f)
         }
 
         savedMatrix.set(imageMatrix)

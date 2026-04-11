@@ -1510,17 +1510,20 @@ class SettingsActivity : AppCompatActivity() {
     private fun refreshBgPreview() {
         val savedBg = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getSavedBackground(this)
         if (savedBg != null && !com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.isVideoFile(savedBg)) {
-            // 圖片預覽 — Canvas View 使用 fullPreviewBgBitmap，統一載入
+            // 圖片預覽 — Canvas View 自帶遮罩，不需要外部 overlayView
             bgPreviewView?.visibility = View.VISIBLE
+            bgPreviewOverlay?.visibility = View.GONE
             bgPreviewLabel?.visibility = View.GONE
         } else if (savedBg != null) {
-            // 影片預覽：TextureView 播放
+            // 影片預覽：TextureView 播放，需要外部 overlayView
             stopVideoPreview()
             bgPreviewView?.visibility = View.GONE
+            bgPreviewOverlay?.visibility = View.VISIBLE
             bgPreviewLabel?.visibility = View.GONE
             startVideoPreview(savedBg.absolutePath)
         } else {
             bgPreviewView?.visibility = View.GONE
+            bgPreviewOverlay?.visibility = View.GONE
             bgPreviewLabel?.text = tr("尚未設定背景")
             bgPreviewLabel?.visibility = View.VISIBLE
         }
@@ -1581,6 +1584,7 @@ class SettingsActivity : AppCompatActivity() {
             withContext(Dispatchers.Main) {
                 fullPreviewBgBitmap = bmp
                 fullPreviewView?.invalidate()
+                bgPreviewView?.invalidate()
             }
         }
     }
