@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 160
-        versionName "0.9.94"
+        versionCode 161
+        versionName "0.9.95"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,9 +82,7 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 雲端同步（偏好+詞庫+主題+7種學習資料）\n" +
-                    "- feat: 設定頁新增雲端同步卡片（上傳/下載/開關）\n" +
-                    "- feat: Supabase user_learning_data 表（綁 Insight 帳號）"
+                    "- fix: 日文即時候選字按了沒反應（selectCandidateAt 漏掉非変換模式）"
             }
         }
         debug {
@@ -93,9 +91,7 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 雲端同步（偏好+詞庫+主題+7種學習資料）\n" +
-                    "- feat: 設定頁新增雲端同步卡片（上傳/下載/開關）\n" +
-                    "- feat: Supabase user_learning_data 表（綁 Insight 帳號）"
+                    "- fix: 日文即時候選字按了沒反應（selectCandidateAt 漏掉非変換模式）"
             }
         }
     }

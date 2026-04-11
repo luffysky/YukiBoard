@@ -221,8 +221,15 @@ class JapaneseInputEngine(context: Context? = null) : InputEngine {
      * Select a candidate by index and commit it.
      */
     fun selectCandidateAt(index: Int): InputResult {
-        if (!isConverting || candidates.isEmpty()) return InputResult.Idle
-        val text = candidates.getOrNull(index) ?: return InputResult.Idle
+        // 変換モード：从 candidates 选字
+        if (isConverting) {
+            val text = candidates.getOrNull(index) ?: return InputResult.Idle
+            resetState()
+            return InputResult.CommitText(text)
+        }
+        // 入力中：从即時候補（getCandidates）选字
+        val liveCandidates = getCandidates()
+        val text = liveCandidates.getOrNull(index) ?: return InputResult.Idle
         resetState()
         return InputResult.CommitText(text)
     }
