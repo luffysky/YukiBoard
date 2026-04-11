@@ -350,10 +350,10 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
         }
 
         // 同一檔案才跳過重載（不同檔案要重新載入）
-        if (currentType == BackgroundType.VIDEO && isVideoFile(savedBg) && mediaPlayer != null
-            && currentLoadedPath == savedBg.absolutePath) {
+        if (currentType == BackgroundType.VIDEO && isVideoFile(savedBg)
+            && currentLoadedPath == savedBg.absolutePath
+            && textureView != null) {
             applyVideoTransform()
-            // 確保影片在播放中（可能被 pause 或錯誤中斷）
             resume()
             return true
         }
@@ -406,21 +406,36 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
     }
 
     fun resume() {
-        if (mediaPlayer == null && currentType == BackgroundType.VIDEO && currentLoadedPath != null) {
-            // MediaPlayer 已被 onSurfaceTextureDestroyed 釋放，重新建立
-            setVideoBackground(File(currentLoadedPath!!))
-            return
-        }
-        mediaPlayer?.let { mp ->
-            if (!mp.isPlaying) {
-                try { mp.start() } catch (_: Exception) {
-                    // MediaPlayer 狀態異常，嘗試重新載入
-                    val path = currentLoadedPath
-                    if (path != null && currentType == BackgroundType.VIDEO) {
-                        releaseMediaPlayer()
-                        setVideoBackground(File(path))
+        val tv = textureView
+        val mp = mediaPlayer
+        val path = currentLoadedPath
+
+        when {
+            // Surface 可用且 MediaPlayer 存在 → 直接播放
+            tv != null && tv.isAvailable && mp != null -> {
+                if (!mp.isPlaying) {
+                    try {
+                        mp.start()
+                    } catch (_: Exception) {
+                        if (path != null) {
+                            releaseMediaPlayer()
+                            setVideoBackground(File(path))
+                        }
                     }
                 }
+            }
+
+            // Surface 不可用（IME window 重新顯示，Surface 失效）→ 重建 TextureView
+            tv != null && !tv.isAvailable && path != null -> {
+                releaseMediaPlayer()
+                removeView(tv)
+                textureView = null
+                setVideoBackground(File(path))
+            }
+
+            // MediaPlayer 不存在但有路徑 → 重建
+            mp == null && path != null && currentType == BackgroundType.VIDEO -> {
+                setVideoBackground(File(path))
             }
         }
     }

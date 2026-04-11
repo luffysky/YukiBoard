@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 142
-        versionName "0.9.76"
+        versionCode 143
+        versionName "0.9.77"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,9 +82,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: Android 13+ 媒體權限（READ_MEDIA_IMAGES/VIDEO）\n" +
-                    "- fix: 影片背景黑屏修復（SurfaceTexture 生命週期 + race condition）\n" +
-                    "- fix: 設定頁影片預覽改全 Main thread 避免 Surface 失效"
+                    "- fix: 影片背景 resume 重寫（Surface 失效偵測 + 自動重建）\n" +
+                    "- fix: onStartInputView 移除重複 resume，由 reloadFromStorage 統一處理\n" +
+                    "- fix: setInputView 重建前先 destroy 舊 backgroundView 避免資源洩漏"
             }
         }
         debug {
@@ -93,9 +93,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: Android 13+ 媒體權限（READ_MEDIA_IMAGES/VIDEO）\n" +
-                    "- fix: 影片背景黑屏修復（SurfaceTexture 生命週期 + race condition）\n" +
-                    "- fix: 設定頁影片預覽改全 Main thread 避免 Surface 失效"
+                    "- fix: 影片背景 resume 重寫（Surface 失效偵測 + 自動重建）\n" +
+                    "- fix: onStartInputView 移除重複 resume，由 reloadFromStorage 統一處理\n" +
+                    "- fix: setInputView 重建前先 destroy 舊 backgroundView 避免資源洩漏"
             }
         }
     }

@@ -589,6 +589,8 @@ class YukiBoardIMEService : InputMethodService() {
             prefs.floatingModeEnabled = !prefs.floatingModeEnabled
             // 重建前清理面板狀態，避免洩漏舊引用
             closePanel()
+            backgroundView?.destroy()
+            backgroundView = null
             setInputView(onCreateInputView())
         }
 
@@ -836,7 +838,7 @@ class YukiBoardIMEService : InputMethodService() {
         if (prefs.gyroscopeCursorEnabled) gyroController.register()
 
         glSurfaceView?.onResume()
-        backgroundView?.resume()
+        // backgroundView 的 resume 由下面的 reloadFromStorage() 統一處理
         if (prefs.characterAnimEnabled) {
             characterView?.resumeAnimation()
         }
@@ -1608,6 +1610,8 @@ class YukiBoardIMEService : InputMethodService() {
                 p.onKeyboardHeightChanged = {
                     // 重建前清理面板狀態
                     closePanel()
+                    backgroundView?.destroy()
+                    backgroundView = null
                     setInputView(onCreateInputView())
                 }
                 p
@@ -2611,6 +2615,8 @@ class YukiBoardIMEService : InputMethodService() {
             prefs.floatingX = -1
             prefs.floatingY = -1
             closePanel()
+            backgroundView?.destroy()
+            backgroundView = null
             setInputView(onCreateInputView())
         }
 
