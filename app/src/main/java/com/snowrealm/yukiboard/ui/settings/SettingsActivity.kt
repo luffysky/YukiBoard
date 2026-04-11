@@ -944,8 +944,8 @@ class SettingsActivity : AppCompatActivity() {
                     val maxDx = (sw - w).coerceAtLeast(0f)
                     val maxDy = (sh - h).coerceAtLeast(0f)
                     bgMatrix.setScale(scale, scale)
-                    val tx = (-maxDx * (1.0f - prefs.bgOffsetX)).coerceIn(-maxDx, 0f)
-                    val ty = (-maxDy * (1.0f - prefs.bgOffsetY)).coerceIn(-maxDy, 0f)
+                    val tx = (-maxDx * prefs.bgOffsetX).coerceIn(-maxDx, 0f)
+                    val ty = (-maxDy * prefs.bgOffsetY).coerceIn(-maxDy, 0f)
                     bgMatrix.postTranslate(tx, ty)
                 }
                 if (prefs.bgRotation != 0) {
@@ -1530,8 +1530,8 @@ class SettingsActivity : AppCompatActivity() {
             val scaledH = effH * cropScale
             val maxDx = (scaledW - vw).coerceAtLeast(0f)
             val maxDy = (scaledH - vh).coerceAtLeast(0f)
-            val tx = (-maxDx * (1.0f - prefs.bgOffsetX)).coerceIn(-maxDx, 0f)
-            val ty = (-maxDy * (1.0f - prefs.bgOffsetY)).coerceIn(-maxDy, 0f)
+            val tx = (-maxDx * prefs.bgOffsetX).coerceIn(-maxDx, 0f)
+            val ty = (-maxDy * prefs.bgOffsetY).coerceIn(-maxDy, 0f)
             matrix.postTranslate(tx, ty)
         }
 
@@ -1671,8 +1671,8 @@ class SettingsActivity : AppCompatActivity() {
                         val maxDx = (sw - w).coerceAtLeast(0f)
                         val maxDy = (sh - h).coerceAtLeast(0f)
                         bgMatrix.setScale(scale, scale)
-                        val tx = (-maxDx * (1.0f - prefs.bgOffsetX)).coerceIn(-maxDx, 0f)
-                        val ty = (-maxDy * (1.0f - prefs.bgOffsetY)).coerceIn(-maxDy, 0f)
+                        val tx = (-maxDx * prefs.bgOffsetX).coerceIn(-maxDx, 0f)
+                        val ty = (-maxDy * prefs.bgOffsetY).coerceIn(-maxDy, 0f)
                         bgMatrix.postTranslate(tx, ty)
                     }
                     // 旋轉（以 View 中心）

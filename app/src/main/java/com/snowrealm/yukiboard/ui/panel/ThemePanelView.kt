@@ -752,8 +752,8 @@ class ThemePanelView(context: Context) : View(context) {
                 val maxDx = (sw - pvW).coerceAtLeast(0f)
                 val maxDy = (sh - pvH).coerceAtLeast(0f)
                 previewBgMatrix.setScale(scale, scale)
-                val tx = (-maxDx * (1.0f - prefs.bgOffsetX)).coerceIn(-maxDx, 0f)
-                val ty = (-maxDy * (1.0f - prefs.bgOffsetY)).coerceIn(-maxDy, 0f)
+                val tx = (-maxDx * prefs.bgOffsetX).coerceIn(-maxDx, 0f)
+                val ty = (-maxDy * prefs.bgOffsetY).coerceIn(-maxDy, 0f)
                 previewBgMatrix.postTranslate(
                     pvRect.left + tx,
                     pvRect.top + ty

@@ -216,8 +216,8 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
             val maxDx = (scaledW - vw).coerceAtLeast(0f)
             val maxDy = (scaledH - vh).coerceAtLeast(0f)
             imageMatrix.setScale(scale, scale)
-            val tx = (-maxDx * (1.0f - offsetX)).coerceIn(-maxDx, 0f)
-            val ty = (-maxDy * (1.0f - offsetY)).coerceIn(-maxDy, 0f)
+            val tx = (-maxDx * offsetX).coerceIn(-maxDx, 0f)
+            val ty = (-maxDy * offsetY).coerceIn(-maxDy, 0f)
             imageMatrix.postTranslate(tx, ty)
         }
         if (bgRotation != 0) {
@@ -275,8 +275,8 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
             val scaledH = effH * cropScale
             val maxDx = (scaledW - vw).coerceAtLeast(0f)
             val maxDy = (scaledH - vh).coerceAtLeast(0f)
-            val tx = (-maxDx * (1.0f - offsetX)).coerceIn(-maxDx, 0f)
-            val ty = (-maxDy * (1.0f - offsetY)).coerceIn(-maxDy, 0f)
+            val tx = (-maxDx * offsetX).coerceIn(-maxDx, 0f)
+            val ty = (-maxDy * offsetY).coerceIn(-maxDy, 0f)
             matrix.postTranslate(tx, ty)
         }
 
