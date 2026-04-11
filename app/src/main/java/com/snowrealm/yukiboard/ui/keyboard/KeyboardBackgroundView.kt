@@ -228,7 +228,9 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
         iv.imageMatrix = imageMatrix
     }
 
-    /** 影片背景的 transform（center-crop + rotation + offset） */
+    /** 影片背景的 transform（center-crop + rotation + offset）。
+     *  TextureView 預設 stretch 影片到 View 大小，Matrix 要先還原再 crop。
+     */
     private fun applyVideoTransform() {
         val tv = textureView ?: return
         val vw = tv.width.toFloat()
@@ -241,31 +243,38 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
         val cy = vh / 2f
 
         val isRotated = bgRotation == 90 || bgRotation == 270
-        val effectiveW = if (isRotated) vH else vW
-        val effectiveH = if (isRotated) vW else vH
 
         val matrix = Matrix()
 
         if (scaleMode == 1) {
-            // 整張塞入
-            matrix.setTranslate(cx - vW / 2f, cy - vH / 2f)
-            if (bgRotation != 0) matrix.postRotate(bgRotation.toFloat(), cx, cy)
-            matrix.postScale(vw / effectiveW, vh / effectiveH, cx, cy)
+            // 整張塞入 — TextureView 預設就是 stretch，只需處理旋轉
+            if (isRotated) {
+                matrix.postTranslate(-cx, -cy)
+                matrix.postRotate(bgRotation.toFloat())
+                matrix.postScale(vw / vh, vh / vw)
+                matrix.postTranslate(cx, cy)
+            } else if (bgRotation == 180) {
+                matrix.postRotate(180f, cx, cy)
+            }
         } else {
-            // center-crop：填滿鍵盤
-            val scale = maxOf(vw / effectiveW, vh / effectiveH)
-            val scaledW = effectiveW * scale
-            val scaledH = effectiveH * scale
+            // center-crop
+            val scaleX = vW / vw
+            val scaleY = vH / vh
+            val effW = if (isRotated) vH else vW
+            val effH = if (isRotated) vW else vH
+            val cropScale = maxOf(vw / effW, vh / effH)
+            val finalSx = scaleX * cropScale
+            val finalSy = scaleY * cropScale
+
+            matrix.setScale(finalSx, finalSy, cx, cy)
+            if (bgRotation != 0) {
+                matrix.postRotate(bgRotation.toFloat(), cx, cy)
+            }
+
+            val scaledW = effW * cropScale
+            val scaledH = effH * cropScale
             val maxDx = (scaledW - vw).coerceAtLeast(0f)
             val maxDy = (scaledH - vh).coerceAtLeast(0f)
-
-            // 1. 移到 View 中心
-            matrix.setTranslate(cx - vW / 2f, cy - vH / 2f)
-            // 2. 旋轉
-            if (bgRotation != 0) matrix.postRotate(bgRotation.toFloat(), cx, cy)
-            // 3. 縮放（以 View 中心）
-            matrix.postScale(scale, scale, cx, cy)
-            // 4. 偏移裁切（clamp 防止超出邊界）
             val tx = (-maxDx * (1.0f - offsetX)).coerceIn(-maxDx, 0f)
             val ty = (-maxDy * (1.0f - offsetY)).coerceIn(-maxDy, 0f)
             matrix.postTranslate(tx, ty)

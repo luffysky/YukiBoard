@@ -1472,7 +1472,11 @@ class SettingsActivity : AppCompatActivity() {
         bgPreviewView?.invalidate()
     }
 
-    /** 根據 prefs 的 bgScaleMode + bgOffsetX/Y 更新影片預覽 TextureView 的 transform */
+    /** 根據 prefs 的 bgScaleMode + bgOffsetX/Y 更新影片預覽 TextureView 的 transform。
+     *
+     * TextureView 預設會 stretch 影片到 View 大小。
+     * 所以 Matrix 要先還原到原始比例，再做 center-crop。
+     */
     private fun updateVideoPreviewTransform() {
         val tv = bgVideoTexture ?: return
         val vw = tv.width.toFloat()
@@ -1485,27 +1489,47 @@ class SettingsActivity : AppCompatActivity() {
         val cy = vh / 2f
         val rotation = prefs.bgRotation
         val isRotated = rotation == 90 || rotation == 270
-        val effectiveW = if (isRotated) vH else vW
-        val effectiveH = if (isRotated) vW else vH
 
         val matrix = android.graphics.Matrix()
 
         if (prefs.bgScaleMode == 1) {
-            // 整張塞入
-            matrix.setTranslate(cx - vW / 2f, cy - vH / 2f)
-            if (rotation != 0) matrix.postRotate(rotation.toFloat(), cx, cy)
-            matrix.postScale(vw / effectiveW, vh / effectiveH, cx, cy)
+            // 整張塞入 — TextureView 預設就是 stretch，只需要處理旋轉
+            if (isRotated) {
+                matrix.postTranslate(-cx, -cy)
+                matrix.postRotate(rotation.toFloat())
+                matrix.postScale(vw / vh, vh / vw)
+                matrix.postTranslate(cx, cy)
+            } else if (rotation == 180) {
+                matrix.postRotate(180f, cx, cy)
+            }
         } else {
-            // center-crop：填滿預��
-            val scale = maxOf(vw / effectiveW, vh / effectiveH)
-            val scaledW = effectiveW * scale
-            val scaledH = effectiveH * scale
+            // center-crop：填滿 View，裁切超出部分
+            // TextureView 預設 stretch 到 vw x vh，先還原到原始比例
+            val scaleX = vW / vw
+            val scaleY = vH / vh
+
+            // 旋轉後的有效尺寸
+            val effW = if (isRotated) vH else vW
+            val effH = if (isRotated) vW else vH
+
+            // center-crop scale（基於原始影片尺寸）
+            val cropScale = maxOf(vw / effW, vh / effH)
+
+            // 最終 scale = 還原 stretch × crop
+            val finalSx = scaleX * cropScale
+            val finalSy = scaleY * cropScale
+
+            // 先 scale（以中心），再旋轉，再偏移
+            matrix.setScale(finalSx, finalSy, cx, cy)
+            if (rotation != 0) {
+                matrix.postRotate(rotation.toFloat(), cx, cy)
+            }
+
+            // 偏移
+            val scaledW = effW * cropScale
+            val scaledH = effH * cropScale
             val maxDx = (scaledW - vw).coerceAtLeast(0f)
             val maxDy = (scaledH - vh).coerceAtLeast(0f)
-
-            matrix.setTranslate(cx - vW / 2f, cy - vH / 2f)
-            if (rotation != 0) matrix.postRotate(rotation.toFloat(), cx, cy)
-            matrix.postScale(scale, scale, cx, cy)
             val tx = (-maxDx * (1.0f - prefs.bgOffsetX)).coerceIn(-maxDx, 0f)
             val ty = (-maxDy * (1.0f - prefs.bgOffsetY)).coerceIn(-maxDy, 0f)
             matrix.postTranslate(tx, ty)
