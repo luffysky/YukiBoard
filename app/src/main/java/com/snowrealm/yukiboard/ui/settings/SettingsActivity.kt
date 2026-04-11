@@ -1406,6 +1406,8 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     /** 根據 prefs 的 bgOffsetX/Y + bgScaleMode 更新預覽圖的 Matrix */
+    /** 根據 prefs 的 bgOffsetX/Y + bgScaleMode + bgRotation 更新預覽圖的 Matrix。
+     *  邏輯與 KeyboardBackgroundView.applyOffset() 保持一致。 */
     private fun updateBgPreviewMatrix() {
         val iv = bgPreviewImage ?: return
         val drawable = iv.drawable ?: return
@@ -1419,24 +1421,36 @@ class SettingsActivity : AppCompatActivity() {
             if (vw <= 0 || vh <= 0) return@post
 
             val matrix = android.graphics.Matrix()
+            val cx = vw / 2f
+            val cy = vh / 2f
+            val isRotated = prefs.bgRotation == 90 || prefs.bgRotation == 270
+
             if (prefs.bgScaleMode == 1) {
-                // 整張塞入（拉伸填滿）
-                matrix.setScale(vw / bmpW, vh / bmpH)
+                // 整張塞入
+                if (isRotated) {
+                    matrix.setTranslate(cx - bmpW / 2f, cy - bmpH / 2f)
+                    matrix.postRotate(prefs.bgRotation.toFloat(), cx, cy)
+                    matrix.postScale(vw / bmpH, vh / bmpW, cx, cy)
+                } else {
+                    matrix.setScale(vw / bmpW, vh / bmpH)
+                    if (prefs.bgRotation == 180) {
+                        matrix.postRotate(180f, cx, cy)
+                    }
+                }
             } else {
                 // 保持比例（裁切）
-                val scale = maxOf(vw / bmpW, vh / bmpH)
-                val scaledW = bmpW * scale
-                val scaledH = bmpH * scale
-                val maxDx = (scaledW - vw).coerceAtLeast(0f)
-                val maxDy = (scaledH - vh).coerceAtLeast(0f)
-                val dx = -maxDx * prefs.bgOffsetX
-                val dy = -maxDy * prefs.bgOffsetY
+                val effW = if (isRotated) bmpH else bmpW
+                val effH = if (isRotated) bmpW else bmpH
+                val scale = maxOf(vw / effW, vh / effH)
+                val maxDx = (effW * scale - vw).coerceAtLeast(0f)
+                val maxDy = (effH * scale - vh).coerceAtLeast(0f)
+
                 matrix.setScale(scale, scale)
-                matrix.postTranslate(dx, dy)
-            }
-            // 旋轉（以 View 中心）
-            if (prefs.bgRotation != 0) {
-                matrix.postRotate(prefs.bgRotation.toFloat(), vw / 2f, vh / 2f)
+                matrix.postTranslate(cx - bmpW * scale / 2f, cy - bmpH * scale / 2f)
+                if (prefs.bgRotation != 0) {
+                    matrix.postRotate(prefs.bgRotation.toFloat(), cx, cy)
+                }
+                matrix.postTranslate(-maxDx * prefs.bgOffsetX, -maxDy * prefs.bgOffsetY)
             }
             iv.imageMatrix = matrix
         }

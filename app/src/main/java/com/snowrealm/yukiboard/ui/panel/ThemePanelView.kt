@@ -752,6 +752,14 @@ class ThemePanelView(context: Context) : View(context) {
                     pvRect.top - maxDy * prefs.bgOffsetY
                 )
             }
+            // 旋轉（以預覽區域中心）— 與 buildFullKeyboardPreview 一致
+            if (prefs.bgRotation != 0) {
+                previewBgMatrix.postRotate(
+                    prefs.bgRotation.toFloat(),
+                    pvRect.left + pvW / 2f,
+                    pvRect.top + pvH / 2f
+                )
+            }
             canvas.drawBitmap(bmp, previewBgMatrix, null)
 
             previewKeyPaint.color = Color.argb(prefs.bgOverlayAlpha, 0, 0, 0)
