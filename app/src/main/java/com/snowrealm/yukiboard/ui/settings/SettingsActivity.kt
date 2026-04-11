@@ -704,32 +704,21 @@ class SettingsActivity : AppCompatActivity() {
                 setTextColor(0xFF90CAF9.toInt())
                 textSize = 14f
                 background = null
-                setOnClickListener {
-                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://yukiboard.snowrealm.pet/privacy"))
-                    try { startActivity(intent) } catch (_: Exception) {
-                        showPrivacyPolicyDialog()
-                    }
-                }
+                setOnClickListener { showLegalWebView("privacy_policy.html", "隱私權政策") }
             }
             legalChildren += Button(this).apply {
                 text = tr("服務條款")
                 setTextColor(0xFF90CAF9.toInt())
                 textSize = 14f
                 background = null
-                setOnClickListener {
-                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://yukiboard.snowrealm.pet/terms"))
-                    try { startActivity(intent) } catch (_: Exception) {}
-                }
+                setOnClickListener { showLegalWebView("terms_of_service.html", "服務條款") }
             }
             legalChildren += Button(this).apply {
                 text = tr("開源授權")
                 setTextColor(0xFF90CAF9.toInt())
                 textSize = 14f
                 background = null
-                setOnClickListener {
-                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://yukiboard.snowrealm.pet/licenses"))
-                    try { startActivity(intent) } catch (_: Exception) {}
-                }
+                setOnClickListener { showLegalWebView("open_source.html", "開源授權") }
             }
         })
 
@@ -1254,6 +1243,15 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun startVideoPreview(filePath: String) {
         val container = bgPreviewContainer ?: return
+
+        // 先驗證檔案可用
+        val file = java.io.File(filePath)
+        if (!file.exists() || file.length() == 0L) {
+            bgPreviewLabel?.text = tr("影片檔案不存在")
+            bgPreviewLabel?.visibility = View.VISIBLE
+            return
+        }
+
         val tv = android.view.TextureView(this).apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -1264,43 +1262,38 @@ class SettingsActivity : AppCompatActivity() {
 
         tv.surfaceTextureListener = object : android.view.TextureView.SurfaceTextureListener {
             override fun onSurfaceTextureAvailable(st: android.graphics.SurfaceTexture, w: Int, h: Int) {
-                activityScope.launch(Dispatchers.IO) {
-                    try {
-                        val mp = android.media.MediaPlayer().apply {
-                            setDataSource(filePath)
-                        }
-                        withContext(Dispatchers.Main) {
-                            try {
-                                mp.setSurface(android.view.Surface(st))
-                                mp.isLooping = true
-                                mp.setVolume(0f, 0f)
-                                mp.setOnPreparedListener { player ->
-                                    bgVideoWidth = player.videoWidth
-                                    bgVideoHeight = player.videoHeight
-                                    updateVideoPreviewTransform()
-                                    player.start()
-                                }
-                                mp.prepareAsync()
-                                bgVideoPlayer = mp
-                            } catch (e: Exception) {
-                                bgPreviewLabel?.text = tr("🎬 影片播放失敗")
-                                bgPreviewLabel?.visibility = View.VISIBLE
-                                try { mp.release() } catch (_: Exception) {}
-                            }
-                        }
-                    } catch (e: Exception) {
-                        withContext(Dispatchers.Main) {
-                            bgPreviewLabel?.text = tr("🎬 影片載入失敗")
-                            bgPreviewLabel?.visibility = View.VISIBLE
-                        }
+                try {
+                    val mp = android.media.MediaPlayer()
+                    mp.setDataSource(filePath)
+                    mp.setSurface(android.view.Surface(st))
+                    mp.isLooping = true
+                    mp.setVolume(0f, 0f)
+                    mp.setOnErrorListener { _, what, extra ->
+                        android.util.Log.e("SettingsBgVideo", "MediaPlayer error: what=$what extra=$extra")
+                        bgPreviewLabel?.text = tr("影片格式不支援")
+                        bgPreviewLabel?.visibility = View.VISIBLE
+                        true
                     }
+                    mp.setOnPreparedListener { player ->
+                        bgVideoWidth = player.videoWidth
+                        bgVideoHeight = player.videoHeight
+                        updateVideoPreviewTransform()
+                        player.start()
+                    }
+                    mp.prepareAsync()
+                    bgVideoPlayer = mp
+                } catch (e: Exception) {
+                    android.util.Log.e("SettingsBgVideo", "Video init failed: $filePath", e)
+                    bgPreviewLabel?.text = tr("影片載入失敗")
+                    bgPreviewLabel?.visibility = View.VISIBLE
+                    // fallback: 顯示影片第一幀
+                    showVideoFirstFrame(filePath)
                 }
             }
             override fun onSurfaceTextureSizeChanged(st: android.graphics.SurfaceTexture, w: Int, h: Int) {
                 updateVideoPreviewTransform()
             }
             override fun onSurfaceTextureDestroyed(st: android.graphics.SurfaceTexture): Boolean {
-                // 僅釋放 MediaPlayer，不移除 View（避免 stopVideoPreview 重入）
                 val mp = bgVideoPlayer
                 bgVideoPlayer = null
                 try { mp?.stop() } catch (_: Exception) { }
@@ -1313,6 +1306,24 @@ class SettingsActivity : AppCompatActivity() {
         // 插入到 ImageView 後面，overlay 前面（index 1）
         val overlayIdx = container.indexOfChild(bgPreviewOverlay)
         container.addView(tv, if (overlayIdx > 0) overlayIdx else 1)
+    }
+
+    /** 影片無法播放時，提取第一幀作為靜態預覽 */
+    private fun showVideoFirstFrame(filePath: String) {
+        activityScope.launch(Dispatchers.IO) {
+            try {
+                val retriever = android.media.MediaMetadataRetriever()
+                retriever.setDataSource(filePath)
+                val frame = retriever.getFrameAtTime(0)
+                retriever.release()
+                withContext(Dispatchers.Main) {
+                    if (frame != null) {
+                        bgPreviewImage?.setImageBitmap(frame)
+                        updateBgPreviewMatrix()
+                    }
+                }
+            } catch (_: Exception) { }
+        }
     }
 
     private fun stopVideoPreview() {
@@ -2468,36 +2479,27 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
-    private fun showPrivacyPolicyDialog() {
+    /** 用內嵌 WebView 顯示 assets/legal/ 下的 HTML 法律文件 */
+    private fun showLegalWebView(fileName: String, title: String) {
+        val webView = android.webkit.WebView(this).apply {
+            settings.javaScriptEnabled = false
+            settings.loadWithOverviewMode = true
+            settings.useWideViewPort = true
+            setBackgroundColor(0xFF0F1923.toInt())
+            loadUrl("file:///android_asset/legal/$fileName")
+        }
         android.app.AlertDialog.Builder(this)
-            .setTitle("YukiBoard 隱私權政策")
-            .setMessage(
-                "最後更新：2026-04-11\n\n" +
-                "1. 資料收集\n" +
-                "YukiBoard 是一款在裝置上運行的輸入法。我們重視你的隱私：\n" +
-                "- 打字內容：所有打字內容僅在裝置本地處理，不會上傳至任何伺服器\n" +
-                "- 學習詞庫：儲存在裝置本地 SharedPreferences，不會同步至雲端（除非你主動開啟設定同步）\n" +
-                "- AI 功能：僅在你主動使用 AI Skill 時，將你選定的文字傳送至你選擇的 AI 服務商（OpenAI/Anthropic/Gemini/Groq）。傳送前會明確提示\n" +
-                "- 防詐偵測：本地規則引擎分析，不上傳原文。匿名回報需你明確同意（opt-in）\n" +
-                "- 語音輸入：音訊僅用於辨識，不儲存、不上傳（Android 內建引擎在裝置本地處理；Whisper 引擎會傳送至你設定的伺服器）\n\n" +
-                "2. 我們不會做的事\n" +
-                "❌ 不會記錄你的打字內容\n" +
-                "❌ 不會蒐集密碼或信用卡號\n" +
-                "❌ 不會在背景偷傳資料\n" +
-                "❌ 不會出售任何個人資料\n\n" +
-                "3. 權限用途\n" +
-                "- 輸入法權限：提供鍵盤功能（必要）\n" +
-                "- 麥克風：語音輸入（選用）\n" +
-                "- 藍牙：遠端鍵盤功能（選用）\n" +
-                "- 網路：AI 功能、GIF 搜尋、雲端同步（選用）\n" +
-                "- 位置：天氣面板（選用）\n\n" +
-                "4. 使用者權利\n" +
-                "你可以隨時：查詢資料、刪除詞庫、關閉所有雲端功能、解除安裝。\n" +
-                "聯繫：privacy@snowrealm.pet\n\n" +
-                "本政策依台灣《個資法》、GDPR、CCPA 撰寫。"
-            )
-            .setPositiveButton("了解") { d, _ -> d.dismiss() }
+            .setTitle(title)
+            .setView(webView)
+            .setPositiveButton("關閉") { d, _ -> d.dismiss() }
             .show()
+            .apply {
+                // 設定 Dialog 較大尺寸以便閱讀
+                window?.setLayout(
+                    (resources.displayMetrics.widthPixels * 0.95).toInt(),
+                    (resources.displayMetrics.heightPixels * 0.85).toInt()
+                )
+            }
     }
 
     private fun testWhisperConnection(statusView: TextView) {

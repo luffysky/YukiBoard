@@ -253,25 +253,24 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
         tv.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
             override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) {
                 try {
-                    val mp = MediaPlayer().apply {
-                        setDataSource(filePath)
-                        setSurface(Surface(st))
-                        isLooping = true
-                        setVolume(0f, 0f)
-                        setOnErrorListener { _, what, extra ->
-                            android.util.Log.e("KeyboardBgView", "MediaPlayer error: what=$what extra=$extra")
-                            // 錯誤後釋放資源，避免卡在錯誤狀態
-                            releaseMediaPlayer()
-                            true
-                        }
-                        prepareAsync()
-                        setOnPreparedListener { player ->
-                            this@KeyboardBackgroundView.videoWidth = player.videoWidth
-                            this@KeyboardBackgroundView.videoHeight = player.videoHeight
-                            applyVideoTransform()
-                            player.start()
-                        }
+                    val mp = MediaPlayer()
+                    mp.setDataSource(filePath)
+                    mp.setSurface(Surface(st))
+                    mp.isLooping = true
+                    mp.setVolume(0f, 0f)
+                    mp.setOnErrorListener { _, what, extra ->
+                        android.util.Log.e("KeyboardBgView", "MediaPlayer error: what=$what extra=$extra")
+                        releaseMediaPlayer()
+                        true
                     }
+                    // 必須在 prepareAsync 之前設 listener，避免 race condition
+                    mp.setOnPreparedListener { player ->
+                        this@KeyboardBackgroundView.videoWidth = player.videoWidth
+                        this@KeyboardBackgroundView.videoHeight = player.videoHeight
+                        applyVideoTransform()
+                        player.start()
+                    }
+                    mp.prepareAsync()
                     mediaPlayer = mp
                 } catch (e: Exception) {
                     android.util.Log.e("KeyboardBgView", "Video playback failed: $filePath", e)
@@ -339,24 +338,23 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
         tv.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
             override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) {
                 try {
-                    val mp = MediaPlayer().apply {
-                        setDataSource(context, uri)
-                        setSurface(Surface(st))
-                        isLooping = true
-                        setVolume(0f, 0f)
-                        setOnErrorListener { _, what, extra ->
-                            android.util.Log.e("KeyboardBgView", "MediaPlayer error: what=$what extra=$extra")
-                            releaseMediaPlayer()
-                            true
-                        }
-                        prepareAsync()
-                        setOnPreparedListener { player ->
-                            this@KeyboardBackgroundView.videoWidth = player.videoWidth
-                            this@KeyboardBackgroundView.videoHeight = player.videoHeight
-                            applyVideoTransform()
-                            player.start()
-                        }
+                    val mp = MediaPlayer()
+                    mp.setDataSource(context, uri)
+                    mp.setSurface(Surface(st))
+                    mp.isLooping = true
+                    mp.setVolume(0f, 0f)
+                    mp.setOnErrorListener { _, what, extra ->
+                        android.util.Log.e("KeyboardBgView", "MediaPlayer error: what=$what extra=$extra")
+                        releaseMediaPlayer()
+                        true
                     }
+                    mp.setOnPreparedListener { player ->
+                        this@KeyboardBackgroundView.videoWidth = player.videoWidth
+                        this@KeyboardBackgroundView.videoHeight = player.videoHeight
+                        applyVideoTransform()
+                        player.start()
+                    }
+                    mp.prepareAsync()
                     mediaPlayer = mp
                 } catch (e: Exception) {
                     android.util.Log.e("KeyboardBgView", "Video URI playback failed", e)

@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 139
-        versionName "0.9.73"
+        versionCode 140
+        versionName "0.9.74"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,12 +82,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 注音一聲候選字修復（按 1 正確出現一聲字）\n" +
-                    "- fix: 常用字/詞頻率排序（幫我>綁我）+ 擴充 350+ 字頻\n" +
-                    "- fix: 候選字列間距加大 + 文字放大\n" +
-                    "- fix: 選字後延續預測改善（主字典+詞組雙來源）\n" +
-                    "- fix: 影片背景修復（硬體加速+Surface 保留+首幀 fallback）\n" +
-                    "- fix: 隱私安全加固（log 脫敏/HTTPS/簽名外部化/法律頁面）"
+                    "- fix: 影片背景修復（prepareAsync race condition + 首幀 fallback）\n" +
+                    "- feat: 法律頁面改 WebView 內嵌（隱私政策/服務條款/開源授權）\n" +
+                    "- fix: MediaPlayer listener 順序修正（setOnPreparedListener 在 prepareAsync 之前）"
             }
         }
         debug {
@@ -96,12 +93,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 注音一聲候選字修復（按 1 正確出現一聲字）\n" +
-                    "- fix: 常用字/詞頻率排序（幫我>綁我）+ 擴充 350+ 字頻\n" +
-                    "- fix: 候選字列間距加大 + 文字放大\n" +
-                    "- fix: 選字後延續預測改善（主字典+詞組雙來源）\n" +
-                    "- fix: 影片背景修復（硬體加速+Surface 保留+首幀 fallback）\n" +
-                    "- fix: 隱私安全加固（log 脫敏/HTTPS/簽名外部化/法律頁面）"
+                    "- fix: 影片背景修復（prepareAsync race condition + 首幀 fallback）\n" +
+                    "- feat: 法律頁面改 WebView 內嵌（隱私政策/服務條款/開源授權）\n" +
+                    "- fix: MediaPlayer listener 順序修正（setOnPreparedListener 在 prepareAsync 之前）"
             }
         }
     }
