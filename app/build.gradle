@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 141
-        versionName "0.9.75"
+        versionCode 142
+        versionName "0.9.76"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,9 +82,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 影片背景恢復正常（改回 setDataSource 字串路徑 + IO coroutine）\n" +
-                    "- fix: 設定頁背景變更即時同步到鍵盤（ACTION_BG_UPDATED 廣播）\n" +
-                    "- fix: 服務條款 email 更正為 service@snowrealm.pet"
+                    "- fix: Android 13+ 媒體權限（READ_MEDIA_IMAGES/VIDEO）\n" +
+                    "- fix: 影片背景黑屏修復（SurfaceTexture 生命週期 + race condition）\n" +
+                    "- fix: 設定頁影片預覽改全 Main thread 避免 Surface 失效"
             }
         }
         debug {
@@ -93,9 +93,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 影片背景恢復正常（改回 setDataSource 字串路徑 + IO coroutine）\n" +
-                    "- fix: 設定頁背景變更即時同步到鍵盤（ACTION_BG_UPDATED 廣播）\n" +
-                    "- fix: 服務條款 email 更正為 service@snowrealm.pet"
+                    "- fix: Android 13+ 媒體權限（READ_MEDIA_IMAGES/VIDEO）\n" +
+                    "- fix: 影片背景黑屏修復（SurfaceTexture 生命週期 + race condition）\n" +
+                    "- fix: 設定頁影片預覽改全 Main thread 避免 Surface 失效"
             }
         }
     }

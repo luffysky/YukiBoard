@@ -751,10 +751,8 @@ class YukiBoardIMEService : InputMethodService() {
         // 註冊背景更新廣播接收器
         bgUpdateReceiver = object : android.content.BroadcastReceiver() {
             override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
-                backgroundView?.let { bg ->
-                    bg.clearBackground()
-                    bg.reloadFromStorage()
-                }
+                // 不要 clearBackground()，直接重載（reloadFromStorage 內部已有去重邏輯）
+                backgroundView?.reloadFromStorage()
                 keyboardView.hasCustomBackground = prefs.useCustomBackground
                 keyboardView.invalidate()
                 themePanel?.reloadPreviewBitmap()

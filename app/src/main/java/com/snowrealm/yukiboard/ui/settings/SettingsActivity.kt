@@ -32,7 +32,10 @@ class SettingsActivity : AppCompatActivity() {
     companion object {
         private const val REQUEST_PICK_BG_IMAGE = 9001
         private const val REQUEST_PICK_BG_VIDEO = 9002
+        private const val RC_MEDIA_PERMISSION = 9003
     }
+
+    private var pendingMediaAction: (() -> Unit)? = null
 
     private val activityScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var isRestarting = false
@@ -947,22 +950,25 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         row.addView(styledButton("選圖片", 0xFF2A3A5C.toInt(), 0xFFE8F4FF.toInt()) {
-            // 用 ACTION_PICK + MediaStore 開啟系統內建相簿
-            val intent = Intent(Intent.ACTION_PICK).apply {
-                data = android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            requestMediaPermissionThen("image") {
+                val intent = Intent(Intent.ACTION_PICK).apply {
+                    data = android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+                }
+                @Suppress("DEPRECATION")
+                startActivityForResult(intent, REQUEST_PICK_BG_IMAGE)
             }
-            @Suppress("DEPRECATION")
-            startActivityForResult(intent, REQUEST_PICK_BG_IMAGE)
         }.apply {
             layoutParams = LinearLayout.LayoutParams(0, dp(40), 1f).apply { marginEnd = dp(4) }
         })
 
         row.addView(styledButton("選影片", 0xFF2A3A5C.toInt(), 0xFFE8F4FF.toInt()) {
-            val intent = Intent(Intent.ACTION_PICK).apply {
-                data = android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            requestMediaPermissionThen("video") {
+                val intent = Intent(Intent.ACTION_PICK).apply {
+                    data = android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+                }
+                @Suppress("DEPRECATION")
+                startActivityForResult(intent, REQUEST_PICK_BG_VIDEO)
             }
-            @Suppress("DEPRECATION")
-            startActivityForResult(intent, REQUEST_PICK_BG_VIDEO)
         }.apply {
             layoutParams = LinearLayout.LayoutParams(0, dp(40), 1f).apply {
                 marginStart = dp(4); marginEnd = dp(4)
@@ -1254,36 +1260,31 @@ class SettingsActivity : AppCompatActivity() {
 
         tv.surfaceTextureListener = object : android.view.TextureView.SurfaceTextureListener {
             override fun onSurfaceTextureAvailable(st: android.graphics.SurfaceTexture, w: Int, h: Int) {
-                activityScope.launch(Dispatchers.IO) {
-                    try {
-                        val mp = android.media.MediaPlayer().apply {
-                            setDataSource(filePath)
-                        }
-                        withContext(Dispatchers.Main) {
-                            try {
-                                mp.setSurface(android.view.Surface(st))
-                                mp.isLooping = true
-                                mp.setVolume(0f, 0f)
-                                mp.setOnPreparedListener { player ->
-                                    bgVideoWidth = player.videoWidth
-                                    bgVideoHeight = player.videoHeight
-                                    updateVideoPreviewTransform()
-                                    player.start()
-                                }
-                                mp.prepareAsync()
-                                bgVideoPlayer = mp
-                            } catch (e: Exception) {
-                                bgPreviewLabel?.text = tr("影片播放失敗")
-                                bgPreviewLabel?.visibility = View.VISIBLE
-                                try { mp.release() } catch (_: Exception) {}
-                            }
-                        }
-                    } catch (e: Exception) {
-                        withContext(Dispatchers.Main) {
-                            bgPreviewLabel?.text = tr("影片載入失敗")
+                // 全部在 Main thread，不切 IO — setDataSource 對本地檔案是同步且快速的
+                try {
+                    val mp = android.media.MediaPlayer().apply {
+                        setDataSource(filePath)
+                        setSurface(android.view.Surface(st))
+                        isLooping = true
+                        setVolume(0f, 0f)
+                        setOnErrorListener { _, what, extra ->
+                            android.util.Log.e("BgPreview", "MediaPlayer error: what=$what extra=$extra")
+                            bgPreviewLabel?.text = tr("影片播放失敗")
                             bgPreviewLabel?.visibility = View.VISIBLE
+                            true
                         }
+                        setOnPreparedListener { player ->
+                            bgVideoWidth = player.videoWidth
+                            bgVideoHeight = player.videoHeight
+                            updateVideoPreviewTransform()
+                            player.start()
+                        }
+                        prepareAsync()
                     }
+                    bgVideoPlayer = mp
+                } catch (e: Exception) {
+                    bgPreviewLabel?.text = tr("影片載入失敗")
+                    bgPreviewLabel?.visibility = View.VISIBLE
                 }
             }
             override fun onSurfaceTextureSizeChanged(st: android.graphics.SurfaceTexture, w: Int, h: Int) {
@@ -3298,6 +3299,35 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
+
+    private fun requestMediaPermissionThen(type: String, action: () -> Unit) {
+        val permission = if (android.os.Build.VERSION.SDK_INT >= 33) {
+            if (type == "video") android.Manifest.permission.READ_MEDIA_VIDEO
+            else android.Manifest.permission.READ_MEDIA_IMAGES
+        } else {
+            android.Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+        if (checkSelfPermission(permission) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            action()
+        } else {
+            pendingMediaAction = action
+            requestPermissions(arrayOf(permission), RC_MEDIA_PERMISSION)
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int, permissions: Array<out String>, grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == RC_MEDIA_PERMISSION) {
+            if (grantResults.firstOrNull() == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                pendingMediaAction?.invoke()
+            } else {
+                Toast.makeText(this, "需要相冊存取權限", Toast.LENGTH_SHORT).show()
+            }
+            pendingMediaAction = null
+        }
+    }
 
     @Suppress("DEPRECATION")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

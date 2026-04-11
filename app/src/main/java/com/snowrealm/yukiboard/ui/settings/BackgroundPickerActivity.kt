@@ -21,6 +21,7 @@ class BackgroundPickerActivity : Activity() {
     companion object {
         const val EXTRA_PICK_TYPE = "pick_type"
         private const val RC_PICK = 7001
+        private const val RC_PERMISSION = 7002
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -28,7 +29,37 @@ class BackgroundPickerActivity : Activity() {
 
         val type = intent.getStringExtra(EXTRA_PICK_TYPE) ?: "image"
 
-        // 優先用系統內建相簿（ACTION_PICK + MediaStore）
+        // Android 13+ 需要執行時期權限
+        val permission = if (android.os.Build.VERSION.SDK_INT >= 33) {
+            if (type == "video") android.Manifest.permission.READ_MEDIA_VIDEO
+            else android.Manifest.permission.READ_MEDIA_IMAGES
+        } else {
+            android.Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+
+        if (checkSelfPermission(permission) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(permission), RC_PERMISSION)
+            return
+        }
+
+        launchPicker(type)
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int, permissions: Array<out String>, grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == RC_PERMISSION) {
+            if (grantResults.firstOrNull() == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                launchPicker(intent.getStringExtra(EXTRA_PICK_TYPE) ?: "image")
+            } else {
+                Toast.makeText(this, "需要相冊存取權限", Toast.LENGTH_SHORT).show()
+                finish()
+            }
+        }
+    }
+
+    private fun launchPicker(type: String) {
         val pickIntent = Intent(Intent.ACTION_PICK).apply {
             data = if (type == "video") {
                 MediaStore.Video.Media.EXTERNAL_CONTENT_URI
@@ -41,7 +72,6 @@ class BackgroundPickerActivity : Activity() {
             @Suppress("DEPRECATION")
             startActivityForResult(pickIntent, RC_PICK)
         } catch (_: Exception) {
-            // fallback：ACTION_GET_CONTENT
             val mimeType = if (type == "video") "video/*" else "image/*"
             try {
                 @Suppress("DEPRECATION")
@@ -104,7 +134,6 @@ class BackgroundPickerActivity : Activity() {
             contentResolver.openInputStream(uri)?.use { input ->
                 dest.outputStream().use { output -> input.copyTo(output) }
             }
-            // 驗證複製成功
             if (!dest.exists() || dest.length() == 0L) {
                 Toast.makeText(this, "背景檔案複製失敗", Toast.LENGTH_SHORT).show()
                 return

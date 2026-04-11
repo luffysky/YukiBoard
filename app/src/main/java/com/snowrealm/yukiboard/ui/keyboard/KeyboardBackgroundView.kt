@@ -274,8 +274,10 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
                 applyVideoTransform()
             }
             override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
-                releaseMediaPlayer()
-                return true
+                // return false = 自己管理 SurfaceTexture，不讓系統釋放
+                // IME 視窗隱藏/顯示時不需重建 MediaPlayer
+                mediaPlayer?.pause()
+                return false
             }
             override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
         }
