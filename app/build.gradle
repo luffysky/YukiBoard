@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 146
-        versionName "0.9.80"
+        versionCode 147
+        versionName "0.9.81"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,9 +82,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 背景全螢幕（outerFrame 架構，鍵盤縮窄不露黑色）\n" +
-                    "- feat: 影片旋轉（0°/90°/180°/270°，設定頁+功能列）\n" +
-                    "- fix: 影片同步（lastModified 比對，覆寫同名檔正確重載）"
+                    "- fix: 背景區域修復（bgView 回歸 keyboardContainer，填滿鍵盤區域）\n" +
+                    "- fix: 移除 outerFrame 架構，背景不再延伸到螢幕頂端\n" +
+                    "- fix: 懸浮模式隱藏背景（透明）"
             }
         }
         debug {
@@ -93,9 +93,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- feat: 背景全螢幕（outerFrame 架構，鍵盤縮窄不露黑色）\n" +
-                    "- feat: 影片旋轉（0°/90°/180°/270°，設定頁+功能列）\n" +
-                    "- fix: 影片同步（lastModified 比對，覆寫同名檔正確重載）"
+                    "- fix: 背景區域修復（bgView 回歸 keyboardContainer，填滿鍵盤區域）\n" +
+                    "- fix: 移除 outerFrame 架構，背景不再延伸到螢幕頂端\n" +
+                    "- fix: 懸浮模式隱藏背景（透明）"
             }
         }
     }

@@ -58,7 +58,6 @@ import kotlinx.coroutines.withContext
 class YukiBoardIMEService : InputMethodService() {
 
     private lateinit var rootContainer: LinearLayout
-    private var outerFrame: FrameLayout? = null
     private lateinit var toolbarView: ToolbarView
     private lateinit var panelContainer: FrameLayout
     private lateinit var topPanelContainer: FrameLayout
@@ -590,7 +589,6 @@ class YukiBoardIMEService : InputMethodService() {
             prefs.floatingModeEnabled = !prefs.floatingModeEnabled
             // 重建前清理面板狀態，避免洩漏舊引用
             closePanel()
-            outerFrame = null
             backgroundView?.destroy()
             backgroundView = null
             setInputView(onCreateInputView())
@@ -623,8 +621,11 @@ class YukiBoardIMEService : InputMethodService() {
                 bgView.setImageBackground(savedBg)
             }
         }
+        keyboardContainer.addView(bgView, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ))
         backgroundView = bgView
-        // bgView 稍後加進 outerFrame，不加進 keyboardContainer
 
         keyboardContainer.addView(keyboardView, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
@@ -763,20 +764,7 @@ class YukiBoardIMEService : InputMethodService() {
         val bgFilter = android.content.IntentFilter("com.snowrealm.yukiboard.ACTION_BG_UPDATED")
         registerReceiver(bgUpdateReceiver, bgFilter, android.content.Context.RECEIVER_NOT_EXPORTED)
 
-        // 建立外層 FrameLayout，讓背景可以全螢幕
-        val frame = FrameLayout(this).also { outerFrame = it }
-        frame.addView(bgView, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT
-        ))
-        frame.addView(rootContainer, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT
-        ).apply {
-            gravity = android.view.Gravity.BOTTOM
-        })
-
-        return frame
+        return rootContainer
     }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
@@ -1624,7 +1612,6 @@ class YukiBoardIMEService : InputMethodService() {
                 p.onKeyboardHeightChanged = {
                     // 重建前清理面板狀態
                     closePanel()
-                    outerFrame = null
                     backgroundView?.destroy()
                     backgroundView = null
                     setInputView(onCreateInputView())
@@ -2571,6 +2558,8 @@ class YukiBoardIMEService : InputMethodService() {
 
     private fun wrapInFloatingMode(content: LinearLayout): View {
         isFloatingMode = true
+        // 懸浮模式不顯示背景
+        backgroundView?.visibility = View.GONE
         val wrapper = FloatingKeyboardWrapper(this).also { floatingWrapper = it }
         wrapper.theme = ThemeManager.getInstance(this).currentTheme
         wrapper.setWillNotDraw(false)
@@ -2630,7 +2619,6 @@ class YukiBoardIMEService : InputMethodService() {
             prefs.floatingX = -1
             prefs.floatingY = -1
             closePanel()
-            this@YukiBoardIMEService.outerFrame = null
             backgroundView?.destroy()
             backgroundView = null
             setInputView(onCreateInputView())
