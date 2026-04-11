@@ -244,7 +244,8 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
         currentType = BackgroundType.VIDEO
         currentLoadedPath = savePath
 
-        val filePath = savePath
+        // 使用 Uri.fromFile — 與原始可用版本一致，避免 setDataSource(String) 的權限問題
+        val fileUri = Uri.fromFile(file)
 
         val tv = TextureView(context).apply {
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
@@ -254,7 +255,7 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
             override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) {
                 try {
                     val mp = MediaPlayer()
-                    mp.setDataSource(filePath)
+                    mp.setDataSource(context, fileUri)
                     mp.setSurface(Surface(st))
                     mp.isLooping = true
                     mp.setVolume(0f, 0f)
@@ -263,7 +264,6 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
                         releaseMediaPlayer()
                         true
                     }
-                    // 必須在 prepareAsync 之前設 listener，避免 race condition
                     mp.setOnPreparedListener { player ->
                         this@KeyboardBackgroundView.videoWidth = player.videoWidth
                         this@KeyboardBackgroundView.videoHeight = player.videoHeight
@@ -273,7 +273,7 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
                     mp.prepareAsync()
                     mediaPlayer = mp
                 } catch (e: Exception) {
-                    android.util.Log.e("KeyboardBgView", "Video playback failed: $filePath", e)
+                    android.util.Log.e("KeyboardBgView", "Video playback failed: $savePath", e)
                 }
             }
 
@@ -299,7 +299,7 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
                 // MediaPlayer 建立失敗，用首幀當靜態背景
                 try {
                     val retriever = android.media.MediaMetadataRetriever()
-                    retriever.setDataSource(filePath)
+                    retriever.setDataSource(savePath)
                     val frame = retriever.getFrameAtTime(0)
                     retriever.release()
                     if (frame != null) {

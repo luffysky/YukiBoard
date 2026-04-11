@@ -1264,7 +1264,7 @@ class SettingsActivity : AppCompatActivity() {
             override fun onSurfaceTextureAvailable(st: android.graphics.SurfaceTexture, w: Int, h: Int) {
                 try {
                     val mp = android.media.MediaPlayer()
-                    mp.setDataSource(filePath)
+                    mp.setDataSource(this@SettingsActivity, android.net.Uri.fromFile(java.io.File(filePath)))
                     mp.setSurface(android.view.Surface(st))
                     mp.isLooping = true
                     mp.setVolume(0f, 0f)
