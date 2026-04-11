@@ -104,6 +104,12 @@ class BackgroundPickerActivity : Activity() {
             contentResolver.openInputStream(uri)?.use { input ->
                 dest.outputStream().use { output -> input.copyTo(output) }
             }
+            // 驗證複製成功
+            if (!dest.exists() || dest.length() == 0L) {
+                Toast.makeText(this, "背景檔案複製失敗", Toast.LENGTH_SHORT).show()
+                return
+            }
+            android.util.Log.i("BgPicker", "Background saved: ${dest.absolutePath} (${dest.length() / 1024}KB)")
             prefs.useCustomBackground = true
 
             val intent = android.content.Intent("com.snowrealm.yukiboard.ACTION_BG_UPDATED")
