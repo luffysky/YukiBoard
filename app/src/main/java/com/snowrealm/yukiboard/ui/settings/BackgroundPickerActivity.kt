@@ -113,20 +113,23 @@ class BackgroundPickerActivity : Activity() {
         bgDir.listFiles()?.forEach { it.delete() }
 
         val pickType = intent.getStringExtra(EXTRA_PICK_TYPE) ?: "image"
-        val ext = if (pickType == "video") {
-            val mime = contentResolver.getType(uri) ?: "video/mp4"
-            when {
-                mime.contains("webm") -> "webm"
-                mime.contains("3gp") -> "3gp"
-                else -> "mp4"
-            }
-        } else {
-            val mime = contentResolver.getType(uri) ?: "image/png"
-            when {
-                mime.contains("jpeg") || mime.contains("jpg") -> "jpg"
-                mime.contains("webp") -> "webp"
-                else -> "png"
-            }
+        val mime = contentResolver.getType(uri) ?: ""
+        val ext = when {
+            mime.contains("webm")           -> "webm"
+            mime.contains("3gp")            -> "3gp"
+            mime.contains("x-matroska")     -> "mkv"
+            mime.contains("quicktime")      -> "mov"
+            mime.contains("x-msvideo")      -> "avi"
+            mime.contains("mp2t")           -> "ts"
+            mime.contains("video")          -> "mp4"
+            mime.contains("jpeg") || mime.contains("jpg") -> "jpg"
+            mime.contains("webp")           -> "webp"
+            mime.contains("gif")            -> "gif"
+            mime.contains("bmp")            -> "bmp"
+            mime.contains("heic") || mime.contains("heif") -> "heic"
+            mime.contains("avif")           -> "avif"
+            mime.contains("png")            -> "png"
+            else -> if (pickType == "video") "mp4" else "jpg"
         }
 
         val dest = java.io.File(bgDir, "keyboard_bg.$ext")

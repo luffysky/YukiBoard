@@ -621,8 +621,10 @@ class YukiBoardIMEService : InputMethodService() {
                 bgView.setImageBackground(savedBg)
             }
         }
+        // 背景用螢幕完整寬度，避免鍵盤縮窄時露出黑色
+        val screenW = resources.displayMetrics.widthPixels
         keyboardContainer.addView(bgView, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
+            screenW,
             FrameLayout.LayoutParams.MATCH_PARENT
         ))
         backgroundView = bgView

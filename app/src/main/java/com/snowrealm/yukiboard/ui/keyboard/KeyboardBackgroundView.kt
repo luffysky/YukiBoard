@@ -117,8 +117,7 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
         }
 
         bgScope.launch(Dispatchers.IO) {
-            val opts = BitmapFactory.Options().apply { inSampleSize = 2 }
-            val bmp = BitmapFactory.decodeFile(file.absolutePath, opts)
+            val bmp = BitmapFactory.decodeFile(file.absolutePath)
             withContext(Dispatchers.Main) {
                 if (bmp != null) {
                     iv.setImageBitmap(bmp)
@@ -354,7 +353,7 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
             applyVideoTransform()
             return true
         }
-        if (currentType == BackgroundType.IMAGE && !isVideoFile(savedBg) && imageView != null
+        if (currentType == BackgroundType.IMAGE && isImageFile(savedBg) && imageView != null
             && currentLoadedPath == savedBg.absolutePath) {
             applyOffset()
             return true
@@ -420,19 +419,21 @@ class KeyboardBackgroundView(context: Context) : FrameLayout(context) {
         /** 取得已儲存的背景檔（null = 無自訂背景） */
         fun getSavedBackground(context: Context): File? {
             val dir = getBackgroundDir(context)
-            val video = dir.listFiles()?.firstOrNull {
-                it.extension.lowercase() in listOf("mp4", "webm", "3gp")
-            }
+            val video = dir.listFiles()?.firstOrNull { isVideoFile(it) }
             if (video != null) return video
-
-            val image = dir.listFiles()?.firstOrNull {
-                it.extension.lowercase() in listOf("jpg", "jpeg", "png", "webp")
-            }
-            return image
+            return dir.listFiles()?.firstOrNull { isImageFile(it) }
         }
 
         fun isVideoFile(file: File): Boolean {
-            return file.extension.lowercase() in listOf("mp4", "webm", "3gp")
+            return file.extension.lowercase() in listOf(
+                "mp4", "m4v", "webm", "3gp", "mkv", "mov", "avi", "ts", "flv"
+            )
+        }
+
+        fun isImageFile(file: File): Boolean {
+            return file.extension.lowercase() in listOf(
+                "jpg", "jpeg", "png", "webp", "gif", "bmp", "heic", "heif", "avif"
+            )
         }
     }
 }
