@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 140
-        versionName "0.9.74"
+        versionCode 141
+        versionName "0.9.75"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,9 +82,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 影片背景修復（prepareAsync race condition + 首幀 fallback）\n" +
-                    "- feat: 法律頁面改 WebView 內嵌（隱私政策/服務條款/開源授權）\n" +
-                    "- fix: MediaPlayer listener 順序修正（setOnPreparedListener 在 prepareAsync 之前）"
+                    "- fix: 影片背景恢復正常（改回 setDataSource 字串路徑 + IO coroutine）\n" +
+                    "- fix: 設定頁背景變更即時同步到鍵盤（ACTION_BG_UPDATED 廣播）\n" +
+                    "- fix: 服務條款 email 更正為 service@snowrealm.pet"
             }
         }
         debug {
@@ -93,9 +93,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 影片背景修復（prepareAsync race condition + 首幀 fallback）\n" +
-                    "- feat: 法律頁面改 WebView 內嵌（隱私政策/服務條款/開源授權）\n" +
-                    "- fix: MediaPlayer listener 順序修正（setOnPreparedListener 在 prepareAsync 之前）"
+                    "- fix: 影片背景恢復正常（改回 setDataSource 字串路徑 + IO coroutine）\n" +
+                    "- fix: 設定頁背景變更即時同步到鍵盤（ACTION_BG_UPDATED 廣播）\n" +
+                    "- fix: 服務條款 email 更正為 service@snowrealm.pet"
             }
         }
     }
