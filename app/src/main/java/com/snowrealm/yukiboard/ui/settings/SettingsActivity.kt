@@ -874,6 +874,8 @@ class SettingsActivity : AppCompatActivity() {
     private var bgPreviewOverlay: View? = null
     private var bgPreviewLabel: TextView? = null
     private var bgPreviewContainer: FrameLayout? = null
+    /** 背景預覽 Canvas View（與鍵盤預覽共用 fullPreviewBgBitmap + 同一套 Matrix 邏輯） */
+    private var bgPreviewView: View? = null
     private var bgVideoPlayer: android.media.MediaPlayer? = null
     private var bgVideoTexture: android.view.TextureView? = null
     // 背景同步用的 UI 元件引用
@@ -912,19 +914,67 @@ class SettingsActivity : AppCompatActivity() {
                 }
             }
         }
+        bgPreviewContainer = previewContainer
 
+        // Canvas 背景預覽 — 邏輯與 buildFullKeyboardPreview onDraw 的背景部分完全相同（不畫按鍵）
+        val canvasPreview = object : View(this@SettingsActivity) {
+            private val bgMatrix = android.graphics.Matrix()
+            private val overlayPaint = android.graphics.Paint()
+
+            override fun onDraw(canvas: Canvas) {
+                super.onDraw(canvas)
+                val w = width.toFloat()
+                val h = height.toFloat()
+                if (w <= 0 || h <= 0) return
+
+                val bmp = fullPreviewBgBitmap
+                if (bmp != null && prefs.useCustomBackground) {
+                    // ─── 與 buildFullKeyboardPreview 完全相同的 Matrix ───
+                    bgMatrix.reset()
+                    if (prefs.bgScaleMode == 1) {
+                        bgMatrix.setScale(w / bmp.width, h / bmp.height)
+                    } else {
+                        val scale = maxOf(w / bmp.width, h / bmp.height)
+                        val sw = bmp.width * scale
+                        val sh = bmp.height * scale
+                        val maxDx = (sw - w).coerceAtLeast(0f)
+                        val maxDy = (sh - h).coerceAtLeast(0f)
+                        bgMatrix.setScale(scale, scale)
+                        bgMatrix.postTranslate(-maxDx * prefs.bgOffsetX, -maxDy * prefs.bgOffsetY)
+                    }
+                    if (prefs.bgRotation != 0) {
+                        bgMatrix.postRotate(prefs.bgRotation.toFloat(), w / 2f, h / 2f)
+                    }
+                    canvas.drawBitmap(bmp, bgMatrix, null)
+
+                    // 遮罩
+                    overlayPaint.color = android.graphics.Color.argb(prefs.bgOverlayAlpha, 0, 0, 0)
+                    overlayPaint.style = android.graphics.Paint.Style.FILL
+                    canvas.drawRect(0f, 0f, w, h, overlayPaint)
+                }
+            }
+        }.apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        }
+        bgPreviewView = canvasPreview
+        previewContainer.addView(canvasPreview)
+
+        // 保留 ImageView 給影片第一幀備用（影片預覽仍用 TextureView）
         val previewImg = android.widget.ImageView(this).apply {
             scaleType = android.widget.ImageView.ScaleType.MATRIX
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
+            visibility = View.GONE
         }
         bgPreviewImage = previewImg
-        bgPreviewContainer = previewContainer
         previewContainer.addView(previewImg)
 
-        // 遮罩覆蓋（模擬鍵盤上的效果）
+        // 遮罩覆蓋（用於影片預覽時）
         val overlayView = View(this).apply {
             setBackgroundColor(android.graphics.Color.argb(prefs.bgOverlayAlpha, 0, 0, 0))
             layoutParams = FrameLayout.LayoutParams(
@@ -992,10 +1042,12 @@ class SettingsActivity : AppCompatActivity() {
             dir.listFiles()?.forEach { it.delete() }
             prefs.useCustomBackground = false
             bgPreviewImage?.setImageBitmap(null)
+            bgPreviewView?.visibility = View.GONE
             bgPreviewLabel?.text = tr("尚未設定背景")
             bgPreviewLabel?.visibility = View.VISIBLE
             fullPreviewBgBitmap = null
             fullPreviewView?.invalidate()
+            bgPreviewView?.invalidate()
             sendBroadcast(Intent("com.snowrealm.yukiboard.ACTION_BG_UPDATED").setPackage(packageName))
             Toast.makeText(this, "已清除背景", Toast.LENGTH_SHORT).show()
         }.apply {
@@ -1025,6 +1077,7 @@ class SettingsActivity : AppCompatActivity() {
                     alphaLabel.text = tr("遮罩深度: %d%%").format((p * 100) / 255)
                     bgPreviewOverlay?.setBackgroundColor(android.graphics.Color.argb(p, 0, 0, 0))
                     fullPreviewView?.invalidate()
+                    bgPreviewView?.invalidate()
                     sendBroadcast(Intent("com.snowrealm.yukiboard.ACTION_BG_UPDATED").setPackage(packageName))
                 }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
@@ -1383,8 +1436,10 @@ class SettingsActivity : AppCompatActivity() {
                 retriever.release()
                 withContext(Dispatchers.Main) {
                     if (frame != null) {
-                        bgPreviewImage?.setImageBitmap(frame)
-                        updateBgPreviewMatrix()
+                        fullPreviewBgBitmap = frame
+                        bgPreviewView?.visibility = View.VISIBLE
+                        bgPreviewView?.invalidate()
+                        fullPreviewView?.invalidate()
                     }
                 }
             } catch (_: Exception) { }
@@ -1405,55 +1460,10 @@ class SettingsActivity : AppCompatActivity() {
         bgVideoTexture = null
     }
 
-    /** 根據 prefs 的 bgOffsetX/Y + bgScaleMode 更新預覽圖的 Matrix */
-    /** 根據 prefs 的 bgOffsetX/Y + bgScaleMode + bgRotation 更新預覽圖的 Matrix。
-     *  邏輯與 KeyboardBackgroundView.applyOffset() 保持一致。 */
+    /** 背景預覽現在是 Canvas View，Matrix 邏輯在 onDraw 內。
+     *  只需 invalidate 觸發重繪即可。 */
     private fun updateBgPreviewMatrix() {
-        val iv = bgPreviewImage ?: return
-        val drawable = iv.drawable ?: return
-        val bmpW = drawable.intrinsicWidth.toFloat()
-        val bmpH = drawable.intrinsicHeight.toFloat()
-        if (bmpW <= 0 || bmpH <= 0) return
-
-        iv.post {
-            val vw = iv.width.toFloat()
-            val vh = iv.height.toFloat()
-            if (vw <= 0 || vh <= 0) return@post
-
-            val matrix = android.graphics.Matrix()
-            val cx = vw / 2f
-            val cy = vh / 2f
-            val isRotated = prefs.bgRotation == 90 || prefs.bgRotation == 270
-
-            if (prefs.bgScaleMode == 1) {
-                // 整張塞入
-                if (isRotated) {
-                    matrix.setTranslate(cx - bmpW / 2f, cy - bmpH / 2f)
-                    matrix.postRotate(prefs.bgRotation.toFloat(), cx, cy)
-                    matrix.postScale(vw / bmpH, vh / bmpW, cx, cy)
-                } else {
-                    matrix.setScale(vw / bmpW, vh / bmpH)
-                    if (prefs.bgRotation == 180) {
-                        matrix.postRotate(180f, cx, cy)
-                    }
-                }
-            } else {
-                // 保持比例（裁切）
-                val effW = if (isRotated) bmpH else bmpW
-                val effH = if (isRotated) bmpW else bmpH
-                val scale = maxOf(vw / effW, vh / effH)
-                val maxDx = (effW * scale - vw).coerceAtLeast(0f)
-                val maxDy = (effH * scale - vh).coerceAtLeast(0f)
-
-                matrix.setScale(scale, scale)
-                matrix.postTranslate(cx - bmpW * scale / 2f, cy - bmpH * scale / 2f)
-                if (prefs.bgRotation != 0) {
-                    matrix.postRotate(prefs.bgRotation.toFloat(), cx, cy)
-                }
-                matrix.postTranslate(-maxDx * prefs.bgOffsetX, -maxDy * prefs.bgOffsetY)
-            }
-            iv.imageMatrix = matrix
-        }
+        bgPreviewView?.invalidate()
     }
 
     /** 根據 prefs 的 bgScaleMode + bgOffsetX/Y 更新影片預覽 TextureView 的 transform */
@@ -1500,30 +1510,24 @@ class SettingsActivity : AppCompatActivity() {
     private fun refreshBgPreview() {
         val savedBg = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getSavedBackground(this)
         if (savedBg != null && !com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.isVideoFile(savedBg)) {
-            // 圖片預覽
-            activityScope.launch(Dispatchers.IO) {
-                val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = 4 }
-                val bmp = android.graphics.BitmapFactory.decodeFile(savedBg.absolutePath, opts)
-                withContext(Dispatchers.Main) {
-                    bgPreviewImage?.setImageBitmap(bmp)
-                    bgPreviewLabel?.visibility = View.GONE
-                    updateBgPreviewMatrix()
-                }
-            }
+            // 圖片預覽 — Canvas View 使用 fullPreviewBgBitmap，統一載入
+            bgPreviewView?.visibility = View.VISIBLE
+            bgPreviewLabel?.visibility = View.GONE
         } else if (savedBg != null) {
             // 影片預覽：TextureView 播放
             stopVideoPreview()
-            bgPreviewImage?.setImageBitmap(null)
+            bgPreviewView?.visibility = View.GONE
             bgPreviewLabel?.visibility = View.GONE
             startVideoPreview(savedBg.absolutePath)
         } else {
-            bgPreviewImage?.setImageBitmap(null)
+            bgPreviewView?.visibility = View.GONE
             bgPreviewLabel?.text = tr("尚未設定背景")
             bgPreviewLabel?.visibility = View.VISIBLE
         }
-        // 同步更新鍵盤完整預覽的背景
+        // 同步更新鍵盤完整預覽的背景（也會被 Canvas 背景預覽共用）
         reloadFullPreviewBitmap()
         fullPreviewView?.invalidate()
+        bgPreviewView?.invalidate()
     }
 
     // ─────────────────────────────────────────────────────────

@@ -738,12 +738,17 @@ class ThemePanelView(context: Context) : View(context) {
         val bmp = previewBgBitmap
         if (bmp != null && prefs.useCustomBackground) {
             previewBgMatrix.reset()
+            val bw = bmp.width.toFloat()
+            val bh = bmp.height.toFloat()
+            val pcx = pvRect.left + pvW / 2f
+            val pcy = pvRect.top + pvH / 2f
+
             if (prefs.bgScaleMode == 1) {
-                previewBgMatrix.setScale(pvW / bmp.width, pvH / bmp.height)
+                previewBgMatrix.setScale(pvW / bw, pvH / bh)
                 previewBgMatrix.postTranslate(pvRect.left, pvRect.top)
             } else {
-                val scale = maxOf(pvW / bmp.width, pvH / bmp.height)
-                val sw = bmp.width * scale; val sh = bmp.height * scale
+                val scale = maxOf(pvW / bw, pvH / bh)
+                val sw = bw * scale; val sh = bh * scale
                 val maxDx = (sw - pvW).coerceAtLeast(0f)
                 val maxDy = (sh - pvH).coerceAtLeast(0f)
                 previewBgMatrix.setScale(scale, scale)
@@ -755,9 +760,7 @@ class ThemePanelView(context: Context) : View(context) {
             // 旋轉（以預覽區域中心）— 與 buildFullKeyboardPreview 一致
             if (prefs.bgRotation != 0) {
                 previewBgMatrix.postRotate(
-                    prefs.bgRotation.toFloat(),
-                    pvRect.left + pvW / 2f,
-                    pvRect.top + pvH / 2f
+                    prefs.bgRotation.toFloat(), pcx, pcy
                 )
             }
             canvas.drawBitmap(bmp, previewBgMatrix, null)
