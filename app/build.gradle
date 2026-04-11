@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 148
-        versionName "0.9.82"
+        versionCode 149
+        versionName "0.9.83"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,9 +82,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 背景縮放改為 fit-inside（完整顯示不裁切）\n" +
-                    "- fix: 影片旋轉 + fit-inside 正確順序（先旋轉再縮放）\n" +
-                    "- fix: X/Y 滑桿在 fit-inside 模式控制位置"
+                    "- fix: 背景縮放改回 center-crop（填滿鍵盤，裁切超出）\n" +
+                    "- fix: 影片旋轉 + center-crop 正確順序\n" +
+                    "- fix: 設定頁預覽圖片加旋轉支援"
             }
         }
         debug {
@@ -93,9 +93,9 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 背景縮放改為 fit-inside（完整顯示不裁切）\n" +
-                    "- fix: 影片旋轉 + fit-inside 正確順序（先旋轉再縮放）\n" +
-                    "- fix: X/Y 滑桿在 fit-inside 模式控制位置"
+                    "- fix: 背景縮放改回 center-crop（填滿鍵盤，裁切超出）\n" +
+                    "- fix: 影片旋轉 + center-crop 正確順序\n" +
+                    "- fix: 設定頁預覽圖片加旋轉支援"
             }
         }
     }

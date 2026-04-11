@@ -1456,31 +1456,23 @@ class SettingsActivity : AppCompatActivity() {
 
         val matrix = android.graphics.Matrix()
 
-        // Step 1：影片原點移到 View 中心
-        matrix.setTranslate(cx - vW / 2f, cy - vH / 2f)
-
-        // Step 2：以 View 中心旋轉
-        if (rotation != 0) {
-            matrix.postRotate(rotation.toFloat(), cx, cy)
-        }
-
-        // Step 3：縮放
         if (prefs.bgScaleMode == 1) {
-            val sx = vw / effectiveW
-            val sy = vh / effectiveH
-            matrix.postScale(sx, sy, cx, cy)
+            // 整張塞入
+            matrix.setTranslate(cx - vW / 2f, cy - vH / 2f)
+            if (rotation != 0) matrix.postRotate(rotation.toFloat(), cx, cy)
+            matrix.postScale(vw / effectiveW, vh / effectiveH, cx, cy)
         } else {
-            val scale = minOf(vw / effectiveW, vh / effectiveH)
-            matrix.postScale(scale, scale, cx, cy)
-
-            // Step 4：X/Y 偏移
+            // center-crop：填滿預��
+            val scale = maxOf(vw / effectiveW, vh / effectiveH)
             val scaledW = effectiveW * scale
             val scaledH = effectiveH * scale
-            val remainX = (vw - scaledW).coerceAtLeast(0f)
-            val remainY = (vh - scaledH).coerceAtLeast(0f)
-            val dx = remainX * prefs.bgOffsetX - remainX * 0.5f
-            val dy = remainY * prefs.bgOffsetY - remainY * 0.5f
-            matrix.postTranslate(dx, dy)
+            val maxDx = (scaledW - vw).coerceAtLeast(0f)
+            val maxDy = (scaledH - vh).coerceAtLeast(0f)
+
+            matrix.setTranslate(cx - vW / 2f, cy - vH / 2f)
+            if (rotation != 0) matrix.postRotate(rotation.toFloat(), cx, cy)
+            matrix.postScale(scale, scale, cx, cy)
+            matrix.postTranslate(-maxDx * prefs.bgOffsetX, -maxDy * prefs.bgOffsetY)
         }
 
         tv.setTransform(matrix)
@@ -1622,6 +1614,10 @@ class SettingsActivity : AppCompatActivity() {
                         val maxDy = (sh - h).coerceAtLeast(0f)
                         bgMatrix.setScale(scale, scale)
                         bgMatrix.postTranslate(-maxDx * prefs.bgOffsetX, -maxDy * prefs.bgOffsetY)
+                    }
+                    // 旋轉（以 View 中心）
+                    if (prefs.bgRotation != 0) {
+                        bgMatrix.postRotate(prefs.bgRotation.toFloat(), w / 2f, h / 2f)
                     }
                     canvas.drawBitmap(bmp, bgMatrix, null)
 
