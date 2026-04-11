@@ -921,37 +921,40 @@ class SettingsActivity : AppCompatActivity() {
             private val bgMatrix = android.graphics.Matrix()
             private val overlayPaint = android.graphics.Paint()
 
+            init {
+                // 必須設定 setWillNotDraw(false)，否則沒有 background 的 View 不會觸發 onDraw
+                setWillNotDraw(false)
+            }
+
             override fun onDraw(canvas: Canvas) {
                 super.onDraw(canvas)
                 val w = width.toFloat()
                 val h = height.toFloat()
                 if (w <= 0 || h <= 0) return
 
-                val bmp = fullPreviewBgBitmap
-                if (bmp != null && prefs.useCustomBackground) {
-                    // ─── 與 buildFullKeyboardPreview 完全相同的 Matrix ───
-                    bgMatrix.reset()
-                    if (prefs.bgScaleMode == 1) {
-                        bgMatrix.setScale(w / bmp.width, h / bmp.height)
-                    } else {
-                        val scale = maxOf(w / bmp.width, h / bmp.height)
-                        val sw = bmp.width * scale
-                        val sh = bmp.height * scale
-                        val maxDx = (sw - w).coerceAtLeast(0f)
-                        val maxDy = (sh - h).coerceAtLeast(0f)
-                        bgMatrix.setScale(scale, scale)
-                        bgMatrix.postTranslate(-maxDx * prefs.bgOffsetX, -maxDy * prefs.bgOffsetY)
-                    }
-                    if (prefs.bgRotation != 0) {
-                        bgMatrix.postRotate(prefs.bgRotation.toFloat(), w / 2f, h / 2f)
-                    }
-                    canvas.drawBitmap(bmp, bgMatrix, null)
-
-                    // 遮罩
-                    overlayPaint.color = android.graphics.Color.argb(prefs.bgOverlayAlpha, 0, 0, 0)
-                    overlayPaint.style = android.graphics.Paint.Style.FILL
-                    canvas.drawRect(0f, 0f, w, h, overlayPaint)
+                val bmp = fullPreviewBgBitmap ?: return
+                // ─── 與 buildFullKeyboardPreview 完全相同的 Matrix ───
+                bgMatrix.reset()
+                if (prefs.bgScaleMode == 1) {
+                    bgMatrix.setScale(w / bmp.width, h / bmp.height)
+                } else {
+                    val scale = maxOf(w / bmp.width, h / bmp.height)
+                    val sw = bmp.width * scale
+                    val sh = bmp.height * scale
+                    val maxDx = (sw - w).coerceAtLeast(0f)
+                    val maxDy = (sh - h).coerceAtLeast(0f)
+                    bgMatrix.setScale(scale, scale)
+                    bgMatrix.postTranslate(-maxDx * prefs.bgOffsetX, -maxDy * prefs.bgOffsetY)
                 }
+                if (prefs.bgRotation != 0) {
+                    bgMatrix.postRotate(prefs.bgRotation.toFloat(), w / 2f, h / 2f)
+                }
+                canvas.drawBitmap(bmp, bgMatrix, null)
+
+                // 遮罩
+                overlayPaint.color = android.graphics.Color.argb(prefs.bgOverlayAlpha, 0, 0, 0)
+                overlayPaint.style = android.graphics.Paint.Style.FILL
+                canvas.drawRect(0f, 0f, w, h, overlayPaint)
             }
         }.apply {
             layoutParams = FrameLayout.LayoutParams(
