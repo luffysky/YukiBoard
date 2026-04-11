@@ -14,7 +14,6 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
@@ -34,7 +33,7 @@ import com.snowrealm.yukiboard.ui.settings.YukiPreferences
  * - 長按彈出選單（複製/加密/釘選/刪除）
  * - 敏感內容自動偵測（信用卡、身分證號）
  */
-class ClipboardPanelView(context: Context) : FrameLayout(context) {
+class ClipboardPanelView(context: Context) : FrameLayout(context), PanelInputTarget {
 
     private val density = context.resources.displayMetrics.density
     private val appContext = context.applicationContext
@@ -43,6 +42,11 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
     private val clipManager = appContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     private val encryptHelper: ClipboardEncryptionHelper by lazy { ClipboardEncryptionHelper(appContext) }
     private val handler = Handler(Looper.getMainLooper())
+
+    // ═══ PanelInputTarget ═══
+    private val inputBuffer = StringBuilder()
+    override var isInInputMode: Boolean = false
+        private set
 
     // ═══ Child views ═══
     private val searchBar: TextView
@@ -59,9 +63,6 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
         }
 
     var onClipSelected: ((String) -> Unit)? = null
-
-    /** 由 Service 提供的 Dialog 顯示回呼（IME 內部 View 無法直接使用 EditText） */
-    var onShowDialog: ((android.app.AlertDialog) -> Unit)? = null
 
     private var clipHistory = mutableListOf<ClipItem>()
     private var filteredItems = listOf<ClipItem>()
@@ -109,7 +110,7 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
                 setMargins((8 * density).toInt(), (6 * density).toInt(), (8 * density).toInt(), (2 * density).toInt())
             }
         }
-        searchBar.setOnClickListener { showSearchDialog() }
+        searchBar.setOnClickListener { enterInputMode() }
         root.addView(searchBar)
 
         // 2. Tag filter row
@@ -370,47 +371,61 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
         // Tag chips use dark theme colors which work with most themes
     }
 
-    private fun showSearchDialog() {
-        val input = EditText(context).apply {
-            hint = "輸入關鍵字"
-            setText(searchQuery)
-            textSize = 15f
-            setPadding((20 * density).toInt(), (12 * density).toInt(), (20 * density).toInt(), (12 * density).toInt())
+    // ═══ PanelInputTarget 實作 ═══
+
+    override fun enterInputMode() {
+        isInInputMode = true
+        inputBuffer.clear()
+        inputBuffer.append(searchQuery)
+        updateSearchDisplay()
+    }
+
+    override fun exitInputMode() {
+        isInInputMode = false
+        searchQuery = inputBuffer.toString().trim()
+        applyFilters()
+        updateSearchBarDisplay()
+    }
+
+    override fun onCharInput(text: String) {
+        inputBuffer.append(text)
+        searchQuery = inputBuffer.toString()
+        applyFilters()
+        updateSearchDisplay()
+    }
+
+    override fun onDeleteInput() {
+        if (inputBuffer.isNotEmpty()) {
+            inputBuffer.deleteCharAt(inputBuffer.length - 1)
+            searchQuery = inputBuffer.toString()
+            applyFilters()
+            updateSearchDisplay()
         }
-        val dialog = android.app.AlertDialog.Builder(context, android.app.AlertDialog.THEME_DEVICE_DEFAULT_DARK)
-            .setTitle("搜尋剪貼簿")
-            .setView(input)
-            .setPositiveButton("搜尋") { _, _ ->
-                searchQuery = input.text.toString().trim()
-                applyFilters()
-                updateSearchBarDisplay()
-            }
-            .setNeutralButton("清除") { _, _ ->
-                searchQuery = ""
-                applyFilters()
-                updateSearchBarDisplay()
-            }
-            .setNegativeButton("取消", null)
-            .create()
-        val cb = onShowDialog
-        if (cb != null) {
-            cb.invoke(dialog)
-        } else {
-            try {
-                dialog.window?.let { w ->
-                    w.setType(android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY)
-                    w.setSoftInputMode(
-                        android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN or
-                        android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
-                    )
-                    w.setGravity(android.view.Gravity.TOP or android.view.Gravity.CENTER_HORIZONTAL)
-                    val lp = w.attributes
-                    lp.y = (48 * context.resources.displayMetrics.density).toInt()
-                    w.attributes = lp
-                }
-                dialog.show()
-            } catch (e: Exception) { android.util.Log.w("Clipboard", "Crypto operation failed: ${e.message}") }
-        }
+    }
+
+    override fun onSpaceInput() {
+        onCharInput(" ")
+    }
+
+    override fun onEnterInput() {
+        exitInputMode()
+    }
+
+    override fun onComposedTextInput(text: String) {
+        inputBuffer.append(text)
+        searchQuery = inputBuffer.toString()
+        applyFilters()
+        updateSearchDisplay()
+    }
+
+    override fun updateComposingHint(hint: String) {
+        updateSearchDisplay(hint)
+    }
+
+    private fun updateSearchDisplay(composing: String = "") {
+        val display = inputBuffer.toString() + composing + "\u25B8"  // ▸ cursor
+        searchBar.text = "\uD83D\uDD0D $display"
+        searchBar.setTextColor(0xFFE0E0E0.toInt())
     }
 
     private fun updateSearchBarDisplay() {

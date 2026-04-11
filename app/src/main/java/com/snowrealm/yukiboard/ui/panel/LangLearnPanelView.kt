@@ -29,6 +29,8 @@ class LangLearnPanelView(context: Context) : LinearLayout(context), PanelInputTa
 
     var inputTextProvider: (() -> String)? = null
     var onInsertText: ((String) -> Unit)? = null
+    /** TTS 朗讀回呼 (text, locale code) */
+    var onSpeak: ((String, String?) -> Unit)? = null
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val client = OkHttpClient.Builder()
@@ -46,22 +48,27 @@ class LangLearnPanelView(context: Context) : LinearLayout(context), PanelInputTa
 
     override val isInInputMode: Boolean get() = _isInInputMode
 
+    private fun updateSearchDisplay(composing: String = "") {
+        val display = inputBuffer.toString() + composing + "\u2581"
+        searchInput.text = display
+    }
+
     override fun onCharInput(text: String) {
         if (!_isInInputMode) return
         inputBuffer.append(text)
-        searchInput.text = inputBuffer.toString()
+        updateSearchDisplay()
     }
 
     override fun onDeleteInput() {
         if (!_isInInputMode || inputBuffer.isEmpty()) return
         inputBuffer.deleteCharAt(inputBuffer.lastIndex)
-        searchInput.text = inputBuffer.toString()
+        updateSearchDisplay()
     }
 
     override fun onSpaceInput() {
         if (!_isInInputMode) return
         inputBuffer.append(" ")
-        searchInput.text = inputBuffer.toString()
+        updateSearchDisplay()
     }
 
     override fun onEnterInput() {
@@ -72,10 +79,12 @@ class LangLearnPanelView(context: Context) : LinearLayout(context), PanelInputTa
     override fun onComposedTextInput(text: String) {
         if (!_isInInputMode) return
         inputBuffer.append(text)
-        searchInput.text = inputBuffer.toString()
+        updateSearchDisplay()
     }
 
-    override fun updateComposingHint(hint: String) {}
+    override fun updateComposingHint(hint: String) {
+        updateSearchDisplay(hint)
+    }
 
     override fun exitInputMode() {
         _isInInputMode = false
@@ -440,6 +449,15 @@ class LangLearnPanelView(context: Context) : LinearLayout(context), PanelInputTa
         }
         titleRow.addView(saveBtn)
 
+        // TTS 朗讀按鈕
+        val ttsLocale = langCodeToLocale(lang)
+        titleRow.addView(TextView(context).apply {
+            text = "🔊"
+            textSize = 18f
+            setPadding(dp(6), 0, dp(4), 0)
+            setOnClickListener { onSpeak?.invoke(info.word, ttsLocale) }
+        })
+
         // 插入按鈕
         titleRow.addView(TextView(context).apply {
             text = "📝"
@@ -450,13 +468,14 @@ class LangLearnPanelView(context: Context) : LinearLayout(context), PanelInputTa
 
         card.addView(titleRow)
 
-        // ── 音標/讀音 ──
+        // ── 音標/讀音（點擊朗讀） ──
         if (!info.phonetic.isNullOrBlank()) {
             card.addView(TextView(context).apply {
                 text = "🔊 ${info.phonetic}"
                 setTextColor(0xFF90CAF9.toInt())
                 textSize = 14f
                 setPadding(0, dp(2), 0, dp(4))
+                setOnClickListener { onSpeak?.invoke(info.word, ttsLocale) }
             })
         }
         if (!info.reading.isNullOrBlank()) {
@@ -465,6 +484,7 @@ class LangLearnPanelView(context: Context) : LinearLayout(context), PanelInputTa
                 setTextColor(0xFF90CAF9.toInt())
                 textSize = 14f
                 setPadding(0, dp(2), 0, dp(4))
+                setOnClickListener { onSpeak?.invoke(info.word, ttsLocale) }
             })
         }
 
@@ -589,6 +609,14 @@ class LangLearnPanelView(context: Context) : LinearLayout(context), PanelInputTa
                 setPadding(dp(4), 0, dp(8), 0)
             })
 
+            // TTS 按鈕
+            row.addView(TextView(context).apply {
+                text = "🔊"
+                textSize = 16f
+                setPadding(dp(4), 0, dp(4), 0)
+                setOnClickListener { onSpeak?.invoke(word, langCodeToLocale(lang)) }
+            })
+
             // 查詢按鈕
             row.addView(TextView(context).apply {
                 text = "📖"
@@ -619,6 +647,19 @@ class LangLearnPanelView(context: Context) : LinearLayout(context), PanelInputTa
 
             resultLayout.addView(row)
         }
+    }
+
+    private fun langCodeToLocale(lang: String): String = when (lang) {
+        "en" -> "en-US"
+        "ja" -> "ja-JP"
+        "ko" -> "ko-KR"
+        "zh" -> "zh-TW"
+        "de" -> "de-DE"
+        "fr" -> "fr-FR"
+        "es" -> "es-ES"
+        "vi" -> "vi-VN"
+        "it" -> "it-IT"
+        else -> lang
     }
 
     override fun onDetachedFromWindow() {

@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 137
-        versionName "0.9.71"
+        versionCode 138
+        versionName "0.9.72"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 

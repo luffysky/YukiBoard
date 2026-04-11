@@ -117,6 +117,16 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
     private val inputBuffer = StringBuilder()
     private var composingHint = ""
 
+    // ── 新增模式（inline，不用 Dialog） ──
+    private var isAddMode = false
+    private var addField = 0  // 0=詞彙, 1=注音
+    private val addWordBuffer = StringBuilder()
+    private val addBopoBuffer = StringBuilder()
+    private var addConfirmRect = RectF()
+    private var addCancelRect = RectF()
+    private var addFieldWordRect = RectF()
+    private var addFieldBopoRect = RectF()
+
     // ── 尺寸 ──
     private val headerH = 42f * density
     private val tabBarH = 34f * density
@@ -178,7 +188,9 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
         drawHeader(canvas)
 
         var contentTop = headerH
-        if (isSearchMode) {
+        if (isAddMode) {
+            contentTop += drawAddModeBar(canvas, contentTop)
+        } else if (isSearchMode) {
             drawSearchBar(canvas, contentTop)
             contentTop += searchBarH
         }
@@ -544,6 +556,34 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
 
                 val elapsed = System.currentTimeMillis() - touchDownTime
 
+                // Add mode buttons
+                if (isAddMode) {
+                    if (addConfirmRect.contains(event.x, event.y)) {
+                        commitAddEntry()
+                        performClick()
+                        return true
+                    }
+                    if (addCancelRect.contains(event.x, event.y)) {
+                        cancelAddMode()
+                        performClick()
+                        return true
+                    }
+                    if (addFieldWordRect.contains(event.x, event.y)) {
+                        addField = 0
+                        composingHint = ""
+                        invalidate()
+                        performClick()
+                        return true
+                    }
+                    if (addFieldBopoRect.contains(event.x, event.y)) {
+                        addField = 1
+                        composingHint = ""
+                        invalidate()
+                        performClick()
+                        return true
+                    }
+                }
+
                 // Header buttons
                 if (addBtnRect.contains(event.x, event.y)) {
                     showAddDialog()
@@ -653,58 +693,89 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
     // =========================================================================
 
     private fun showAddDialog() {
-        val ctx = context ?: return
-        val layout = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(
-                (20 * density).toInt(), (16 * density).toInt(),
-                (20 * density).toInt(), (8 * density).toInt()
-            )
-        }
-        val wordInput = EditText(ctx).apply {
-            hint = "詞彙（例：迷客夏）"
-            textSize = 15f
-        }
-        val bopoInput = EditText(ctx).apply {
-            hint = "注音（例：ㄇㄧˊ ㄎㄜˋ ㄒㄧㄚˋ）"
-            textSize = 15f
-        }
+        // 進入 inline 新增模式（不用 Dialog）
+        isAddMode = true
+        addField = 0
+        addWordBuffer.clear()
+        addBopoBuffer.clear()
+        composingHint = ""
+        isInputMode = true
+        isSearchMode = false
+        scrollY = 0f
+        invalidate()
+    }
 
-        val categorySpinner = Spinner(ctx)
-        val categories = userDictionary?.getAllCategories() ?: UserDictionary.BUILT_IN_CATEGORIES
-        val adapter = ArrayAdapter(ctx, android.R.layout.simple_spinner_dropdown_item, categories)
-        categorySpinner.adapter = adapter
-
-        val catLabel = TextView(ctx).apply {
-            text = "分類："
-            textSize = 13f
-            setPadding(0, (8 * density).toInt(), 0, 0)
+    private fun commitAddEntry() {
+        val word = addWordBuffer.toString().trim()
+        val bopo = addBopoBuffer.toString().trim()
+        if (word.isNotBlank() && bopo.isNotBlank()) {
+            userDictionary?.addManual(word, bopo, UserDictionary.DEFAULT_CATEGORY)
+            reloadEntries()
+            Toast.makeText(context, "已新增「$word」", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(context, "詞彙和注音都不可為空", Toast.LENGTH_SHORT).show()
         }
+        cancelAddMode()
+    }
 
-        layout.addView(wordInput)
-        layout.addView(bopoInput)
-        layout.addView(catLabel)
-        layout.addView(categorySpinner)
+    private fun cancelAddMode() {
+        isAddMode = false
+        addField = 0
+        addWordBuffer.clear()
+        addBopoBuffer.clear()
+        composingHint = ""
+        invalidate()
+    }
 
-        showImeDialog(
-            AlertDialog.Builder(ctx, AlertDialog.THEME_DEVICE_DEFAULT_DARK)
-                .setTitle("新增詞彙")
-                .setView(layout)
-                .setPositiveButton("新增") { _, _ ->
-                    val word = wordInput.text.toString().trim()
-                    val bopo = bopoInput.text.toString().trim()
-                    val cat = categorySpinner.selectedItem?.toString() ?: UserDictionary.DEFAULT_CATEGORY
-                    if (word.isNotBlank() && bopo.isNotBlank()) {
-                        userDictionary?.addManual(word, bopo, cat)
-                        reloadEntries()
-                        Toast.makeText(ctx, "已新增「$word」→ $cat", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(ctx, "詞彙和注音都不可為空", Toast.LENGTH_SHORT).show()
-                    }
-                }
-                .setNegativeButton("取消", null)
-                .create()
-        )
+    private fun drawAddModeBar(canvas: Canvas, top: Float): Float {
+        val barH = searchBarH * 2.2f
+        // 背景
+        cardPaint.color = 0xFF1A3050.toInt()
+        canvas.drawRoundRect(padding, top + 2, width - padding, top + barH - 2, cardR, cardR, cardPaint)
+
+        val fieldH = (barH - 8 * density) / 2f
+        val left = padding + 8 * density
+        val right = width - padding - 70 * density
+
+        // 詞彙欄位
+        val wordTop = top + 4 * density
+        addFieldWordRect.set(left, wordTop, right, wordTop + fieldH - 2 * density)
+        cardPaint.color = if (addField == 0) 0xFF253D55.toInt() else 0xFF1E3245.toInt()
+        canvas.drawRoundRect(addFieldWordRect, 6 * density, 6 * density, cardPaint)
+        val wordDisplay = if (addField == 0) addWordBuffer.toString() + composingHint + "▏" else addWordBuffer.toString()
+        titlePaint.textSize = 13f * density
+        titlePaint.color = if (addWordBuffer.isEmpty() && addField != 0) DIM_TEXT else TEXT_COLOR
+        val wordText = if (wordDisplay.isEmpty()) "詞彙（直接打字）" else wordDisplay
+        if (wordDisplay.isEmpty()) titlePaint.color = DIM_TEXT
+        canvas.drawText(wordText, left + 8 * density, addFieldWordRect.centerY() + 5 * density, titlePaint)
+
+        // 注音欄位
+        val bopoTop = wordTop + fieldH
+        addFieldBopoRect.set(left, bopoTop, right, bopoTop + fieldH - 2 * density)
+        cardPaint.color = if (addField == 1) 0xFF253D55.toInt() else 0xFF1E3245.toInt()
+        canvas.drawRoundRect(addFieldBopoRect, 6 * density, 6 * density, cardPaint)
+        val bopoDisplay = if (addField == 1) addBopoBuffer.toString() + composingHint + "▏" else addBopoBuffer.toString()
+        titlePaint.color = if (bopoDisplay.isEmpty()) DIM_TEXT else TEXT_COLOR
+        val bopoText = if (bopoDisplay.isEmpty()) "注音（直接打字）" else bopoDisplay
+        canvas.drawText(bopoText, left + 8 * density, addFieldBopoRect.centerY() + 5 * density, titlePaint)
+
+        // 確認按鈕
+        val btnW = 28 * density
+        val btnRight = width - padding - 6 * density
+        addConfirmRect.set(btnRight - btnW, wordTop, btnRight, wordTop + fieldH - 2 * density)
+        cardPaint.color = 0xFF2A6B4A.toInt()
+        canvas.drawRoundRect(addConfirmRect, 6 * density, 6 * density, cardPaint)
+        btnPaint.textSize = 16f * density
+        btnPaint.color = 0xFFFFFFFF.toInt()
+        canvas.drawText("✓", addConfirmRect.centerX(), addConfirmRect.centerY() + 6 * density, btnPaint)
+
+        // 取消按鈕
+        addCancelRect.set(btnRight - btnW, bopoTop, btnRight, bopoTop + fieldH - 2 * density)
+        cardPaint.color = 0xFF6B2A2A.toInt()
+        canvas.drawRoundRect(addCancelRect, 6 * density, 6 * density, cardPaint)
+        canvas.drawText("✕", addCancelRect.centerX(), addCancelRect.centerY() + 6 * density, btnPaint)
+
+        return barH
     }
 
     private fun showEditDialog(index: Int) {
@@ -877,32 +948,49 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
 
     override val isInInputMode: Boolean get() = isInputMode
 
+    private fun activeBuffer(): StringBuilder = when {
+        isAddMode && addField == 0 -> addWordBuffer
+        isAddMode && addField == 1 -> addBopoBuffer
+        else -> inputBuffer
+    }
+
     override fun onCharInput(text: String) {
         if (!isInputMode) return
-        inputBuffer.append(text)
-        searchQuery = inputBuffer.toString()
-        applyFilter()
+        activeBuffer().append(text)
+        if (!isAddMode) { searchQuery = inputBuffer.toString(); applyFilter() }
         invalidate()
     }
 
     override fun onDeleteInput() {
-        if (!isInputMode || inputBuffer.isEmpty()) return
-        inputBuffer.deleteCharAt(inputBuffer.lastIndex)
-        searchQuery = inputBuffer.toString()
-        applyFilter()
+        if (!isInputMode) return
+        val buf = activeBuffer()
+        if (buf.isEmpty()) return
+        buf.deleteCharAt(buf.lastIndex)
+        if (!isAddMode) { searchQuery = inputBuffer.toString(); applyFilter() }
         invalidate()
     }
 
     override fun onSpaceInput() {
         if (!isInputMode) return
-        inputBuffer.append(' ')
-        searchQuery = inputBuffer.toString()
-        applyFilter()
+        activeBuffer().append(' ')
+        if (!isAddMode) { searchQuery = inputBuffer.toString(); applyFilter() }
         invalidate()
     }
 
     override fun onEnterInput() {
         if (!isInputMode) return
+        if (isAddMode) {
+            if (addField == 0) {
+                // 詞彙欄 Enter → 切到注音欄
+                addField = 1
+                composingHint = ""
+            } else {
+                // 注音欄 Enter → 確認新增
+                commitAddEntry()
+            }
+            invalidate()
+            return
+        }
         isInputMode = false
         searchQuery = inputBuffer.toString()
         applyFilter()
@@ -924,10 +1012,9 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
 
     override fun onComposedTextInput(text: String) {
         if (!isInputMode) return
-        inputBuffer.append(text)
+        activeBuffer().append(text)
         composingHint = ""
-        searchQuery = inputBuffer.toString()
-        applyFilter()
+        if (!isAddMode) { searchQuery = inputBuffer.toString(); applyFilter() }
         invalidate()
     }
 

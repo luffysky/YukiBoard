@@ -294,7 +294,7 @@
 #### A-1 RIME 詞庫轉換腳本
 - ~~[ ] 下載 RIME 詞庫（bopomofo_tw.dict.yaml + terra_pinyin.dict.yaml）→ `scripts/dicts/`~~ — v0.9.26 scripts/dicts/ 已建立
 - ~~[ ] 新增 `scripts/convert_rime_dict.py`（拼音→注音轉換 + SQLite 輸出）~~ — v0.9.26 已完成（支援 --local / 下載）
-- [ ] `app/build.gradle` 加入 `convertRimeDict` task（build 前自動執行）
+- ~~[ ] `app/build.gradle` 加入 `convertRimeDict` task（build 前自動執行）~~ ✅ v0.9.47 已加入（手動執行 ./gradlew convertRimeDict）
 - ~~[ ] `app/src/main/assets/.gitignore` 排除 rime_bopomofo.db~~ — v0.9.26
 
 #### A-2 RimeDictionary.kt（Android 查詢層）
@@ -378,7 +378,7 @@
 
 - ✅ GeminiProvider.kt（免費 1500 次/天）
 - ✅ GroqProvider.kt（免費限額，速度最快）
-- [ ] GeminiNanoProvider.kt（Android 14+ 本地離線）
+- ~~[ ] GeminiNanoProvider.kt（Android 14+ 本地離線）~~ ✅ 已實作
 - ✅ AIProviderType enum 更新（+GEMINI/GROQ）
 - ✅ GeminiProvider（SSE streaming + gemini-2.0-flash）
 - ✅ GroqProvider（OpenAI相容格式 + llama-3.3-70b）
@@ -415,7 +415,7 @@
 - ✅ scripts/generate_invite_codes.py — HMAC-SHA256 邀請碼批量生成腳本
 - ✅ 翻譯引擎接 MLKit Translation 離線模型 → TranslateEngine.kt
 - ✅ `.env.example` 範本檔案
-- [ ] CLAUDE.md 補充各 Key 用途與申請網址
+- ~~[ ] CLAUDE.md 補充各 Key 用途與申請網址~~ ✅ 已有環境變數表
 
 ---
 
@@ -437,7 +437,7 @@
   - 30天未使用 → 降級，60天 → 刪除
   - 手動釘選（永不降級）/ 取消釘選 / 刪除
 - ✅ 整合 SmartInputManager + InputRouter 候選字排序
-- [ ] 設定頁 UI：個人詞庫管理（釘選/刪除/匯出）
+- ~~[ ] 設定頁 UI：個人詞庫管理（釘選/刪除/匯出）~~ ✅ UserDictionaryPanelView 已實作（功能列入口）
 
 #### J-2 StyleProfiler（語氣風格學習）
 - ✅ `input/smart/StyleProfiler.kt` — 語尾詞統計 + App 維度語氣分數
@@ -455,7 +455,7 @@
 - ✅ `input/smart/EmotionStickerEngine.kt` — 依打字情緒推薦貼圖標籤
   - 7 情緒分類 + 關鍵詞/Emoji 偵測
   - recommend() 回傳貼圖標籤
-- [ ] StickerPanelView 貼圖標籤系統（接收推薦顯示）
+- ~~[ ] StickerPanelView 貼圖標籤系統（接收推薦顯示）~~ ✅ 已整合 EmotionStickerEngine
 - [ ] 候選列末尾浮出推薦貼圖縮圖
 
 ---
@@ -500,18 +500,16 @@
 - ✅ ClawPanelView 防詐結果加「⚠️ 確實有風險 / ✅ 沒有問題」回饋按鈕
 - ✅ 回饋後雪凜回應（「記住了，下次會更注意！」/「好的，誤判了抱歉～」）
 
-#### L-3 回報系統（匿名聚合，群體智慧）
-- [ ] security/FraudReportManager.kt — 匿名化處理
-  - 文字 → SHA-256 hash（不上傳原文）
-  - 只上傳：fraud_type / matched_keywords / is_fraud / rule_score / device_locale
+#### L-3 回報系統（匿名聚合，群體智慧）✅
+- ~~[ ] security/FraudReportManager.kt — 匿名化處理~~ ✅ 已實作
 - [ ] Supabase 建 fraud_reports 表（RLS insert only，使用者只能寫不能讀）
-- [ ] ClawPanelView 加「回報詐騙 / 不是詐騙」按鈕（接 FraudReportManager）
+- ~~[ ] ClawPanelView 加「回報詐騙 / 不是詐騙」按鈕（接 FraudReportManager）~~ ✅ 已實作
 - [ ] 同意聲明對話框（首次回報時顯示隱私說明，opt-in）
-- [ ] YukiPreferences 加 fraudReportConsent: Boolean
+- ~~[ ] YukiPreferences 加 fraudReportConsent: Boolean~~ ✅ 已實作
 
 #### L-4 雲端規則下發（定期更新）
 - [ ] Supabase 建 fraud_rules_v2 表（type / keyword / weight / updated_at）
-- [ ] security/FraudRuleSync.kt — App 啟動時拉最新規則
+- ~~[ ] security/FraudRuleSync.kt — App 啟動時拉最新規則~~ ✅ 已實作
   - 每 24 小時同步一次（SharedPreferences 記錄 lastSyncTime）
   - 合併遠端規則 + 本地回饋權重 = 最終規則集
   - 新增詐騙類型可動態擴充（不用更新 App）
@@ -519,20 +517,20 @@
   - 回報數 ≥ 10 且「是詐騙」比例 ≥ 70% → 關鍵字 weight 上調
   - 「不是詐騙」比例 ≥ 60% → weight 下調或移除
 
-#### L-5 合成訓練資料生成
-- [ ] scripts/generate_fraud_training_data.py — Claude API 批次生成
-- [ ] 8 種詐騙類型 × 200 筆 + 1000 筆正常對話
-- [ ] 輸出 JSONL（fraud_conversations + safe_conversations）
+#### L-5 合成訓練資料生成 ✅
+- ~~[ ] scripts/generate_fraud_training_data.py — Claude API 批次生成~~ ✅ 已實作
+- ~~[ ] 8 種詐騙類型 × 200 筆 + 1000 筆正常對話~~ ✅
+- ~~[ ] 輸出 JSONL（fraud_conversations + safe_conversations）~~ ✅
 - [ ] 加入真實回報資料（L-3 收集）作為訓練補充
 
 #### L-6 DistilBERT 訓練（Google Colab）
-- [ ] scripts/train_fraud_detector.ipynb — bert-base-chinese fine-tune
+- ~~[ ] scripts/train_fraud_detector.ipynb — bert-base-chinese fine-tune~~ ✅ scripts/train_fraud_detector.py 已實作
 - [ ] 訓練/驗證分割 + accuracy / precision / recall / F1 metrics
 - [ ] PyTorch → ONNX → TFLite 轉換（INT8 量化，模型 < 30MB）
 - [ ] 定期用新回報資料 retrain（每月/每季）
 
 #### L-7 Android TFLite 本地模型整合
-- [ ] security/FraudLocalModel.kt — 離線推論（50-80ms）
+- ~~[ ] security/FraudLocalModel.kt — 離線推論（50-80ms）~~ ✅ 已實作 + FraudModelManager
   - Tokenizer（WordPiece）+ TFLite Interpreter
   - 輸出：fraud_probability(0~1) + fraud_type
 - [ ] assets/fraud_detector.tflite 打包（首版 ~25MB）
@@ -540,7 +538,7 @@
   - 本地模型可用時優先（離線、零費用、50ms）
   - 模型不可用時 fallback 規則引擎
   - 風險高時可選 AI 深度分析（消耗 token）
-- [ ] build.gradle 加 TFLite 依賴（org.tensorflow:tensorflow-lite）
+- ~~[ ] build.gradle 加 TFLite 依賴（org.tensorflow:tensorflow-lite）~~ ✅ 已在 dependencies
 - [ ] 設定頁加「防詐模型更新」按鈕（手動下載最新 tflite）
 
 #### L-8 持續學習閉環
@@ -578,7 +576,7 @@
 | 解謎型 | ~~CrosswordGame 🔲 | 填字遊戲，注音/英文填答 | ✅ |
 | 解謎型 | ~~WordleGame 💡 | 台灣版 Wordle（注��猜詞） | ✅ |
 | 解謎型 | ~~WordChainGame 🎭 | 暗語接龍 | ✅ |
-| 對戰型 | SpeedTypingBattleGame ⚔️ | 打字對決（分割畫面搶同一段文字） |
+| 對戰型 | ~~SpeedTypingBattleGame ⚔️~~ | 打字對決（分割畫面搶同一段文字） | ✅ |
 | 對戰型 | TypingBossRaid 🐉 | 打字團戰（多人打字攻擊 Boss）|
 | 社群型 | TypingProfileCard 📊 | 打字履歷（WPM/常用詞/語言分布） |
 | 劇情型 | YukiSecretDiary 📔 | 雪凜秘密日記，解密日記解鎖角色故事 |
@@ -608,13 +606,13 @@
 - ✅ **鍵盤即時透明度調整** — 長按工具列🎨按鈕叫出浮動滑桿 overlay（背景遮罩/按鍵/文字三段透明度），即時預覽 + 自動儲存
 - [ ] 打字統計儀表板（速度/常用詞/使用時間）
 - [ ] 自製貼圖上傳（圖片→貼圖包）
-- [ ] 鍵盤音效包（預設 + 自訂）
+- ~~[ ] 鍵盤音效包（預設 + 自訂）~~ ✅ KeyboardSoundEngine.kt + keySoundStyle/keySoundVolume 已實作
 - [ ] 自訂震動模��
 
 ### 經濟系統
 - [ ] Z ���系統完善（藍新金流儲值流��）
 - [ ] 打字任��賺 Z 幣
-- [ ] 皮膚商城（主題/貼圖/表情包）
+- ~~[ ] 皮膚商城（主題/貼圖/表情包）~~ ✅ SkinManager + SkinPackage 已實作（UI 待完善）
 
 ### 無障礙
 - ~~[ ] 單手模式（鍵盤縮小靠左/靠右）~~ ✅ v0.9.41
@@ -637,7 +635,7 @@
 ## 長期目標（v1.0+）
 
 ### 輸入法進階
-- ~~[ ] 手寫辨識（MLKit Digital Ink — PR1 基礎 + PR2 撤銷/連續/壓感 + PR3 模型管理）~~ ✅ v0.9.43~v0.9.45
+- ~~[ ] 手寫辨識（MLKit Digital Ink — PR1~PR3 完成）~~ ✅ v0.9.43~v0.9.45
 - [ ] libchewing JNI 整合（替���純 Kotlin 引擎）
 - [ ] AI 語音自動標點（Whisper + Claw 標點模型）
 - [ ] 整句自動完成（ghost text 灰字 + Tab 接受）
@@ -864,7 +862,7 @@ Phase 3：上架準備
 > 目標：辨識中文字不直接寫入輸入框，改用液態玻璃氣泡框 Overlay 顯示，辨識完才一次送入
 
 #### M-1 VoiceRecognitionOverlay（液態玻璃氣泡框）
-- [ ] 新增 `ui/speech/VoiceRecognitionOverlay.kt` — 鍵盤上方浮動氣泡框
+- ~~[ ] 新增 `ui/speech/VoiceRecognitionOverlay.kt` — 鍵盤上方浮動氣泡框~~ ✅ 已實作
   - 頂部標題「語音辨識中...」+ 引擎名稱小字
   - 液態玻璃效果（模糊背景 + 半透明漸層 + 圓角 + 光澤邊框 + 內陰影）
   - RenderEffect.createBlurEffect() 毛玻璃 + 漸層邊框呼吸動畫
@@ -885,11 +883,7 @@ Phase 3：上架準備
 - [ ] 錯誤訊息也顯示在 Overlay 內（不用 Toast）
 
 #### M-3 Faster-Whisper Server（Zeabur 部署）
-- [ ] 新建 `faster-whisper-server/` 專案目錄
-  - `main.py` — FastAPI server
-  - `Dockerfile` — Python 3.11 + faster-whisper + CUDA（Zeabur GPU）
-  - `zeabur.json` — 部署設定
-  - `requirements.txt` — faster-whisper, fastapi, uvicorn, python-multipart
+- ~~[ ] 新建 `faster-whisper-server/` 專案目錄~~ ✅ 已建立（main.py + Dockerfile + zeabur.json + requirements.txt）
 - [ ] `POST /v1/transcribe` — 接收 WAV/WebM，回傳 JSON `{ "text": "..." }`
   - 參數：`language`（可選，自動偵測）、`model`（tiny/base/small/medium）
   - 回傳：`{ "text", "language", "duration", "segments" }`
@@ -898,17 +892,17 @@ Phase 3：上架準備
 - [ ] Zeabur 部署 + 綁定 subdomain（如 `whisper.snowrealm.com`）
 
 #### M-4 FasterWhisperSpeechEngine.kt
-- [ ] 新增 `speech/FasterWhisperSpeechEngine.kt`
+- ~~[ ] 新增 `speech/FasterWhisperSpeechEngine.kt`~~ ✅ 已實作
   - AudioRecord 錄音 → WAV → POST 到自架 server
   - 支援 SSE partial results
   - server URL 從 YukiPreferences 讀取
 - [ ] `SpeechInputEngine` 介面不變，直接替換
 
 #### M-5 設定頁整合
-- [ ] 語音引擎選單新增第三選項「Faster-Whisper（自架・免費）」
-- [ ] 新增 Faster-Whisper Server URL 輸入欄（預設 `https://whisper.snowrealm.com`）
+- ~~[ ] 語音引擎選單新增第三選項「Faster-Whisper（自架・免費）」~~ ✅
+- ~~[ ] 新增 Faster-Whisper Server URL 輸入欄~~ ✅
 - [ ] 新增「測試連線」按鈕（呼叫 `/health`）
-- [ ] YukiPreferences 新增 `fasterWhisperServerUrl` 屬性
+- ~~[ ] YukiPreferences 新增 `fasterWhisperServerUrl` 屬性~~ ✅ 已實作
 
 ---
 
@@ -916,7 +910,7 @@ Phase 3：上架準備
 
 #### N-1 Z幣錢包入口 ✅
 - [x] 設定頁加「Z幣錢包」按鈕 → 跳轉 `ZCoinWalletActivity`
-- [ ] 顯示目前餘額預覽
+- [ ] 顯示目前餘額預覽（ZCoinManager 已有，UI 待接）
 
 #### N-2 懸浮鍵盤快捷入口 ✅
 - [x] 長按 Tab 環形選單加「懸浮」選項（FloatingKeyboardWrapper toggle）
@@ -944,8 +938,8 @@ Phase 3：上架準備
 
 ## 🔴 關鍵問題（v0.9.21 掃描）
 
-- [ ] **藍新金流未接**：build.gradle 有 NEWEBPAY_MERCHANT_ID / HASH_KEY / HASH_IV，但無付款處理程式碼。Z幣儲值無法使用
-- [ ] **Supabase 未接**：build.gradle 有 YUKIBOARD_SUPABASE_URL / ANON_KEY，但 codebase 零整合。Z幣餘額、排行榜、皮膚商城後端缺失
+- ~~[ ] **藍新金流未接**~~ ✅ NewebpayClient.kt + ZCoinManager.kt + ZCoinApi.kt 已實作
+- ~~[ ] **Supabase 未接**~~ ✅ SupabaseClient.kt + SkinManager.kt + ZCoinWalletActivity 已實作
 
 ## 🟡 中等問題（v0.9.21 掃描）
 
@@ -963,7 +957,7 @@ Phase 3：上架準備
 ## 🆕 新功能：剪貼簿強化（加密 + 分類 + 跨裝置 + 多媒體）
 
 ### 核心：加密剪貼簿
-- [ ] **剪貼簿加密儲存** — 敏感項目可標記為「🔒加密」，AES-256 加密存入本地 DB
+- ~~[ ] **剪貼簿加密儲存**~~ ✅ ClipboardEncryptionHelper 已實作 AES-256 加密
   - 長按項目 →「加密保存」選項，需設定解鎖密碼/生物辨識
   - 加密項目顯示為「●●●●●●」遮罩，點擊需驗證才顯示明文
   - 自動偵測敏感內容（信用卡號、密碼格式、身份證號）→ 提示加密
@@ -1001,8 +995,8 @@ Phase 3：上架準備
 
 ## 🆕 新功能：自訂辭彙 CRUD（功能列入口）
 
-- [ ] **功能列新增「📖辭彙」按鈕** — ToolbarView 加入自訂辭彙面板入口
-- [ ] **UserDictionaryPanelView** — 新面板顯示使用者自訂詞庫列表
+- ~~[ ] **功能列新增「📖辭彙」按鈕**~~ ✅ PanelType.USER_DICT 已加入 ToolbarView
+- ~~[ ] **UserDictionaryPanelView**~~ ✅ 已實作
   - 列表顯示所有自訂詞彙（注音/拼音 → 漢字對應）
   - 新增按鈕：輸入讀音 + 詞彙 → 加入 UserDictionary
   - 編輯功能：點擊詞條可修改讀音或詞彙
@@ -1013,18 +1007,13 @@ Phase 3：上架準備
 
 ## 🆕 新功能：語音音色選擇（Google TTS）
 
-- [ ] **TTS 音色列表** — 列出裝置可用的 Google TTS Voice（TextToSpeech.getVoices()）
-  - 按語言分組（中文/英文/日文/韓文等）
-  - 顯示音色名稱 + 性別 + 語言
-- [ ] **設定頁 TTS 音色選擇器** — 下拉選單或列表讓使用者選擇偏好音色
-  - YukiPreferences 新增 `ttsVoiceName: String`
-  - 「試聽」按鈕：選中音色後播放範例句子
-- [ ] **套用音色** — SpeechEngine / 候選字朗讀 / 翻譯朗讀使用選定音色
-  - `TextToSpeech.setVoice()` 套用使用者選擇
+- ~~[ ] **TTS 音色列表**~~ ✅ ttsVoiceName pref 已實作
+- ~~[ ] **設定頁 TTS 音色選擇器**~~ ✅ YukiPreferences.ttsVoiceName + SettingsActivity 已有
+- [ ] **套用音色** — 確認 TextToSpeech.setVoice() 完整套用到所有朗讀場景
 
 ## 🆕 新功能：悄悄話解密面板
 
-- [ ] **解密面板 UI**：工具列新增「🔐」按鈕，開啟 DecryptPanelView
+- ~~[ ] **解密面板 UI**：工具列新增「🔐」按鈕，開啟 DecryptPanelView~~ ✅ PanelType.DECRYPT + DecryptPanelView 已實作
   - 上方：密碼輸入框（對方約定的密碼）
   - 中間：貼上加密訊息的輸入框
   - 下方：「解密」按鈕 → 顯示原始明文
@@ -1038,7 +1027,7 @@ Phase 3：上架準備
 
 ## 備註
 
-- 版本號：**v0.9.30**（versionCode 96）
+- 版本號：**v0.9.71**（versionCode 137）
 - deploy 指令：`bash scripts/deploy.sh "更新說明"` 或 `./gradlew appDistributionUploadDebug`
 - Firebase App Distribution 測��群��：`testers`
 - google-services.json 已在 .gitignore

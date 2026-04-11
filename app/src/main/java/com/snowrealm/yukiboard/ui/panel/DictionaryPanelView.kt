@@ -36,6 +36,9 @@ class DictionaryPanelView(context: Context) : LinearLayout(context), PanelInputT
     /** 外部注入：將文字插入輸入框 */
     var onInsertText: ((String) -> Unit)? = null
 
+    /** TTS 朗讀回呼 (text, locale code) */
+    var onSpeak: ((String, String?) -> Unit)? = null
+
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
@@ -52,22 +55,27 @@ class DictionaryPanelView(context: Context) : LinearLayout(context), PanelInputT
 
     override val isInInputMode: Boolean get() = _isInInputMode
 
+    private fun updateSearchDisplay(composing: String = "") {
+        val display = inputBuffer.toString() + composing + "▏"
+        searchInput.text = display
+    }
+
     override fun onCharInput(text: String) {
         if (!_isInInputMode) return
         inputBuffer.append(text)
-        searchInput.text = inputBuffer.toString()
+        updateSearchDisplay()
     }
 
     override fun onDeleteInput() {
         if (!_isInInputMode || inputBuffer.isEmpty()) return
         inputBuffer.deleteCharAt(inputBuffer.lastIndex)
-        searchInput.text = inputBuffer.toString()
+        updateSearchDisplay()
     }
 
     override fun onSpaceInput() {
         if (!_isInInputMode) return
         inputBuffer.append(" ")
-        searchInput.text = inputBuffer.toString()
+        updateSearchDisplay()
     }
 
     override fun onEnterInput() {
@@ -78,11 +86,11 @@ class DictionaryPanelView(context: Context) : LinearLayout(context), PanelInputT
     override fun onComposedTextInput(text: String) {
         if (!_isInInputMode) return
         inputBuffer.append(text)
-        searchInput.text = inputBuffer.toString()
+        updateSearchDisplay()
     }
 
     override fun updateComposingHint(hint: String) {
-        // 顯示組字中的提示（如注音的中間狀態）
+        updateSearchDisplay(hint)
     }
 
     override fun exitInputMode() {
@@ -429,7 +437,9 @@ class DictionaryPanelView(context: Context) : LinearLayout(context), PanelInputT
                 }
             }
 
-            // 單字 + 音標
+            // 單字 + 音標 + 朗讀
+            val langCode = LANGUAGES[langSpinner.selectedItemPosition].first
+            val ttsLocale = langCodeToLocale(langCode)
             val headerRow = LinearLayout(context).apply {
                 orientation = HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
@@ -439,6 +449,7 @@ class DictionaryPanelView(context: Context) : LinearLayout(context), PanelInputT
                 setTextColor(0xFF64B5F6.toInt())
                 textSize = 16f
                 setTypeface(null, Typeface.BOLD)
+                layoutParams = LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f)
             })
             if (!entry.phonetic.isNullOrBlank()) {
                 headerRow.addView(TextView(context).apply {
@@ -447,6 +458,13 @@ class DictionaryPanelView(context: Context) : LinearLayout(context), PanelInputT
                     textSize = 13f
                 })
             }
+            // TTS 朗讀
+            headerRow.addView(TextView(context).apply {
+                text = "🔊"
+                textSize = 18f
+                setPadding(dp(8), 0, dp(4), 0)
+                setOnClickListener { onSpeak?.invoke(entry.word, ttsLocale) }
+            })
             card.addView(headerRow)
 
             // 詞性
@@ -499,6 +517,19 @@ class DictionaryPanelView(context: Context) : LinearLayout(context), PanelInputT
 
             resultLayout.addView(card)
         }
+    }
+
+    private fun langCodeToLocale(lang: String): String = when (lang) {
+        "en" -> "en-US"
+        "ja" -> "ja-JP"
+        "ko" -> "ko-KR"
+        "zh" -> "zh-TW"
+        "de" -> "de-DE"
+        "fr" -> "fr-FR"
+        "es" -> "es-ES"
+        "vi" -> "vi-VN"
+        "it" -> "it-IT"
+        else -> lang
     }
 
     override fun onDetachedFromWindow() {

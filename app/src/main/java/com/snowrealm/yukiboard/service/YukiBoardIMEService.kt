@@ -83,12 +83,13 @@ class YukiBoardIMEService : InputMethodService() {
     private var bgUpdateReceiver: android.content.BroadcastReceiver? = null
     private val fraudAnalyzer by lazy { com.snowrealm.yukiboard.security.FraudAIAnalyzer(this) }
     private var lastFraudScanText: String? = null  // 避免重複掃描同一段文字
-    private var fraudScanCommitCount = 0  // 每 N 次提交重新掃描
+    private var lastFraudReplyText: String? = null // 避免重複掃描同一段回覆
     private val fraudDetectRunnable = Runnable {
         if (::panelContainer.isInitialized && panelContainer.childCount > 0) {
             (panelContainer.getChildAt(0) as? ClawPanelView)?.triggerSkill("fraud_detect")
         }
     }
+    private var clipboardListener: android.content.ClipboardManager.OnPrimaryClipChangedListener? = null
 
     // 面板
     private var activePanel: PanelType? = null
@@ -442,6 +443,7 @@ class YukiBoardIMEService : InputMethodService() {
                 decryptPanel?.let { if (it.isInInputMode) return it }
                 dictionaryPanel?.let { if (it.isInInputMode) return it }
                 langLearnPanel?.let { if (it.isInInputMode) return it }
+                clipboardPanel?.let { if (it.isInInputMode) return it }
                 return null
             }
             fun commitToPanel(target: PanelInputTarget, text: String) {
@@ -900,8 +902,9 @@ class YukiBoardIMEService : InputMethodService() {
             }
         }
 
-        // 防詐被動偵測：掃描輸入框上下文
+        // 防詐被動偵測：掃描輸入框上下文 + 註冊剪貼簿監聽
         scanForFraud()
+        registerClipboardFraudListener()
 
         // 遊戲模式恢復
         if (isInGameMode) {
@@ -963,59 +966,181 @@ class YukiBoardIMEService : InputMethodService() {
 
     /**
      * 被動防詐偵測 — 讀取輸入框上方文字，背景跑規則引擎。
+     * 規則引擎 <1ms 零成本，每次 commit 都可掃。
      * 風險 ≥ 30 → 雪凜泡泡警告；點泡泡 → 開 Claw 面板深度分析。
      */
     private fun scanForFraud() {
         if (!prefs.aiFraudDetect || !prefs.aiFraudPassiveScan) return
         val ic = currentInputConnection ?: return
         val textBefore = ic.getTextBeforeCursor(2000, 0)?.toString() ?: return
-        if (textBefore.length < 20) return  // 文字太短不分析
+        if (textBefore.length < 10) return  // 文字太短不分析
         if (textBefore == lastFraudScanText) return  // 同一段文字不重複掃
         lastFraudScanText = textBefore
 
         serviceScope.launch(Dispatchers.Default) {
             try {
                 val result = fraudAnalyzer.analyzeByRules(textBefore)
-            // URL 獨立掃描（即使整體風險 < 30，有可疑連結也要警告）
-            val urlRisks = fraudAnalyzer.scanUrls(textBefore).filter { it.score >= 20 }
-            val effectiveScore = maxOf(result.riskScore, urlRisks.maxOfOrNull { it.score } ?: 0)
+                val urlRisks = fraudAnalyzer.scanUrls(textBefore).filter { it.score >= 20 }
+                val effectiveScore = maxOf(result.riskScore, urlRisks.maxOfOrNull { it.score } ?: 0)
 
-            if (effectiveScore >= 30 || urlRisks.isNotEmpty()) {
-                val emoji = fraudAnalyzer.getRiskEmoji(effectiveScore)
-                val urlWarning = if (urlRisks.isNotEmpty()) "，連結也要小心" else ""
-                val warning = when {
-                    effectiveScore >= 80 -> "$emoji 雪凜很擔心這段對話…點我看看$urlWarning"
-                    effectiveScore >= 60 -> "$emoji 這段對話有些地方要注意唷$urlWarning"
-                    else -> "$emoji 雪凜覺得有些用語要留意一下$urlWarning"
+                if (effectiveScore >= 30 || urlRisks.isNotEmpty()) {
+                    showFraudBubble(effectiveScore, urlRisks.isNotEmpty())
                 }
-
-                withContext(Dispatchers.Main) {
-                    val charAnchor = characterView as? android.view.View ?: return@withContext
-                    yukiSpeechBubble?.let { bubble ->
-                        bubble.isFraudWarning = true
-                        bubble.onBubbleTapped = {
-                            // 點泡泡 → 開啟 Claw 面板的防詐分析
-                            bubble.hideNow()
-                            showPanel(PanelType.CLAW)
-                            // 延遲一點讓面板建好再觸發 skill
-                            charAnchor.removeCallbacks(fraudDetectRunnable)
-                            charAnchor.postDelayed(fraudDetectRunnable, 300)
-                        }
-                        bubble.show(warning, charAnchor)
-                    }
-                    // 雪凜表情反應（驚訝/警覺）
-                    characterView?.playReaction("surprised")
-                }
-            }
             } catch (e: kotlin.coroutines.cancellation.CancellationException) { throw e }
             catch (e: Exception) { android.util.Log.w("Fraud", "Passive scan failed: ${e.message}") }
         }
+    }
+
+    /**
+     * 回覆風險偵測 — 掃描使用者正在打的文字。
+     * 如果使用者自己打出「好我轉帳」「帳號多少」等回覆，代表可能正在被騙。
+     */
+    private fun scanReplyForFraud(committedText: String) {
+        if (!prefs.aiFraudDetect || !prefs.aiFraudPassiveScan) return
+        if (committedText.length < 2) return
+        val lower = committedText.lowercase()
+        if (lower == lastFraudReplyText) return
+        lastFraudReplyText = lower
+
+        // 使用者回覆風險模式（正在被騙的跡象）
+        val replyRiskPatterns = listOf(
+            // 匯款/轉帳意圖
+            listOf("好我匯", "好 我匯", "我轉給你", "我匯給你", "馬上轉", "等下轉",
+                   "已匯款", "已轉帳", "轉好了", "匯好了", "已經轉了", "已經匯了"),
+            // 索取帳號
+            listOf("帳號多少", "帳號是什麼", "你的帳號", "匯到哪", "轉到哪", "銀行帳號"),
+            // 交出個資
+            listOf("身分證", "我的密碼", "驗證碼給你", "OTP", "信用卡號", "卡號是"),
+            // 順從高壓話術
+            listOf("好我馬上", "我現在就去", "好 我去ATM", "我去超商", "我去買點數",
+                   "好我不跟別人說", "我不會說出去"),
+            // 點擊連結確認
+            listOf("我點了", "已經點了", "打開了", "登入了", "已經填了", "已輸入")
+        )
+
+        for (patterns in replyRiskPatterns) {
+            for (pattern in patterns) {
+                if (lower.contains(pattern.lowercase())) {
+                    serviceScope.launch(Dispatchers.Default) {
+                        val score = 65  // 使用者自己打出危險回覆 = 中高風險
+                        showFraudBubble(score, false, replyWarning = true)
+                    }
+                    return
+                }
+            }
+        }
+    }
+
+    /**
+     * 剪貼簿防詐掃描 — 使用者複製文字時自動掃描。
+     * 聊天 App 的對方訊息只有複製後才能讀到。
+     */
+    private fun scanClipboardForFraud(text: String) {
+        if (!prefs.aiFraudDetect || !prefs.aiFraudPassiveScan) return
+        if (text.length < 10) return
+
+        serviceScope.launch(Dispatchers.Default) {
+            try {
+                val result = fraudAnalyzer.analyzeByRules(text)
+                val urlRisks = fraudAnalyzer.scanUrls(text).filter { it.score >= 20 }
+                val effectiveScore = maxOf(result.riskScore, urlRisks.maxOfOrNull { it.score } ?: 0)
+
+                if (effectiveScore >= 30 || urlRisks.isNotEmpty()) {
+                    showFraudBubble(effectiveScore, urlRisks.isNotEmpty(), clipboardScan = true)
+                }
+            } catch (e: kotlin.coroutines.cancellation.CancellationException) { throw e }
+            catch (e: Exception) { android.util.Log.w("Fraud", "Clipboard scan failed: ${e.message}") }
+        }
+    }
+
+    /**
+     * 顯示防詐雪凜氣泡（統一入口）。
+     */
+    private suspend fun showFraudBubble(
+        score: Int,
+        hasUrlRisk: Boolean,
+        replyWarning: Boolean = false,
+        clipboardScan: Boolean = false
+    ) {
+        val emoji = fraudAnalyzer.getRiskEmoji(score)
+        val urlNote = if (hasUrlRisk) "，連結也要小心" else ""
+        val warning = when {
+            replyWarning && score >= 60 ->
+                "$emoji 等一下！你打的這段話看起來像在回應詐騙…要不要先冷靜一下？"
+            replyWarning ->
+                "$emoji 雪凜注意到你打的內容有點像在回應可疑訊息，先確認一下唷"
+            clipboardScan && score >= 80 ->
+                "$emoji 你剛複製的這段文字風險很高！點我幫你分析$urlNote"
+            clipboardScan && score >= 60 ->
+                "$emoji 你複製的訊息有些地方要注意唷$urlNote"
+            clipboardScan ->
+                "$emoji 雪凜幫你掃了一下複製的內容，有些用語要留意$urlNote"
+            score >= 80 ->
+                "$emoji 雪凜很擔心這段對話…點我看看$urlNote"
+            score >= 60 ->
+                "$emoji 這段對話有些地方要注意唷$urlNote"
+            else ->
+                "$emoji 雪凜覺得有些用語要留意一下$urlNote"
+        }
+
+        kotlinx.coroutines.withContext(Dispatchers.Main) {
+            val charAnchor = characterView as? android.view.View ?: return@withContext
+            yukiSpeechBubble?.let { bubble ->
+                bubble.isFraudWarning = true
+                bubble.onBubbleTapped = {
+                    bubble.hideNow()
+                    showPanel(PanelType.CLAW)
+                    charAnchor.removeCallbacks(fraudDetectRunnable)
+                    charAnchor.postDelayed(fraudDetectRunnable, 300)
+                }
+                bubble.show(warning, charAnchor)
+            }
+            // 雪凜表情反應
+            val reaction = if (replyWarning || score >= 60) "worried" else "surprised"
+            characterView?.playReaction(reaction)
+        }
+    }
+
+    /**
+     * 註冊剪貼簿監聽器（防詐用）。
+     */
+    private fun registerClipboardFraudListener() {
+        if (clipboardListener != null) return  // 已註冊
+        if (!prefs.aiFraudDetect || !prefs.aiFraudPassiveScan) return
+        try {
+            val cm = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager ?: return
+            val listener = android.content.ClipboardManager.OnPrimaryClipChangedListener {
+                try {
+                    val clip = cm.primaryClip ?: return@OnPrimaryClipChangedListener
+                    if (clip.itemCount == 0) return@OnPrimaryClipChangedListener
+                    val text = clip.getItemAt(0).text?.toString() ?: return@OnPrimaryClipChangedListener
+                    if (text.length in 10..5000) {
+                        scanClipboardForFraud(text)
+                    }
+                } catch (_: Exception) { }
+            }
+            cm.addPrimaryClipChangedListener(listener)
+            clipboardListener = listener
+        } catch (_: Exception) { }
+    }
+
+    /**
+     * 移除剪貼簿監聽器。
+     */
+    private fun unregisterClipboardFraudListener() {
+        val listener = clipboardListener ?: return
+        try {
+            val cm = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+            cm?.removePrimaryClipChangedListener(listener)
+        } catch (_: Exception) { }
+        clipboardListener = null
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
         aiCandidateJob?.cancel()
         aiCandidateJob = null
+        unregisterClipboardFraudListener()
         inputRouter.smartInput.persist()
         inputRouter.reset()
         shakeDetector.stop()
@@ -1281,7 +1406,6 @@ class YukiBoardIMEService : InputMethodService() {
             PanelType.CLIPBOARD -> {
                 val p = ClipboardPanelView(this).also { clipboardPanel = it }
                 p.theme = theme
-                p.onShowDialog = { dialog -> showImeDialog(dialog) }
                 p.captureCurrentClip()
                 p.onClipSelected = { text ->
                     currentInputConnection?.commitText(text, 1)
@@ -1675,6 +1799,7 @@ class YukiBoardIMEService : InputMethodService() {
                     else ic?.getTextBeforeCursor(200, 0)?.toString()?.trim()?.split("\\s+".toRegex())?.lastOrNull() ?: ""
                 }
                 p.onInsertText = { text -> currentInputConnection?.commitText(text, 1) }
+                p.onSpeak = { text, locale -> ttsSpeak(text, locale) }
                 p
             }
             PanelType.LANG_LEARN -> {
@@ -1687,6 +1812,7 @@ class YukiBoardIMEService : InputMethodService() {
                     else ic?.getTextBeforeCursor(200, 0)?.toString()?.trim()?.split("\\s+".toRegex())?.lastOrNull() ?: ""
                 }
                 p.onInsertText = { text -> currentInputConnection?.commitText(text, 1) }
+                p.onSpeak = { text, locale -> ttsSpeak(text, locale) }
                 p
             }
             else -> return
@@ -2112,9 +2238,18 @@ class YukiBoardIMEService : InputMethodService() {
         val speechLang = prefs.speechLanguage
         val localeHint = when (speechLang) {
             "auto" -> when (inputRouter.inputMode) {
+                com.snowrealm.yukiboard.input.router.InputMode.ENGLISH -> "en-US"
+                com.snowrealm.yukiboard.input.router.InputMode.BOPOMOFO,
+                com.snowrealm.yukiboard.input.router.InputMode.CANGJIE,
+                com.snowrealm.yukiboard.input.router.InputMode.SPEED_CANGJIE -> "zh-TW"
+                com.snowrealm.yukiboard.input.router.InputMode.PINYIN -> "zh-CN"
                 com.snowrealm.yukiboard.input.router.InputMode.JAPANESE -> "ja-JP"
                 com.snowrealm.yukiboard.input.router.InputMode.KOREAN -> "ko-KR"
-                com.snowrealm.yukiboard.input.router.InputMode.ENGLISH -> "en-US"
+                com.snowrealm.yukiboard.input.router.InputMode.GERMAN -> "de-DE"
+                com.snowrealm.yukiboard.input.router.InputMode.FRENCH -> "fr-FR"
+                com.snowrealm.yukiboard.input.router.InputMode.SPANISH -> "es-ES"
+                com.snowrealm.yukiboard.input.router.InputMode.VIETNAMESE -> "vi-VN"
+                com.snowrealm.yukiboard.input.router.InputMode.ITALIAN -> "it-IT"
                 else -> "zh-TW"
             }
             "mixed" -> ""  // 空字串 = 不指定，引擎自動偵測
@@ -2977,6 +3112,7 @@ class YukiBoardIMEService : InputMethodService() {
             decryptPanel?.isInInputMode == true -> decryptPanel
             dictionaryPanel?.isInInputMode == true -> dictionaryPanel
             langLearnPanel?.isInInputMode == true -> langLearnPanel
+            clipboardPanel?.isInInputMode == true -> clipboardPanel
             else -> null
         }
         if (activeTarget != null) {
@@ -2989,10 +3125,9 @@ class YukiBoardIMEService : InputMethodService() {
             // 動態偵測：有正在輸入的面板就保持開啟
             val hasActiveInput = listOfNotNull(
                 translatePanel, gifPanel, userDictPanel, decryptPanel,
-                dictionaryPanel, langLearnPanel
+                dictionaryPanel, langLearnPanel, clipboardPanel
             ).any { it.isInInputMode }
             val keepOpen = hasActiveInput
-                    || activePanel == PanelType.CLIPBOARD
             if (!keepOpen) {
                 closePanel()
             }
@@ -3509,13 +3644,10 @@ class YukiBoardIMEService : InputMethodService() {
                 characterView?.playHappy()
                 forwardTextToRemote(result.text)
 
-                // 被動防詐：每 10 次提交重新掃描輸入框上下文
-                fraudScanCommitCount++
-                if (fraudScanCommitCount >= 10) {
-                    fraudScanCommitCount = 0
-                    lastFraudScanText = null  // 清除快取，強制重新掃描
-                    scanForFraud()
-                }
+                // 被動防詐：每次提交都掃（規則引擎 <1ms 零成本）
+                scanForFraud()
+                // 回覆風險偵測：使用者自己打的文字也掃
+                scanReplyForFraud(result.text)
 
                 // 累積句子，用於整句學習
                 sentenceBuffer.append(result.text)
