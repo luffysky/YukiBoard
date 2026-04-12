@@ -33,9 +33,12 @@ class LoginActivity : AppCompatActivity() {
     private val baseUrl get() = BuildConfig.INSIGHT_API_BASE_URL.trimEnd('/')
     private val callbackUrl = "yukiboard://auth/callback"
 
+    private var wasLoggedIn = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         authClient = SnowRealmAuthClient.getInstance(this)
+        wasLoggedIn = authClient.isLoggedIn
 
         window.statusBarColor = Color.TRANSPARENT
         window.navigationBarColor = Color.TRANSPARENT
@@ -52,8 +55,33 @@ class LoginActivity : AppCompatActivity() {
         if (intent?.getBooleanExtra("oauth_success", false) == true) {
             if (authClient.isLoggedIn) {
                 setResult(RESULT_OK)
-                // 重新建構 UI 顯示已登入狀態
                 recreate()
+            }
+        }
+    }
+
+    /**
+     * 從 Chrome Custom Tab 回來時，主動檢查登入狀態。
+     * 即使 deep link callback 沒觸發，只要 token 已存就能偵測到。
+     */
+    override fun onResume() {
+        super.onResume()
+        if (!wasLoggedIn && authClient.isLoggedIn) {
+            // Deep link callback 已經存了 token，直接刷新 UI
+            wasLoggedIn = true
+            setResult(RESULT_OK)
+            recreate()
+            return
+        }
+        // 額外檢查：token 存在但 UI 還沒更新（可能 callback 在背景完成）
+        if (!wasLoggedIn) {
+            CoroutineScope(Dispatchers.Main).launch {
+                val me = kotlinx.coroutines.withContext(Dispatchers.IO) { authClient.fetchMe() }
+                if (me != null && !wasLoggedIn) {
+                    wasLoggedIn = true
+                    setResult(RESULT_OK)
+                    recreate()
+                }
             }
         }
     }
