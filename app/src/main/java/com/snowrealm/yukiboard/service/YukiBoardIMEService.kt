@@ -1200,10 +1200,6 @@ class YukiBoardIMEService : InputMethodService() {
 
     override fun onWindowShown() {
         super.onWindowShown()
-        // 某些 App 不觸發 onStartInputView，在這裡重置確保鍵盤可用
-        if (currentInputConnection != null && ::keyboardView.isInitialized) {
-            keyboardView.resetTouchState()
-        }
     }
 
     override fun onDestroy() {
