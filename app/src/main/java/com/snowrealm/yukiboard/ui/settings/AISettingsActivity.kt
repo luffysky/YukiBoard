@@ -359,7 +359,7 @@ class AISettingsActivity : AppCompatActivity() {
         root.addView(divider())
         root.addView(sectionTitle("帳號同步"))
         root.addView(TextView(this).apply {
-            val auth = com.snowrealm.yukiboard.auth.SnowRealmAuthClient(this@AISettingsActivity)
+            val auth = com.snowrealm.yukiboard.auth.SnowRealmAuthClient.getInstance(this@AISettingsActivity)
             text = if (auth.isLoggedIn) "已登入：${auth.currentDisplayName ?: auth.currentEmail ?: "已登入"}"
                    else "尚未登入，登入後可同步 API Key 到雲端"
             textSize = 13f
