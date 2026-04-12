@@ -71,6 +71,7 @@ class SettingsActivity : AppCompatActivity() {
         themeManager = ThemeManager.getInstance(this)
         prefs = YukiPreferences(this)
         currentLang = SettingsStrings.Lang.fromCode(prefs.settingsLanguage)
+        wasLoggedIn = com.snowrealm.yukiboard.auth.SnowRealmAuthClient.getInstance(this).isLoggedIn
 
         val scrollView = ScrollView(this).apply {
             setBackgroundColor(0xFF1A2035.toInt())
@@ -167,21 +168,68 @@ class SettingsActivity : AppCompatActivity() {
                 startActivity(Intent(this@SettingsActivity, com.snowrealm.yukiboard.ui.currency.ZCoinWalletActivity::class.java))
             }
         })
-        btnRow.addView(Button(this).apply {
-            val auth = com.snowrealm.yukiboard.auth.SnowRealmAuthClient.getInstance(this@SettingsActivity)
-            text = if (auth.isLoggedIn) auth.currentDisplayName ?: "帳號" else "登入"
+        // 使用者名稱標籤
+        val auth = com.snowrealm.yukiboard.auth.SnowRealmAuthClient.getInstance(this@SettingsActivity)
+        val userNameLabel = TextView(this).apply {
+            textSize = 13f
+            setTextColor(0xFF8BC34A.toInt())
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { marginEnd = dp(8) }
+        }
+        val authBtn = Button(this).apply {
             setTextColor(0xFFFFFFFF.toInt())
             textSize = 13f
             minWidth = 0; minimumWidth = 0; minHeight = 0; minimumHeight = 0
-            background = GradientDrawable().apply {
-                setColor(if (auth.isLoggedIn) 0xFF1B6B3A.toInt() else 0xFF4A90E2.toInt())
-                cornerRadius = dp(8).toFloat()
-            }
             setPadding(dp(14), dp(6), dp(14), dp(6))
-            setOnClickListener {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        fun updateAuthUI(loggedIn: Boolean, displayName: String?) {
+            if (loggedIn && displayName != null) {
+                userNameLabel.text = displayName
+                userNameLabel.visibility = View.VISIBLE
+                authBtn.text = tr("登出")
+                authBtn.background = GradientDrawable().apply {
+                    setColor(0xFFC62828.toInt())
+                    cornerRadius = dp(8).toFloat()
+                }
+            } else {
+                userNameLabel.visibility = View.GONE
+                authBtn.text = tr("登入")
+                authBtn.background = GradientDrawable().apply {
+                    setColor(0xFF4A90E2.toInt())
+                    cornerRadius = dp(8).toFloat()
+                }
+            }
+        }
+
+        // 初始狀態（先用本地快取）
+        updateAuthUI(auth.isLoggedIn, auth.currentDisplayName ?: auth.currentEmail)
+
+        // 非同步驗證 Insight 連線狀態
+        activityScope.launch {
+            val me = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { auth.fetchMe() }
+            updateAuthUI(me != null, me?.displayName?.ifBlank { me.email })
+        }
+
+        authBtn.setOnClickListener {
+            if (auth.isLoggedIn) {
+                auth.logout()
+                updateAuthUI(false, null)
+                android.widget.Toast.makeText(this@SettingsActivity, tr("已登出"), android.widget.Toast.LENGTH_SHORT).show()
+            } else {
                 startActivity(Intent(this@SettingsActivity, com.snowrealm.yukiboard.ui.auth.LoginActivity::class.java))
             }
-        })
+        }
+
+        btnRow.addView(userNameLabel)
+        btnRow.addView(authBtn)
         root.addView(btnRow)
 
         // ═══════════════════════════════════════════════════════
@@ -888,14 +936,30 @@ class SettingsActivity : AppCompatActivity() {
         val syncManager = com.snowrealm.yukiboard.data.CloudSyncManager.getInstance(this)
         val auth = com.snowrealm.yukiboard.auth.SnowRealmAuthClient.getInstance(this)
 
-        // 帳號狀態
-        card.addView(TextView(this).apply {
-            text = if (auth.isLoggedIn) tr("已登入：${auth.currentDisplayName ?: auth.currentUserId}")
+        // 帳號狀態（先用本地快取，再非同步驗證）
+        val syncStatusLabel = TextView(this).apply {
+            text = if (auth.isLoggedIn) tr("已登入：${auth.currentDisplayName ?: auth.currentEmail ?: auth.currentUserId}")
                    else tr("尚未登入（請先在 Insight 登入）")
             textSize = 13f
             setTextColor(if (auth.isLoggedIn) 0xFF66BB6A.toInt() else 0xFFFF8A65.toInt())
             setPadding(dp(4), dp(4), 0, dp(8))
-        })
+        }
+        card.addView(syncStatusLabel)
+
+        // 非同步驗證實際連線狀態
+        activityScope.launch {
+            val me = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { auth.fetchMe() }
+            if (me != null) {
+                syncStatusLabel.text = tr("已連線：${me.displayName.ifBlank { me.email }}")
+                syncStatusLabel.setTextColor(0xFF66BB6A.toInt())
+            } else if (auth.isLoggedIn) {
+                syncStatusLabel.text = tr("Token 已過期，請重新登入")
+                syncStatusLabel.setTextColor(0xFFFF8A65.toInt())
+            } else {
+                syncStatusLabel.text = tr("尚未登入（請先在 Insight 登入）")
+                syncStatusLabel.setTextColor(0xFFFF8A65.toInt())
+            }
+        }
 
         // 同步開關
         card.addView(switchRow(tr("啟用雲端同步"), tr("偏好/詞庫/主題/學習資料全量同步"), syncManager.isSyncEnabled) {
@@ -3750,9 +3814,19 @@ class SettingsActivity : AppCompatActivity() {
         bgVideoPlayer?.pause()
     }
 
+    private var wasLoggedIn: Boolean = false
+
     override fun onResume() {
         super.onResume()
         bgVideoPlayer?.start()
+
+        // 從 LoginActivity 回來時，若登入狀態改變，重建 UI
+        val auth = com.snowrealm.yukiboard.auth.SnowRealmAuthClient.getInstance(this)
+        val nowLoggedIn = auth.isLoggedIn
+        if (nowLoggedIn != wasLoggedIn) {
+            wasLoggedIn = nowLoggedIn
+            recreate()
+        }
     }
 
     override fun onDestroy() {
