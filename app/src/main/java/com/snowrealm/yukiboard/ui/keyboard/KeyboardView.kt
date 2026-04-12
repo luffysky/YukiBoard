@@ -709,6 +709,15 @@ class KeyboardView(context: Context) : View(context) {
         swipeDwellKey = null
         handler.removeCallbacks(longPressRunnable)
         handler.removeCallbacks(deleteRepeatRunnable)
+        // 重置所有可能攔截觸控的彈出狀態
+        altPopupActive = false
+        altPopupChars = emptyList()
+        altPopupRects = emptyList()
+        altPopupHoveredIndex = -1
+        caseMenuVisible = false
+        activeRadialView = null
+        isCandidateExpanded = false
+        expandScrollOffset = 0f
         invalidate()
     }
 
@@ -1537,9 +1546,9 @@ class KeyboardView(context: Context) : View(context) {
 
             row.forEach { key ->
                 val keyWidth = unitWidth * key.widthWeight
-                // 第一排往上延伸，確保候選列邊界附近的觸碰也能命中按鍵
+                // 第一排從候選列底部開始，避免跟候選列觸控區重疊
                 val touchTop = when (rowIndex) {
-                    0 -> 0f
+                    0 -> candidateBarHeight
                     else -> top - rh * 0.3f
                 }
                 val touchRect = RectF(x, touchTop, x + keyWidth, top + rh)
@@ -2206,9 +2215,9 @@ class KeyboardView(context: Context) : View(context) {
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 // 候選列觸控（含展開箭頭）
-                // 候選列攔截只在中間區域生效（不含最底部 4dp，讓給第一排按鍵上緣）
-                val candidateHitZone = candidateBarHeight - 4f * density
-                if (y < candidateHitZone && candidates.isNotEmpty()) {
+                // 候選列只攔截在候選列視覺區域內的觸控，不跟第一排按鍵重疊
+                val candidateHitZone = candidateBarHeight
+                if (y < candidateHitZone && y >= 0 && candidates.isNotEmpty()) {
                     candidateLastTouchX = x
                     candidateDownX = x
                     candidateIsDragging = false
@@ -2453,8 +2462,8 @@ class KeyboardView(context: Context) : View(context) {
                     val cellHeight = 42f * density
                     val contentPadding = 8f * density
                     val startY = candidateBarHeight + contentPadding - expandScrollOffset
-                    val selectX = if (expandIsScrolling) x else expandDownX
-                    val selectY = if (expandIsScrolling) y else expandDownY
+                    val selectX = x  // 用 ACTION_UP 的位置選字，更精確
+                    val selectY = y
                     val col = (selectX / cellWidth).toInt().coerceIn(0, EXPAND_GRID_COLS - 1)
                     val row = ((selectY - startY) / cellHeight).toInt()
                     if (row >= 0) {

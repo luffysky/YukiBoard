@@ -95,7 +95,7 @@ class GifPanelView(context: Context) : View(context), PanelInputTarget {
         tagRects.clear()
         gifRects.clear()
 
-        bgPaint.color = theme.backgroundColorInt
+        bgPaint.color = theme.effectivePanelBackground()
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
 
         // 搜尋列

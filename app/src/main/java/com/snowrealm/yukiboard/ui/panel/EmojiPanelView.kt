@@ -92,7 +92,7 @@ class EmojiPanelView(context: Context) : View(context) {
         emojiRects.clear()
 
         // 背景
-        bgPaint.color = theme.backgroundColorInt
+        bgPaint.color = theme.effectivePanelBackground()
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
 
         // Emoji 網格（先畫，被分類列蓋住上方溢出）

@@ -3,6 +3,7 @@ package com.snowrealm.yukiboard.data
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
+import com.snowrealm.yukiboard.BuildConfig
 import com.snowrealm.yukiboard.auth.SnowRealmAuthClient
 import com.snowrealm.yukiboard.input.dictionary.UserDictionary
 import com.snowrealm.yukiboard.input.smart.*
@@ -10,6 +11,9 @@ import com.snowrealm.yukiboard.ui.settings.YukiPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.util.concurrent.TimeUnit
 
 /**
  * YukiBoard 雲端同步管理器。
@@ -36,6 +40,8 @@ class CloudSyncManager(private val context: Context) {
         private const val TAG = "CloudSync"
         private const val PREF_LAST_SYNC = "cloud_sync_last_time"
         private const val PREF_SYNC_ENABLED = "cloud_sync_enabled"
+        private const val SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000L  // 24 小時同步一次
+        private const val SYNC_ON_COMMIT_THRESHOLD = 50  // 每提交 50 次觸發一次同步
 
         @Volatile
         private var instance: CloudSyncManager? = null
@@ -57,8 +63,115 @@ class CloudSyncManager(private val context: Context) {
     val isSyncEnabled: Boolean get() = metaPrefs.getBoolean(PREF_SYNC_ENABLED, false)
     val lastSyncTime: Long get() = metaPrefs.getLong(PREF_LAST_SYNC, 0)
 
+    private var commitsSinceLastSync = 0
+
+    /**
+     * 取得 userId，若 token 存在但 userId 未儲存（OAuth 回呼時 fetchMe 失敗），
+     * 會嘗試重新呼叫 fetchMe() 補齊使用者資料。
+     */
+    private suspend fun resolveUserId(): String? {
+        auth.currentUserId?.let { return it }
+        if (!auth.isLoggedIn) return null
+        // token 存在但 userId 為空 → 補呼叫 fetchMe
+        Log.d(TAG, "userId null but token exists, calling fetchMe to resolve")
+        val me = auth.fetchMe()
+        return me?.id ?: auth.currentUserId
+    }
+
+    // ─────────────────────────────────────────
+    // Supabase Token 交換（Insight JWT → Supabase JWT）
+    // ─────────────────────────────────────────
+
+    private val httpClient = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .build()
+
+    private var cachedSupabaseToken: String? = null
+    private var supabaseTokenExpiry: Long = 0
+
+    /**
+     * 取得 YukiBoard Supabase 能認的 JWT。
+     * 流程：拿 Insight JWT → 打 Insight /api/auth/supabase-token → 換回 Supabase JWT。
+     * 快取 1 小時，過期前 5 分鐘自動重新換。
+     */
+    private suspend fun getSupabaseToken(): String? {
+        // 快取有效就直接用
+        val now = System.currentTimeMillis()
+        cachedSupabaseToken?.let { token ->
+            if (now < supabaseTokenExpiry - 5 * 60 * 1000) return token
+        }
+
+        val insightToken = auth.getToken() ?: return null
+        val baseUrl = BuildConfig.INSIGHT_API_BASE_URL.trimEnd('/')
+
+        return withContext(Dispatchers.IO) {
+            try {
+                val request = Request.Builder()
+                    .url("$baseUrl/api/auth/supabase-token")
+                    .header("Authorization", "Bearer $insightToken")
+                    .post(okhttp3.RequestBody.create(null, ByteArray(0)))
+                    .build()
+                val response = httpClient.newCall(request).execute()
+                val body = response.body?.string() ?: return@withContext null
+                if (!response.isSuccessful) {
+                    Log.e(TAG, "supabase-token exchange failed: ${response.code} $body")
+                    return@withContext null
+                }
+                val obj = json.parseToJsonElement(body).jsonObject
+                val token = obj["token"]?.jsonPrimitive?.contentOrNull
+                val expiresIn = obj["expiresIn"]?.jsonPrimitive?.longOrNull ?: 3600
+                if (token != null) {
+                    cachedSupabaseToken = token
+                    supabaseTokenExpiry = now + expiresIn * 1000
+                    Log.d(TAG, "Supabase token exchanged, expires in ${expiresIn}s")
+                }
+                token
+            } catch (e: Exception) {
+                Log.e(TAG, "supabase-token exchange error", e)
+                null
+            }
+        }
+    }
+
     fun setSyncEnabled(enabled: Boolean) {
         metaPrefs.edit().putBoolean(PREF_SYNC_ENABLED, enabled).apply()
+    }
+
+    /** 每次輸入 session 結束時呼叫（由 IMEService.onFinishInputView 觸發） */
+    suspend fun onSessionEnd() {
+        if (!isSyncEnabled) return
+        if (!auth.isLoggedIn) return
+
+        commitsSinceLastSync++
+        val now = System.currentTimeMillis()
+        val timeSinceSync = now - lastSyncTime
+
+        // 超過 24 小時 或 累積 50 次 session → 上傳學習資料 + 詞庫
+        if (timeSinceSync > SYNC_INTERVAL_MS || commitsSinceLastSync >= SYNC_ON_COMMIT_THRESHOLD) {
+            commitsSinceLastSync = 0
+            val userId = resolveUserId() ?: return
+            val token = getSupabaseToken()
+            try {
+                uploadLearningData(userId, token)
+                uploadDictionary(userId, token)
+                metaPrefs.edit().putLong(PREF_LAST_SYNC, now).apply()
+                Log.d(TAG, "Auto sync completed")
+            } catch (e: Exception) {
+                Log.e(TAG, "Auto sync failed", e)
+            }
+        }
+    }
+
+    /** 登入後立即同步（下載雲端資料到本地） */
+    suspend fun syncOnLogin(): SyncResult {
+        val userId = resolveUserId() ?: return SyncResult.NotLoggedIn
+        return try {
+            downloadAll()
+        } catch (e: Exception) {
+            Log.e(TAG, "syncOnLogin failed", e)
+            SyncResult.Error("登入同步失敗: ${e.message}")
+        }
     }
 
     // ─────────────────────────────────────────
@@ -67,9 +180,9 @@ class CloudSyncManager(private val context: Context) {
 
     /** 全量上傳（偏好 + 詞庫 + 主題 + 學習資料） */
     suspend fun uploadAll(): SyncResult = withContext(Dispatchers.IO) {
-        val userId = auth.currentUserId ?: return@withContext SyncResult.NotLoggedIn
+        val userId = resolveUserId() ?: return@withContext SyncResult.NotLoggedIn
         if (!supabase.isConfigured) return@withContext SyncResult.Error("Supabase 未設定")
-        val token = auth.getToken()
+        val token = getSupabaseToken() ?: return@withContext SyncResult.Error("無法取得 Supabase token")
 
         try {
             val r1 = uploadSettings(userId, token)
@@ -150,9 +263,9 @@ class CloudSyncManager(private val context: Context) {
 
     /** 全量下載（偏好 + 詞庫 + 主題 + 學習資料） */
     suspend fun downloadAll(): SyncResult = withContext(Dispatchers.IO) {
-        val userId = auth.currentUserId ?: return@withContext SyncResult.NotLoggedIn
+        val userId = resolveUserId() ?: return@withContext SyncResult.NotLoggedIn
         if (!supabase.isConfigured) return@withContext SyncResult.Error("Supabase 未設定")
-        val token = auth.getToken()
+        val token = getSupabaseToken() ?: return@withContext SyncResult.Error("無法取得 Supabase token")
 
         try {
             val r1 = downloadSettings(userId, token)
@@ -414,8 +527,20 @@ class CloudSyncManager(private val context: Context) {
         val editor = sp.edit()
         val keys = mutableListOf<String>()
         for ((word, value) in obj) {
-            val raw = value.jsonPrimitive.contentOrNull ?: continue
-            editor.putString("ad_$word", raw)
+            val remoteRaw = value.jsonPrimitive.contentOrNull ?: continue
+            val localRaw = sp.getString("ad_$word", null)
+
+            if (localRaw == null) {
+                // 本地沒有 → 直接用雲端
+                editor.putString("ad_$word", remoteRaw)
+            } else {
+                // 兩邊都有 → 取頻率較高的（格式: "freq|timestamp"）
+                val localFreq = localRaw.split("|").getOrNull(0)?.toIntOrNull() ?: 0
+                val remoteFreq = remoteRaw.split("|").getOrNull(0)?.toIntOrNull() ?: 0
+                if (remoteFreq > localFreq) {
+                    editor.putString("ad_$word", remoteRaw)
+                }
+            }
             keys.add(word)
         }
         // 合併既有 index
@@ -445,8 +570,24 @@ class CloudSyncManager(private val context: Context) {
         val editor = sp.edit()
         val keys = mutableListOf<String>()
         for ((word, value) in obj) {
-            val raw = value.jsonPrimitive.contentOrNull ?: continue
-            editor.putString("pd_$word", raw)
+            val remoteRaw = value.jsonPrimitive.contentOrNull ?: continue
+            val localRaw = sp.getString("pd_$word", null)
+
+            if (localRaw == null) {
+                // 本地沒有 → 直接用雲端
+                editor.putString("pd_$word", remoteRaw)
+            } else {
+                // 兩邊都有 → 取 tier 或 frequency 較高的（格式: "tier|freq|timestamp"）
+                val localParts = localRaw.split("|")
+                val remoteParts = remoteRaw.split("|")
+                val localTier = localParts.getOrNull(0)?.toIntOrNull() ?: 0
+                val remoteTier = remoteParts.getOrNull(0)?.toIntOrNull() ?: 0
+                val localFreq = localParts.getOrNull(1)?.toIntOrNull() ?: 0
+                val remoteFreq = remoteParts.getOrNull(1)?.toIntOrNull() ?: 0
+                if (remoteTier > localTier || (remoteTier == localTier && remoteFreq > localFreq)) {
+                    editor.putString("pd_$word", remoteRaw)
+                }
+            }
             keys.add(word)
         }
         val existing = sp.getString("_pd_index", null)?.split(",")?.filter { it.isNotBlank() } ?: emptyList()

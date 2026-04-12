@@ -33,6 +33,7 @@ class SettingsActivity : AppCompatActivity() {
         private const val REQUEST_PICK_BG_IMAGE = 9001
         private const val REQUEST_PICK_BG_VIDEO = 9002
         private const val RC_MEDIA_PERMISSION = 9003
+        private const val REQUEST_IMPORT_DICT = 9010
     }
 
     private var pendingMediaAction: (() -> Unit)? = null
@@ -167,7 +168,7 @@ class SettingsActivity : AppCompatActivity() {
             }
         })
         btnRow.addView(Button(this).apply {
-            val auth = com.snowrealm.yukiboard.auth.SnowRealmAuthClient(this@SettingsActivity)
+            val auth = com.snowrealm.yukiboard.auth.SnowRealmAuthClient.getInstance(this@SettingsActivity)
             text = if (auth.isLoggedIn) auth.currentDisplayName ?: "帳號" else "登入"
             setTextColor(0xFFFFFFFF.toInt())
             textSize = 13f
@@ -543,6 +544,44 @@ class SettingsActivity : AppCompatActivity() {
             inputChildren += switchRow(tr("顯示觸控面積"), tr("打字時顯示手指接觸範圍，方便確認是否按到"), prefs.showTouchArea) { prefs.showTouchArea = it }
             inputChildren += switchRow(tr("自動更正"), tr("英文自動更正"), prefs.autoCorrect) { prefs.autoCorrect = it }
             inputChildren += switchRow(tr("RIME 詞庫"), tr("啟用 RIME 大型注音詞庫（更準確的候選字）"), prefs.rimeDictEnabled) { prefs.rimeDictEnabled = it }
+
+            // 詞庫匯出/匯入
+            val dictBtnRow = LinearLayout(this@SettingsActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(dp(12), dp(4), dp(12), dp(4))
+                addView(styledButton(tr("匯出詞庫"), 0xFF2A3A5C.toInt(), 0xFFE8F4FF.toInt()) {
+                    val dict = com.snowrealm.yukiboard.input.dictionary.UserDictionary(this@SettingsActivity)
+                    val data = dict.exportToString()
+                    if (data.isBlank()) {
+                        Toast.makeText(this@SettingsActivity, tr("詞庫是空的"), Toast.LENGTH_SHORT).show()
+                        return@styledButton
+                    }
+                    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(android.content.Intent.EXTRA_SUBJECT, "YukiBoard 個人詞庫")
+                        putExtra(android.content.Intent.EXTRA_TEXT, data)
+                    }
+                    startActivity(android.content.Intent.createChooser(intent, tr("匯出詞庫")))
+                }.apply {
+                    layoutParams = LinearLayout.LayoutParams(0, dp(40), 1f).apply { setMargins(0, 0, dp(4), 0) }
+                })
+                addView(styledButton(tr("匯入詞庫"), 0xFF2A3A5C.toInt(), 0xFFE8F4FF.toInt()) {
+                    val intent = android.content.Intent(android.content.Intent.ACTION_GET_CONTENT).apply {
+                        type = "text/plain"
+                        addCategory(android.content.Intent.CATEGORY_OPENABLE)
+                    }
+                    try {
+                        @Suppress("DEPRECATION")
+                        startActivityForResult(intent, REQUEST_IMPORT_DICT)
+                    } catch (_: Exception) {
+                        Toast.makeText(this@SettingsActivity, tr("無法開啟檔案選擇器"), Toast.LENGTH_SHORT).show()
+                    }
+                }.apply {
+                    layoutParams = LinearLayout.LayoutParams(0, dp(40), 1f).apply { setMargins(dp(4), 0, 0, 0) }
+                })
+            }
+            inputChildren += dictBtnRow
+
             inputChildren += switchRow(tr("滑動自我學習"), tr("記住你選過的滑動候選，越用越準"), prefs.swipeSelfLearn) { prefs.swipeSelfLearn = it }
             inputChildren += switchRow(tr("糾錯自我學習"), tr("記住你接受/拒絕的校正，越改越聰明"), prefs.correctionSelfLearn) { prefs.correctionSelfLearn = it }
             inputChildren += switchRow(tr("Snippet 展開"), tr("開發者模式：縮寫 + Tab 展開"), prefs.snippetEnabled) { prefs.snippetEnabled = it }
@@ -861,6 +900,20 @@ class SettingsActivity : AppCompatActivity() {
         // 同步開關
         card.addView(switchRow(tr("啟用雲端同步"), tr("偏好/詞庫/主題/學習資料全量同步"), syncManager.isSyncEnabled) {
             syncManager.setSyncEnabled(it)
+            // 開啟同步時，自動下載雲端資料
+            if (it && auth.isLoggedIn) {
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                    val result = syncManager.syncOnLogin()
+                    val msg = when (result) {
+                        is com.snowrealm.yukiboard.data.CloudSyncManager.SyncResult.Success -> tr("同步完成")
+                        is com.snowrealm.yukiboard.data.CloudSyncManager.SyncResult.NotLoggedIn -> tr("請先登入")
+                        is com.snowrealm.yukiboard.data.CloudSyncManager.SyncResult.Error -> result.message
+                    }
+                    android.widget.Toast.makeText(this@SettingsActivity, msg, android.widget.Toast.LENGTH_SHORT).show()
+                }
+            } else if (it && !auth.isLoggedIn) {
+                android.widget.Toast.makeText(this@SettingsActivity, tr("請先登入 Insight 帳號"), android.widget.Toast.LENGTH_SHORT).show()
+            }
         })
 
         // 上次同步時間
@@ -3620,6 +3673,20 @@ class SettingsActivity : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode != RESULT_OK) return
         val uri = data?.data ?: return
+
+        // 詞庫匯入
+        if (requestCode == REQUEST_IMPORT_DICT) {
+            try {
+                val text = contentResolver.openInputStream(uri)?.bufferedReader()?.readText() ?: return
+                val dict = com.snowrealm.yukiboard.input.dictionary.UserDictionary(this)
+                val count = dict.importFromString(text)
+                Toast.makeText(this, "成功匯入 $count 個詞", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(this, "匯入失敗：${e.message}", Toast.LENGTH_SHORT).show()
+            }
+            return
+        }
+
         stopVideoPreview()
         val bgDir = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getBackgroundDir(this)
         bgDir.listFiles()?.forEach { it.delete() }

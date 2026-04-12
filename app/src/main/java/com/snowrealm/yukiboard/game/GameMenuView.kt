@@ -62,21 +62,36 @@ class GameMenuView(
         textSize = 10f * density
     }
 
+    // 內部捲動支持
+    private var scrollOffset = 0f
+    private var maxScrollOffset = 0f
+    private var lastTouchY = 0f
+    private var isDragging = false
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec).let {
             if (it > 0) it else resources.displayMetrics.widthPixels
         }
+        val specH = MeasureSpec.getSize(heightMeasureSpec)
         val games = GameMode.entries.filter { it.category == selectedCategory }
         val cardsPerRow = ((w - cardPadding) / ((w - cardPadding * 3) / 2f + cardPadding)).toInt().coerceAtLeast(1)
         val rowCount = (games.size + cardsPerRow - 1) / cardsPerRow
-        val totalHeight = (36f * density + tabHeight + rowCount * (cardHeight + cardPadding) + 16f * density).toInt()
-        setMeasuredDimension(w, totalHeight)
+        val contentHeight = (36f * density + tabHeight + rowCount * (cardHeight + cardPadding) + 16f * density).toInt()
+        // 使用容器高度（不超出），超出部分透過內部捲動
+        val h = if (specH > 0) specH else contentHeight
+        maxScrollOffset = maxOf(0f, contentHeight.toFloat() - h.toFloat())
+        scrollOffset = scrollOffset.coerceIn(0f, maxScrollOffset)
+        setMeasuredDimension(w, h)
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         canvas.drawColor(theme.backgroundColorInt)
         cardRects.clear(); tabRects.clear()
+
+        // 套用捲動偏移
+        canvas.save()
+        canvas.translate(0f, -scrollOffset)
 
         // ⌨返回 按鈕（左上角）
         val btnW = 56f * density
@@ -134,26 +149,67 @@ class GameMenuView(
                 canvas.drawText("最高: $highScore", rect.centerX(), rect.top + 14f * density, highScorePaint)
             }
         }
+
+        canvas.restore()
+
+        // 捲動指示器（有可捲動內容時顯示）
+        if (maxScrollOffset > 0f) {
+            val trackH = height.toFloat() - 4 * density
+            val thumbRatio = height.toFloat() / (height.toFloat() + maxScrollOffset)
+            val thumbH = (trackH * thumbRatio).coerceAtLeast(20 * density)
+            val thumbY = 2 * density + (trackH - thumbH) * (scrollOffset / maxScrollOffset)
+            cardPaint.color = (theme.keyLabelColorInt and 0x00FFFFFF) or 0x44000000
+            canvas.drawRoundRect(
+                width - 5f * density, thumbY,
+                width - 1f * density, thumbY + thumbH,
+                2 * density, 2 * density, cardPaint
+            )
+        }
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (event.action == MotionEvent.ACTION_UP) {
-            // ⌨返回
-            if (backBtnRect.contains(event.x, event.y)) {
-                onBackToNormal?.invoke()
-                return true
+        // 觸控座標轉為內容座標（加上捲動偏移）
+        val contentY = event.y + scrollOffset
+
+        when (event.action) {
+            MotionEvent.ACTION_DOWN -> {
+                lastTouchY = event.y
+                isDragging = false
             }
-            // Tab 點擊
-            for ((rect, cat) in tabRects) {
-                if (rect.contains(event.x, event.y)) {
-                    selectedCategory = cat; requestLayout(); invalidate(); return true
+            MotionEvent.ACTION_MOVE -> {
+                val dy = lastTouchY - event.y
+                if (!isDragging && Math.abs(dy) > 8 * density) {
+                    isDragging = true
+                }
+                if (isDragging && maxScrollOffset > 0f) {
+                    scrollOffset = (scrollOffset + dy).coerceIn(0f, maxScrollOffset)
+                    lastTouchY = event.y
+                    invalidate()
                 }
             }
-            // 卡片點擊
-            val hit = cardRects.firstOrNull { it.first.contains(event.x, event.y) }
-            if (hit != null) {
-                onGameSelected(hit.second)
-                return true
+            MotionEvent.ACTION_UP -> {
+                if (!isDragging) {
+                    // ⌨返回
+                    if (backBtnRect.contains(event.x, contentY)) {
+                        onBackToNormal?.invoke()
+                        return true
+                    }
+                    // Tab 點擊
+                    for ((rect, cat) in tabRects) {
+                        if (rect.contains(event.x, contentY)) {
+                            selectedCategory = cat
+                            scrollOffset = 0f
+                            requestLayout(); invalidate(); return true
+                        }
+                    }
+                    // 卡片點擊
+                    val hit = cardRects.firstOrNull { it.first.contains(event.x, contentY) }
+                    if (hit != null) {
+                        onGameSelected(hit.second)
+                        return true
+                    }
+                }
+                isDragging = false
             }
         }
         return true

@@ -93,7 +93,7 @@ class RemoteKeyboardPanelView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        bgPaint.color = theme.backgroundColorInt
+        bgPaint.color = theme.effectivePanelBackground()
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
 
         // 標題

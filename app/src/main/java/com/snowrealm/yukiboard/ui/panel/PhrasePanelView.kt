@@ -171,7 +171,7 @@ class PhrasePanelView(context: Context) : View(context) {
         val gap = 3f * density
 
         // 背景
-        bgPaint.color = theme.backgroundColorInt
+        bgPaint.color = theme.effectivePanelBackground()
         canvas.drawRect(0f, 0f, w, h, bgPaint)
 
         // 分類標籤列（水平捲動）

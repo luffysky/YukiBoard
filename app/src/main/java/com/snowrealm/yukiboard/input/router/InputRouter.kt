@@ -953,14 +953,21 @@ class InputRouter(private val context: Context) {
             if (trimmed.length > 1) {
                 smartInput.onWordCommitted(trimmed, currentAppPackage)
             }
-            // 自動學詞：中文選字後記錄 word + bopomofo 到 UserDictionary
-            // 供下次注音查詢時優先顯示使用者打過的詞
+            // 所有 CJK/日文/韓文都學習，不只注音
+            userDict.learn(trimmed)
+
+            // 注音專用：記錄注音索引，供下次注音查詢時優先顯示使用者打過的詞
             if (hasCjk && activeEngine is ChewingInputEngine) {
                 val bopo = (activeEngine as ChewingInputEngine).lastComposingBopomofo
                 if (bopo.isNotEmpty() && trimmed.length >= 2) {
                     userDict.addManual(trimmed, bopo)
                 }
-                userDict.learn(trimmed)
+            }
+
+            // CJK 也呼叫 recordUsage，讓 AdaptiveDictionary 學習
+            val dict = (englishEngine as? EnglishInputEngine)?.getDictionary()
+            if (dict != null) {
+                smartInput.adaptiveDictionary.recordUsage(trimmed, dict)
             }
         } else {
             val words = trimmed.split("\\s+".toRegex())

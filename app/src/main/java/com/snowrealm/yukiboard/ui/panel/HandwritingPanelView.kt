@@ -164,7 +164,7 @@ class HandwritingPanelView(
         candidateBarRect.set(0f, controlH, w, controlH + candidateH)
 
         val writingTop = controlH + candidateH + pad
-        val writingBottom = h - pad - modelH
+        val writingBottom = (h - pad - modelH).coerceAtLeast(writingTop + 50 * density)
         writingAreaRect.set(pad, writingTop, w - pad, writingBottom)
 
         // 模型管理列
@@ -224,7 +224,7 @@ class HandwritingPanelView(
         val w = width.toFloat()
 
         // 背景
-        bgPaint.color = theme.backgroundColorInt
+        bgPaint.color = theme.effectivePanelBackground()
         canvas.drawRect(0f, 0f, w, height.toFloat(), bgPaint)
 
         drawControlBar(canvas)
@@ -464,8 +464,15 @@ class HandwritingPanelView(
                     }
                 }
 
-                // 手寫區域
-                if (writingAreaRect.contains(x, y)) {
+                // 手寫區域（加 8dp 邊緣容差，讓邊界附近也能寫）
+                val writingTolerance = 8 * density
+                val expandedWriting = RectF(
+                    writingAreaRect.left - writingTolerance,
+                    writingAreaRect.top - writingTolerance,
+                    writingAreaRect.right + writingTolerance,
+                    writingAreaRect.bottom + writingTolerance
+                )
+                if (expandedWriting.contains(x, y)) {
                     handler.removeCallbacks(autoRecognizeRunnable)
                     handler.removeCallbacks(autoCommitRunnable)
                     strokeCollector.startStroke(event)

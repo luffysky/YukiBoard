@@ -297,6 +297,12 @@ class YukiBoardIMEService : InputMethodService() {
     override fun onShowInputRequested(flags: Int, configChange: Boolean): Boolean = true
 
     override fun onCreateInputView(): View {
+        // 重建前先清掉舊的 receiver，避免多次 register 累積洩漏
+        bgUpdateReceiver?.let {
+            try { unregisterReceiver(it) } catch (_: Exception) {}
+        }
+        bgUpdateReceiver = null
+
         // 確保 IME window 啟用硬體加速（TextureView 影片背景需要）
         window?.window?.let { w ->
             @Suppress("DEPRECATION")
@@ -778,6 +784,8 @@ class YukiBoardIMEService : InputMethodService() {
         inputRouter.reset()
         keyboardView.updateCandidates(emptyList())
         keyboardView.updateComposingText("")
+        // 重置觸控狀態，避免上一個 session 的彈出狀態殘留導致按鍵按不到
+        keyboardView.resetTouchState()
 
         // 重新套用鍵盤高度（設定頁可能已修改 / 螢幕旋轉）
         val kbHeight = calculateKeyboardHeight()
@@ -1168,6 +1176,15 @@ class YukiBoardIMEService : InputMethodService() {
 
         // 遊戲暫停
         gameLoop?.pause()
+
+        // 雲端同步（非阻塞，背景執行）
+        serviceScope.launch {
+            try {
+                com.snowrealm.yukiboard.data.CloudSyncManager
+                    .getInstance(applicationContext)
+                    .onSessionEnd()
+            } catch (_: Exception) {}
+        }
     }
 
     override fun onFinishInput() {
@@ -1230,33 +1247,57 @@ class YukiBoardIMEService : InputMethodService() {
                 val stickerDir = java.io.File(cacheDir, "stickers").also { it.mkdirs() }
                 // 從 URL path 判斷副檔名（忽略 query 參數）
                 val urlPath = try { java.net.URL(url).path } catch (_: Exception) { url }
-                val ext = when {
+                var ext = when {
                     urlPath.contains(".gif", true) -> ".gif"
                     urlPath.contains(".webp", true) -> ".webp"
                     urlPath.contains(".png", true) -> ".png"
                     urlPath.contains(".jpg", true) || urlPath.contains(".jpeg", true) -> ".jpg"
-                    else -> ".gif"  // Giphy 預設為 GIF
+                    else -> ""  // 暫時未知，等 response Content-Type 決定
                 }
-                val mimeType = when (ext) {
-                    ".gif" -> "image/gif"
-                    ".webp" -> "image/webp"
-                    ".jpg" -> "image/jpeg"
-                    else -> "image/png"
-                }
-                val fileName = "sticker_${url.hashCode()}$ext"
-                val file = java.io.File(stickerDir, fileName)
 
-                if (!file.exists() || file.length() == 0L) {
-                    val client = okhttp3.OkHttpClient.Builder()
-                        .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
-                        .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-                        .build()
+                val tempFileName = "sticker_${url.hashCode()}"
+                val client = okhttp3.OkHttpClient.Builder()
+                    .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
+
+                // 優先用已快取的檔案
+                val cachedFile = stickerDir.listFiles()?.firstOrNull {
+                    it.name.startsWith(tempFileName) && it.length() > 0
+                }
+                val file: java.io.File
+
+                if (cachedFile != null) {
+                    file = cachedFile
+                    ext = ".${cachedFile.extension}"
+                } else {
                     val request = okhttp3.Request.Builder().url(url).build()
                     val response = client.newCall(request).execute()
                     if (!response.isSuccessful) throw Exception("HTTP ${response.code}")
+
+                    // 用 response Content-Type 修正副檔名（保持透明格式正確）
+                    val contentType = response.header("Content-Type") ?: ""
+                    if (ext.isEmpty()) {
+                        ext = when {
+                            contentType.contains("png") -> ".png"
+                            contentType.contains("webp") -> ".webp"
+                            contentType.contains("gif") -> ".gif"
+                            contentType.contains("jpeg") || contentType.contains("jpg") -> ".jpg"
+                            else -> ".png"  // 預設 PNG（支援透明）
+                        }
+                    }
+
+                    file = java.io.File(stickerDir, "$tempFileName$ext")
                     response.body?.byteStream()?.use { input ->
                         file.outputStream().use { output -> input.copyTo(output) }
                     } ?: throw Exception("Empty response body")
+                }
+
+                val mimeType = when (file.extension.lowercase()) {
+                    "gif" -> "image/gif"
+                    "webp" -> "image/webp"
+                    "jpg", "jpeg" -> "image/jpeg"
+                    else -> "image/png"
                 }
 
                 val authority = "$packageName.fileprovider"
@@ -1691,11 +1732,22 @@ class YukiBoardIMEService : InputMethodService() {
                 p.onShowDialog = { dialog -> showImeDialog(dialog) }
                 p.onExportRequest = { data ->
                     try {
+                        // 寫到檔案 + 用分享 Intent 讓使用者選擇存放位置
                         val file = java.io.File(getExternalFilesDir(null), "yukiboard_user_dict.txt")
                         file.writeText(data)
-                        android.os.Handler(android.os.Looper.getMainLooper()).post {
-                            android.widget.Toast.makeText(this, "已匯出至 ${file.absolutePath}", android.widget.Toast.LENGTH_LONG).show()
+                        val uri = androidx.core.content.FileProvider.getUriForFile(
+                            this, "$packageName.fileprovider", file
+                        )
+                        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                            putExtra(android.content.Intent.EXTRA_SUBJECT, "YukiBoard 個人詞庫")
+                            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                         }
+                        startActivity(android.content.Intent.createChooser(shareIntent, "匯出詞庫").apply {
+                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        })
                     } catch (e: Exception) {
                         android.os.Handler(android.os.Looper.getMainLooper()).post {
                             android.widget.Toast.makeText(this, "匯出失敗: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
@@ -1785,12 +1837,16 @@ class YukiBoardIMEService : InputMethodService() {
                     // 通知 InputRouter 學習這個字
                     inputRouter.onHandwritingCommit(text)
                 }
-                p.onRecognized = { candidates ->
-                    if (candidates.isNotEmpty()) {
-                        val sourceMap = candidates.associateWith {
+                p.onRecognized = { rawCandidates ->
+                    if (rawCandidates.isNotEmpty()) {
+                        // 合併使用者詞庫排序：常用詞優先
+                        val boosted = rawCandidates.sortedByDescending { word ->
+                            inputRouter.smartInput.adaptiveDictionary.getFrequency(word)
+                        }
+                        val sourceMap = boosted.associateWith {
                             com.snowrealm.yukiboard.input.router.CandidateSource.DICTIONARY
                         }
-                        keyboardView.updateCandidates(candidates, sourceMap)
+                        keyboardView.updateCandidates(boosted, sourceMap)
                     }
                 }
                 p.onBackspace = {
@@ -3299,7 +3355,6 @@ class YukiBoardIMEService : InputMethodService() {
                             val trimmed = spaceResult.text.trimEnd()
                             if (trimmed.isNotEmpty()) {
                                 ic.beginBatchEdit()
-                                ic.setComposingText("", 0)
                                 ic.commitText(trimmed, 1)
                                 ic.endBatchEdit()
                             }
@@ -3307,11 +3362,9 @@ class YukiBoardIMEService : InputMethodService() {
                             val commitResult = inputRouter.getActiveEngine().forceCommit()
                             if (commitResult is InputResult.CommitText) {
                                 ic.beginBatchEdit()
-                                ic.setComposingText("", 0)
                                 ic.commitText(commitResult.text, 1)
                                 ic.endBatchEdit()
                             } else {
-                                ic.setComposingText("", 0)
                                 ic.finishComposingText()
                             }
                         }
@@ -3645,8 +3698,7 @@ class YukiBoardIMEService : InputMethodService() {
         val pending = inputRouter.consumePendingCommit()
         if (!pending.isNullOrEmpty()) {
             ic.beginBatchEdit()
-            ic.setComposingText("", 1)  // 清掉舊 composing（含已選字+未完成注音）
-            ic.commitText(pending, 1)   // 只 commit 已選字部分
+            ic.commitText(pending, 1)   // commitText 自動替換 composing region
             ic.endBatchEdit()
         }
 
@@ -3665,8 +3717,7 @@ class YukiBoardIMEService : InputMethodService() {
                 }
 
                 ic.beginBatchEdit()
-                ic.setComposingText("", 0)  // 0 = 丟棄 composing，不 commit，避免重複輸出
-                ic.commitText(result.text, 1)
+                ic.commitText(result.text, 1)  // commitText 自動替換 composing region
                 ic.endBatchEdit()
                 characterView?.playHappy()
                 forwardTextToRemote(result.text)

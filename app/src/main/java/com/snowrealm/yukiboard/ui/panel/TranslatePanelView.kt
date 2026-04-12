@@ -118,7 +118,7 @@ class TranslatePanelView(context: Context) : View(context), PanelInputTarget {
         fromLangRects.clear()
         toLangRects.clear()
 
-        bgPaint.color = theme.backgroundColorInt
+        bgPaint.color = theme.effectivePanelBackground()
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
 
         // 語言選擇列

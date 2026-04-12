@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 162
-        versionName "0.9.96"
+        versionCode 163
+        versionName "0.9.97"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,7 +82,12 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 關閉面板後無法打字 + 詞庫面板改為 inline 編輯"
+                    "- fix: 候選列/按鍵觸控衝突、展開面板選字、按鍵有時按不了\n" +
+                    "- fix: 英文重複輸出、BroadcastReceiver 洩漏\n" +
+                    "- fix: 手寫區域 + 候選字排序、CJK 學詞修復\n" +
+                    "- feat: 詞庫匯入/匯出、GIF/貼圖透明背景傳送\n" +
+                    "- feat: 雲端同步強化（自動同步 + Supabase token 交換）\n" +
+                    "- feat: 遊戲選單捲動、登入/同步連線 Insight 修復"
             }
         }
         debug {
@@ -91,7 +96,12 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 關閉面板後無法打字 + 詞庫面板改為 inline 編輯"
+                    "- fix: 候選列/按鍵觸控衝突、展開面板選字、按鍵有時按不了\n" +
+                    "- fix: 英文重複輸出、BroadcastReceiver 洩漏\n" +
+                    "- fix: 手寫區域 + 候選字排序、CJK 學詞修復\n" +
+                    "- feat: 詞庫匯入/匯出、GIF/貼圖透明背景傳送\n" +
+                    "- feat: 雲端同步強化（自動同步 + Supabase token 交換）\n" +
+                    "- feat: 遊戲選單捲動、登入/同步連線 Insight 修復"
             }
         }
     }

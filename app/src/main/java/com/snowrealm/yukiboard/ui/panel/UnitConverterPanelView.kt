@@ -109,7 +109,7 @@ class UnitConverterPanelView(context: Context) : View(context) {
         val displayH = 44f * density
         val unitRowH = 28f * density
 
-        bgPaint.color = theme.backgroundColorInt
+        bgPaint.color = theme.effectivePanelBackground()
         canvas.drawRect(0f, 0f, w, h, bgPaint)
 
         // ── 分類標籤列 ──

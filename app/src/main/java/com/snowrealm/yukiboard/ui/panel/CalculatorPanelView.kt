@@ -95,7 +95,7 @@ class CalculatorPanelView(context: Context) : View(context) {
         val btnH = (btnAreaH - gap * (rows + 1)) / rows
 
         // 背景
-        bgPaint.color = theme.backgroundColorInt
+        bgPaint.color = theme.effectivePanelBackground()
         canvas.drawRect(0f, 0f, w, h, bgPaint)
 
         // 顯示欄
