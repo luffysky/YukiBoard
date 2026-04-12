@@ -1381,12 +1381,18 @@ class YukiBoardIMEService : InputMethodService() {
         decryptPanel?.exitInputMode()
         dictionaryPanel?.exitInputMode()
         langLearnPanel?.exitInputMode()
+        clipboardPanel?.exitInputMode()
         translatePanel = null
         gifPanel = null
         userDictPanel = null
         decryptPanel = null
         dictionaryPanel = null
         langLearnPanel = null
+        clipboardPanel = null
+        // 面板切換時重置 InputRouter，避免殘留 composing 狀態
+        inputRouter.reset()
+        keyboardView.updateComposingText("")
+        keyboardView.updateCandidates(emptyList())
         panelContainer.removeAllViews()
         panelContainer.visibility = View.GONE
         topPanelContainer.removeAllViews()
@@ -1857,12 +1863,14 @@ class YukiBoardIMEService : InputMethodService() {
         decryptPanel?.exitInputMode()
         dictionaryPanel?.exitInputMode()
         langLearnPanel?.exitInputMode()
+        clipboardPanel?.exitInputMode()
         translatePanel = null
         gifPanel = null
         userDictPanel = null
         decryptPanel = null
         dictionaryPanel = null
         langLearnPanel = null
+        clipboardPanel = null
         handwritingPanel = null
         activePanel = null
         toolbarView.activePanel = null
@@ -1871,7 +1879,10 @@ class YukiBoardIMEService : InputMethodService() {
         topPanelContainer.removeAllViews()
         topPanelContainer.visibility = View.GONE
         hidePanelControlBar()
-        // 回到鍵盤時確保 InputConnection composing 狀態乾淨
+        // 回到鍵盤時確保 InputRouter + InputConnection 狀態乾淨
+        inputRouter.reset()
+        keyboardView.updateComposingText("")
+        keyboardView.updateCandidates(emptyList())
         currentInputConnection?.finishComposingText()
         // 確保圖層正常
         if (isPanelBehindKeyboard) {

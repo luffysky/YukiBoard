@@ -18,7 +18,7 @@ import com.snowrealm.yukiboard.theme.KeyboardTheme
  * - 頂部標題列（搜尋框 + 新增按鈕）
  * - 分類標籤列（水平捲動：全部 / 一般 / 人名 / 地名 / 專有名詞 / 工作用語 / 網路用語 / 自訂）
  * - 直向捲動卡片列表，每張卡片：word (large) + bopomofo (small) + category chip
- * - 點擊卡片編輯、長按卡片刪除
+ * - 點擊卡片 → inline 編輯、長按卡片 → 刪除確認
  * - 底部匯出/匯入按鈕
  * - 暗色主題：bg 0xFF0D1B2A, cards 0xFF1A2A3A, text 0xFFE8F4FF, accent 0xFF9ECFFF
  */
@@ -76,7 +76,7 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
     var onExportRequest: ((String) -> Unit)? = null
     /** 匯入回呼 */
     var onImportRequest: (() -> Unit)? = null
-    /** 由 Service 提供的 Dialog 顯示回呼（IME 內部 View 無法直接彈 Dialog） */
+    /** 由 Service 提供的 Dialog 顯示回呼（僅剩刪除確認用） */
     var onShowDialog: ((AlertDialog) -> Unit)? = null
 
     // ── 資料 ──
@@ -85,6 +85,8 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
     private var searchQuery = ""
     private var selectedCategory = "全部"
     private val categoryTabs = mutableListOf("全部")
+    /** 使用者自訂分類（非內建的） */
+    private val customCategories = mutableListOf<String>()
 
     // ── 觸控區域 ──
     private val itemRects = mutableListOf<Pair<RectF, Int>>()
@@ -113,24 +115,42 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
     // ── 搜尋模式 ──
     private var isSearchMode = false
     // ── canvas 輸入模式（鍵盤直接輸入到搜尋框） ──
-    private var isInputMode = false
+    private var isInputMode = true  // 預設 true，像 LangLearnPanel 一樣直接接收輸入
     private val inputBuffer = StringBuilder()
     private var composingHint = ""
 
-    // ── 新增模式（inline，不用 Dialog） ──
+    // ── 新增/編輯模式（inline，不用 Dialog） ──
     private var isAddMode = false
-    private var addField = 0  // 0=詞彙, 1=注音
+    private var isEditMode = false
+    private var editingIndex = -1       // 正在編輯的 filteredEntries index
+    private var editingOldWord = ""     // 編輯前的原始 word（用於 updateManual）
+    private var addField = 0  // 0=詞彙, 1=注音, 2=新增分類名稱
     private val addWordBuffer = StringBuilder()
     private val addBopoBuffer = StringBuilder()
+    private val newCategoryBuffer = StringBuilder()
     private var addConfirmRect = RectF()
     private var addCancelRect = RectF()
     private var addFieldWordRect = RectF()
     private var addFieldBopoRect = RectF()
+    private var addSelectedCategory = UserDictionary.DEFAULT_CATEGORY
+
+    // ── 分類選擇器（新增/編輯模式用） ──
+    private val catChipRects = mutableListOf<Pair<RectF, String>>()
+    private var catScrollX = 0f
+    private var catTouchDownX = 0f
+    private var catTouchDownScrollX = 0f
+    private var isCatDragging = false
+    private var newCatBtnRect = RectF()
+    private var isNewCatMode = false // 正在輸入新分類名稱
+    private var newCatConfirmRect = RectF()
+    private var newCatCancelRect = RectF()
+    private var newCatFieldRect = RectF()
 
     // ── 尺寸 ──
     private val headerH = 42f * density
     private val tabBarH = 34f * density
     private val searchBarH = 36f * density
+    private val catBarH = 32f * density
     private val itemH = 58f * density
     private val itemGap = 5f * density
     private val cardR = 10f * density
@@ -141,9 +161,11 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
         allEntries = userDictionary?.getAllManualWithCategory() ?: emptyList()
         categoryTabs.clear()
         categoryTabs.add("全部")
-        categoryTabs.addAll(userDictionary?.getAllCategories() ?: UserDictionary.BUILT_IN_CATEGORIES)
-        categoryTabs.remove("全部") // remove duplicate if present from getAllCategories
-        categoryTabs.add(0, "全部")
+        val allCats = userDictionary?.getAllCategories() ?: UserDictionary.BUILT_IN_CATEGORIES
+        for (c in allCats) if (c != "全部" && c !in categoryTabs) categoryTabs.add(c)
+        // 追蹤自訂分類
+        customCategories.clear()
+        customCategories.addAll(allCats.filter { it !in UserDictionary.BUILT_IN_CATEGORIES })
         applyFilter()
         scrollY = 0f
         invalidate()
@@ -180,6 +202,7 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
         itemRects.clear()
         deleteRects.clear()
         tabRects.clear()
+        catChipRects.clear()
 
         // 背景
         bgPaint.color = BG_COLOR
@@ -188,8 +211,13 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
         drawHeader(canvas)
 
         var contentTop = headerH
-        if (isAddMode) {
-            contentTop += drawAddModeBar(canvas, contentTop)
+        if (isAddMode || isEditMode) {
+            contentTop += drawAddEditBar(canvas, contentTop)
+            if (isNewCatMode) {
+                contentTop += drawNewCategoryBar(canvas, contentTop)
+            } else {
+                contentTop += drawCategorySelector(canvas, contentTop)
+            }
         } else if (isSearchMode) {
             drawSearchBar(canvas, contentTop)
             contentTop += searchBarH
@@ -310,7 +338,7 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
     }
 
     // =========================================================================
-    // Category tabs (horizontal scroll)
+    // Category tabs (horizontal scroll) — 列表篩選用
     // =========================================================================
     private fun drawCategoryTabs(canvas: Canvas, top: Float) {
         canvas.save()
@@ -371,8 +399,9 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
             val rect = RectF(padding, y, width - padding, y + itemH)
             itemRects.add(rect to i)
 
-            // Card background
-            cardPaint.color = CARD_COLOR
+            // Card background — 編輯中的卡片高亮
+            val isEditing = isEditMode && editingIndex == i
+            cardPaint.color = if (isEditing) 0xFF253D55.toInt() else CARD_COLOR
             canvas.drawRoundRect(rect, cardR, cardR, cardPaint)
 
             // Left color bar based on category
@@ -499,6 +528,183 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
     }
 
     // =========================================================================
+    // Add/Edit mode bar（詞彙 + 注音輸入欄）
+    // =========================================================================
+    private fun drawAddEditBar(canvas: Canvas, top: Float): Float {
+        val barH = searchBarH * 2.2f
+        // 背景
+        cardPaint.color = 0xFF1A3050.toInt()
+        canvas.drawRoundRect(padding, top + 2, width - padding, top + barH - 2, cardR, cardR, cardPaint)
+
+        val fieldH = (barH - 8 * density) / 2f
+        val left = padding + 8 * density
+        val right = width - padding - 70 * density
+
+        // 標題
+        val modeLabel = if (isEditMode) "✏️ 編輯" else "➕ 新增"
+        titlePaint.textSize = 10f * density
+        titlePaint.color = ACCENT_COLOR
+        // 不佔空間，畫在背景框右上角
+        canvas.drawText(modeLabel, right + 6 * density, top + 12 * density, titlePaint)
+
+        // 詞彙欄位
+        val wordTop = top + 4 * density
+        addFieldWordRect.set(left, wordTop, right, wordTop + fieldH - 2 * density)
+        cardPaint.color = if (addField == 0) 0xFF253D55.toInt() else 0xFF1E3245.toInt()
+        canvas.drawRoundRect(addFieldWordRect, 6 * density, 6 * density, cardPaint)
+        if (addField == 0) {
+            val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE; strokeWidth = 1f * density; color = ACCENT_COLOR
+            }
+            canvas.drawRoundRect(addFieldWordRect, 6 * density, 6 * density, borderPaint)
+        }
+        val wordDisplay = if (addField == 0) addWordBuffer.toString() + composingHint + "▏" else addWordBuffer.toString()
+        titlePaint.textSize = 13f * density
+        titlePaint.color = if (addWordBuffer.isEmpty() && addField != 0) DIM_TEXT else TEXT_COLOR
+        val wordText = if (wordDisplay.isEmpty()) "詞彙（直接打字）" else wordDisplay
+        if (wordDisplay.isEmpty()) titlePaint.color = DIM_TEXT
+        canvas.drawText(wordText, left + 8 * density, addFieldWordRect.centerY() + 5 * density, titlePaint)
+
+        // 注音欄位
+        val bopoTop = wordTop + fieldH
+        addFieldBopoRect.set(left, bopoTop, right, bopoTop + fieldH - 2 * density)
+        cardPaint.color = if (addField == 1) 0xFF253D55.toInt() else 0xFF1E3245.toInt()
+        canvas.drawRoundRect(addFieldBopoRect, 6 * density, 6 * density, cardPaint)
+        if (addField == 1) {
+            val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE; strokeWidth = 1f * density; color = ACCENT_COLOR
+            }
+            canvas.drawRoundRect(addFieldBopoRect, 6 * density, 6 * density, borderPaint)
+        }
+        val bopoDisplay = if (addField == 1) addBopoBuffer.toString() + composingHint + "▏" else addBopoBuffer.toString()
+        titlePaint.color = if (bopoDisplay.isEmpty()) DIM_TEXT else TEXT_COLOR
+        val bopoText = if (bopoDisplay.isEmpty()) "注音（直接打字）" else bopoDisplay
+        canvas.drawText(bopoText, left + 8 * density, addFieldBopoRect.centerY() + 5 * density, titlePaint)
+
+        // 確認按鈕
+        val btnW = 28 * density
+        val btnRight = width - padding - 6 * density
+        addConfirmRect.set(btnRight - btnW, wordTop, btnRight, wordTop + fieldH - 2 * density)
+        cardPaint.color = 0xFF2A6B4A.toInt()
+        canvas.drawRoundRect(addConfirmRect, 6 * density, 6 * density, cardPaint)
+        btnPaint.textSize = 16f * density
+        btnPaint.color = 0xFFFFFFFF.toInt()
+        canvas.drawText("✓", addConfirmRect.centerX(), addConfirmRect.centerY() + 6 * density, btnPaint)
+
+        // 取消按鈕
+        addCancelRect.set(btnRight - btnW, bopoTop, btnRight, bopoTop + fieldH - 2 * density)
+        cardPaint.color = 0xFF6B2A2A.toInt()
+        canvas.drawRoundRect(addCancelRect, 6 * density, 6 * density, cardPaint)
+        canvas.drawText("✕", addCancelRect.centerX(), addCancelRect.centerY() + 6 * density, btnPaint)
+
+        return barH
+    }
+
+    // =========================================================================
+    // Category selector（新增/編輯時選擇分類）
+    // =========================================================================
+    private fun drawCategorySelector(canvas: Canvas, top: Float): Float {
+        canvas.save()
+        canvas.clipRect(0f, top, width.toFloat(), top + catBarH)
+
+        val chipH = 24f * density
+        val chipY = top + (catBarH - chipH) / 2f
+        val chipPadH = 10f * density
+        val chipGap = 5f * density
+        val chipRadius = chipH / 2f
+
+        chipTextPaint.textSize = 10f * density
+
+        var x = padding - catScrollX
+
+        val allCats = (UserDictionary.BUILT_IN_CATEGORIES + customCategories).distinct()
+        for (cat in allCats) {
+            val isActive = cat == addSelectedCategory
+            val textW = chipTextPaint.measureText(cat)
+            val chipW = textW + chipPadH * 2
+            val rect = RectF(x, chipY, x + chipW, chipY + chipH)
+            catChipRects.add(rect to cat)
+
+            val chipColor = CATEGORY_COLORS[cat] ?: ACCENT_COLOR
+            chipPaint.color = if (isActive) chipColor else (chipColor and 0x00FFFFFF) or 0x25000000
+            canvas.drawRoundRect(rect, chipRadius, chipRadius, chipPaint)
+
+            if (isActive) {
+                val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    style = Paint.Style.STROKE; strokeWidth = 1.5f * density; color = chipColor
+                }
+                canvas.drawRoundRect(rect, chipRadius, chipRadius, borderPaint)
+            }
+
+            chipTextPaint.color = if (isActive) 0xFFFFFFFF.toInt() else chipColor
+            canvas.drawText(cat, rect.centerX(), rect.centerY() + 3.5f * density, chipTextPaint)
+
+            x += chipW + chipGap
+        }
+
+        // ＋新增分類 按鈕
+        val addCatText = "＋新增"
+        val addCatTextW = chipTextPaint.measureText(addCatText)
+        val addCatW = addCatTextW + chipPadH * 2
+        newCatBtnRect = RectF(x, chipY, x + addCatW, chipY + chipH)
+        chipPaint.color = (ACCENT_COLOR and 0x00FFFFFF) or 0x18000000
+        canvas.drawRoundRect(newCatBtnRect, chipRadius, chipRadius, chipPaint)
+        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE; strokeWidth = 1f * density; color = ACCENT_COLOR; alpha = 100
+        }
+        canvas.drawRoundRect(newCatBtnRect, chipRadius, chipRadius, borderPaint)
+        chipTextPaint.color = ACCENT_COLOR
+        canvas.drawText(addCatText, newCatBtnRect.centerX(), newCatBtnRect.centerY() + 3.5f * density, chipTextPaint)
+
+        canvas.restore()
+        return catBarH
+    }
+
+    // =========================================================================
+    // New category inline input
+    // =========================================================================
+    private fun drawNewCategoryBar(canvas: Canvas, top: Float): Float {
+        val barH = 32f * density
+        val left = padding + 8 * density
+        val fieldRight = width - padding - 70 * density
+
+        // 輸入框
+        newCatFieldRect = RectF(left, top + 3 * density, fieldRight, top + barH - 3 * density)
+        cardPaint.color = if (addField == 2) 0xFF253D55.toInt() else 0xFF1E3245.toInt()
+        canvas.drawRoundRect(newCatFieldRect, 6 * density, 6 * density, cardPaint)
+        if (addField == 2) {
+            val bp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE; strokeWidth = 1f * density; color = ACCENT_COLOR
+            }
+            canvas.drawRoundRect(newCatFieldRect, 6 * density, 6 * density, bp)
+        }
+
+        val display = if (addField == 2) newCategoryBuffer.toString() + composingHint + "▏" else newCategoryBuffer.toString()
+        titlePaint.textSize = 12f * density
+        titlePaint.color = if (display.isEmpty()) DIM_TEXT else TEXT_COLOR
+        val text = if (display.isEmpty()) "新分類名稱..." else display
+        canvas.drawText(text, left + 8 * density, newCatFieldRect.centerY() + 4 * density, titlePaint)
+
+        // 確認
+        val btnW = 28 * density
+        val btnRight = width - padding - 6 * density
+        newCatConfirmRect = RectF(btnRight - btnW, top + 3 * density, btnRight, top + barH - 3 * density)
+        cardPaint.color = 0xFF2A6B4A.toInt()
+        canvas.drawRoundRect(newCatConfirmRect, 6 * density, 6 * density, cardPaint)
+        btnPaint.textSize = 14f * density
+        btnPaint.color = 0xFFFFFFFF.toInt()
+        canvas.drawText("✓", newCatConfirmRect.centerX(), newCatConfirmRect.centerY() + 5 * density, btnPaint)
+
+        // 取消
+        newCatCancelRect = RectF(btnRight - btnW * 2 - 4 * density, top + 3 * density, btnRight - btnW - 4 * density, top + barH - 3 * density)
+        cardPaint.color = 0xFF6B2A2A.toInt()
+        canvas.drawRoundRect(newCatCancelRect, 6 * density, 6 * density, cardPaint)
+        canvas.drawText("✕", newCatCancelRect.centerX(), newCatCancelRect.centerY() + 5 * density, btnPaint)
+
+        return barH
+    }
+
+    // =========================================================================
     // Touch handling
     // =========================================================================
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -511,11 +717,23 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
                 isDragging = false
 
                 // Check if touch is in tab bar area for horizontal scrolling
-                val tabTop = headerH + (if (isSearchMode) searchBarH else 0f)
+                val addEditH = if (isAddMode || isEditMode) searchBarH * 2.2f + (if (isNewCatMode) 32f * density else catBarH) else 0f
+                val searchH = if (isSearchMode && !isAddMode && !isEditMode) searchBarH else 0f
+                val tabTop = headerH + addEditH + searchH
                 if (event.y in tabTop..(tabTop + tabBarH)) {
                     tabTouchDownX = event.x
                     tabTouchDownScrollX = tabScrollX
                     isTabDragging = false
+                }
+
+                // Category selector horizontal scroll
+                if ((isAddMode || isEditMode) && !isNewCatMode) {
+                    val catTop = headerH + searchBarH * 2.2f
+                    if (event.y in catTop..(catTop + catBarH)) {
+                        catTouchDownX = event.x
+                        catTouchDownScrollX = catScrollX
+                        isCatDragging = false
+                    }
                 }
 
                 return true
@@ -525,7 +743,9 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
                 val dx = event.x - touchDownX
 
                 // Tab bar horizontal drag
-                val tabTop = headerH + (if (isSearchMode) searchBarH else 0f)
+                val addEditH = if (isAddMode || isEditMode) searchBarH * 2.2f + (if (isNewCatMode) 32f * density else catBarH) else 0f
+                val searchH = if (isSearchMode && !isAddMode && !isEditMode) searchBarH else 0f
+                val tabTop = headerH + addEditH + searchH
                 if (touchDownY in tabTop..(tabTop + tabBarH) && Math.abs(dx) > 8 * density) {
                     isTabDragging = true
                     tabScrollX = (tabTouchDownScrollX - (event.x - tabTouchDownX)).coerceAtLeast(0f)
@@ -533,11 +753,22 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
                     return true
                 }
 
+                // Category selector horizontal drag
+                if ((isAddMode || isEditMode) && !isNewCatMode) {
+                    val catTop = headerH + searchBarH * 2.2f
+                    if (touchDownY in catTop..(catTop + catBarH) && Math.abs(dx) > 8 * density) {
+                        isCatDragging = true
+                        catScrollX = (catTouchDownScrollX - (event.x - catTouchDownX)).coerceAtLeast(0f)
+                        invalidate()
+                        return true
+                    }
+                }
+
                 if (!isDragging && Math.abs(event.y - touchDownY) > 8 * density) {
                     isDragging = true
                 }
                 if (isDragging) {
-                    val contentTop = headerH + tabBarH + (if (isSearchMode) searchBarH else 0f)
+                    val contentTop = headerH + tabBarH + addEditH + searchH
                     scrollY -= dy
                     val contentH = filteredEntries.size * (itemH + itemGap)
                     val visibleH = (height - bottomBarH) - contentTop
@@ -548,23 +779,49 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
                 return true
             }
             MotionEvent.ACTION_UP -> {
-                if (isDragging || isTabDragging) {
+                if (isDragging || isTabDragging || isCatDragging) {
                     isTabDragging = false
+                    isCatDragging = false
                     performClick()
                     return true
                 }
 
                 val elapsed = System.currentTimeMillis() - touchDownTime
 
-                // Add mode buttons
-                if (isAddMode) {
+                // New category mode buttons
+                if (isNewCatMode) {
+                    if (newCatConfirmRect.contains(event.x, event.y)) {
+                        commitNewCategory()
+                        performClick()
+                        return true
+                    }
+                    if (newCatCancelRect.contains(event.x, event.y)) {
+                        isNewCatMode = false
+                        addField = 0
+                        newCategoryBuffer.clear()
+                        composingHint = ""
+                        invalidate()
+                        performClick()
+                        return true
+                    }
+                    if (newCatFieldRect.contains(event.x, event.y)) {
+                        addField = 2
+                        composingHint = ""
+                        invalidate()
+                        performClick()
+                        return true
+                    }
+                }
+
+                // Add/Edit mode buttons
+                if (isAddMode || isEditMode) {
                     if (addConfirmRect.contains(event.x, event.y)) {
-                        commitAddEntry()
+                        commitAddEditEntry()
                         performClick()
                         return true
                     }
                     if (addCancelRect.contains(event.x, event.y)) {
-                        cancelAddMode()
+                        cancelAddEditMode()
                         performClick()
                         return true
                     }
@@ -582,25 +839,44 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
                         performClick()
                         return true
                     }
+
+                    // Category chip selection
+                    if (!isNewCatMode) {
+                        val catHit = catChipRects.firstOrNull { it.first.contains(event.x, event.y) }
+                        if (catHit != null) {
+                            addSelectedCategory = catHit.second
+                            invalidate()
+                            performClick()
+                            return true
+                        }
+                        if (newCatBtnRect.contains(event.x, event.y)) {
+                            isNewCatMode = true
+                            addField = 2
+                            newCategoryBuffer.clear()
+                            composingHint = ""
+                            invalidate()
+                            performClick()
+                            return true
+                        }
+                    }
                 }
 
                 // Header buttons
                 if (addBtnRect.contains(event.x, event.y)) {
-                    showAddDialog()
+                    enterAddMode()
                     performClick()
                     return true
                 }
                 if (searchBtnRect.contains(event.x, event.y)) {
                     if (isSearchMode) {
                         isSearchMode = false
-                        isInputMode = false
                         inputBuffer.clear()
                         composingHint = ""
                         searchQuery = ""
                         applyFilter()
                     } else {
+                        cancelAddEditMode()
                         isSearchMode = true
-                        isInputMode = true
                         inputBuffer.clear()
                         if (searchQuery.isNotEmpty()) inputBuffer.append(searchQuery)
                     }
@@ -632,21 +908,6 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
                     performClick()
                     return true
                 }
-                if (isSearchMode) {
-                    val searchTop = headerH
-                    val barRect = RectF(padding, searchTop, width - padding, searchTop + searchBarH)
-                    if (barRect.contains(event.x, event.y)) {
-                        // 進入 inputMode
-                        if (!isInputMode) {
-                            isInputMode = true
-                            inputBuffer.clear()
-                            if (searchQuery.isNotEmpty()) inputBuffer.append(searchQuery)
-                            invalidate()
-                        }
-                        performClick()
-                        return true
-                    }
-                }
 
                 // Category tabs
                 val tabHit = tabRects.firstOrNull { it.first.contains(event.x, event.y) }
@@ -667,13 +928,13 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
                     return true
                 }
 
-                // Item tap → edit; long press → delete
+                // Item tap → inline edit; long press → delete
                 val itemHit = itemRects.firstOrNull { it.first.contains(event.x, event.y) }
                 if (itemHit != null && itemHit.second < filteredEntries.size) {
                     if (elapsed > 500) {
                         showDeleteConfirmation(itemHit.second)
                     } else {
-                        showEditDialog(itemHit.second)
+                        enterEditMode(itemHit.second)
                     }
                     performClick()
                     return true
@@ -689,154 +950,97 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
     }
 
     // =========================================================================
-    // Dialogs
+    // Add / Edit mode management
     // =========================================================================
 
-    private fun showAddDialog() {
-        // 進入 inline 新增模式（不用 Dialog）
+    private fun enterAddMode() {
         isAddMode = true
+        isEditMode = false
+        editingIndex = -1
         addField = 0
         addWordBuffer.clear()
         addBopoBuffer.clear()
+        addSelectedCategory = UserDictionary.DEFAULT_CATEGORY
         composingHint = ""
-        isInputMode = true
         isSearchMode = false
+        isNewCatMode = false
+        catScrollX = 0f
         scrollY = 0f
         invalidate()
     }
 
-    private fun commitAddEntry() {
+    private fun enterEditMode(index: Int) {
+        if (index !in filteredEntries.indices) return
+        val (word, bopo, cat) = filteredEntries[index]
+        isEditMode = true
+        isAddMode = false
+        editingIndex = index
+        editingOldWord = word
+        addField = 0
+        addWordBuffer.clear().append(word)
+        addBopoBuffer.clear().append(bopo)
+        addSelectedCategory = cat
+        composingHint = ""
+        isSearchMode = false
+        isNewCatMode = false
+        catScrollX = 0f
+        invalidate()
+    }
+
+    private fun commitAddEditEntry() {
         val word = addWordBuffer.toString().trim()
         val bopo = addBopoBuffer.toString().trim()
         if (word.isNotBlank() && bopo.isNotBlank()) {
-            userDictionary?.addManual(word, bopo, UserDictionary.DEFAULT_CATEGORY)
+            if (isEditMode) {
+                userDictionary?.updateManual(editingOldWord, word, bopo, addSelectedCategory)
+                Toast.makeText(context, "已更新「$word」", Toast.LENGTH_SHORT).show()
+            } else {
+                userDictionary?.addManual(word, bopo, addSelectedCategory)
+                Toast.makeText(context, "已新增「$word」", Toast.LENGTH_SHORT).show()
+            }
             reloadEntries()
-            Toast.makeText(context, "已新增「$word」", Toast.LENGTH_SHORT).show()
         } else {
             Toast.makeText(context, "詞彙和注音都不可為空", Toast.LENGTH_SHORT).show()
         }
-        cancelAddMode()
+        cancelAddEditMode()
     }
 
-    private fun cancelAddMode() {
+    private fun cancelAddEditMode() {
         isAddMode = false
+        isEditMode = false
+        editingIndex = -1
         addField = 0
         addWordBuffer.clear()
         addBopoBuffer.clear()
+        newCategoryBuffer.clear()
+        composingHint = ""
+        isNewCatMode = false
+        invalidate()
+    }
+
+    private fun commitNewCategory() {
+        val name = newCategoryBuffer.toString().trim()
+        if (name.isNotBlank() && name !in UserDictionary.BUILT_IN_CATEGORIES && name !in customCategories) {
+            customCategories.add(name)
+            if (name !in categoryTabs) categoryTabs.add(name)
+            addSelectedCategory = name
+            Toast.makeText(context, "已新增分類「$name」", Toast.LENGTH_SHORT).show()
+        } else if (name.isBlank()) {
+            Toast.makeText(context, "分類名稱不可為空", Toast.LENGTH_SHORT).show()
+        } else {
+            // 分類已存在，直接選擇
+            addSelectedCategory = name
+        }
+        isNewCatMode = false
+        addField = 0
+        newCategoryBuffer.clear()
         composingHint = ""
         invalidate()
     }
 
-    private fun drawAddModeBar(canvas: Canvas, top: Float): Float {
-        val barH = searchBarH * 2.2f
-        // 背景
-        cardPaint.color = 0xFF1A3050.toInt()
-        canvas.drawRoundRect(padding, top + 2, width - padding, top + barH - 2, cardR, cardR, cardPaint)
-
-        val fieldH = (barH - 8 * density) / 2f
-        val left = padding + 8 * density
-        val right = width - padding - 70 * density
-
-        // 詞彙欄位
-        val wordTop = top + 4 * density
-        addFieldWordRect.set(left, wordTop, right, wordTop + fieldH - 2 * density)
-        cardPaint.color = if (addField == 0) 0xFF253D55.toInt() else 0xFF1E3245.toInt()
-        canvas.drawRoundRect(addFieldWordRect, 6 * density, 6 * density, cardPaint)
-        val wordDisplay = if (addField == 0) addWordBuffer.toString() + composingHint + "▏" else addWordBuffer.toString()
-        titlePaint.textSize = 13f * density
-        titlePaint.color = if (addWordBuffer.isEmpty() && addField != 0) DIM_TEXT else TEXT_COLOR
-        val wordText = if (wordDisplay.isEmpty()) "詞彙（直接打字）" else wordDisplay
-        if (wordDisplay.isEmpty()) titlePaint.color = DIM_TEXT
-        canvas.drawText(wordText, left + 8 * density, addFieldWordRect.centerY() + 5 * density, titlePaint)
-
-        // 注音欄位
-        val bopoTop = wordTop + fieldH
-        addFieldBopoRect.set(left, bopoTop, right, bopoTop + fieldH - 2 * density)
-        cardPaint.color = if (addField == 1) 0xFF253D55.toInt() else 0xFF1E3245.toInt()
-        canvas.drawRoundRect(addFieldBopoRect, 6 * density, 6 * density, cardPaint)
-        val bopoDisplay = if (addField == 1) addBopoBuffer.toString() + composingHint + "▏" else addBopoBuffer.toString()
-        titlePaint.color = if (bopoDisplay.isEmpty()) DIM_TEXT else TEXT_COLOR
-        val bopoText = if (bopoDisplay.isEmpty()) "注音（直接打字）" else bopoDisplay
-        canvas.drawText(bopoText, left + 8 * density, addFieldBopoRect.centerY() + 5 * density, titlePaint)
-
-        // 確認按鈕
-        val btnW = 28 * density
-        val btnRight = width - padding - 6 * density
-        addConfirmRect.set(btnRight - btnW, wordTop, btnRight, wordTop + fieldH - 2 * density)
-        cardPaint.color = 0xFF2A6B4A.toInt()
-        canvas.drawRoundRect(addConfirmRect, 6 * density, 6 * density, cardPaint)
-        btnPaint.textSize = 16f * density
-        btnPaint.color = 0xFFFFFFFF.toInt()
-        canvas.drawText("✓", addConfirmRect.centerX(), addConfirmRect.centerY() + 6 * density, btnPaint)
-
-        // 取消按鈕
-        addCancelRect.set(btnRight - btnW, bopoTop, btnRight, bopoTop + fieldH - 2 * density)
-        cardPaint.color = 0xFF6B2A2A.toInt()
-        canvas.drawRoundRect(addCancelRect, 6 * density, 6 * density, cardPaint)
-        canvas.drawText("✕", addCancelRect.centerX(), addCancelRect.centerY() + 6 * density, btnPaint)
-
-        return barH
-    }
-
-    private fun showEditDialog(index: Int) {
-        if (index !in filteredEntries.indices) return
-        val (oldWord, oldBopo, oldCat) = filteredEntries[index]
-        val ctx = context ?: return
-
-        val layout = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(
-                (20 * density).toInt(), (16 * density).toInt(),
-                (20 * density).toInt(), (8 * density).toInt()
-            )
-        }
-        val wordInput = EditText(ctx).apply {
-            hint = "詞彙"
-            setText(oldWord)
-            textSize = 15f
-        }
-        val bopoInput = EditText(ctx).apply {
-            hint = "注音"
-            setText(oldBopo)
-            textSize = 15f
-        }
-
-        val categorySpinner = Spinner(ctx)
-        val categories = userDictionary?.getAllCategories() ?: UserDictionary.BUILT_IN_CATEGORIES
-        val adapter = ArrayAdapter(ctx, android.R.layout.simple_spinner_dropdown_item, categories)
-        categorySpinner.adapter = adapter
-        val catIndex = categories.indexOf(oldCat)
-        if (catIndex >= 0) categorySpinner.setSelection(catIndex)
-
-        val catLabel = TextView(ctx).apply {
-            text = "分類："
-            textSize = 13f
-            setPadding(0, (8 * density).toInt(), 0, 0)
-        }
-
-        layout.addView(wordInput)
-        layout.addView(bopoInput)
-        layout.addView(catLabel)
-        layout.addView(categorySpinner)
-
-        showImeDialog(
-            AlertDialog.Builder(ctx, AlertDialog.THEME_DEVICE_DEFAULT_DARK)
-                .setTitle("編輯詞彙")
-                .setView(layout)
-                .setPositiveButton("儲存") { _, _ ->
-                    val newWord = wordInput.text.toString().trim()
-                    val newBopo = bopoInput.text.toString().trim()
-                    val newCat = categorySpinner.selectedItem?.toString() ?: UserDictionary.DEFAULT_CATEGORY
-                    if (newWord.isNotBlank() && newBopo.isNotBlank()) {
-                        userDictionary?.updateManual(oldWord, newWord, newBopo, newCat)
-                        reloadEntries()
-                        Toast.makeText(ctx, "已更新「$newWord」", Toast.LENGTH_SHORT).show()
-                    }
-                }
-                .setNegativeButton("取消", null)
-                .create()
-        )
-    }
+    // =========================================================================
+    // Delete confirmation（僅此處保留 Dialog）
+    // =========================================================================
 
     private fun showDeleteConfirmation(index: Int) {
         if (index !in filteredEntries.indices) return
@@ -851,39 +1055,6 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
                     userDictionary?.removeManual(word)
                     reloadEntries()
                     Toast.makeText(ctx, "已刪除「$word」", Toast.LENGTH_SHORT).show()
-                }
-                .setNegativeButton("取消", null)
-                .create()
-        )
-    }
-
-    private fun showSearchDialog() {
-        val ctx = context ?: return
-        val input = EditText(ctx).apply {
-            hint = "輸入關鍵字"
-            setText(searchQuery)
-            textSize = 15f
-            setPadding(
-                (20 * density).toInt(), (12 * density).toInt(),
-                (20 * density).toInt(), (12 * density).toInt()
-            )
-        }
-
-        showImeDialog(
-            AlertDialog.Builder(ctx, AlertDialog.THEME_DEVICE_DEFAULT_DARK)
-                .setTitle("搜尋詞庫")
-                .setView(input)
-                .setPositiveButton("搜尋") { _, _ ->
-                    searchQuery = input.text.toString().trim()
-                    applyFilter()
-                    scrollY = 0f
-                    invalidate()
-                }
-                .setNeutralButton("清除") { _, _ ->
-                    searchQuery = ""
-                    applyFilter()
-                    scrollY = 0f
-                    invalidate()
                 }
                 .setNegativeButton("取消", null)
                 .create()
@@ -949,15 +1120,16 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
     override val isInInputMode: Boolean get() = isInputMode
 
     private fun activeBuffer(): StringBuilder = when {
-        isAddMode && addField == 0 -> addWordBuffer
-        isAddMode && addField == 1 -> addBopoBuffer
+        isNewCatMode && addField == 2 -> newCategoryBuffer
+        (isAddMode || isEditMode) && addField == 0 -> addWordBuffer
+        (isAddMode || isEditMode) && addField == 1 -> addBopoBuffer
         else -> inputBuffer
     }
 
     override fun onCharInput(text: String) {
         if (!isInputMode) return
         activeBuffer().append(text)
-        if (!isAddMode) { searchQuery = inputBuffer.toString(); applyFilter() }
+        if (!isAddMode && !isEditMode && !isNewCatMode) { searchQuery = inputBuffer.toString(); applyFilter() }
         invalidate()
     }
 
@@ -966,32 +1138,39 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
         val buf = activeBuffer()
         if (buf.isEmpty()) return
         buf.deleteCharAt(buf.lastIndex)
-        if (!isAddMode) { searchQuery = inputBuffer.toString(); applyFilter() }
+        if (!isAddMode && !isEditMode && !isNewCatMode) { searchQuery = inputBuffer.toString(); applyFilter() }
         invalidate()
     }
 
     override fun onSpaceInput() {
         if (!isInputMode) return
         activeBuffer().append(' ')
-        if (!isAddMode) { searchQuery = inputBuffer.toString(); applyFilter() }
+        if (!isAddMode && !isEditMode && !isNewCatMode) { searchQuery = inputBuffer.toString(); applyFilter() }
         invalidate()
     }
 
     override fun onEnterInput() {
         if (!isInputMode) return
-        if (isAddMode) {
-            if (addField == 0) {
-                // 詞彙欄 Enter → 切到注音欄
-                addField = 1
-                composingHint = ""
-            } else {
-                // 注音欄 Enter → 確認新增
-                commitAddEntry()
+        if (isNewCatMode && addField == 2) {
+            commitNewCategory()
+            return
+        }
+        if (isAddMode || isEditMode) {
+            when (addField) {
+                0 -> {
+                    // 詞彙欄 Enter → 切到注音欄
+                    addField = 1
+                    composingHint = ""
+                }
+                1 -> {
+                    // 注音欄 Enter → 確認新增/編輯
+                    commitAddEditEntry()
+                }
             }
             invalidate()
             return
         }
-        isInputMode = false
+        // 搜尋模式 Enter → 確認搜尋
         searchQuery = inputBuffer.toString()
         applyFilter()
         invalidate()
@@ -1014,7 +1193,7 @@ class UserDictionaryPanelView(context: Context) : View(context), PanelInputTarge
         if (!isInputMode) return
         activeBuffer().append(text)
         composingHint = ""
-        if (!isAddMode) { searchQuery = inputBuffer.toString(); applyFilter() }
+        if (!isAddMode && !isEditMode && !isNewCatMode) { searchQuery = inputBuffer.toString(); applyFilter() }
         invalidate()
     }
 

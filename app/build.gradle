@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 161
-        versionName "0.9.95"
+        versionCode 162
+        versionName "0.9.96"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,7 +82,7 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 日文即時候選字按了沒反應（selectCandidateAt 漏掉非変換模式）"
+                    "- fix: 關閉面板後無法打字 + 詞庫面板改為 inline 編輯"
             }
         }
         debug {
@@ -91,7 +91,7 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- fix: 日文即時候選字按了沒反應（selectCandidateAt 漏掉非変換模式）"
+                    "- fix: 關閉面板後無法打字 + 詞庫面板改為 inline 編輯"
             }
         }
     }
