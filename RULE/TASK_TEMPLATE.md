@@ -12,7 +12,7 @@
 
 - **基線文件**：
   - `/CODEX.md`
-  - `/ARCHITECTURE_REFACTOR_PLAN.md`
+  - `/docs/ARCHITECTURE_REFACTOR_PLAN.md`
 - **SPEC**：`/path/to/SPEC.md`
 - **相依 TASK**：無 / `TASK-XXX`
 

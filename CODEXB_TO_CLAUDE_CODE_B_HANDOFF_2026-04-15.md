@@ -90,7 +90,7 @@
 ## G. 參考文件
 
 - [CODEX.md](/D:/SnowRealmRebirth/SnowRealmYukiBoard/CODEX.md)
-- [CLAUDE_CODEX_COLLAB_GUIDE.md](/D:/SnowRealmRebirth/SnowRealmYukiBoard/CLAUDE_CODEX_COLLAB_GUIDE.md)
+- [CLAUDE_CODEX_COLLAB_GUIDE.md](/D:/SnowRealmRebirth/SnowRealmYukiBoard/docs/CLAUDE_CODEX_COLLAB_GUIDE.md)
 - [RULE/AI_PROTOCOL.md](/D:/SnowRealmRebirth/SnowRealmYukiBoard/RULE/AI_PROTOCOL.md)
 - [RULE/LOCK_RULES.md](/D:/SnowRealmRebirth/SnowRealmYukiBoard/RULE/LOCK_RULES.md)
 - [BIG_FILE_REFACTOR_PLAN_0414.md](/D:/SnowRealmRebirth/SnowRealmYukiBoard/BIG_FILE_REFACTOR_PLAN_0414.md)

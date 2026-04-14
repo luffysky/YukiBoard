@@ -43,8 +43,8 @@
 
 目前已建立的協作關係如下：
 
-- `Claude Code` 已讀過基線文件，並已交接一份 [CODEX_HANDOFF.md](D:\SnowRealmRebirth\SnowRealmYukiBoard\CODEX_HANDOFF.md)
-- `Codex` 已回交一份 [CODEX_REPLY_TO_CLAUDE_CODE_2026-04-13.md](D:\SnowRealmRebirth\SnowRealmYukiBoard\CODEX_REPLY_TO_CLAUDE_CODE_2026-04-13.md)
+- `Claude Code` 已讀過基線文件，並已交接一份 [CODEX_HANDOFF.md](/D:/SnowRealmRebirth/SnowRealmYukiBoard/docs/CODEX_HANDOFF.md)
+- `Codex` 已回交一份 [CODEX_REPLY_TO_CLAUDE_CODE_2026-04-13.md](/D:/SnowRealmRebirth/SnowRealmYukiBoard/docs/CODEX_REPLY_TO_CLAUDE_CODE_2026-04-13.md)
 
 雙方已形成共識：
 
@@ -155,12 +155,12 @@
 
 新 session 進來後，優先閱讀：
 
-1. [PROJECT_HEALTH_CHECK_2026-04-13.md](D:\SnowRealmRebirth\SnowRealmYukiBoard\PROJECT_HEALTH_CHECK_2026-04-13.md)
-2. [ARCHITECTURE_REFACTOR_PLAN.md](D:\SnowRealmRebirth\SnowRealmYukiBoard\ARCHITECTURE_REFACTOR_PLAN.md)
-3. [CLAUDE_CODEX_COLLAB_GUIDE.md](D:\SnowRealmRebirth\SnowRealmYukiBoard\CLAUDE_CODEX_COLLAB_GUIDE.md)
-4. [CODEX_HANDOFF.md](D:\SnowRealmRebirth\SnowRealmYukiBoard\CODEX_HANDOFF.md)
-5. [CODEX_REPLY_TO_CLAUDE_CODE_2026-04-13.md](D:\SnowRealmRebirth\SnowRealmYukiBoard\CODEX_REPLY_TO_CLAUDE_CODE_2026-04-13.md)
-6. [CODEX_SESSION_GUIDE.md](D:\SnowRealmRebirth\SnowRealmYukiBoard\CODEX_SESSION_GUIDE.md)
+1. [PROJECT_HEALTH_CHECK_2026-04-13.md](/D:/SnowRealmRebirth/SnowRealmYukiBoard/docs/PROJECT_HEALTH_CHECK_2026-04-13.md)
+2. [ARCHITECTURE_REFACTOR_PLAN.md](/D:/SnowRealmRebirth/SnowRealmYukiBoard/docs/ARCHITECTURE_REFACTOR_PLAN.md)
+3. [CLAUDE_CODEX_COLLAB_GUIDE.md](/D:/SnowRealmRebirth/SnowRealmYukiBoard/docs/CLAUDE_CODEX_COLLAB_GUIDE.md)
+4. [CODEX_HANDOFF.md](/D:/SnowRealmRebirth/SnowRealmYukiBoard/docs/CODEX_HANDOFF.md)
+5. [CODEX_REPLY_TO_CLAUDE_CODE_2026-04-13.md](/D:/SnowRealmRebirth/SnowRealmYukiBoard/docs/CODEX_REPLY_TO_CLAUDE_CODE_2026-04-13.md)
+6. [CODEX_SESSION_GUIDE.md](/D:/SnowRealmRebirth/SnowRealmYukiBoard/docs/CODEX_SESSION_GUIDE.md)
 7. [RULE/AI_PROTOCOL.md](D:\SnowRealmRebirth\SnowRealmYukiBoard\RULE\AI_PROTOCOL.md)
 8. [RULE/LOCK_RULES.md](D:\SnowRealmRebirth\SnowRealmYukiBoard\RULE\LOCK_RULES.md)
 9. [RULE/TASK_TEMPLATE.md](D:\SnowRealmRebirth\SnowRealmYukiBoard\RULE\TASK_TEMPLATE.md)

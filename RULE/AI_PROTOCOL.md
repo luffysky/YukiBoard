@@ -20,9 +20,9 @@
 後續所有協作必須以這些文件為基線：
 
 - `/CODEX.md`
-- `/PROJECT_HEALTH_CHECK_2026-04-13.md`
-- `/ARCHITECTURE_REFACTOR_PLAN.md`
-- `/CLAUDE_CODEX_COLLAB_GUIDE.md`
+- `/docs/PROJECT_HEALTH_CHECK_2026-04-13.md`
+- `/docs/ARCHITECTURE_REFACTOR_PLAN.md`
+- `/docs/CLAUDE_CODEX_COLLAB_GUIDE.md`
 
 若和舊認知衝突，以上文件優先。
 

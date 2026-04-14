@@ -409,3 +409,132 @@
 - 0414 這輪 `CodeXA` 不主動做 repo 整理
 - 0414 這輪 `CodeXA` 不主動做 Firebase 版本更新
 - 0414 這輪 `CodeXA` 不主動和 `Claude CodeA` / `CodeXB` 競爭同一批核心檔案
+
+---
+
+## Phase 2 前置與後續路線（2026-04-15 最新判定）
+
+### 現在的正式判定
+
+- `Phase 1`：已完成
+- `Phase 2`：尚未 ready，只能做前置任務
+- `Phase 3+`：不得提前展開
+
+原因：
+
+- `composingText / candidates` 的同步直寫 UI 路徑仍過多
+- `handleKeyPress()` / `applyInputResult()` 仍是同步熱路徑
+- 現階段若直接 collect 化，會有 race / 延遲風險
+
+### CodeX A
+
+- [ ] 監督重點改為：
+  - 是否有人誤把 `composingText / candidates` 提前 collect 化
+  - 是否真的在做 `Phase 2` 前置，而不是偷跑 `Phase 2` 實作
+  - 是否持續維持不碰 `handleKeyPress()` / `applyInputResult()` 主語意
+- [ ] 下一輪輸出一份短版判定：
+  - `Phase 2 ready`
+  - 或 `Phase 2 not ready`
+  - 並附不超過 3 條理由
+
+### Claude Code A
+
+- [ ] settings 側不再追 provider 小收斂
+- [ ] 下一輪改做 repo-ready 收尾：
+  - 更新 `RULE/SETTINGS_SMOKE_CHECKLIST.md`
+  - 補一份 settings 側最終風險摘要
+  - 確保 `SettingsActivity.kt` 不再反彈
+- [ ] 不碰 IME
+
+### Claude Code B
+
+- [ ] 只做 `Phase 2` 前置盤點，不做 collect 實作
+- [ ] 具體任務：
+  - 盤點所有 `keyboardView.updateComposingText(...)` 寫入點
+  - 盤點所有 `keyboardView.updateCandidates(...)` 寫入點
+  - 分類為：
+    - 熱路徑同步更新
+    - panel / gesture 特例
+    - callback 清理路徑
+  - 提出單一 render 入口草案，但不改主流程
+- [ ] 不碰：
+  - `handleKeyPress()`
+  - `applyInputResult()`
+  - `KeyboardView.kt`
+
+### CodeX B
+
+- [ ] 只做 `Phase 2` 架構前置決策，不做實作
+- [ ] 具體任務：
+  - 定義 `composingText / candidates` 若要進 `Phase 2`，需要滿足哪些條件
+  - 新增 `PHASE2_READINESS_CHECK.md` 或等價文件
+  - 明確列出：
+    - 哪些直接寫 UI 路徑必須先收掉
+    - 哪些仍可暫時保留
+    - 哪些路徑屬於熱路徑，不能引入 collect 延遲
+- [ ] 不碰：
+  - `USER_DICT`
+  - `KeyboardView.kt`
+  - 高依賴 panel
+
+---
+
+## Phase 2 之後還有什麼
+
+### Phase 2
+
+目標：
+
+- `composingText`
+- `candidates`
+
+啟動條件：
+
+- 單一 render 入口已存在
+- 所有同步直寫 UI 路徑已盤乾淨
+- 熱路徑與 collect 邊界已釐清
+- `handleKeyPress()` / `applyInputResult()` 已再次審核
+
+### Phase 3
+
+目標：
+
+- `remoteConnectionState`
+- `isFloatingMode`
+- `isPanelBehindKeyboard`
+- `isInGameMode`
+
+說明：
+
+- 這一階段是 container / mode / external state 的收斂
+- 仍先由 `YukiBoardIMEService` 當 consume owner
+- 不急著讓 `KeyboardView.kt` 自己 collect
+
+### Phase 4
+
+目標：
+
+- 開始處理 integration-heavy panel 的新邊界
+
+候選順序：
+
+1. `THEME`
+2. `CLAW`
+3. `REMOTE`
+4. `HANDWRITING`
+5. `MUSIC`
+6. `USER_DICT`
+
+### Phase 5
+
+目標：
+
+- 重新審 `handleKeyPress()`
+- 重新審 `applyInputResult()`
+- 判斷能否把 service 再降成更薄的 orchestration shell
+
+這一階段才是：
+
+- 真正的輸入主流程重構
+- 更深的 coordinator-first 收斂
+- 是否讓 `KeyboardView.kt` 進一步降責
