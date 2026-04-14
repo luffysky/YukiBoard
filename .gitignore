@@ -21,3 +21,17 @@ app/google-services.json
 keystore/
 test_kb_*.png
 test_screen.png
+
+# Local build / sandbox artifacts
+.android-user-home/
+.gradle-user-home/
+.kotlin/
+node_modules/
+supabase/.temp/
+tools/__pycache__/
+__pycache__/
+*.pyc
+
+# Local investigation assets
+bug_pic/
+opus/

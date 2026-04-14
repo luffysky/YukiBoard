@@ -236,3 +236,115 @@ MVVM + Clean Architecture
 - 主題顏色 field 以 `Int` 結尾（例如 `backgroundColorInt`）代表 ARGB Int
 - InputResult 子類型使用 `object`（無資料）或 `data class`（有資料）
 - KeyCode 常數：KEYCODE_DESIGN_*（設計者）、KEYCODE_DEV_*（開發者）
+
+---
+
+## Claude Code x Codex 協作規則（2026-04-13 生效）
+
+本專案由兩個 AI 協作開發，使用者（luffysky）主導分工安排。
+
+### 誰是誰
+
+- **Claude Code**（就是你）：Anthropic CLI agent，負責日常實作、bug 修復、功能搬遷。每次對話都是你。
+- **Codex**（OpenAI Codex）：另一個 AI agent，負責架構設計、骨架建立、結構校正。Codex 不在這個對話裡，透過 markdown 文件交接。
+- 兩邊不會同時改同一個檔案。透過文件（CODEX_HANDOFF / CODEX_REPLY）做非同步交接。
+- 如果使用者提到「Codex 說…」或貼了 Codex 的文件，視為已確認的架構決策，Claude Code 應遵守。
+- 如果使用者要求的修改超出 Claude Code 的安全操作範圍，應主動提醒「這個應該由 Codex 主導」。
+
+### 協作時間線
+
+- **2026-04-13**：Codex 完成專案健檢 + 架構重構藍圖 + 協作指南
+- **2026-04-13**：Claude Code 寫交接文件（CODEX_HANDOFF.md），Codex 回覆確認（CODEX_REPLY_TO_CLAUDE_CODE_2026-04-13.md）
+- **當前階段**：Claude Code 穩定登入 + 平行拆安全 section；等 Codex 立 Sprint 1 骨架後依骨架搬遷
+
+本區塊為 Claude Code 與 Codex 共同確認的架構重構邊界與行為約束。
+所有後續對話都必須遵守，不得以「趕進度」或「先塞進去」為由違反。
+
+詳細文件請見：
+- `CLAUDE_CODEX_COLLAB_GUIDE.md` — 完整分工與交接格式
+- `ARCHITECTURE_REFACTOR_PLAN.md` — Sprint 制重構藍圖
+- `PROJECT_HEALTH_CHECK_2026-04-13.md` — 專案健檢報告
+- `CODEX_HANDOFF.md` — Claude Code → Codex 交接
+- `CODEX_REPLY_TO_CLAUDE_CODE_2026-04-13.md` — Codex 回覆確認
+
+### 角色分工
+
+| 角色 | 負責範圍 |
+|------|---------|
+| **Codex** | 架構掃描、切割設計、骨架建立、package 邊界、風險盤點、結構校正 |
+| **Claude Code** | 依骨架搬遷功能、UI section 拆分、bug 修復、登入流程穩定化 |
+
+### 絕對禁止（Claude Code 不得違反）
+
+1. **不得再往 `YukiBoardIMEService.kt` 加任何新功能或新責任**
+2. **不得再往 `SettingsActivity.kt` 加任何新 section 或新邏輯**
+3. **不得新增 `getInstance(context)` 式跨層依賴**
+4. **不得在 view / panel 類裡直接建立 network client**
+5. **不得引入與 `platform -> application -> domain <- integration` 方向衝突的設計**
+6. **不得大改 `handleKeyPress()` 核心演算法路徑**（需 Codex 主導）
+7. **不得在登入流程未穩定前重寫 auth / sync 全鏈路**
+8. **不得把架構重構與功能大改混在同一輪**
+9. **不得在沒有說明的情況下大規模搬檔或改 package**
+10. **不得把臨時 patch 寫回核心 super class**
+
+### 新代碼必須遵守的方向
+
+- 新功能進設定頁 → 以 section binder 形式落地，不加進 `SettingsActivity` 本體
+- 新功能進 IME → 以 coordinator 形式落地，不加進 `YukiBoardIMEService` 本體
+- 狀態管理 → 走 `UiState + Coordinator + Repository`，不用 activity/service 私有變數
+- 外部整合 → 走統一 Repository / Gateway，不在多處各自處理 token / timeout / 錯誤
+- SharedPreferences → 不再散落直讀直寫，新代碼走 Repository 封裝
+
+### 目標依賴方向
+
+```
+platform -> application -> domain <- integration
+```
+
+- `platform`：Android framework 接線（IMEService、Activity），只依賴 application
+- `application`：coordinator、state store、use case
+- `domain`：pure Kotlin 業務邏輯，不依賴 Android
+- `integration`：外部 API / storage / auth，實作 domain 定義的介面
+
+### 重構優先順序（固定）
+
+1. 立新骨架（Sprint 1：UiState、Coordinator、Repository）
+2. 瘦 `YukiBoardIMEService`
+3. 瘦 `SettingsActivity`
+4. 收斂狀態來源
+5. 收斂 integration boundary
+6. 最後才考慮加大功能面
+
+### Claude Code 可安全操作的區塊
+
+- `AuthSettingsSection` — 從 SettingsActivity 拆出登入/帳號 UI
+- `SyncSettingsSection` — 拆出雲端同步 UI
+- `AISettingsSection` — 拆出 AI 設定 UI binder
+- `ImeSessionHooks` — 從 IMEService 抽出 session lifecycle
+- `ImeVoiceCoordinator` — 語音輸入薄封裝
+- 登入流程 bug 修復（不大改架構）
+- helper / binder / controller 新增
+- 重複 UI 建構邏輯拆出
+
+### 每輪工作交接格式
+
+完成一輪工作後，必須用以下格式留交接紀錄：
+
+- **A. 變更摘要**：改了什麼、主要檔案、新骨架/介面/依賴
+- **B. 風險**：回歸風險、暫時只搬殼的地方
+- **C. 下一步建議**：下一輪最適合做什麼、哪裡先不碰
+- **D. 架構決策**：新增的 coordinator / repository / interface（不藏在 commit 裡）
+
+### 決策衝突時的優先選擇
+
+當方案有衝突，選：
+1. 更容易縮小 `YukiBoardIMEService` 的
+2. 更容易縮小 `SettingsActivity` 的
+3. 更符合單一狀態來源的
+4. 更能隔離外部整合副作用的
+
+而不是選看起來比較快但會繼續累積結構債的方案。
+
+### 核心準則
+
+> 每一輪修改，都應讓核心流程更清楚、狀態更單一、依賴更可追蹤，而不是只是把功能先塞進去。
