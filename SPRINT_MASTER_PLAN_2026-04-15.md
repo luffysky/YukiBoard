@@ -134,7 +134,7 @@
 
 ### Sprint 3 Phase 2
 
-狀態：`尚未 ready`
+狀態：`尚未 ready（2026-04-16 已由 CodeX B 正式確認）`
 
 目標：
 
@@ -157,6 +157,7 @@
 不能做：
 
 - 真正把 `composingText / candidates` 改成 collect 驅動
+- 見：`PHASE2_READINESS_CHECK.md`
 
 ---
 
@@ -187,6 +188,11 @@
 - 不直接全面重寫輸入法引擎
 - 不同步重構所有 panel
 
+2026-04-16 補充：
+
+- `CodeX B` 已補 Sprint 4 正式邊界文件：`SPRINT4_INPUT_FLOW_REVIEW_2026-04-16.md`
+- 目前狀態為：`邊界已定義，尚未進核心實作`
+
 ---
 
 ## Sprint 5：Mode / Container / External State 收斂
@@ -203,6 +209,11 @@
 - 這是 mode / container / external integration state 的 consume 收斂
 - 仍先由 `YukiBoardIMEService` 當 consume owner
 - 不急著讓 `KeyboardView.kt` 自己 collect
+
+2026-04-16 補充：
+
+- `CodeX B` 已補 Sprint 5 正式邊界文件：`SPRINT5_MODE_CONTAINER_STATE_PLAN_2026-04-16.md`
+- 目前狀態為：`consume 邊界已定義，尚未進實作`
 
 ---
 
@@ -402,7 +413,8 @@
 2. 文件一致
 3. 沒有越界碰禁止範圍
 4. checklist 已更新
-5. 可清楚說明：
+5. `CodeX A` 已正式審核並明確判定可進下一階段
+6. 可清楚說明：
    - 改了什麼
    - 沒改什麼
    - 還剩什麼風險
@@ -420,6 +432,12 @@
 - 不提前做 `USER_DICT`
 - 不提前展開高依賴 panel
 - 不為了好看而犧牲功能完整性
+
+補充正式 gate：
+
+- 每一步 Sprint 與每一個 Phase，都必須先經 `CodeX A` 審核通過
+- `CodeX B`、`Claude Code A`、`Claude Code B` 可完成規劃、實作、文件與前置盤點
+- 但沒有 `CodeX A` 的明確核可，不得宣告進入下一階段
 
 ---
 

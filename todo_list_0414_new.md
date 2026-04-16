@@ -504,14 +504,16 @@
 
 ### CodeX B
 
-- [ ] 只做 `Phase 2` 架構前置決策，不做實作
-- [ ] 具體任務：
+- [x] 只做 `Phase 2` 架構前置決策，不做實作
+- [x] 具體任務：
   - 定義 `composingText / candidates` 若要進 `Phase 2`，需要滿足哪些條件
-  - 新增 `PHASE2_READINESS_CHECK.md` 或等價文件
+  - 新增 `PHASE2_READINESS_CHECK.md`
   - 明確列出：
     - 哪些直接寫 UI 路徑必須先收掉
     - 哪些仍可暫時保留
     - 哪些路徑屬於熱路徑，不能引入 collect 延遲
+- [x] 補 Sprint 4 正式邊界文件：`SPRINT4_INPUT_FLOW_REVIEW_2026-04-16.md`
+- [x] 補 Sprint 5 正式邊界文件：`SPRINT5_MODE_CONTAINER_STATE_PLAN_2026-04-16.md`
 - [ ] 不碰：
   - `USER_DICT`
   - `KeyboardView.kt`
@@ -578,3 +580,46 @@
 - 真正的輸入主流程重構
 - 更深的 coordinator-first 收斂
 - 是否讓 `KeyboardView.kt` 進一步降責
+
+---
+
+## CodeXA 最新指派（2026-04-16）
+
+### CodeXA 今日正式判定
+
+- [x] 補建 `PHASE2_READINESS_CHECK.md`
+- [x] 重跑 `:app:compileDebugKotlin`，結果 `BUILD SUCCESSFUL`
+- [x] 正式判定：
+  - `Sprint 3 Phase 2` = `NOT READY`
+  - `Sprint 4` = `LOCKED`
+  - `Sprint 5` = `LOCKED`
+
+### 給 Claude CodeB 的最新監督要求
+
+- [ ] 只做 `composingText / candidates` 直寫路徑分類與風險標註
+- [ ] 產出可直接對應 `PHASE2_READINESS_CHECK.md` 的分類結果：
+  - 熱路徑同步更新
+  - callback / cleanup 路徑
+  - panel / gesture / 特例 UI 路徑
+- [ ] 不做 collect 實作
+- [ ] 不碰 `handleKeyPress()`
+- [ ] 不碰 `applyInputResult()`
+- [ ] 不碰 `KeyboardView.kt`
+
+### 給 CodeXB 的最新監督要求
+
+- [ ] 只做 Phase 2 邊界驗證與 Sprint 4 前置條件整理
+- [ ] 依 `PHASE2_READINESS_CHECK.md` 決定哪些 direct UI write 可先收、哪些必須保留同步
+- [ ] 在 `CodeXA` 二次拍板前，不得直接啟動 Sprint 4 實作
+
+### 給 Claude CodeA 的最新監督要求
+
+- [ ] 繼續維持 settings repo-ready 狀態
+- [ ] 不碰 IME
+- [ ] 不讓 `SettingsActivity.kt` 反彈膨脹
+
+### CodeXA 持續監督點
+
+- [ ] 若有人提早把 `composingText / candidates` collect 化，視為越界
+- [ ] 若有人提早碰 `handleKeyPress()` / `applyInputResult()`，視為越界
+- [ ] 若有人跳過 Sprint 3 直接主張完成 Sprint 4/5，視為計畫違規
