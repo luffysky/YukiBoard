@@ -92,7 +92,7 @@ class YukiBoardIMEService : InputMethodService() {
     internal lateinit var imeImageCommitter: ImeImageCommitter
     internal var floatingBall: FloatingBallView? = null
     internal var floatingOuterFrame: FrameLayout? = null
-    internal var isPanelBehindKeyboard = false
+    // Sprint 5 Round 3: isPanelBehindKeyboard local field removed；SSOT = imeCoordinator.uiState
     internal lateinit var keyboardView: KeyboardView
     internal lateinit var inputRouter: InputRouter
     internal lateinit var snippetManager: SnippetManager
@@ -101,6 +101,18 @@ class YukiBoardIMEService : InputMethodService() {
     internal lateinit var appModeDetector: AppModeDetector
     internal lateinit var imePanelFactory: ImePanelFactory
     internal lateinit var imeCoordinator: ImeSessionCoordinator
+    // Sprint 4 Round 1: InputUiSync 正式邊界（render ownership for composingText / candidateState）
+    internal val inputUiSync: com.snowrealm.yukiboard.app.ime.InputUiSync by lazy {
+        com.snowrealm.yukiboard.app.ime.InputUiSync(
+            viewProvider = { keyboardView },
+            coordinator = imeCoordinator,
+        )
+    }
+    // Sprint 5 Round 1: container / external state 的 read-only consume 邊界
+    // （reader 遷移屬 Round 2，writer 整併屬 Round 3；本輪僅建立入口，不替換既有 read/write）
+    internal val imeContainerState: com.snowrealm.yukiboard.app.ime.ImeContainerStateConsumer by lazy {
+        com.snowrealm.yukiboard.app.ime.ImeContainerStateConsumer(imeCoordinator)
+    }
     internal lateinit var imeCandidateInteractionHandler: ImeCandidateInteractionHandler
     internal lateinit var imePanelCleanup: ImePanelCleanup
     internal lateinit var imePanelCoordinator: ImePanelCoordinator
@@ -128,7 +140,7 @@ class YukiBoardIMEService : InputMethodService() {
     internal var clipboardListener: android.content.ClipboardManager.OnPrimaryClipChangedListener? = null
 
     // 面板
-    internal var activePanel: PanelType? = null
+    // Sprint 5 Round 3: activePanel local field removed；SSOT = imeCoordinator.uiState.activePanel
     internal val imePanelBindings = ImePanelBindings()
 
     // 貼圖同步 + 下載管理
@@ -195,12 +207,15 @@ class YukiBoardIMEService : InputMethodService() {
     // 鍵盤尺寸調整 + 懸浮
     internal var resizeHandle: KeyboardResizeHandle? = null
     internal var floatingWrapper: FloatingKeyboardWrapper? = null
-    internal var isFloatingMode = false
+    // Sprint 5 Round 3: isFloatingMode local field removed；SSOT = imeCoordinator.uiState.isFloatingMode
 
     internal var stickerSyncDone = false
 
     // uiState collect（Sprint 3 Phase 1）
     internal var uiStateCollectJob: Job? = null
+
+    // composingText / candidates guarded consume（Sprint 3 Phase 2 第一版）
+    internal var composingCandidatesCollectJob: Job? = null
 
     // 遊戲相關
     internal val showGameMenuRunnable = Runnable { showGameMenu() }
@@ -208,7 +223,7 @@ class YukiBoardIMEService : InputMethodService() {
     internal var gameKeyboardView: GameKeyboardView? = null
     internal var gameLoop: GameLoopRunner? = null
     internal var currentGame: GameLogic? = null
-    internal var isInGameMode = false
+    // Sprint 5 Round 3: isInGameMode local field removed；SSOT = imeCoordinator.uiState.isInGameMode
 
     internal var manualModeOverride = false
 
@@ -264,7 +279,8 @@ class YukiBoardIMEService : InputMethodService() {
 
         shakeDetector = ShakeDetector(applicationContext)
         shakeDetector.setOnShakeListener {
-            if (prefs.shakeToUndoEnabled && !isInGameMode) {
+            // Sprint 5 Round 2: reader 遷移至 ImeContainerStateConsumer（R1）
+            if (prefs.shakeToUndoEnabled && !imeContainerState.isInGame) {
                 val ic = currentInputConnection ?: return@setOnShakeListener
                 sendCtrlKey(ic, KeyEvent.KEYCODE_Z)
                 keyboardView.vibrateShort()
@@ -281,8 +297,7 @@ class YukiBoardIMEService : InputMethodService() {
                     if (result is InputResult.CommitText) ic.commitText(result.text, 1)
                     ic.finishComposingText()
                     inputRouter.reset()
-                    keyboardView.updateComposingText("")
-                    keyboardView.updateCandidates(emptyList())
+                    clearComposingAndCandidatesUi()
                 }
                 val keyCode = when (direction) {
                     CursorDirection.LEFT -> KeyEvent.KEYCODE_DPAD_LEFT
@@ -392,6 +407,7 @@ class YukiBoardIMEService : InputMethodService() {
         // 懸浮模式
         if (prefs.floatingModeEnabled) {
             startUiStateCollect()
+            startImeComposingCandidatesCollect()
             return wrapInFloatingMode(rootContainer)
         }
 
@@ -423,6 +439,8 @@ class YukiBoardIMEService : InputMethodService() {
 
         // Sprint 3 Phase 1: 啟動 uiState collect（activePanel + isVoiceInputActive）
         startUiStateCollect()
+        // Sprint 3 Phase 2 第一版：composingText / candidates guarded consume（只消費清空信號）
+        startImeComposingCandidatesCollect()
 
         return rootContainer
     }
@@ -440,8 +458,7 @@ class YukiBoardIMEService : InputMethodService() {
                 ic.endBatchEdit()
             }
             inputRouter.reset()
-            keyboardView.updateCandidates(emptyList())
-            keyboardView.updateComposingText("")
+            clearComposingAndCandidatesUi()
             // 重置觸控狀態，避免上一個 session 的彈出狀態殘留導致按鍵按不到
             keyboardView.resetTouchState()
         }
@@ -466,6 +483,10 @@ class YukiBoardIMEService : InputMethodService() {
         keyboardView.updateKeyRows(rowsForInputMode(inputRouter.inputMode))
         keyboardView.updateEditorInfo(info)
         syncImeCoordinatorFromRouter()
+        // Sprint 4 Round 3: session-init 的 composing/candidates 明確走 InputUiSync
+        // （取代原本 syncImeCoordinatorFromRouter 內隱含的 coordinator-only 寫入）
+        inputUiSync.renderComposing(inputRouter.composingText)
+        inputUiSync.renderCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
 
         // 同步智慧輸入開關
         inputRouter.smartInput.smartCorrectionEnabled = prefs.smartCorrection
@@ -512,7 +533,8 @@ class YukiBoardIMEService : InputMethodService() {
         registerClipboardFraudListener()
 
         // 遊戲模式恢復
-        if (isInGameMode) {
+        // Sprint 5 Round 2: reader 遷移至 ImeContainerStateConsumer（R2 / onStartInputView session-init 非熱路徑）
+        if (imeContainerState.isInGame) {
             gameLoop?.resume()
         }
     }
@@ -613,6 +635,8 @@ class YukiBoardIMEService : InputMethodService() {
                 cancelScope = {
                     uiStateCollectJob?.cancel()
                     uiStateCollectJob = null
+                    composingCandidatesCollectJob?.cancel()
+                    composingCandidatesCollectJob = null
                     serviceScope.cancel()
                 },
             ),
@@ -624,7 +648,8 @@ class YukiBoardIMEService : InputMethodService() {
 
     override fun onComputeInsets(outInsets: Insets) {
         super.onComputeInsets(outInsets)
-        if (isFloatingMode) {
+        // Sprint 5 Round 2: reader 遷移至 ImeContainerStateConsumer（R3）
+        if (imeContainerState.isFloating) {
             // 懸浮模式：告訴系統不要推移 App 畫面，讓鍵盤浮在上面
             outInsets.contentTopInsets = outInsets.visibleTopInsets
             outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_FRAME
@@ -655,7 +680,9 @@ class YukiBoardIMEService : InputMethodService() {
         }
 
         // 面板開啟中但使用者按了鍵盤按鍵 → 需要輸入的面板保持開啟，其他面板關閉
-        if (activePanel != null) {
+        // Sprint 5 Round 2: reader 遷移至 ImeContainerStateConsumer（R4 / handleKeyPress 外層 guard）
+        // writer（updatePanelSelection → syncPanelSelection）已 dual-write，coordinator 與 local 等值
+        if (imeContainerState.activePanel != null) {
             // 動態偵測：有正在輸入的面板就保持開啟
             val keepOpen = imePanelBindings.hasActiveInputTarget()
             if (!keepOpen) {
@@ -698,7 +725,8 @@ class YukiBoardIMEService : InputMethodService() {
                 return
             }
             KeyboardView.KEYCODE_HANDWRITING -> {
-                if (activePanel == PanelType.HANDWRITING) {
+                // Sprint 5 Round 3: R5 遷移（Round 3 移除 activePanel local field 前置）
+                if (imeContainerState.activePanel == PanelType.HANDWRITING) {
                     closePanel()
                 } else {
                     handlePanelToggle(PanelType.HANDWRITING)
@@ -835,7 +863,8 @@ class YukiBoardIMEService : InputMethodService() {
             requestAICandidates()
         } else {
 
-        keyboardView.updateComposingText(inputRouter.composingText)
+        // Sprint 4 Round 1: composing render 改走 InputUiSync（同步 view + coordinator）
+        inputUiSync.renderComposing(inputRouter.composingText)
 
         // 候選列為空時，僅在開發者模式且有高信心預測時顯示提示
         val candidates = inputRouter.candidates.toMutableList()
@@ -862,7 +891,8 @@ class YukiBoardIMEService : InputMethodService() {
                 }
             }
         }
-        keyboardView.updateCandidates(candidates, inputRouter.candidateSourceMap)
+        // Sprint 4 Round 1: candidates render 改走 InputUiSync（同步 view + coordinator，含 sourceMap）
+        inputUiSync.renderCandidates(candidates, inputRouter.candidateSourceMap)
 
         // AI 候選字 debounce：有組字或上下文時觸發
         requestAICandidates()
@@ -979,8 +1009,11 @@ class YukiBoardIMEService : InputMethodService() {
     }
 
     internal fun syncImeCoordinatorFromRouter() {
+        // Sprint 4 Round 3: UI render 職責正式委派給 InputUiSync。
+        // composing/candidates 的同步由 caller 在 applyInputResult() 後的
+        // inputUiSync.renderComposing / renderCandidates 統一處理；
+        // session-init（onStartInputView）也明確走 InputUiSync。
+        // 本 function 只保留 inputMode 同步（屬非 render 的 state 欄位）。
         imeCoordinator.setInputMode(inputRouter.inputMode)
-        imeCoordinator.updateComposingText(inputRouter.composingText)
-        imeCoordinator.updateCandidates(inputRouter.candidates)
     }
 }

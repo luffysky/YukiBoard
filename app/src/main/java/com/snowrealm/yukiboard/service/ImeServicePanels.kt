@@ -106,7 +106,8 @@ internal fun YukiBoardIMEService.buildHiddenPanelSet(): Set<PanelType> {
 
 internal fun YukiBoardIMEService.handlePanelToggle(panel: PanelType) {
     imePanelRouter.routeToggle(
-        currentActivePanel = activePanel,
+        // Sprint 5 Round 2: reader 遷移至 ImeContainerStateConsumer（R6）
+        currentActivePanel = imeContainerState.activePanel,
         requestedPanel = panel,
         updatePanelSelection = ::updatePanelSelection,
         openVoiceInput = ::toggleVoiceInput,
@@ -168,8 +169,8 @@ internal fun YukiBoardIMEService.showPanel(panel: PanelType) {
         panelView = panelView,
         onOverlayPanelShown = ::showPanelControlBar,
         onOverlayPanelAttached = {
-            if (isPanelBehindKeyboard) {
-                isPanelBehindKeyboard = false
+            // Sprint 5 Round 3: writer 收斂（W6 drop local write）；coordinator 為單一來源
+            if (imeContainerState.isPanelBehind) {
                 imeCoordinator.setPanelBehindKeyboard(false)
                 panelContainer.bringToFront()
             }
@@ -415,38 +416,48 @@ internal fun YukiBoardIMEService.createHighDependencyPanelOrNull(panel: PanelTyp
         }
         PanelType.HANDWRITING -> {
             if (handwritingEngine == null) {
-                handwritingEngine = com.snowrealm.yukiboard.input.handwriting.HandwritingEngine(this).also { it.init() }
-            }
-            val p = HandwritingPanelView(this, handwritingEngine!!).also { imePanelBindings.handwritingPanel = it }
-            p.theme = theme
-            p.onCandidateSelected = { text ->
-                currentInputConnection?.commitText(text, 1)
-                keyboardView.updateCandidates(emptyList())
-                inputRouter.onHandwritingCommit(text)
-            }
-            p.onRecognized = { rawCandidates ->
-                if (rawCandidates.isNotEmpty()) {
-                    val boosted = rawCandidates.sortedByDescending { word ->
-                        inputRouter.smartInput.adaptiveDictionary.getFrequency(word)
-                    }
-                    val sourceMap = boosted.associateWith {
-                        com.snowrealm.yukiboard.input.router.CandidateSource.DICTIONARY
-                    }
-                    keyboardView.updateCandidates(boosted, sourceMap)
+                try {
+                    handwritingEngine = com.snowrealm.yukiboard.input.handwriting.HandwritingEngine(this).also { it.init() }
+                } catch (e: Exception) {
+                    android.util.Log.e("YukiIME", "HandwritingEngine init failed", e)
                 }
             }
-            p.onBackspace = {
-                currentInputConnection?.deleteSurroundingText(1, 0)
-            }
-            p.onConfirm = {
-                sendDefaultEditorAction(true)
-            }
-            p.ensureReady { ready ->
-                if (!ready) {
-                    android.widget.Toast.makeText(this, "手寫模型下載中…", android.widget.Toast.LENGTH_SHORT).show()
+            val engine = handwritingEngine
+            if (engine == null) {
+                android.widget.Toast.makeText(this, "手寫引擎初始化失敗", android.widget.Toast.LENGTH_SHORT).show()
+                null
+            } else {
+                val p = HandwritingPanelView(this, engine).also { imePanelBindings.handwritingPanel = it }
+                p.theme = theme
+                p.onCandidateSelected = { text ->
+                    currentInputConnection?.commitText(text, 1)
+                    clearCandidatesUi()
+                    inputRouter.onHandwritingCommit(text)
                 }
+                p.onRecognized = { rawCandidates ->
+                    if (rawCandidates.isNotEmpty()) {
+                        val boosted = rawCandidates.sortedByDescending { word ->
+                            inputRouter.smartInput.adaptiveDictionary.getFrequency(word)
+                        }
+                        val sourceMap = boosted.associateWith {
+                            com.snowrealm.yukiboard.input.router.CandidateSource.DICTIONARY
+                        }
+                        keyboardView.updateCandidates(boosted, sourceMap)
+                    }
+                }
+                p.onBackspace = {
+                    currentInputConnection?.deleteSurroundingText(1, 0)
+                }
+                p.onConfirm = {
+                    sendDefaultEditorAction(true)
+                }
+                p.ensureReady { ready ->
+                    if (!ready) {
+                        android.widget.Toast.makeText(this, "手寫模型下載中…", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+                p
             }
-            p
         }
         else -> null
     }
@@ -474,10 +485,42 @@ internal fun YukiBoardIMEService.clearActivePanelBindings() {
     imePanelBindings.clearInputModeBindings()
 }
 
+internal fun YukiBoardIMEService.clearComposingAndCandidatesUi() {
+    // Sprint 4 Round 1: 改走 InputUiSync.clearAll()（單一 render ownership 入口）
+    inputUiSync.clearAll()
+}
+
+/**
+ * candidates-only clear helper（Sprint 3 Phase 2 第二輪 → Sprint 4 Round 1 改走 InputUiSync）：
+ * 用於 HANDWRITING 類僅清候選、不清 composing 的場景。
+ */
+internal fun YukiBoardIMEService.clearCandidatesUi() {
+    inputUiSync.clearCandidates()
+}
+
+/**
+ * Sprint 3 Phase 2（第一版 guarded consume）：
+ * 訂閱 coordinator uiState，只在 composingText / candidates 被清空時把清空信號下推到 KeyboardView。
+ * 非空狀態仍由熱路徑直接同步寫入，避免 callback 未同步 coordinator 造成的 stale-state 覆蓋。
+ * 完整 consume（含非空）等 callback 端也把寫入統一走 coordinator 後再移除 guard。
+ */
+internal fun YukiBoardIMEService.startImeComposingCandidatesCollect() {
+    composingCandidatesCollectJob?.cancel()
+    composingCandidatesCollectJob = serviceScope.launch {
+        imeCoordinator.uiState.collect { state ->
+            if (state.composingText.isEmpty()) {
+                keyboardView.updateComposingText("")
+            }
+            if (state.candidateState.items.isEmpty()) {
+                keyboardView.updateCandidates(emptyList())
+            }
+        }
+    }
+}
+
 internal fun YukiBoardIMEService.resetInputUiStateForPanelTransition() {
     inputRouter.reset()
-    keyboardView.updateComposingText("")
-    keyboardView.updateCandidates(emptyList())
+    clearComposingAndCandidatesUi()
 }
 
 internal fun YukiBoardIMEService.restoreKeyboardFocusAfterPanelClose() {

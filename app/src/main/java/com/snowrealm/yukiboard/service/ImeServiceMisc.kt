@@ -97,15 +97,14 @@ internal fun YukiBoardIMEService.commitImageContent(url: String) {
 }
 
 internal fun YukiBoardIMEService.updatePanelSelection(panel: PanelType?) {
-    imePanelCoordinator.syncPanelSelection(panel) { selectedPanel ->
-        activePanel = selectedPanel
-        // toolbarView.activePanel 由 renderImeUiState collect 驅動（Sprint 3 Phase 1）
-    }
+    // Sprint 5 Round 3: writer 收斂（W7 drop local write）；coordinator.showPanel 為單一寫入點，
+    // toolbarView.activePanel 由 renderImeUiState collect 驅動（Sprint 3 Phase 1）
+    imePanelCoordinator.syncPanelSelection(panel) { }
 }
 
 internal fun YukiBoardIMEService.restorePanelOverlayOrder() {
-    if (isPanelBehindKeyboard) {
-        isPanelBehindKeyboard = false
+    // Sprint 5 Round 3: writer 收斂（W1 drop local write）；coordinator 為單一來源
+    if (imeContainerState.isPanelBehind) {
         imeCoordinator.setPanelBehindKeyboard(false)
         panelContainer.bringToFront()
     }
@@ -156,14 +155,14 @@ internal fun YukiBoardIMEService.toggleOneHandMode() {
 }
 
 internal fun YukiBoardIMEService.togglePanelLayer() {
-    isPanelBehindKeyboard = !isPanelBehindKeyboard
-    imeCoordinator.setPanelBehindKeyboard(isPanelBehindKeyboard)
-    if (isPanelBehindKeyboard) {
+    // Sprint 5 Round 3: writer 收斂（W2 single-write at coordinator）；StateFlow.update 同步，後續 reader 讀到新值
+    imeCoordinator.setPanelBehindKeyboard(!imeContainerState.isPanelBehind)
+    if (imeContainerState.isPanelBehind) {
         keyboardView.bringToFront()
     } else {
         panelContainer.bringToFront()
     }
-    imePanelControlBar.updateSwapButton(isPanelBehindKeyboard)
+    imePanelControlBar.updateSwapButton(imeContainerState.isPanelBehind)
     characterView?.bringToFront()
     yukiSpeechBubble?.bringToFront()
 }
@@ -265,7 +264,7 @@ internal fun YukiBoardIMEService.applyTransparentMode() {
 }
 
 internal fun YukiBoardIMEService.wrapInFloatingMode(content: LinearLayout): View {
-    isFloatingMode = true
+    // Sprint 5 Round 3: writer 收斂（W3 drop local write）；coordinator 為單一來源
     imeCoordinator.setFloatingMode(true)
     backgroundView?.visibility = View.GONE
 
@@ -443,7 +442,7 @@ internal fun YukiBoardIMEService.openSettings() {
 }
 
 internal fun YukiBoardIMEService.enterGameMode() {
-    isInGameMode = true
+    // Sprint 5 Round 3: writer 收斂（W4 drop local write）；coordinator 為單一來源
     imeCoordinator.setGameMode(true)
     closePanel()
     keyboardView.visibility = View.GONE
@@ -453,7 +452,7 @@ internal fun YukiBoardIMEService.enterGameMode() {
 }
 
 internal fun YukiBoardIMEService.exitGameMode() {
-    isInGameMode = false
+    // Sprint 5 Round 3: writer 收斂（W5 drop local write）；coordinator 為單一來源
     imeCoordinator.setGameMode(false)
     gameLoop?.stop()
     currentGame = null

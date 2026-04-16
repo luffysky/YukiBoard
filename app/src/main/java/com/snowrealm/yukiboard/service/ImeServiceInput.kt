@@ -559,15 +559,15 @@ internal fun YukiBoardIMEService.handleDelete(ic: InputConnection) {
         }
         else -> ic.deleteSurroundingText(1, 0)
     }
-    keyboardView.updateComposingText(inputRouter.composingText)
-    keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
+    inputUiSync.renderComposing(inputRouter.composingText)
+    inputUiSync.renderCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
 }
 
 internal fun YukiBoardIMEService.handleEnter(ic: InputConnection) {
     val result = inputRouter.processEnter()
     applyInputResult(ic, result)
-    keyboardView.updateComposingText(inputRouter.composingText)
-    keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
+    inputUiSync.renderComposing(inputRouter.composingText)
+    inputUiSync.renderCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
 
     // Enter = 句子結束 → 學習整句模式
     val sentence = sentenceBuffer.toString().trim()
@@ -622,15 +622,15 @@ internal fun YukiBoardIMEService.handleSpace(ic: InputConnection) {
             applyInputResult(ic, InputResult.CommitText("$confirmed "))
             // 記錄提交並觸發下一詞預測
             inputRouter.selectCandidate(inputRouter.candidateManager.focusedIndex)
-            keyboardView.updateComposingText("")
-            keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
+            inputUiSync.renderComposing("")
+            inputUiSync.renderCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
             return
         }
     }
     applyInputResult(ic, inputRouter.processSpace())
     // 更新候選列（日文漢字轉換、注音選字等需要此更新）
-    keyboardView.updateComposingText(inputRouter.composingText)
-    keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
+    inputUiSync.renderComposing(inputRouter.composingText)
+    inputUiSync.renderCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
 }
 
 internal fun YukiBoardIMEService.handleSwitchLang() {
@@ -680,8 +680,8 @@ internal fun YukiBoardIMEService.routeKeyToPanel(panel: PanelInputTarget, keyCod
         KeyboardView.KEYCODE_DELETE -> {
             if (isCjk && inputRouter.composingText.isNotEmpty()) {
                 inputRouter.processDelete()
-                keyboardView.updateComposingText(inputRouter.composingText)
-                keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
+                inputUiSync.renderComposing(inputRouter.composingText)
+                inputUiSync.renderCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
             } else {
                 panel.onDeleteInput()
             }
@@ -690,8 +690,7 @@ internal fun YukiBoardIMEService.routeKeyToPanel(panel: PanelInputTarget, keyCod
             if (isCjk && inputRouter.composingText.isNotEmpty()) {
                 panel.onComposedTextInput(inputRouter.composingText)
                 inputRouter.reset()
-                keyboardView.updateComposingText("")
-                keyboardView.updateCandidates(emptyList())
+                inputUiSync.clearAll()
             }
             panel.onEnterInput()
         }
@@ -701,8 +700,8 @@ internal fun YukiBoardIMEService.routeKeyToPanel(panel: PanelInputTarget, keyCod
                 if (result is InputResult.CommitText) {
                     panel.onComposedTextInput(result.text)
                 }
-                keyboardView.updateComposingText(inputRouter.composingText)
-                keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
+                inputUiSync.renderComposing(inputRouter.composingText)
+                inputUiSync.renderCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
             } else {
                 panel.onSpaceInput()
             }
@@ -715,8 +714,8 @@ internal fun YukiBoardIMEService.routeKeyToPanel(panel: PanelInputTarget, keyCod
                 if (result is InputResult.CommitText) {
                     panel.onComposedTextInput(result.text)
                 }
-                keyboardView.updateComposingText(inputRouter.composingText)
-                keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
+                inputUiSync.renderComposing(inputRouter.composingText)
+                inputUiSync.renderCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
                 panel.updateComposingHint(inputRouter.composingText)
             } else {
                 panel.onCharInput(label)

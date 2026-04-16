@@ -132,10 +132,7 @@ internal fun YukiBoardIMEService.bindKeyboardViewCallbacks() {
             composingText = inputRouter.composingText,
             commitComposing = { composing -> ic.commitText(composing, 1) },
             resetInputState = { inputRouter.reset() },
-            clearInputUiState = {
-                keyboardView.updateComposingText("")
-                keyboardView.updateCandidates(emptyList())
-            },
+            clearInputUiState = { clearComposingAndCandidatesUi() },
         )
         ic.commitText(text, 1)
     }
@@ -170,10 +167,7 @@ internal fun YukiBoardIMEService.bindKeyboardViewCallbacks() {
                 clearPendingFlag = { swipeInputPending = false },
                 clearCandidates = { swipeInputCandidates = emptyList() },
                 clearAccumulated = { swipeAccumulated.clear() },
-                clearInputUiState = {
-                    keyboardView.updateComposingText("")
-                    keyboardView.updateCandidates(emptyList())
-                },
+                clearInputUiState = { clearComposingAndCandidatesUi() },
             )
             return@setOnCandidateSelectListener
         }
@@ -195,16 +189,16 @@ internal fun YukiBoardIMEService.bindKeyboardViewCallbacks() {
                 inputRouter.reset()
                 applyInputResult(ic, InputResult.CommitText(displayedText))
             }
-            keyboardView.updateComposingText("")
-            keyboardView.updateCandidates(emptyList())
+            clearComposingAndCandidatesUi()
             return@setOnCandidateSelectListener
         }
 
         val hwPanel = imePanelBindings.handwritingPanel
-        if (hwPanel != null && activePanel == PanelType.HANDWRITING) {
+        // Sprint 5 Round 3: R11 遷移（Round 3 移除 activePanel local field 前置）
+        if (hwPanel != null && imeContainerState.activePanel == PanelType.HANDWRITING) {
             val text = displayedCandidates.getOrNull(index) ?: return@setOnCandidateSelectListener
             currentInputConnection?.commitText(text, 1)
-            keyboardView.updateCandidates(emptyList())
+            clearCandidatesUi()
             inputRouter.onHandwritingCommit(text)
             return@setOnCandidateSelectListener
         }
@@ -226,8 +220,9 @@ internal fun YukiBoardIMEService.bindKeyboardViewCallbacks() {
             val ic = currentInputConnection ?: return@setOnCandidateSelectListener
             applyInputResult(ic, result)
         }
-        keyboardView.updateComposingText(inputRouter.composingText)
-        keyboardView.updateCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
+        // Sprint 4 Round 1: candidate select post-commit render 改走 InputUiSync（coordinator 同步承載 sourceMap）
+        inputUiSync.renderComposing(inputRouter.composingText)
+        inputUiSync.renderCandidates(inputRouter.candidates, inputRouter.candidateSourceMap)
         val comboEffect = inputRouter.smartInput.comboTracker.consumeEffect()
         if (comboEffect != null) {
             keyboardView.triggerComboEffect(comboEffect.ordinal + 1)
@@ -260,8 +255,7 @@ internal fun YukiBoardIMEService.bindKeyboardViewCallbacks() {
                 characterView?.playSwitchLang()
                 keyboardView.currentInputMode = mode
                 keyboardView.updateKeyRows(rowsForInputMode(mode))
-                keyboardView.updateComposingText("")
-                keyboardView.updateCandidates(emptyList())
+                clearComposingAndCandidatesUi()
                 keyboardView.showToast(if (mode == InputMode.AUTO) "⚡ 已啟動智慧輸入法" else mode.displayName)
             }
             is RadialLanguageMenu.LanguageOption.Emoji -> {

@@ -3,6 +3,7 @@ package com.snowrealm.yukiboard.app.ime
 import android.content.Context
 import android.view.inputmethod.EditorInfo
 import com.snowrealm.yukiboard.app.session.UserSessionRepository
+import com.snowrealm.yukiboard.input.router.CandidateSource
 import com.snowrealm.yukiboard.input.router.InputMode
 import com.snowrealm.yukiboard.theme.ThemeManager
 import com.snowrealm.yukiboard.ui.panel.PanelType
@@ -52,7 +53,7 @@ class ImeSessionCoordinator(context: Context) {
         _uiState.update { state ->
             state.copy(
                 composingText = "",
-                candidates = emptyList(),
+                candidateState = CandidateUiState.EMPTY,
             )
         }
     }
@@ -75,8 +76,32 @@ class ImeSessionCoordinator(context: Context) {
         _uiState.update { it.copy(composingText = text) }
     }
 
+    /**
+     * 舊版 API：只寫 items，sourceMap 視為空。
+     * 熱路徑 `syncImeCoordinatorFromRouter()` 暫時繼續走這條，
+     * sourceMap 的 coordinator 接入留待 Sprint 4 熱路徑抽出。
+     */
     fun updateCandidates(candidates: List<String>) {
-        _uiState.update { it.copy(candidates = candidates) }
+        _uiState.update {
+            it.copy(candidateState = CandidateUiState(items = candidates, sourceMap = emptyMap()))
+        }
+    }
+
+    /**
+     * Sprint 3 Phase 2 Round 3 新增：同時寫入 items + sourceMap。
+     * 提供給已授權的 callback / helper 在需要攜帶著色資訊時使用。
+     */
+    fun updateCandidates(items: List<String>, sourceMap: Map<String, CandidateSource>) {
+        _uiState.update {
+            it.copy(candidateState = CandidateUiState(items = items, sourceMap = sourceMap))
+        }
+    }
+
+    /**
+     * 直接寫入完整 CandidateUiState。提供給未來 InputUiSync 使用。
+     */
+    fun updateCandidateState(candidateState: CandidateUiState) {
+        _uiState.update { it.copy(candidateState = candidateState) }
     }
 
     fun showPanel(panelType: PanelType?) {
