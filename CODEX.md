@@ -165,6 +165,7 @@
 7. [RULE/AI_PROTOCOL.md](D:\SnowRealmRebirth\SnowRealmYukiBoard\RULE\AI_PROTOCOL.md)
 8. [RULE/LOCK_RULES.md](D:\SnowRealmRebirth\SnowRealmYukiBoard\RULE\LOCK_RULES.md)
 9. [RULE/TASK_TEMPLATE.md](D:\SnowRealmRebirth\SnowRealmYukiBoard\RULE\TASK_TEMPLATE.md)
+10. [RULE/SPRINT_GATE_RULE.md](D:\SnowRealmRebirth\SnowRealmYukiBoard\RULE\SPRINT_GATE_RULE.md)
 
 ## 9. 當前未解但重要的事
 
@@ -215,3 +216,4 @@ Codex 或 Claude Code 若完成一輪工作，盡量用以下格式交接：
 2. 能讓 `YukiBoardIMEService` 更瘦的方案
 3. 能讓 `SettingsActivity` 更瘦的方案
 4. 能讓狀態來源更單一、整合邊界更清楚的方案
+5. `CodeX A` 的 Sprint / Phase gate 規則

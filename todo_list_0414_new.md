@@ -384,15 +384,15 @@
 
 ### 對 Claude CodeA 的後續監督重點
 
-- [ ] 觀察 `BackgroundSettingsSection.kt` 是否需要再二次切分
+- [x] ~~觀察 `BackgroundSettingsSection.kt` 是否需要再二次切分~~ ✅ 已評估：不切（職責清晰、切分成本 > 收益）
   - 背景選取
   - 預覽
   - 顏色選擇器
   - lifecycle / result handling
 
-- [ ] 觀察 `TtsSettingsSection.kt` 是否仍有過重 callback 留在 `SettingsActivity`
+- [x] ~~觀察 `TtsSettingsSection.kt` 是否仍有過重 callback 留在 `SettingsActivity`~~ ✅ 已確認合規（1 個 callback ~20 行，門檻為 3 個）
 
-- [ ] 確認 `SettingsActivity` 後續維持在健康範圍，不再反彈膨脹
+- [x] ~~確認 `SettingsActivity` 後續維持在健康範圍，不再反彈膨脹~~ ✅ 455 行，全指標安全
 
 ### 對 CodeXB 的後續監督重點
 
@@ -468,12 +468,12 @@
 
 ### Claude Code A
 
-- [ ] settings 側不再追 provider 小收斂
-- [ ] 下一輪改做 repo-ready 收尾：
-  - 更新 `RULE/SETTINGS_SMOKE_CHECKLIST.md`
-  - 補一份 settings 側最終風險摘要
-  - 確保 `SettingsActivity.kt` 不再反彈
-- [ ] 不碰 IME
+- [x] ~~settings 側不再追 provider 小收斂~~ ✅ 遵守
+- [x] ~~下一輪改做 repo-ready 收尾：~~ ✅
+  - ~~更新 `RULE/SETTINGS_SMOKE_CHECKLIST.md`~~ ✅ 監督指標行數校正
+  - ~~補一份 settings 側最終風險摘要~~ ✅ `REPO_READY_SETTINGS_RISK_SUMMARY_2026-04-16.md`
+  - ~~確保 `SettingsActivity.kt` 不再反彈~~ ✅ 維持 455 行
+- [x] ~~不碰 IME~~ ✅ 遵守
 
 ### Claude Code B
 
@@ -614,12 +614,13 @@
 
 ### 給 Claude CodeA 的最新監督要求
 
-- [ ] 繼續維持 settings repo-ready 狀態
-- [ ] 不碰 IME
-- [ ] 不讓 `SettingsActivity.kt` 反彈膨脹
+- [x] ~~繼續維持 settings repo-ready 狀態~~ ✅ 已完成風險摘要 `REPO_READY_SETTINGS_RISK_SUMMARY_2026-04-16.md`
+- [x] ~~不碰 IME~~ ✅ 遵守
+- [x] ~~不讓 `SettingsActivity.kt` 反彈膨脹~~ ✅ 維持 455 行
 
 ### CodeXA 持續監督點
 
 - [ ] 若有人提早把 `composingText / candidates` collect 化，視為越界
 - [ ] 若有人提早碰 `handleKeyPress()` / `applyInputResult()`，視為越界
 - [ ] 若有人跳過 Sprint 3 直接主張完成 Sprint 4/5，視為計畫違規
+- [ ] 後續所有 Sprint / Phase / readiness step，都必須先經 `CodeX A` 核可

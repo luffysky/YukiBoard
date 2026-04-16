@@ -109,7 +109,7 @@
 
 以下為常見回歸方向，每輪應特別留意：
 
-- SettingsActivity 行數是否超過 500 行警戒線（目前 455 行）
+- SettingsActivity 行數是否超過 500 行警戒線（2026-04-16 確認：455 行）
 - Section 是否反向引用 Activity（應為 0）
 - 是否有新增的 `auth.fetchMe()` 散落在 section 內（應統一由 coordinator 發起）
 - 是否有新增的 `AIProviderManager.getInstance()` 散落在 section 內
@@ -146,7 +146,7 @@
 ## 6. 依賴邊界地圖
 
 ```
-SettingsActivity (455 行)
+SettingsActivity (455 行, 2026-04-16 確認)
   ├─ settingsCoordinator: SettingsScreenCoordinator
   │    ├─ sessionRepository: UserSessionRepository
   │    │    ├─ authClient: SnowRealmAuthClient.getInstance()

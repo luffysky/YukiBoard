@@ -266,6 +266,7 @@ MVVM + Clean Architecture
 - `PROJECT_HEALTH_CHECK_2026-04-13.md` — 專案健檢報告
 - `CODEX_HANDOFF.md` — Claude Code → Codex 交接
 - `CODEX_REPLY_TO_CLAUDE_CODE_2026-04-13.md` — Codex 回覆確認
+- `RULE/SPRINT_GATE_RULE.md` — 所有 Sprint / Phase 的正式 gate 規則
 
 ### 角色分工
 
@@ -334,6 +335,22 @@ platform -> application -> domain <- integration
 - **B. 風險**：回歸風險、暫時只搬殼的地方
 - **C. 下一步建議**：下一輪最適合做什麼、哪裡先不碰
 - **D. 架構決策**：新增的 coordinator / repository / interface（不藏在 commit 裡）
+- **E. CodeX A 審核需求/結論**：是否需要 `CodeX A` gate，或 `READY / NOT READY / LOCKED`
+
+### Sprint Gate 規則
+
+從 2026-04-16 起，所有 Sprint、所有 Phase、所有 readiness step，都必須先經過 `CodeX A` 審核，才能進入下一步。
+
+Claude Code 必須遵守：
+
+1. 可以做前置盤點、草案、局部實作、文件整理
+2. 不可自行宣告下一個 Sprint 或下一個 Phase 已解鎖
+3. 不可把 readiness 文件當成已獲准實作
+4. 必須等待 `CodeX A` 明確輸出：
+   - `READY`
+   - `NOT READY`
+   - 或 `LOCKED`
+5. 沒有 `CodeX A` 的明確核可，一律視為不得往下
 
 ### 決策衝突時的優先選擇
 

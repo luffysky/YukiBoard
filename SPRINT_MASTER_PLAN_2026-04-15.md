@@ -9,6 +9,7 @@
 - `CodeX A / CodeX B / Claude Code A / Claude Code B` 的分工
 - 每階段完成條件
 - 每階段明確不做的事
+- 每一個 Sprint / Phase 的 gate 規則
 
 ---
 
@@ -21,6 +22,21 @@
 3. integration boundary 更清楚
 4. repo-ready 文件、檢查表、交接流程完整
 5. 在不破壞既有功能的前提下，為後續核心主流程重構鋪路
+
+---
+
+## Gate 規則（全 Sprint 通用）
+
+從這份主表開始，所有 Sprint / Phase 一律套用同一條規則：
+
+1. 執行者可做盤點、草案、實作、文件
+2. `CodeX B` 可做技術審核與 ready 建議
+3. 只有 `CodeX A` 可正式拍板：
+   - `READY`
+   - `NOT READY`
+   - `LOCKED`
+4. 沒有 `CodeX A` 的明確核可，不得進下一個 Sprint 或下一個 Phase
+5. 詳細規則見：`RULE/SPRINT_GATE_RULE.md`
 
 ---
 
@@ -170,6 +186,7 @@
 - Sprint 3 Phase 2 完成
 - `composingText / candidates` consume 邊界已釐清
 - 熱路徑同步更新與 render 入口已整理完
+- 並且 `CodeX A` 已正式核可進 Sprint 4
 
 目標：
 
@@ -209,6 +226,7 @@
 - 這是 mode / container / external integration state 的 consume 收斂
 - 仍先由 `YukiBoardIMEService` 當 consume owner
 - 不急著讓 `KeyboardView.kt` 自己 collect
+- 並且只有在 `CodeX A` 正式核可後才可啟動
 
 2026-04-16 補充：
 
@@ -236,6 +254,7 @@
 
 - 一次只處理一個高依賴 panel 類別
 - 不把多個外部系統重構混在一輪
+- 並且只有在 `CodeX A` 正式核可後才可啟動
 
 ---
 
@@ -251,6 +270,7 @@
 
 - 這一階段偏 integration / application 層治理
 - 不一定只動 IME
+- 並且只有在 `CodeX A` 正式核可後才可啟動
 
 ---
 
@@ -432,6 +452,7 @@
 - 不提前做 `USER_DICT`
 - 不提前展開高依賴 panel
 - 不為了好看而犧牲功能完整性
+- 不自行宣告下一 Sprint 或下一 Phase 已解鎖
 
 補充正式 gate：
 

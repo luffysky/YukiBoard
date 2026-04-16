@@ -6,7 +6,7 @@
 
 ## 1. 目的
 
-SettingsActivity 已從 3,868 行瘦身至 442 行（-88%）。
+SettingsActivity 已從 3,868 行瘦身至 455 行（-88%）。
 本規則確保後續開發不讓它反彈膨脹。
 
 ## 2. SettingsActivity 允許持有的責任
@@ -80,7 +80,7 @@ SettingsActivity 已從 3,868 行瘦身至 442 行（-88%）。
 
 | 指標 | 警戒值 | 目前值 |
 |------|--------|--------|
-| SettingsActivity 行數 | > 500 行 | 442 行 |
+| SettingsActivity 行數 | > 500 行 | 455 行（2026-04-16 確認） |
 | Activity 內 SeekBar/Switch/Radio/Checkbox 數量 | > 0 | 0 |
 | Activity 內 prefs 直接業務存取 | > 0（lambda 閉包除外） | 0 |
 | Section 反向引用 Activity | > 0 | 0 |

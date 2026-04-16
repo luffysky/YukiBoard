@@ -91,6 +91,12 @@
 - D. 架構決策
 - E. `CodeX A` 審核需求或審核結論
 
+所有 Sprint / Phase 的正式前進，還必須遵守：
+
+- 先由執行者完成前置或回交
+- 再由 `CodeX A` 輸出 `READY / NOT READY / LOCKED`
+- 沒有 `CodeX A` 的明確核可，不得宣告進入下一階段
+
 ## 6. 衝突處理
 
 ### 情境 1：Task 與基線文件衝突
