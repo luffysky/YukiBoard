@@ -5,13 +5,12 @@ import android.media.AudioFormat
 import android.media.AudioTrack
 import android.util.Base64
 import android.util.Log
+import com.snowrealm.yukiboard.app.net.AppHttpClient
 import kotlinx.coroutines.*
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import java.util.concurrent.TimeUnit
 
 /**
  * Google Cloud Text-to-Speech API 語音輸出引擎。
@@ -33,10 +32,7 @@ class GoogleCloudTtsEngine(
     private var playbackJob: Job? = null
     private var audioTrack: AudioTrack? = null
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build()
+    private val client = AppHttpClient.newBuilder(AppHttpClient.Profile.DEFAULT).build()
 
     override var isReady: Boolean = true
         private set

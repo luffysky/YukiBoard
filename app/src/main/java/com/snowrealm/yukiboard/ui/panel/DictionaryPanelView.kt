@@ -10,13 +10,12 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.widget.*
+import com.snowrealm.yukiboard.app.net.AppHttpClient
 import com.snowrealm.yukiboard.theme.KeyboardTheme
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.*
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.URLEncoder
-import java.util.concurrent.TimeUnit
 
 /**
  * 字典面板 — 支援全球語言的即時查詞。
@@ -40,10 +39,7 @@ class DictionaryPanelView(context: Context) : LinearLayout(context), PanelInputT
     var onSpeak: ((String, String?) -> Unit)? = null
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
-        .build()
+    private val client = AppHttpClient.newBuilder(AppHttpClient.Profile.SHORT).build()
     private val json = Json { ignoreUnknownKeys = true }
 
     private val density = resources.displayMetrics.density

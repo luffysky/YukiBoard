@@ -2,6 +2,7 @@ package com.snowrealm.yukiboard.input.smart
 
 import android.content.Context
 import android.content.SharedPreferences
+import kotlinx.serialization.json.*
 
 /**
  * 語句預測引擎 — 根據打字習慣預測下一個詞或片語。
@@ -237,5 +238,43 @@ class PhrasePredictor(context: Context) {
         const val TRIGRAM_WEIGHT = 2.5f
         const val MAX_ENTRIES_PER_KEY = 50
         const val MAX_TOP_KEYS = 2000
+    }
+
+    // ─────────────── 雲端 snapshot（Sprint 7-4） ───────────────
+
+    fun exportSnapshot(): JsonObject = buildJsonObject {
+        put("bi_keys", prefs.getString("_bi_keys", "") ?: "")
+        val biKeys = prefs.getString("_bi_keys", null)?.split(",") ?: emptyList()
+        for (key in biKeys) {
+            if (key.isBlank()) continue
+            prefs.getString("bi_$key", null)?.let { put("bi_$key", it) }
+        }
+        put("tri_keys", prefs.getString("_tri_keys", "") ?: "")
+        val triKeys = prefs.getString("_tri_keys", null)?.split(",") ?: emptyList()
+        for (key in triKeys) {
+            if (key.isBlank()) continue
+            prefs.getString("tri_$key", null)?.let { put("tri_$key", it) }
+        }
+    }
+
+    fun importSnapshot(obj: JsonObject) {
+        val editor = prefs.edit()
+        for ((key, value) in obj) {
+            val raw = value.jsonPrimitive.contentOrNull ?: continue
+            if (key == "bi_keys") {
+                val existing = prefs.getString("_bi_keys", null)?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+                val incoming = raw.split(",").filter { it.isNotBlank() }
+                editor.putString("_bi_keys", (existing + incoming).distinct().joinToString(","))
+            } else if (key == "tri_keys") {
+                val existing = prefs.getString("_tri_keys", null)?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+                val incoming = raw.split(",").filter { it.isNotBlank() }
+                editor.putString("_tri_keys", (existing + incoming).distinct().joinToString(","))
+            } else {
+                editor.putString(key, raw)
+            }
+        }
+        editor.apply()
+        // S9-C：import 完成後立即 reload in-memory，讓長生命週期 owner 不需等下次 cold start。
+        loadAll()
     }
 }

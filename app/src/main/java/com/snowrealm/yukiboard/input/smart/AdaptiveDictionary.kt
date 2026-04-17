@@ -3,6 +3,7 @@ package com.snowrealm.yukiboard.input.smart
 import android.content.Context
 import android.content.SharedPreferences
 import com.snowrealm.yukiboard.input.dictionary.EnglishDictionary
+import kotlinx.serialization.json.*
 
 /**
  * 自適應字典 — 自動學習使用者常用詞彙。
@@ -146,6 +147,52 @@ class AdaptiveDictionary(context: Context) {
     /** 持久化（onFinishInputView 時呼叫），將延遲的索引寫入磁碟 */
     fun persist() {
         if (indexDirty) updateIndex()
+    }
+
+    // ─────────────── 雲端 snapshot（Sprint 7-4） ───────────────
+
+    /**
+     * 匯出 snapshot（供 CloudSyncManager 上傳）。
+     * Sprint 7-4：原本由 `CloudSyncManager.exportAdaptiveDict` 直讀 prefs；改由本類 owner 自己輸出。
+     */
+    fun exportSnapshot(): JsonObject {
+        val index = prefs.getString("_ad_index", null)?.split(",") ?: return buildJsonObject {}
+        return buildJsonObject {
+            for (word in index) {
+                if (word.isBlank()) continue
+                prefs.getString("ad_$word", null)?.let { put(word, it) }
+            }
+        }
+    }
+
+    /**
+     * 匯入 snapshot（供 CloudSyncManager 下載後還原）。
+     * 兩邊都有 → 取頻率較高的（格式："freq|timestamp|..."）。
+     * 注意：此方法寫 prefs 但不更新 in-memory `entries`；下次 cold start `loadAll()` 才會讀到。
+     */
+    fun importSnapshot(obj: JsonObject) {
+        val editor = prefs.edit()
+        val keys = mutableListOf<String>()
+        for ((word, value) in obj) {
+            val remoteRaw = value.jsonPrimitive.contentOrNull ?: continue
+            val localRaw = prefs.getString("ad_$word", null)
+            if (localRaw == null) {
+                editor.putString("ad_$word", remoteRaw)
+            } else {
+                val localFreq = localRaw.split("|").getOrNull(0)?.toIntOrNull() ?: 0
+                val remoteFreq = remoteRaw.split("|").getOrNull(0)?.toIntOrNull() ?: 0
+                if (remoteFreq > localFreq) {
+                    editor.putString("ad_$word", remoteRaw)
+                }
+            }
+            keys.add(word)
+        }
+        val existing = prefs.getString("_ad_index", null)?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+        val merged = (existing + keys).distinct()
+        editor.putString("_ad_index", merged.joinToString(","))
+        editor.apply()
+        // S9-C：import 完成後立即 reload in-memory entries，讓長生命週期 owner 不需等下次 cold start。
+        loadAll()
     }
 
     data class WordEntry(

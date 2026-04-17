@@ -9,6 +9,7 @@ import android.view.View
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.snowrealm.yukiboard.app.net.AppHttpClient
 import com.snowrealm.yukiboard.ui.settings.SettingsUiHelper
 import com.snowrealm.yukiboard.ui.settings.SettingsUiHelper.dp
 import com.snowrealm.yukiboard.ui.settings.YukiPreferences
@@ -292,10 +293,7 @@ class SpeechSettingsSection(
                     .post(body)
                     .build()
 
-                val client = okhttp3.OkHttpClient.Builder()
-                    .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-                    .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-                    .build()
+                val client = AppHttpClient.newBuilder(AppHttpClient.Profile.STANDARD).build()
 
                 val response = client.newCall(request).execute()
                 val code = response.code
@@ -337,10 +335,7 @@ class SpeechSettingsSection(
     private fun testFasterWhisperConnection(serverUrl: String, statusView: TextView) {
         scope.launch(Dispatchers.IO) {
             try {
-                val client = okhttp3.OkHttpClient.Builder()
-                    .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
-                    .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
-                    .build()
+                val client = AppHttpClient.newBuilder(AppHttpClient.Profile.SHORT).build()
                 val url = serverUrl.trimEnd('/') + "/health"
                 val request = okhttp3.Request.Builder().url(url).get().build()
                 val response = client.newCall(request).execute()

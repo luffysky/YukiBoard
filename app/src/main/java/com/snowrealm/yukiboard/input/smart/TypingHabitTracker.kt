@@ -2,6 +2,7 @@ package com.snowrealm.yukiboard.input.smart
 
 import android.content.Context
 import android.content.SharedPreferences
+import kotlinx.serialization.json.*
 
 /**
  * 打字習慣追蹤器 — 捕捉使用者個人化模式。
@@ -165,5 +166,45 @@ class TypingHabitTracker(context: Context) {
 
     companion object {
         const val MAX_WORDS_PER_BUCKET = 100
+    }
+
+    // ─────────────── 雲端 snapshot（Sprint 7-4） ───────────────
+
+    fun exportSnapshot(): JsonObject = buildJsonObject {
+        val periodKeys = prefs.getString("_period_keys", null)
+        periodKeys?.let { put("period_keys", it) }
+        periodKeys?.split(",")?.forEach { key ->
+            if (key.isBlank()) return@forEach
+            prefs.getString("period_$key", null)?.let { put("period_$key", it) }
+        }
+        val appKeys = prefs.getString("_app_keys", null)
+        appKeys?.let { put("app_keys", it) }
+        appKeys?.split(",")?.forEach { key ->
+            if (key.isBlank()) return@forEach
+            prefs.getString("app_$key", null)?.let { put("app_$key", it) }
+        }
+    }
+
+    fun importSnapshot(obj: JsonObject) {
+        val editor = prefs.edit()
+        obj["period_keys"]?.jsonPrimitive?.contentOrNull?.let { keys ->
+            val existing = prefs.getString("_period_keys", null)?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+            val incoming = keys.split(",").filter { it.isNotBlank() }
+            editor.putString("_period_keys", (existing + incoming).distinct().joinToString(","))
+        }
+        obj["app_keys"]?.jsonPrimitive?.contentOrNull?.let { keys ->
+            val existing = prefs.getString("_app_keys", null)?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+            val incoming = keys.split(",").filter { it.isNotBlank() }
+            editor.putString("_app_keys", (existing + incoming).distinct().joinToString(","))
+        }
+        for ((key, value) in obj) {
+            if (key.startsWith("period_") && key != "period_keys" ||
+                key.startsWith("app_") && key != "app_keys") {
+                value.jsonPrimitive.contentOrNull?.let { editor.putString(key, it) }
+            }
+        }
+        editor.apply()
+        // S9-C：import 完成後立即 reload in-memory，讓長生命週期 owner 不需等下次 cold start。
+        loadAll()
     }
 }

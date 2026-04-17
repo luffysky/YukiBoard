@@ -70,4 +70,10 @@ class MidiImportActivity : Activity() {
         }
         finish()
     }
+
+    override fun onDestroy() {
+        // S8-1 Bug#3：確保 static callback 在 Activity 結束後一律釋放，避免持有舊 panel reference。
+        onMidiImported = null
+        super.onDestroy()
+    }
 }

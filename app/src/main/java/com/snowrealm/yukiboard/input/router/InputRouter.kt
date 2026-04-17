@@ -419,6 +419,17 @@ class InputRouter(private val context: Context) {
         (bopomofoEngine as? ChewingInputEngine)?.warmUp()
     }
 
+    /**
+     * S8-3：IME service 拆解時呼叫，解除長生命週期 UserDictionary 的
+     * SharedPreferences listener，避免留在 `SharedPreferencesImpl.mListeners` 的
+     * WeakHashMap entry 延後到 GC 才清掉。
+     *
+     * 僅清 listener，不影響已 commit 的 prefs 資料。
+     */
+    fun release() {
+        userDict.release()
+    }
+
     // -------------------------------------------------------------------------
     // AUTO 模式自動偵測
     // -------------------------------------------------------------------------

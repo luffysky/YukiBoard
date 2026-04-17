@@ -9,12 +9,12 @@ import android.widget.Toast
 import androidx.core.content.FileProvider
 import androidx.core.view.inputmethod.InputConnectionCompat
 import androidx.core.view.inputmethod.InputContentInfoCompat
+import com.snowrealm.yukiboard.app.net.AppHttpClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
 import java.net.URL
-import java.util.concurrent.TimeUnit
 
 /**
  * 圖片/GIF/Sticker commitContent 邏輯 — 從 YukiBoardIMEService.commitImageContent() 抽出。
@@ -44,10 +44,7 @@ class ImeImageCommitter(
                 }
 
                 val tempFileName = "sticker_${url.hashCode()}"
-                val client = okhttp3.OkHttpClient.Builder()
-                    .connectTimeout(10, TimeUnit.SECONDS)
-                    .readTimeout(15, TimeUnit.SECONDS)
-                    .build()
+                val client = AppHttpClient.newBuilder(AppHttpClient.Profile.STANDARD).build()
 
                 val cachedFile = stickerDir.listFiles()?.firstOrNull {
                     it.name.startsWith(tempFileName) && it.length() > 0

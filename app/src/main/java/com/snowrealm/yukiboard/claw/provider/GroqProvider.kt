@@ -1,5 +1,6 @@
 package com.snowrealm.yukiboard.claw.provider
 
+import com.snowrealm.yukiboard.app.net.AppHttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -13,11 +14,9 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
-import java.util.concurrent.TimeUnit
 
 /**
  * Groq AI Provider — 超快推論。
@@ -34,11 +33,7 @@ class GroqProvider(private val apiKey: String) : AIProvider {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(15, TimeUnit.SECONDS)
-        .build()
+    private val client = AppHttpClient.newBuilder(AppHttpClient.Profile.DEFAULT).build()
 
     override val type = AIProviderType.GROQ
     override val availableModels = listOf("llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it", "mixtral-8x7b-32768")

@@ -9,13 +9,12 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.snowrealm.yukiboard.BuildConfig
+import com.snowrealm.yukiboard.app.net.AppHttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
-import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 
 /**
@@ -28,10 +27,7 @@ class WeatherManager(private val context: Context) {
 
     private val apiKey: String = BuildConfig.OPENWEATHER_API_KEY
 
-    private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
-        .build()
+    private val httpClient = AppHttpClient.newBuilder(AppHttpClient.Profile.SHORT).build()
 
     private var cachedData: WeatherData? = null
 

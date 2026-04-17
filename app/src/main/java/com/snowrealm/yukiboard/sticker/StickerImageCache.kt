@@ -4,14 +4,13 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.LruCache
+import com.snowrealm.yukiboard.app.net.AppHttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
-import java.util.concurrent.TimeUnit
 
 /**
  * 貼圖圖片快取：Memory LruCache + 磁碟快取。
@@ -28,10 +27,7 @@ class StickerImageCache(context: Context, private val targetSize: Int = 192) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
     }
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .build()
+    private val client = AppHttpClient.newBuilder(AppHttpClient.Profile.STANDARD).build()
 
     /**
      * 取得貼圖 Bitmap（快取優先）。

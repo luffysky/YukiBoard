@@ -1,12 +1,11 @@
 package com.snowrealm.yukiboard.sticker
 
 import com.snowrealm.yukiboard.BuildConfig
+import com.snowrealm.yukiboard.app.net.AppHttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
-import java.util.concurrent.TimeUnit
 
 /**
  * Insight Engine 公開貼圖 API 客戶端。
@@ -16,10 +15,7 @@ import java.util.concurrent.TimeUnit
  */
 class InsightStickerApi {
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .build()
+    private val client = AppHttpClient.newBuilder(AppHttpClient.Profile.STANDARD).build()
 
     private val baseUrl = BuildConfig.INSIGHT_API_BASE_URL.trimEnd('/')
 

@@ -3,6 +3,7 @@ package com.snowrealm.yukiboard.speech
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import com.snowrealm.yukiboard.app.net.AppHttpClient
 import kotlinx.coroutines.*
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
@@ -10,6 +11,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
+import java.util.concurrent.TimeUnit
 
 /**
  * OpenAI Whisper API 語音辨識引擎。
@@ -28,10 +30,9 @@ class WhisperSpeechEngine(
     private var audioRecord: AudioRecord? = null
     private var recordingJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-        .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
-        .writeTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+    // OpenAI Whisper：writeTimeout 60s 配合 WAV 上傳（STREAMING profile write 預設 30s 不夠）
+    private val client = AppHttpClient.newBuilder(AppHttpClient.Profile.STREAMING)
+        .writeTimeout(60, TimeUnit.SECONDS)
         .build()
 
     // 錄音參數

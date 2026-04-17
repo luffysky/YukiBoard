@@ -3,15 +3,14 @@ package com.snowrealm.yukiboard.security
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
+import com.snowrealm.yukiboard.app.net.AppHttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.BufferedReader
 import java.io.InputStreamReader
-import java.util.concurrent.TimeUnit
 
 /**
  * 政府公開防詐資料即時同步。
@@ -78,10 +77,7 @@ class FraudOpenDataSync(private val context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build()
+    private val httpClient = AppHttpClient.newBuilder(AppHttpClient.Profile.DEFAULT).build()
 
     /** 目前黑名單域名數 */
     val blocklistCount: Int get() = prefs.getInt(KEY_BLOCKLIST_COUNT, 0)

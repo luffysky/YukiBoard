@@ -23,7 +23,13 @@ import com.snowrealm.yukiboard.app.ime.ImeFloatingModeHelper
 import com.snowrealm.yukiboard.app.ime.ImeFraudModelInit
 import com.snowrealm.yukiboard.app.ime.ImeGameLauncher
 import com.snowrealm.yukiboard.app.ime.ImeImageCommitter
+import com.snowrealm.yukiboard.app.ime.ImeMusicPanelBinder
 import com.snowrealm.yukiboard.app.ime.ImePanelControlBar
+import com.snowrealm.yukiboard.app.ime.ImeRemotePanelBinder
+import com.snowrealm.yukiboard.app.ime.ImeThemePanelBinder
+import com.snowrealm.yukiboard.app.ime.ImeClawPanelBinder
+import com.snowrealm.yukiboard.app.ime.ImeHandwritingPanelBinder
+import com.snowrealm.yukiboard.app.ime.ImeUserDictPanelBinder
 import com.snowrealm.yukiboard.app.ime.ImeTransparencyOverlay
 import com.snowrealm.yukiboard.app.ime.ImePanelHost
 import com.snowrealm.yukiboard.app.ime.ImePanelRouter
@@ -193,35 +199,103 @@ internal fun YukiBoardIMEService.closePanel() {
 
 internal fun YukiBoardIMEService.createHighDependencyPanelOrNull(panel: PanelType, theme: KeyboardTheme): View? {
     return when (panel) {
-        PanelType.REMOTE -> {
-            val p = RemoteKeyboardPanelView(this).also { imePanelBindings.remotePanel = it }
-            p.theme = theme
-            p.btState = btKeyboard?.connectionState ?: ConnectionState.IDLE
-            p.wifiState = wifiServer?.connectionState ?: ConnectionState.IDLE
-            p.wifiUrl = wifiServer?.getConnectionUrl() ?: ""
-            p.connectedDeviceName = btKeyboard?.connectedDevice?.name
-                ?: wifiServer?.connectedDevice?.name ?: ""
-            p.onBluetoothToggle = { toggleBluetooth() }
-            p.onWifiToggle = { toggleWifi() }
-            p
-        }
+        PanelType.REMOTE -> ImeRemotePanelBinder.bind(
+            context = this,
+            theme = theme,
+            btState = btKeyboard?.connectionState ?: ConnectionState.IDLE,
+            wifiState = wifiServer?.connectionState ?: ConnectionState.IDLE,
+            wifiUrl = wifiServer?.getConnectionUrl() ?: "",
+            connectedDeviceName = btKeyboard?.connectedDevice?.name
+                ?: wifiServer?.connectedDevice?.name ?: "",
+            onBluetoothToggle = { toggleBluetooth() },
+            onWifiToggle = { toggleWifi() },
+        ).also { imePanelBindings.remotePanel = it }
         PanelType.THEME -> {
             val tm = ThemeManager.getInstance(this)
-            val p = ThemePanelView(this).also { imePanelBindings.themePanel = it }
-            p.theme = theme
-            p.currentThemeId = tm.currentTheme.id
-            p.availableThemes = tm.availableThemes
+            val p = ImeThemePanelBinder.bind(
+                context = this,
+                theme = theme,
+                currentThemeId = tm.currentTheme.id,
+                availableThemes = tm.availableThemes,
+                onThemeSelected = { selected ->
+                    tm.currentTheme = selected
+                    prefs.useCustomBackground = false
+                    applyTheme(selected)
+                    imePanelBindings.themePanel?.previewBgBitmap = null
+                },
+                onAnimThemeSelected = { styleId ->
+                    toolbarView.setAnimStyle(styleId)
+                    keyboardView.setAnimStyle(styleId)
+                },
+                onPickBackground = {
+                    try {
+                        val intent = Intent(this, com.snowrealm.yukiboard.ui.settings.BackgroundPickerActivity::class.java).apply {
+                            putExtra(com.snowrealm.yukiboard.ui.settings.BackgroundPickerActivity.EXTRA_PICK_TYPE, "image")
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        startActivity(intent)
+                    } catch (_: Exception) {}
+                },
+                onPickVideo = {
+                    try {
+                        val intent = Intent(this, com.snowrealm.yukiboard.ui.settings.BackgroundPickerActivity::class.java).apply {
+                            putExtra(com.snowrealm.yukiboard.ui.settings.BackgroundPickerActivity.EXTRA_PICK_TYPE, "video")
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        startActivity(intent)
+                    } catch (_: Exception) {}
+                },
+                onClearBackground = {
+                    val dir = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getBackgroundDir(this)
+                    dir.listFiles()?.forEach { it.delete() }
+                    prefs.useCustomBackground = false
+                    backgroundView?.reloadFromStorage()
+                    keyboardView.hasCustomBackground = false
+                    keyboardView.invalidate()
+                    imePanelBindings.themePanel?.previewBgBitmap = null
+                },
+                onOverlayAlphaChanged = { alpha ->
+                    backgroundView?.overlayAlpha = alpha
+                    keyboardView.bgOverlayAlpha = alpha
+                    keyboardView.invalidate()
+                },
+                onLabelColorChanged = { color ->
+                    keyboardView.customKeyLabelColor = color
+                    keyboardView.invalidate()
+                },
+                onBackgroundSettingsChanged = {
+                    backgroundView?.let { bg ->
+                        bg.scaleMode = prefs.bgScaleMode
+                        bg.offsetX = prefs.bgOffsetX
+                        bg.offsetY = prefs.bgOffsetY
+                        bg.bgRotation = prefs.bgRotation
+                        bg.reloadFromStorage()
+                    }
+                    keyboardView.invalidate()
+                    sendBroadcast(android.content.Intent("com.snowrealm.yukiboard.ACTION_BG_UPDATED").setPackage(packageName))
+                },
+                onKeySettingsChanged = {
+                    keyboardView.keyScalePercent = prefs.keyScalePercent
+                    keyboardView.keyOpacity = prefs.keyOpacity
+                    keyboardView.keyTextOpacity = prefs.keyTextOpacity
+                    applyTransparentMode()
+                    val bgHasNow = backgroundView?.reloadFromStorage() ?: false
+                    val glassKeysNow = (prefs.useCustomBackground && bgHasNow) || prefs.transparentKeyboard
+                    keyboardView.hasCustomBackground = glassKeysNow
+                    keyboardView.invalidate()
+                },
+                onPerKeySizeChanged = {
+                    keyboardView.perKeySizes = prefs.getAllPerKeySizes()
+                    keyboardView.invalidate()
+                },
+                onKeyboardHeightChanged = {
+                    closePanel()
+                    backgroundView?.destroy()
+                    backgroundView = null
+                    setInputView(onCreateInputView())
+                },
+            ).also { imePanelBindings.themePanel = it }
             p.reloadPreviewBitmap()
-            p.onThemeSelected = { selected ->
-                tm.currentTheme = selected
-                prefs.useCustomBackground = false
-                applyTheme(selected)
-                p.previewBgBitmap = null
-            }
-            p.onAnimThemeSelected = { styleId ->
-                toolbarView.setAnimStyle(styleId)
-                keyboardView.setAnimStyle(styleId)
-            }
             val themeListener: (com.snowrealm.yukiboard.theme.KeyboardTheme) -> Unit = { newTheme ->
                 p.currentThemeId = newTheme.id
                 p.theme = newTheme
@@ -231,189 +305,103 @@ internal fun YukiBoardIMEService.createHighDependencyPanelOrNull(panel: PanelTyp
             p.addOnDetachListener {
                 tm.removeOnThemeChangedListener(themeListener)
             }
-            p.onPickBackground = {
-                try {
-                    val intent = Intent(this, com.snowrealm.yukiboard.ui.settings.BackgroundPickerActivity::class.java).apply {
-                        putExtra(com.snowrealm.yukiboard.ui.settings.BackgroundPickerActivity.EXTRA_PICK_TYPE, "image")
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    startActivity(intent)
-                } catch (_: Exception) {}
-            }
-            p.onPickVideo = {
-                try {
-                    val intent = Intent(this, com.snowrealm.yukiboard.ui.settings.BackgroundPickerActivity::class.java).apply {
-                        putExtra(com.snowrealm.yukiboard.ui.settings.BackgroundPickerActivity.EXTRA_PICK_TYPE, "video")
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    startActivity(intent)
-                } catch (_: Exception) {}
-            }
-            p.onClearBackground = {
-                val dir = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getBackgroundDir(this)
-                dir.listFiles()?.forEach { it.delete() }
-                prefs.useCustomBackground = false
-                backgroundView?.reloadFromStorage()
-                keyboardView.hasCustomBackground = false
-                keyboardView.invalidate()
-                p.previewBgBitmap = null
-            }
-            p.onOverlayAlphaChanged = { alpha ->
-                backgroundView?.overlayAlpha = alpha
-                keyboardView.bgOverlayAlpha = alpha
-                keyboardView.invalidate()
-            }
-            p.onLabelColorChanged = { color ->
-                keyboardView.customKeyLabelColor = color
-                keyboardView.invalidate()
-            }
-            p.onBackgroundSettingsChanged = {
-                backgroundView?.let { bg ->
-                    bg.scaleMode = prefs.bgScaleMode
-                    bg.offsetX = prefs.bgOffsetX
-                    bg.offsetY = prefs.bgOffsetY
-                    bg.bgRotation = prefs.bgRotation
-                    bg.reloadFromStorage()
-                }
-                keyboardView.invalidate()
-                sendBroadcast(android.content.Intent("com.snowrealm.yukiboard.ACTION_BG_UPDATED").setPackage(packageName))
-            }
-            p.onKeySettingsChanged = {
-                keyboardView.keyScalePercent = prefs.keyScalePercent
-                keyboardView.keyOpacity = prefs.keyOpacity
-                keyboardView.keyTextOpacity = prefs.keyTextOpacity
-                applyTransparentMode()
-                val bgHasNow = backgroundView?.reloadFromStorage() ?: false
-                val glassKeysNow = (prefs.useCustomBackground && bgHasNow) || prefs.transparentKeyboard
-                keyboardView.hasCustomBackground = glassKeysNow
-                keyboardView.invalidate()
-            }
-            p.onPerKeySizeChanged = {
-                keyboardView.perKeySizes = prefs.getAllPerKeySizes()
-                keyboardView.invalidate()
-            }
-            p.onKeyboardHeightChanged = {
-                closePanel()
-                backgroundView?.destroy()
-                backgroundView = null
-                setInputView(onCreateInputView())
-            }
             p
         }
-        PanelType.CLAW -> {
-            val p = ClawPanelView(this)
-            p.theme = theme
-            p.clawClient = clawClient
-            p.prefs = prefs
-            p.setCurrentMode(
-                when (keyboardView.currentMode) {
-                    KeyboardMode.DEVELOPER -> "developer"
-                    else -> "normal"
-                }
-            )
-            p.inputTextProvider = {
+        PanelType.CLAW -> ImeClawPanelBinder.bind(
+            context = this,
+            theme = theme,
+            clawClient = clawClient,
+            prefs = prefs,
+            initialMode = when (keyboardView.currentMode) {
+                KeyboardMode.DEVELOPER -> "developer"
+                else -> "normal"
+            },
+            inputTextProvider = {
                 val ic = currentInputConnection
                 val selected = ic?.getSelectedText(0)?.toString()
                 if (!selected.isNullOrEmpty()) selected
                 else ic?.getTextBeforeCursor(500, 0)?.toString() ?: ""
-            }
-            p.appPackageProvider = {
+            },
+            appPackageProvider = {
                 inputRouter.currentAppPackage ?: ""
-            }
-            p.keyboardModeProvider = {
+            },
+            keyboardModeProvider = {
                 keyboardView.currentMode
-            }
-            p.onSuggestionSelected = { text ->
+            },
+            onSuggestionSelected = { text ->
                 val ic = currentInputConnection
                 if (ic != null) {
                     ic.performContextMenuAction(android.R.id.selectAll)
                     ic.commitText(text, 1)
                 }
                 clawResultFloatingPanel?.showResult("AI", listOf(text))
-            }
-            p.onClose = { closePanel() }
-            p.onLockTapped = {
+            },
+            onClose = { closePanel() },
+            onLockTapped = {
                 startActivity(
                     Intent(this, com.snowrealm.yukiboard.ui.auth.InviteCodeActivity::class.java)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 )
-            }
-            p
-        }
+            },
+        )
         PanelType.USER_DICT -> {
-            val p = UserDictionaryPanelView(this).also { imePanelBindings.userDictPanel = it }
-            p.theme = theme
-            p.userDictionary = com.snowrealm.yukiboard.input.dictionary.UserDictionary(this)
-            p.onShowDialog = { dialog -> showImeDialog(dialog) }
-            p.onExportRequest = { data ->
-                try {
-                    val file = java.io.File(getExternalFilesDir(null), "yukiboard_user_dict.txt")
-                    file.writeText(data)
-                    val uri = androidx.core.content.FileProvider.getUriForFile(
-                        this, "$packageName.fileprovider", file
-                    )
-                    val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                        type = "text/plain"
-                        putExtra(android.content.Intent.EXTRA_STREAM, uri)
-                        putExtra(android.content.Intent.EXTRA_SUBJECT, "YukiBoard 個人詞庫")
-                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    startActivity(android.content.Intent.createChooser(shareIntent, "匯出詞庫").apply {
-                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                    })
-                } catch (e: Exception) {
-                    android.os.Handler(android.os.Looper.getMainLooper()).post {
-                        android.widget.Toast.makeText(this, "匯出失敗: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
-                    }
-                }
-            }
-            p.onImportRequest = {
-                try {
-                    val file = java.io.File(getExternalFilesDir(null), "yukiboard_user_dict.txt")
-                    if (file.exists()) {
-                        val count = p.importEntries(file.readText())
-                        android.os.Handler(android.os.Looper.getMainLooper()).post {
-                            android.widget.Toast.makeText(this, "已匯入 $count 筆詞彙", android.widget.Toast.LENGTH_SHORT).show()
+            val p = ImeUserDictPanelBinder.bind(
+                context = this,
+                theme = theme,
+                userDictionary = com.snowrealm.yukiboard.input.dictionary.UserDictionary(this),
+                onShowDialog = { dialog -> showImeDialog(dialog) },
+                onExportRequest = { data ->
+                    try {
+                        val file = java.io.File(getExternalFilesDir(null), "yukiboard_user_dict.txt")
+                        file.writeText(data)
+                        val uri = androidx.core.content.FileProvider.getUriForFile(
+                            this, "$packageName.fileprovider", file
+                        )
+                        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                            putExtra(android.content.Intent.EXTRA_SUBJECT, "YukiBoard 個人詞庫")
+                            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                         }
-                    } else {
+                        startActivity(android.content.Intent.createChooser(shareIntent, "匯出詞庫").apply {
+                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        })
+                    } catch (e: Exception) {
                         android.os.Handler(android.os.Looper.getMainLooper()).post {
-                            android.widget.Toast.makeText(this, "找不到匯入檔案：${file.absolutePath}", android.widget.Toast.LENGTH_LONG).show()
+                            android.widget.Toast.makeText(this, "匯出失敗: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
                         }
                     }
-                } catch (e: Exception) {
-                    android.os.Handler(android.os.Looper.getMainLooper()).post {
-                        android.widget.Toast.makeText(this, "匯入失敗: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                },
+                onImportRequest = {
+                    try {
+                        val file = java.io.File(getExternalFilesDir(null), "yukiboard_user_dict.txt")
+                        if (file.exists()) {
+                            val count = imePanelBindings.userDictPanel?.importEntries(file.readText()) ?: 0
+                            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                android.widget.Toast.makeText(this, "已匯入 $count 筆詞彙", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        } else {
+                            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                android.widget.Toast.makeText(this, "找不到匯入檔案：${file.absolutePath}", android.widget.Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    } catch (e: Exception) {
+                        android.os.Handler(android.os.Looper.getMainLooper()).post {
+                            android.widget.Toast.makeText(this, "匯入失敗: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                        }
                     }
-                }
-            }
+                },
+            ).also { imePanelBindings.userDictPanel = it }
             p.enterInputMode()
             p
         }
-        PanelType.MUSIC -> {
-            val p = MusicPanelView(this)
-            p.theme = theme
-            p.soundEngine = keySoundEngine
-            p.onImportMidi = {
-                com.snowrealm.yukiboard.ui.MidiImportActivity.onMidiImported = { midiSong ->
-                    val song = MusicPanelView.Song(
-                        name = midiSong.name,
-                        artist = "MIDI",
-                        bpm = 120,
-                        notes = midiSong.notes.map { n ->
-                            MusicPanelView.SongNote(n.semitone, n.startMs, n.durationMs)
-                        }
-                    )
-                    android.os.Handler(android.os.Looper.getMainLooper()).post { p.addImportedSong(song) }
-                }
-                try {
-                    val intent = android.content.Intent(this, com.snowrealm.yukiboard.ui.MidiImportActivity::class.java)
-                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                    startActivity(intent)
-                } catch (_: Exception) {}
-            }
-            p
-        }
+        PanelType.MUSIC -> ImeMusicPanelBinder.bind(
+            context = this,
+            theme = theme,
+            soundEngine = keySoundEngine,
+            onImportMidiClick = ::launchMidiImportFor,
+        )
         PanelType.HANDWRITING -> {
             if (handwritingEngine == null) {
                 try {
@@ -427,30 +415,33 @@ internal fun YukiBoardIMEService.createHighDependencyPanelOrNull(panel: PanelTyp
                 android.widget.Toast.makeText(this, "手寫引擎初始化失敗", android.widget.Toast.LENGTH_SHORT).show()
                 null
             } else {
-                val p = HandwritingPanelView(this, engine).also { imePanelBindings.handwritingPanel = it }
-                p.theme = theme
-                p.onCandidateSelected = { text ->
-                    currentInputConnection?.commitText(text, 1)
-                    clearCandidatesUi()
-                    inputRouter.onHandwritingCommit(text)
-                }
-                p.onRecognized = { rawCandidates ->
-                    if (rawCandidates.isNotEmpty()) {
-                        val boosted = rawCandidates.sortedByDescending { word ->
-                            inputRouter.smartInput.adaptiveDictionary.getFrequency(word)
+                val p = ImeHandwritingPanelBinder.bind(
+                    context = this,
+                    engine = engine,
+                    theme = theme,
+                    onCandidateSelected = { text ->
+                        currentInputConnection?.commitText(text, 1)
+                        clearCandidatesUi()
+                        inputRouter.onHandwritingCommit(text)
+                    },
+                    onRecognized = { rawCandidates ->
+                        if (rawCandidates.isNotEmpty()) {
+                            val boosted = rawCandidates.sortedByDescending { word ->
+                                inputRouter.smartInput.adaptiveDictionary.getFrequency(word)
+                            }
+                            val sourceMap = boosted.associateWith {
+                                com.snowrealm.yukiboard.input.router.CandidateSource.DICTIONARY
+                            }
+                            keyboardView.updateCandidates(boosted, sourceMap)
                         }
-                        val sourceMap = boosted.associateWith {
-                            com.snowrealm.yukiboard.input.router.CandidateSource.DICTIONARY
-                        }
-                        keyboardView.updateCandidates(boosted, sourceMap)
-                    }
-                }
-                p.onBackspace = {
-                    currentInputConnection?.deleteSurroundingText(1, 0)
-                }
-                p.onConfirm = {
-                    sendDefaultEditorAction(true)
-                }
+                    },
+                    onBackspace = {
+                        currentInputConnection?.deleteSurroundingText(1, 0)
+                    },
+                    onConfirm = {
+                        sendDefaultEditorAction(true)
+                    },
+                ).also { imePanelBindings.handwritingPanel = it }
                 p.ensureReady { ready ->
                     if (!ready) {
                         android.widget.Toast.makeText(this, "手寫模型下載中…", android.widget.Toast.LENGTH_SHORT).show()
@@ -461,6 +452,31 @@ internal fun YukiBoardIMEService.createHighDependencyPanelOrNull(panel: PanelTyp
         }
         else -> null
     }
+}
+
+/**
+ * Sprint 6-1：MUSIC panel 匯入 MIDI 的 service-side 啟動器。
+ *
+ * 保留 MidiImportActivity 的 static callback 接線（沿用既有行為），
+ * 但將此耦合收斂到單一函式，避免散落於 panel 建立流程中。
+ */
+internal fun YukiBoardIMEService.launchMidiImportFor(panel: MusicPanelView) {
+    com.snowrealm.yukiboard.ui.MidiImportActivity.onMidiImported = { midiSong ->
+        val song = MusicPanelView.Song(
+            name = midiSong.name,
+            artist = "MIDI",
+            bpm = 120,
+            notes = midiSong.notes.map { n ->
+                MusicPanelView.SongNote(n.semitone, n.startMs, n.durationMs)
+            }
+        )
+        android.os.Handler(android.os.Looper.getMainLooper()).post { panel.addImportedSong(song) }
+    }
+    try {
+        val intent = android.content.Intent(this, com.snowrealm.yukiboard.ui.MidiImportActivity::class.java)
+        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        startActivity(intent)
+    } catch (_: Exception) {}
 }
 
 internal fun YukiBoardIMEService.extractPanelSourceText(): String {

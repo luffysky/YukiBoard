@@ -1,5 +1,6 @@
 package com.snowrealm.yukiboard.claw.provider
 
+import com.snowrealm.yukiboard.app.net.AppHttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -14,11 +15,9 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
-import java.util.concurrent.TimeUnit
 
 class InvalidKeyException(message: String) : Exception(message)
 class RateLimitException(message: String) : Exception(message)
@@ -33,11 +32,7 @@ class OpenAIProvider(private val apiKey: String) : AIProvider {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
-        .build()
+    private val client = AppHttpClient.newBuilder(AppHttpClient.Profile.STREAMING).build()
 
     override val type: AIProviderType = AIProviderType.OPENAI
 

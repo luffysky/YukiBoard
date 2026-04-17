@@ -1,14 +1,13 @@
 package com.snowrealm.yukiboard.data
 
 import com.snowrealm.yukiboard.BuildConfig
+import com.snowrealm.yukiboard.app.net.AppHttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.util.concurrent.TimeUnit
 
 /**
  * YukiBoard Supabase 客戶端（Zeabur 獨立專案）。
@@ -26,10 +25,7 @@ class SupabaseClient private constructor() {
     private val supabaseUrl = BuildConfig.YUKIBOARD_SUPABASE_URL.trimEnd('/')
     private val anonKey = BuildConfig.YUKIBOARD_SUPABASE_ANON_KEY
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .build()
+    private val client = AppHttpClient.newBuilder(AppHttpClient.Profile.STANDARD).build()
 
     private val json = Json { ignoreUnknownKeys = true }
 

@@ -2,14 +2,14 @@ package com.snowrealm.yukiboard.data
 
 import android.content.Context
 import com.snowrealm.yukiboard.BuildConfig
-import com.snowrealm.yukiboard.auth.SnowRealmAuthClient
+import com.snowrealm.yukiboard.app.net.AppHttpClient
+import com.snowrealm.yukiboard.app.session.UserSessionRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.util.concurrent.TimeUnit
 
 /**
  * Insight Engine 統一 API 客戶端。
@@ -19,6 +19,10 @@ import java.util.concurrent.TimeUnit
  * - 401 自動 refresh token 後重試一次
  * - 錯誤訊息統一格式
  * - Platform-Key header
+ *
+ * Sprint 7-3 契約：本類是 Insight /api/ 路徑的唯一 gateway。
+ * 新 caller 禁止自建 OkHttpClient / 自組 Authorization；改走本類 get / post / stream。
+ * Auth token 與 refresh 皆透過 UserSessionRepository，不直達 SnowRealmAuthClient。
  */
 class InsightApiClient private constructor(private val context: Context) {
 
@@ -33,14 +37,10 @@ class InsightApiClient private constructor(private val context: Context) {
 
     private val baseUrl = BuildConfig.INSIGHT_API_BASE_URL.trimEnd('/')
     private val platformKey = BuildConfig.PLATFORM_API_KEY
-    private val authClient = SnowRealmAuthClient.getInstance(context)
+    private val session = UserSessionRepository(context)
     private val json = Json { ignoreUnknownKeys = true }
 
-    private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(15, TimeUnit.SECONDS)
-        .build()
+    private val httpClient = AppHttpClient.newBuilder(AppHttpClient.Profile.DEFAULT).build()
 
     // ── 核心請求方法 ──
 
@@ -67,32 +67,65 @@ class InsightApiClient private constructor(private val context: Context) {
             val request = buildRequest(path)
                 .post(body.toString().toRequestBody(JSON_TYPE))
                 .build()
-            val response = httpClient.newCall(request).execute()
-            if (!response.isSuccessful) {
-                onError("HTTP ${response.code}")
-                return@withContext
-            }
-            val source = response.body?.source() ?: run { onError("empty body"); return@withContext }
-            val buffer = okio.Buffer()
-            while (!source.exhausted()) {
-                source.read(buffer, 8192)
-                val line = buffer.readUtf8()
-                line.split("\n").forEach { raw ->
-                    val trimmed = raw.trim()
-                    if (trimmed.startsWith("data:")) {
-                        val data = trimmed.removePrefix("data:").trim()
-                        if (data == "[DONE]") return@forEach
-                        try {
-                            val chunk = json.parseToJsonElement(data).jsonObject
-                            val text = chunk["text"]?.jsonPrimitive?.content ?: return@forEach
-                            if (text.isNotEmpty()) onChunk(text)
-                        } catch (_: Exception) {}
-                    }
+            httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    onError("HTTP ${response.code}")
+                    return@use
                 }
+                val source = response.body?.source() ?: run {
+                    onError("empty body")
+                    return@use
+                }
+                // S9-A：SSE 解析
+                // 依 SSE spec 以 blank line 做 event 邊界，多行 `data:` 欄位以 `\n` 拼接。
+                // 改用 BufferedSource.readUtf8Line()：內部以字節邊界切行且正確處理 UTF-8 codepoint，
+                // 取代舊版 `read(buffer, 8192) + readUtf8()` —— 舊版會在任意字節處切斷 multi-byte
+                // UTF-8 字元、也會把還沒收完的最後一行當成完整 JSON 去解析。
+                val dataBuffer = StringBuilder()
+                var done = false
+                while (!done) {
+                    val line = source.readUtf8Line() ?: break
+                    if (line.isEmpty()) {
+                        if (dataBuffer.isEmpty()) continue
+                        val data = dataBuffer.toString()
+                        dataBuffer.setLength(0)
+                        if (data == "[DONE]") {
+                            done = true
+                            continue
+                        }
+                        dispatchSseData(data, onChunk)
+                        continue
+                    }
+                    if (line.startsWith(":")) continue  // SSE comment
+                    if (line.startsWith("data:")) {
+                        val value = line.substring(5).let {
+                            if (it.startsWith(" ")) it.substring(1) else it
+                        }
+                        if (dataBuffer.isNotEmpty()) dataBuffer.append('\n')
+                        dataBuffer.append(value)
+                    }
+                    // 其他 SSE 欄位（event:/id:/retry:）本 proxy 未用，安全略過
+                }
+                // stream 在未遇到 blank line 就關閉時，flush 殘留 buffer；
+                // well-formed SSE 不會走到這裡，屬防禦性處理。
+                if (dataBuffer.isNotEmpty() && !done) {
+                    val data = dataBuffer.toString()
+                    if (data != "[DONE]") dispatchSseData(data, onChunk)
+                }
+                onDone()
             }
-            onDone()
         } catch (e: Exception) {
             onError(e.message ?: "network error")
+        }
+    }
+
+    private fun dispatchSseData(data: String, onChunk: (String) -> Unit) {
+        try {
+            val chunk = json.parseToJsonElement(data).jsonObject
+            val text = chunk["text"]?.jsonPrimitive?.content
+            if (!text.isNullOrEmpty()) onChunk(text)
+        } catch (_: Exception) {
+            // 單一 event payload malformed 不中斷 stream
         }
     }
 
@@ -104,7 +137,7 @@ class InsightApiClient private constructor(private val context: Context) {
             .url(url)
             .header("X-Platform-Key", platformKey)
             .header("Content-Type", "application/json")
-        authClient.getToken()?.let { token ->
+        session.getAuthToken()?.let { token ->
             builder.header("Authorization", "Bearer $token")
         }
         return builder
@@ -118,10 +151,10 @@ class InsightApiClient private constructor(private val context: Context) {
 
                 // 401：嘗試 refresh 後重試一次
                 if (response.code == 401) {
-                    val refreshed = authClient.refreshIfNeeded()
+                    val refreshed = session.refreshSession()
                     if (refreshed) {
                         val retryReq = request.newBuilder()
-                            .header("Authorization", "Bearer ${authClient.getToken() ?: ""}")
+                            .header("Authorization", "Bearer ${session.getAuthToken() ?: ""}")
                             .build()
                         val retryResp = httpClient.newCall(retryReq).execute()
                         val retryBody = retryResp.body?.string() ?: ""

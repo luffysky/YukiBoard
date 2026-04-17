@@ -2,7 +2,7 @@ package com.snowrealm.yukiboard.claw.provider
 
 import android.content.Context
 import android.util.Base64
-import com.snowrealm.yukiboard.auth.SnowRealmAuthClient
+import com.snowrealm.yukiboard.app.session.UserSessionRepository
 import com.snowrealm.yukiboard.data.SupabaseClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -35,25 +35,23 @@ object ApiKeySync {
      * 上傳目前的 API Key 到雲端（加密）
      */
     suspend fun uploadKeys(context: Context): SyncResult = withContext(Dispatchers.IO) {
-        val auth = SnowRealmAuthClient.getInstance(context)
-        if (!auth.isLoggedIn) return@withContext SyncResult(false, "請先登入帳號")
-        val userId = auth.currentUserId ?: return@withContext SyncResult(false, "無法取得用戶 ID")
-        val token = auth.getToken() ?: return@withContext SyncResult(false, "Token 無效")
+        val session = UserSessionRepository(context)
+        if (!session.isLoggedIn()) return@withContext SyncResult(false, "請先登入帳號")
+        val userId = session.currentUserId ?: return@withContext SyncResult(false, "無法取得用戶 ID")
+        val token = session.getAuthToken() ?: return@withContext SyncResult(false, "Token 無效")
 
         val supabase = SupabaseClient.getInstance()
         if (!supabase.isConfigured) return@withContext SyncResult(false, "Supabase 未設定")
 
-        val mgr = AIProviderManager.getInstance(context)
-
         // 收集所有 API Key
         val keysJson = buildJsonObject {
-            put("selected_provider", mgr.getSelectedProviderType().name)
+            put("selected_provider", session.getSelectedProvider().name)
             for (type in AIProviderType.entries) {
-                val key = mgr.getApiKey(type)
+                val key = session.getApiKey(type)
                 if (!key.isNullOrBlank()) {
                     put("key_${type.name}", key)
                 }
-                val model = mgr.getSelectedModel(type)
+                val model = session.getSelectedModel(type)
                 put("model_${type.name}", model)
             }
         }
@@ -91,10 +89,10 @@ object ApiKeySync {
      * 從雲端下載 API Key 並還原到本機
      */
     suspend fun downloadKeys(context: Context): SyncResult = withContext(Dispatchers.IO) {
-        val auth = SnowRealmAuthClient.getInstance(context)
-        if (!auth.isLoggedIn) return@withContext SyncResult(false, "請先登入帳號")
-        val userId = auth.currentUserId ?: return@withContext SyncResult(false, "無法取得用戶 ID")
-        val token = auth.getToken() ?: return@withContext SyncResult(false, "Token 無效")
+        val session = UserSessionRepository(context)
+        if (!session.isLoggedIn()) return@withContext SyncResult(false, "請先登入帳號")
+        val userId = session.currentUserId ?: return@withContext SyncResult(false, "無法取得用戶 ID")
+        val token = session.getAuthToken() ?: return@withContext SyncResult(false, "Token 無效")
 
         val supabase = SupabaseClient.getInstance()
         if (!supabase.isConfigured) return@withContext SyncResult(false, "Supabase 未設定")
@@ -119,25 +117,24 @@ object ApiKeySync {
             return@withContext SyncResult(false, "JSON 解析失敗")
         }
 
-        val mgr = AIProviderManager.getInstance(context)
         var restoredCount = 0
 
         for (type in AIProviderType.entries) {
             val key = json["key_${type.name}"]?.jsonPrimitive?.contentOrNull
             if (!key.isNullOrBlank()) {
-                mgr.saveApiKey(type, key)
+                session.saveApiKey(type, key)
                 restoredCount++
             }
             val model = json["model_${type.name}"]?.jsonPrimitive?.contentOrNull
             if (!model.isNullOrBlank()) {
-                mgr.setSelectedModel(type, model)
+                session.saveSelectedModel(type, model)
             }
         }
 
         val provider = json["selected_provider"]?.jsonPrimitive?.contentOrNull
         if (provider != null) {
             try {
-                mgr.setSelectedProvider(AIProviderType.valueOf(provider))
+                session.saveProviderSelection(AIProviderType.valueOf(provider))
             } catch (_: Exception) {}
         }
 

@@ -2,6 +2,7 @@ package com.snowrealm.yukiboard.input.smart
 
 import android.content.Context
 import android.content.SharedPreferences
+import kotlinx.serialization.json.*
 
 /**
  * 自動校正自我學習管理器。
@@ -134,5 +135,33 @@ class CorrectionLearnManager(context: Context) {
     companion object {
         /** 至少被接受 3 次才算「常見錯字」 */
         const val MIN_ACCEPT_FOR_COMMON = 3
+    }
+
+    // ─────────────── 雲端 snapshot（Sprint 7-4） ───────────────
+
+    fun exportSnapshot(): JsonObject {
+        val index = prefs.getString("_cl_index", null)?.split(",") ?: return buildJsonObject {}
+        return buildJsonObject {
+            for (typed in index) {
+                if (typed.isBlank()) continue
+                prefs.getString("cl_$typed", null)?.let { put(typed, it) }
+            }
+        }
+    }
+
+    fun importSnapshot(obj: JsonObject) {
+        val editor = prefs.edit()
+        val keys = mutableListOf<String>()
+        for ((typed, value) in obj) {
+            val raw = value.jsonPrimitive.contentOrNull ?: continue
+            editor.putString("cl_$typed", raw)
+            keys.add(typed)
+        }
+        val existing = prefs.getString("_cl_index", null)?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+        val merged = (existing + keys).distinct()
+        editor.putString("_cl_index", merged.joinToString(","))
+        editor.apply()
+        // S9-C：import 完成後立即 reload in-memory，讓長生命週期 owner 不需等下次 cold start。
+        loadAll()
     }
 }

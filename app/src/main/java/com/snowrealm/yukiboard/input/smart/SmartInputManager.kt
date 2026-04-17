@@ -3,6 +3,8 @@ package com.snowrealm.yukiboard.input.smart
 import android.content.Context
 import com.snowrealm.yukiboard.input.dictionary.EnglishDictionary
 import com.snowrealm.yukiboard.input.swipe.SwipeLearnManager
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 
 /**
  * 智慧輸入總管 — 統合糾錯、自適應字典、語句預測、習慣追蹤。
@@ -233,6 +235,28 @@ class SmartInputManager(context: Context) {
     /** 取得情緒貼圖推薦標籤 */
     fun getEmotionStickerTags(text: String): List<String> {
         return emotionSticker.recommend(text)
+    }
+
+    /**
+     * S9-C：套用雲端下載的 learning snapshot。
+     *
+     * 由 [com.snowrealm.yukiboard.data.CloudSyncManager] 在長生命週期 IME alive 時
+     * 透過 `setSmartInputApplier` 注入的 callback 呼叫；避免 throwaway instance 寫 prefs
+     * 但 long-lived subsystem 記憶體未 reload 的不一致。
+     *
+     * 委派給 7 個 subsystem 各自的 `importSnapshot()`；subsystem 內部 (S9-C) 已在
+     * `editor.apply()` 後 loadAll()，故 callsite 回傳後 in-memory 已同步。
+     *
+     * snapshot JSON schema 與 Sprint 7-4 的 `exportSnapshot()` 對稱（不在本輪收斂）。
+     */
+    fun applyCloudSnapshot(snapshot: JsonObject) {
+        snapshot["adaptive_dict"]?.jsonObject?.let(adaptiveDictionary::importSnapshot)
+        snapshot["personal_dict"]?.jsonObject?.let(personalDictionary::importSnapshot)
+        snapshot["phrase_predict"]?.jsonObject?.let(phrasePredictor::importSnapshot)
+        snapshot["sentence_predict"]?.jsonObject?.let(sentencePredictor::importSnapshot)
+        snapshot["style_profile"]?.jsonObject?.let(styleProfiler::importSnapshot)
+        snapshot["typing_habits"]?.jsonObject?.let(habitTracker::importSnapshot)
+        snapshot["correction_learn"]?.jsonObject?.let(correctionLearnManager::importSnapshot)
     }
 
     /** 定期儲存（onFinishInputView 呼叫） */

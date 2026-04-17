@@ -3,11 +3,11 @@ package com.snowrealm.yukiboard.security
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
+import com.snowrealm.yukiboard.app.net.AppHttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
@@ -64,10 +64,7 @@ class FraudModelManager(private val context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-        .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
-        .build()
+    private val httpClient = AppHttpClient.newBuilder(AppHttpClient.Profile.STREAMING).build()
 
     private val json = Json { ignoreUnknownKeys = true }
 

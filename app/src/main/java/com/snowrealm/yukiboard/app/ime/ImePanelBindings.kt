@@ -89,5 +89,7 @@ class ImePanelBindings {
         langLearnPanel = null
         clipboardPanel = null
         handwritingPanel = null
+        themePanel = null
+        remotePanel = null
     }
 }

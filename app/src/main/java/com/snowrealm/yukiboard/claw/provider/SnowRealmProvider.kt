@@ -3,6 +3,7 @@ package com.snowrealm.yukiboard.claw.provider
 import android.content.Context
 import android.provider.Settings
 import com.snowrealm.yukiboard.BuildConfig
+import com.snowrealm.yukiboard.app.net.AppHttpClient
 import com.snowrealm.yukiboard.auth.InviteCodeManager
 import com.snowrealm.yukiboard.auth.SnowRealmAuthClient
 import kotlinx.coroutines.Dispatchers
@@ -18,10 +19,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.util.concurrent.TimeUnit
 
 /**
  * SnowRealm AI 代理 — 透過 insight-engine 轉發，使用者不需自己填 API key。
@@ -39,11 +38,7 @@ class SnowRealmProvider(private val context: Context) : AIProvider {
     private val authClient = SnowRealmAuthClient.getInstance(context)
     private val json = Json { ignoreUnknownKeys = true }
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(90, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
-        .build()
+    private val client = AppHttpClient.newBuilder(AppHttpClient.Profile.STREAMING_LONG).build()
 
     override val type: AIProviderType = AIProviderType.SNOWREALM
 

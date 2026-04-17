@@ -4,15 +4,16 @@ import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.snowrealm.yukiboard.BuildConfig
+import com.snowrealm.yukiboard.app.net.AppHttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.util.concurrent.TimeUnit
 
 /**
  * SnowRealm 帳號系統客戶端。
@@ -59,10 +60,7 @@ class SnowRealmAuthClient(context: Context) {
         }
     }
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .build()
+    private val client = AppHttpClient.newBuilder(AppHttpClient.Profile.STANDARD).build()
 
     // ─────────────── 登入狀態 ───────────────
 
@@ -76,24 +74,33 @@ class SnowRealmAuthClient(context: Context) {
     /** Email + 密碼登入 */
     suspend fun loginWithEmail(email: String, password: String): AuthResult =
         withContext(Dispatchers.IO) {
-            val body = """{"username":"$email","password":"$password"}"""
+            val body = buildJsonObject {
+                put("username", email)
+                put("password", password)
+            }
             postAuth("/api/auth/login", body, email)
         }
 
     /** 第三方 OAuth token 交換（LINE / Google） */
     suspend fun loginWithOAuth(provider: String, oauthToken: String): AuthResult =
         withContext(Dispatchers.IO) {
-            val body = """{"provider":"$provider","token":"$oauthToken"}"""
+            val body = buildJsonObject {
+                put("provider", provider)
+                put("token", oauthToken)
+            }
             postAuth("/api/auth/oauth", body)
         }
 
     /** 發送驗證碼（註冊前必須） */
     suspend fun sendVerificationCode(email: String): SendCodeResult =
         withContext(Dispatchers.IO) {
-            val body = """{"email":"$email","purpose":"register"}"""
+            val body = buildJsonObject {
+                put("email", email)
+                put("purpose", "register")
+            }
             val request = Request.Builder()
                 .url("$baseUrl/api/auth/send-code")
-                .post(body.toRequestBody("application/json".toMediaType()))
+                .post(body.toString().toRequestBody("application/json".toMediaType()))
                 .build()
             try {
                 val response = client.newCall(request).execute()
@@ -115,7 +122,14 @@ class SnowRealmAuthClient(context: Context) {
     suspend fun register(email: String, password: String, name: String, codeId: String, code: String): AuthResult =
         withContext(Dispatchers.IO) {
             val orgName = name.ifBlank { email.substringBefore("@") }
-            val body = """{"email":"$email","password":"$password","displayName":"$name","orgName":"$orgName","codeId":"$codeId","code":"$code"}"""
+            val body = buildJsonObject {
+                put("email", email)
+                put("password", password)
+                put("displayName", name)
+                put("orgName", orgName)
+                put("codeId", codeId)
+                put("code", code)
+            }
             postAuth("/api/auth/register", body)
         }
 
@@ -201,10 +215,10 @@ class SnowRealmAuthClient(context: Context) {
             .apply()
     }
 
-    private fun postAuth(path: String, body: String, loginEmail: String = ""): AuthResult {
+    private fun postAuth(path: String, body: kotlinx.serialization.json.JsonObject, loginEmail: String = ""): AuthResult {
         val request = Request.Builder()
             .url("$baseUrl$path")
-            .post(body.toRequestBody("application/json".toMediaType()))
+            .post(body.toString().toRequestBody("application/json".toMediaType()))
             .build()
 
         return try {

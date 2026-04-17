@@ -33,6 +33,15 @@ class InviteCodeManager(context: Context) {
         context.getSharedPreferences("yukiboard_invite_fallback", Context.MODE_PRIVATE)
     }
 
+    companion object {
+        /**
+         * Sprint 9-B：InviteCode usage state 是跨多個 InviteCodeManager instance 共用的單一 prefs。
+         * 這裡用 process-wide lock 序列化 activate / reset / consume / revoke，避免多 instance
+         * 下出現 reset 與 consume 交錯、或兩邊都讀到舊值後覆寫的 lost update。
+         */
+        private val usageLock = Any()
+    }
+
     /** Validate invite code format: YUKI-{PAYLOAD}-{HMAC8} */
     fun validateCode(code: String): InviteCodeType? {
         val upper = code.trim().uppercase()
@@ -67,13 +76,15 @@ class InviteCodeManager(context: Context) {
     }
 
     fun activateCode(code: String, type: InviteCodeType) {
-        prefs.edit()
-            .putString("invite_code", code.trim().uppercase())
-            .putString("invite_type", type.name)
-            .putString("activation_date", todayString())
-            .putInt("daily_token_used", 0)
-            .putString("usage_date", todayString())
-            .apply()
+        synchronized(usageLock) {
+            prefs.edit()
+                .putString("invite_code", code.trim().uppercase())
+                .putString("invite_type", type.name)
+                .putString("activation_date", todayString())
+                .putInt("daily_token_used", 0)
+                .putString("usage_date", todayString())
+                .apply()
+        }
     }
 
     fun isActivated(): Boolean = prefs.getString("invite_code", null) != null
@@ -88,8 +99,10 @@ class InviteCodeManager(context: Context) {
     fun getDailyTokenLimit(): Int = getCodeType()?.dailyTokenLimit ?: 0
 
     fun getDailyTokenUsed(): Int {
-        resetDailyUsageIfNeeded()
-        return prefs.getInt("daily_token_used", 0)
+        synchronized(usageLock) {
+            resetDailyUsageIfNeededLocked()
+            return prefs.getInt("daily_token_used", 0)
+        }
     }
 
     fun getRemainingTokens(): Int {
@@ -98,14 +111,21 @@ class InviteCodeManager(context: Context) {
         return (limit - getDailyTokenUsed()).coerceAtLeast(0)
     }
 
-    @Synchronized
     fun consumeTokens(count: Int) {
-        resetDailyUsageIfNeeded()
-        val current = prefs.getInt("daily_token_used", 0)
-        prefs.edit().putInt("daily_token_used", current + count).apply()
+        synchronized(usageLock) {
+            resetDailyUsageIfNeededLocked()
+            val current = prefs.getInt("daily_token_used", 0)
+            prefs.edit().putInt("daily_token_used", current + count).apply()
+        }
     }
 
     fun resetDailyUsageIfNeeded() {
+        synchronized(usageLock) {
+            resetDailyUsageIfNeededLocked()
+        }
+    }
+
+    private fun resetDailyUsageIfNeededLocked() {
         val storedDate = prefs.getString("usage_date", "") ?: ""
         val today = todayString()
         if (storedDate != today) {
@@ -117,7 +137,9 @@ class InviteCodeManager(context: Context) {
     }
 
     fun revokeCode() {
-        prefs.edit().clear().apply()
+        synchronized(usageLock) {
+            prefs.edit().clear().apply()
+        }
     }
 
     private fun computeHmac(payload: String): String {

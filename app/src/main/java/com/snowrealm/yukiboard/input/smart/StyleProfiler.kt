@@ -2,6 +2,7 @@ package com.snowrealm.yukiboard.input.smart
 
 import android.content.Context
 import android.content.SharedPreferences
+import kotlinx.serialization.json.*
 
 /**
  * 語氣風格學習器。
@@ -196,5 +197,37 @@ class StyleProfiler(context: Context) {
             "已處理", "收到", "了解", "同意", "確認", "排程",
             "deploy", "commit", "merge", "review", "bug", "fix"
         )
+    }
+
+    // ─────────────── 雲端 snapshot（Sprint 7-4） ───────────────
+
+    fun exportSnapshot(): JsonObject = buildJsonObject {
+        prefs.getString("_suffixes", null)?.let { put("suffixes", it) }
+        prefs.getString("_global_style", null)?.let { put("global_style", it) }
+        val appKeys = prefs.getString("_app_keys", null)
+        appKeys?.let { put("app_keys", it) }
+        appKeys?.split(",")?.forEach { pkg ->
+            if (pkg.isBlank()) return@forEach
+            prefs.getString("app_style_$pkg", null)?.let { put("app_style_$pkg", it) }
+        }
+    }
+
+    fun importSnapshot(obj: JsonObject) {
+        val editor = prefs.edit()
+        obj["suffixes"]?.jsonPrimitive?.contentOrNull?.let { editor.putString("_suffixes", it) }
+        obj["global_style"]?.jsonPrimitive?.contentOrNull?.let { editor.putString("_global_style", it) }
+        obj["app_keys"]?.jsonPrimitive?.contentOrNull?.let { keys ->
+            val existing = prefs.getString("_app_keys", null)?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+            val incoming = keys.split(",").filter { it.isNotBlank() }
+            editor.putString("_app_keys", (existing + incoming).distinct().joinToString(","))
+        }
+        for ((key, value) in obj) {
+            if (key.startsWith("app_style_")) {
+                value.jsonPrimitive.contentOrNull?.let { editor.putString(key, it) }
+            }
+        }
+        editor.apply()
+        // S9-C：import 完成後立即 reload in-memory，讓長生命週期 owner 不需等下次 cold start。
+        loadAll()
     }
 }

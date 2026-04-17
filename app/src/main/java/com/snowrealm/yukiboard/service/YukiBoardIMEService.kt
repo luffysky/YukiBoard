@@ -133,8 +133,15 @@ class YukiBoardIMEService : InputMethodService() {
     internal var lastFraudScanText: String? = null  // 避免重複掃描同一段文字
     internal var lastFraudReplyText: String? = null // 避免重複掃描同一段回覆
     internal val fraudDetectRunnable = Runnable {
-        if (::panelContainer.isInitialized && panelContainer.childCount > 0) {
-            (panelContainer.getChildAt(0) as? ClawPanelView)?.triggerSkill("fraud_detect")
+        // S8-1 Bug#2：不再依賴 child index，改以 active panel SSOT 判斷後再定位 ClawPanelView。
+        if (imeContainerState.activePanel != PanelType.CLAW) return@Runnable
+        if (!::panelContainer.isInitialized) return@Runnable
+        for (i in 0 until panelContainer.childCount) {
+            val child = panelContainer.getChildAt(i)
+            if (child is ClawPanelView) {
+                child.triggerSkill("fraud_detect")
+                return@Runnable
+            }
         }
     }
     internal var clipboardListener: android.content.ClipboardManager.OnPrimaryClipChangedListener? = null
@@ -230,6 +237,8 @@ class YukiBoardIMEService : InputMethodService() {
     override fun onCreate() {
         super.onCreate()
         inputRouter = InputRouter(applicationContext)
+        CloudSyncManager.getInstance(applicationContext)
+            .setSmartInputApplier(inputRouter.smartInput::applyCloudSnapshot)
         snippetManager = SnippetManager(applicationContext)
         appModeDetector = AppModeDetector()
         imePanelFactory = ImePanelFactory()
@@ -410,6 +419,10 @@ class YukiBoardIMEService : InputMethodService() {
             startImeComposingCandidatesCollect()
             return wrapInFloatingMode(rootContainer)
         }
+
+        // Sprint 6-Bugfix: 非懸浮路徑須 reset coordinator isFloatingMode，避免 dock / close / toggle-off
+        // 留下的 stale true（Entry writer 對稱於 wrapInFloatingMode 內的 setFloatingMode(true)）
+        imeCoordinator.setFloatingMode(false)
 
         // 底部安全間距（避免貼住螢幕底部）
         val bottomPad = (8 * resources.displayMetrics.density).toInt()
@@ -631,6 +644,15 @@ class YukiBoardIMEService : InputMethodService() {
                     clawResultFloatingPanel?.dismiss()
                     glSurfaceView?.onPause()
                     handwritingEngine?.close()
+                },
+                unregisterSmartInputApplier = {
+                    CloudSyncManager.getInstance(applicationContext).setSmartInputApplier(null)
+                },
+                releaseInputRouter = {
+                    // S8-3：解除 InputRouter 持有的 UserDictionary listener。
+                    if (::inputRouter.isInitialized) {
+                        inputRouter.release()
+                    }
                 },
                 cancelScope = {
                     uiStateCollectJob?.cancel()

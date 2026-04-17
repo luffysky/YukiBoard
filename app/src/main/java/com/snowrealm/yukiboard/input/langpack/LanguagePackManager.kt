@@ -2,12 +2,11 @@ package com.snowrealm.yukiboard.input.langpack
 
 import android.content.Context
 import android.util.Log
+import com.snowrealm.yukiboard.app.net.AppHttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
-import java.util.concurrent.TimeUnit
 
 /**
  * 語言套件管理器 — 負責下載、安裝、移除語言詞庫。
@@ -20,10 +19,7 @@ class LanguagePackManager private constructor(private val context: Context) {
     private val prefs = context.getSharedPreferences("langpacks", Context.MODE_PRIVATE)
     private val packDir = File(context.filesDir, "langpacks").also { it.mkdirs() }
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build()
+    private val client = AppHttpClient.newBuilder(AppHttpClient.Profile.DEFAULT).build()
 
     /** 內建語言 ID（不需下載） */
     private val BUILTIN_IDS = setOf("zh_bopomofo", "zh_pinyin", "zh_cangjie", "zh_speed", "en", "ja", "ko")

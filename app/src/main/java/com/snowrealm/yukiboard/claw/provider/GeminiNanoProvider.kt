@@ -3,6 +3,7 @@ package com.snowrealm.yukiboard.claw.provider
 import android.content.Context
 import android.os.Build
 import android.util.Log
+import com.snowrealm.yukiboard.app.net.AppHttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -15,7 +16,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
@@ -44,9 +44,9 @@ class GeminiNanoProvider(private val context: Context) : AIProvider {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    private val client = OkHttpClient.Builder()
+    // 本地 AICore endpoint：保留 5s connect（tight，避免 AICore 不可用時拖長），其餘用 DEFAULT profile。
+    private val client = AppHttpClient.newBuilder(AppHttpClient.Profile.DEFAULT)
         .connectTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
     override val type = AIProviderType.GEMINI_NANO

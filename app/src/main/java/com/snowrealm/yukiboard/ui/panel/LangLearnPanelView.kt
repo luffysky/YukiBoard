@@ -4,13 +4,12 @@ import android.content.Context
 import android.graphics.Typeface
 import android.view.Gravity
 import android.widget.*
+import com.snowrealm.yukiboard.app.net.AppHttpClient
 import com.snowrealm.yukiboard.theme.KeyboardTheme
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.*
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.URLEncoder
-import java.util.concurrent.TimeUnit
 
 /**
  * 語言學習面板 — 查詞時提供完整學習資訊。
@@ -33,10 +32,7 @@ class LangLearnPanelView(context: Context) : LinearLayout(context), PanelInputTa
     var onSpeak: ((String, String?) -> Unit)? = null
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
-        .build()
+    private val client = AppHttpClient.newBuilder(AppHttpClient.Profile.SHORT).build()
     private val json = Json { ignoreUnknownKeys = true }
 
     private val density = resources.displayMetrics.density

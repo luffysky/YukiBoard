@@ -60,6 +60,8 @@ class ImeSessionHooks(
         cleanup.stopSensors()
         cleanup.stopGameLoop()
         cleanup.destroyAudioAndRemote()
+        cleanup.unregisterSmartInputApplier()
+        cleanup.releaseInputRouter()
         cleanup.cancelScope()
     }
 }
@@ -87,5 +89,7 @@ data class DestroyCleanup(
     val stopSensors: () -> Unit,
     val stopGameLoop: () -> Unit,
     val destroyAudioAndRemote: () -> Unit,
+    val unregisterSmartInputApplier: () -> Unit,
+    val releaseInputRouter: () -> Unit,
     val cancelScope: () -> Unit,
 )

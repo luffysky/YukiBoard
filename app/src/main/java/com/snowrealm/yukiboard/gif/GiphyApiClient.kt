@@ -1,13 +1,12 @@
 package com.snowrealm.yukiboard.gif
 
 import com.snowrealm.yukiboard.BuildConfig
+import com.snowrealm.yukiboard.app.net.AppHttpClient
 import com.snowrealm.yukiboard.ui.panel.GifPanelView.GifItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
-import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.util.concurrent.TimeUnit
 
 /**
  * Giphy API 客戶端 — trending + search。
@@ -20,10 +19,7 @@ class GiphyApiClient {
     private val apiKey: String = BuildConfig.GIPHY_API_KEY
     private val baseUrl = "https://api.giphy.com/v1/gifs"
 
-    private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
-        .build()
+    private val httpClient = AppHttpClient.newBuilder(AppHttpClient.Profile.SHORT).build()
 
     /** 是否有有效的 API Key */
     fun isAvailable(): Boolean = apiKey.isNotBlank()

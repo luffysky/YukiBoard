@@ -2,6 +2,7 @@ package com.snowrealm.yukiboard.input.smart
 
 import android.content.Context
 import android.content.SharedPreferences
+import kotlinx.serialization.json.*
 
 /**
  * ���句上下文預測引擎 — 根據輸入框前文的句子，預測使用者可能要回覆的整句。
@@ -450,5 +451,43 @@ class SentencePredictor(context: Context) {
             listOf("사랑해", "좋아해") to
                 listOf("나도 사랑해 ❤️", "나도！", "고마워 ❤️"),
         )
+    }
+
+    // ─────────────── 雲端 snapshot（Sprint 7-4） ───────────────
+
+    fun exportSnapshot(): JsonObject = buildJsonObject {
+        put("sb_keys", prefs.getString("_sb_keys", "") ?: "")
+        val sbKeys = prefs.getString("_sb_keys", null)?.split(";;") ?: emptyList()
+        for (key in sbKeys) {
+            if (key.isBlank()) continue
+            prefs.getString("sb_$key", null)?.let { put("sb_$key", it) }
+        }
+        put("sp_keys", prefs.getString("_sp_keys", "") ?: "")
+        val spKeys = prefs.getString("_sp_keys", null)?.split(";;") ?: emptyList()
+        for (key in spKeys) {
+            if (key.isBlank()) continue
+            prefs.getString("sp_$key", null)?.let { put("sp_$key", it) }
+        }
+    }
+
+    fun importSnapshot(obj: JsonObject) {
+        val editor = prefs.edit()
+        for ((key, value) in obj) {
+            val raw = value.jsonPrimitive.contentOrNull ?: continue
+            if (key == "sb_keys") {
+                val existing = prefs.getString("_sb_keys", null)?.split(";;")?.filter { it.isNotBlank() } ?: emptyList()
+                val incoming = raw.split(";;").filter { it.isNotBlank() }
+                editor.putString("_sb_keys", (existing + incoming).distinct().joinToString(";;"))
+            } else if (key == "sp_keys") {
+                val existing = prefs.getString("_sp_keys", null)?.split(";;")?.filter { it.isNotBlank() } ?: emptyList()
+                val incoming = raw.split(";;").filter { it.isNotBlank() }
+                editor.putString("_sp_keys", (existing + incoming).distinct().joinToString(";;"))
+            } else {
+                editor.putString(key, raw)
+            }
+        }
+        editor.apply()
+        // S9-C：import 完成後立即 reload in-memory，讓長生命週期 owner 不需等下次 cold start。
+        loadAll()
     }
 }

@@ -2,6 +2,7 @@ package com.snowrealm.yukiboard.input.smart
 
 import android.content.Context
 import android.content.SharedPreferences
+import kotlinx.serialization.json.*
 
 /**
  * 個人詞庫 — 三層自動學詞系統。
@@ -214,6 +215,47 @@ class PersonalDictionary(private val context: Context) {
         var lastUsedMs: Long,
         var pinnedMs: Long
     )
+
+    // ─────────────── 雲端 snapshot（Sprint 7-4） ───────────────
+
+    fun exportSnapshot(): JsonObject {
+        val index = prefs.getString("_pd_index", null)?.split(",") ?: return buildJsonObject {}
+        return buildJsonObject {
+            for (word in index) {
+                if (word.isBlank()) continue
+                prefs.getString("pd_$word", null)?.let { put(word, it) }
+            }
+        }
+    }
+
+    fun importSnapshot(obj: JsonObject) {
+        val editor = prefs.edit()
+        val keys = mutableListOf<String>()
+        for ((word, value) in obj) {
+            val remoteRaw = value.jsonPrimitive.contentOrNull ?: continue
+            val localRaw = prefs.getString("pd_$word", null)
+            if (localRaw == null) {
+                editor.putString("pd_$word", remoteRaw)
+            } else {
+                val localParts = localRaw.split("|")
+                val remoteParts = remoteRaw.split("|")
+                val localTier = localParts.getOrNull(0)?.toIntOrNull() ?: 0
+                val remoteTier = remoteParts.getOrNull(0)?.toIntOrNull() ?: 0
+                val localFreq = localParts.getOrNull(1)?.toIntOrNull() ?: 0
+                val remoteFreq = remoteParts.getOrNull(1)?.toIntOrNull() ?: 0
+                if (remoteTier > localTier || (remoteTier == localTier && remoteFreq > localFreq)) {
+                    editor.putString("pd_$word", remoteRaw)
+                }
+            }
+            keys.add(word)
+        }
+        val existing = prefs.getString("_pd_index", null)?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+        val merged = (existing + keys).distinct()
+        editor.putString("_pd_index", merged.joinToString(","))
+        editor.apply()
+        // S9-C：import 完成後立即 reload in-memory，讓長生命週期 owner 不需等下次 cold start。
+        loadAll()
+    }
 
     companion object {
         const val PROMOTE_TO_LEARNED = 3       // 使用 ≥3 次 → LEARNED

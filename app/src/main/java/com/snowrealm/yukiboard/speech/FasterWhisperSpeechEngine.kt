@@ -4,6 +4,7 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.util.Log
+import com.snowrealm.yukiboard.app.net.AppHttpClient
 import kotlinx.coroutines.*
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
@@ -40,8 +41,8 @@ class FasterWhisperSpeechEngine(
     private var audioRecord: AudioRecord? = null
     private var recordingJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
+    // Faster-Whisper 自架 server：readTimeout 延至 120s 配合長音檔推論，writeTimeout 60s 配合 WAV 上傳
+    private val client = AppHttpClient.newBuilder(AppHttpClient.Profile.DEFAULT)
         .readTimeout(120, TimeUnit.SECONDS)
         .writeTimeout(60, TimeUnit.SECONDS)
         .build()

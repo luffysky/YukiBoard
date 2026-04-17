@@ -2,6 +2,7 @@ package com.snowrealm.yukiboard.ui.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import kotlinx.serialization.json.*
 import org.json.JSONObject
 import kotlin.reflect.KProperty
 
@@ -288,6 +289,122 @@ class YukiPreferences(context: Context) {
     // ════��═════════════════════════════��════════════════════════
     // 委派實作
     // ════════���════════════════���═════════════════════════════════
+
+    // ═══════════════════════════════════════════════════════════
+    // 雲端 snapshot（Sprint 7-4 收斂自 CloudSyncManager）
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * 匯出「使用者可控設定」為 JSON（供 CloudSyncManager 上傳）。
+     * 只同步行為開關 / 感測器 / 動畫音效 / 輸入 / 面板 / 遊戲 / 雪凜，
+     * 不包含主題背景（走 [exportThemeSnapshot]）。
+     */
+    fun exportSettingsSnapshot(): JsonObject = buildJsonObject {
+        put("ai_enabled", aiEnabled)
+        put("ai_prediction", aiPrediction)
+        put("ai_writer", aiWriter)
+        put("ai_translate", aiTranslate)
+        put("ai_cupid", aiCupid)
+        put("ai_whisper", aiWhisper)
+        put("ai_grammar_check", aiGrammarCheck)
+        put("ai_tone_adjust", aiToneAdjust)
+        put("ai_summarize", aiSummarize)
+        put("ai_emoji_translate", aiEmojiTranslate)
+        put("ai_quick_reply", aiQuickReply)
+        put("ai_code_complete", aiCodeComplete)
+        put("ai_regex_gen", aiRegexGen)
+        put("shake_to_undo", shakeToUndoEnabled)
+        put("gyro_cursor", gyroscopeCursorEnabled)
+        put("gyro_sensitivity", gyroscopeSensitivity)
+        put("app_auto_detect", appAutoDetectEnabled)
+        put("flow_light", flowLightEnabled)
+        put("character_anim", characterAnimEnabled)
+        put("key_particle", keyParticleEffect)
+        put("key_vibration", keyPressVibration)
+        put("key_sound", keySoundEnabled)
+        put("key_sound_style", keySoundStyle)
+        put("key_sound_volume", keySoundVolume)
+        put("auto_input_mode", autoInputMode)
+        put("swipe_input", swipeInput)
+        put("settings_language", settingsLanguage)
+        put("floating_panel", floatingPanelEnabled)
+        put("weather_panel", weatherPanelEnabled)
+        put("sticker_panel", stickerPanelEnabled)
+        put("games_enabled", gamesEnabled)
+        put("game_bgm", gameBackgroundMusic)
+        put("game_sfx", gameSoundEffects)
+        put("yuki_sarcastic", yukiSarcasticComments)
+        put("yuki_cooldown", yukiEmotionalCooldown)
+        put("yuki_mood_passive", yukiMoodDiaryPassive)
+        put("yuki_weather_alert", yukiWeatherAlert)
+        put("yuki_late_night", yukiLateNightComment)
+    }
+
+    /** 匯入偏好設定（供 CloudSyncManager 下載後還原）。 */
+    fun importSettingsSnapshot(obj: JsonObject) {
+        obj["ai_enabled"]?.jsonPrimitive?.booleanOrNull?.let { aiEnabled = it }
+        obj["ai_prediction"]?.jsonPrimitive?.booleanOrNull?.let { aiPrediction = it }
+        obj["ai_writer"]?.jsonPrimitive?.booleanOrNull?.let { aiWriter = it }
+        obj["ai_translate"]?.jsonPrimitive?.booleanOrNull?.let { aiTranslate = it }
+        obj["ai_cupid"]?.jsonPrimitive?.booleanOrNull?.let { aiCupid = it }
+        obj["ai_whisper"]?.jsonPrimitive?.booleanOrNull?.let { aiWhisper = it }
+        obj["ai_grammar_check"]?.jsonPrimitive?.booleanOrNull?.let { aiGrammarCheck = it }
+        obj["ai_tone_adjust"]?.jsonPrimitive?.booleanOrNull?.let { aiToneAdjust = it }
+        obj["ai_summarize"]?.jsonPrimitive?.booleanOrNull?.let { aiSummarize = it }
+        obj["ai_emoji_translate"]?.jsonPrimitive?.booleanOrNull?.let { aiEmojiTranslate = it }
+        obj["ai_quick_reply"]?.jsonPrimitive?.booleanOrNull?.let { aiQuickReply = it }
+        obj["ai_code_complete"]?.jsonPrimitive?.booleanOrNull?.let { aiCodeComplete = it }
+        obj["ai_regex_gen"]?.jsonPrimitive?.booleanOrNull?.let { aiRegexGen = it }
+        obj["shake_to_undo"]?.jsonPrimitive?.booleanOrNull?.let { shakeToUndoEnabled = it }
+        obj["gyro_cursor"]?.jsonPrimitive?.booleanOrNull?.let { gyroscopeCursorEnabled = it }
+        obj["gyro_sensitivity"]?.jsonPrimitive?.floatOrNull?.let { gyroscopeSensitivity = it }
+        obj["app_auto_detect"]?.jsonPrimitive?.booleanOrNull?.let { appAutoDetectEnabled = it }
+        obj["flow_light"]?.jsonPrimitive?.booleanOrNull?.let { flowLightEnabled = it }
+        obj["character_anim"]?.jsonPrimitive?.booleanOrNull?.let { characterAnimEnabled = it }
+        obj["key_particle"]?.jsonPrimitive?.booleanOrNull?.let { keyParticleEffect = it }
+        obj["key_vibration"]?.jsonPrimitive?.booleanOrNull?.let { keyPressVibration = it }
+        obj["key_sound"]?.jsonPrimitive?.booleanOrNull?.let { keySoundEnabled = it }
+        obj["key_sound_style"]?.jsonPrimitive?.contentOrNull?.let { keySoundStyle = it }
+        obj["key_sound_volume"]?.jsonPrimitive?.floatOrNull?.let { keySoundVolume = it }
+        obj["auto_input_mode"]?.jsonPrimitive?.booleanOrNull?.let { autoInputMode = it }
+        obj["swipe_input"]?.jsonPrimitive?.booleanOrNull?.let { swipeInput = it }
+        obj["settings_language"]?.jsonPrimitive?.contentOrNull?.let { settingsLanguage = it }
+        obj["floating_panel"]?.jsonPrimitive?.booleanOrNull?.let { floatingPanelEnabled = it }
+        obj["weather_panel"]?.jsonPrimitive?.booleanOrNull?.let { weatherPanelEnabled = it }
+        obj["sticker_panel"]?.jsonPrimitive?.booleanOrNull?.let { stickerPanelEnabled = it }
+        obj["games_enabled"]?.jsonPrimitive?.booleanOrNull?.let { gamesEnabled = it }
+        obj["game_bgm"]?.jsonPrimitive?.booleanOrNull?.let { gameBackgroundMusic = it }
+        obj["game_sfx"]?.jsonPrimitive?.booleanOrNull?.let { gameSoundEffects = it }
+        obj["yuki_sarcastic"]?.jsonPrimitive?.booleanOrNull?.let { yukiSarcasticComments = it }
+        obj["yuki_cooldown"]?.jsonPrimitive?.booleanOrNull?.let { yukiEmotionalCooldown = it }
+        obj["yuki_mood_passive"]?.jsonPrimitive?.booleanOrNull?.let { yukiMoodDiaryPassive = it }
+        obj["yuki_weather_alert"]?.jsonPrimitive?.booleanOrNull?.let { yukiWeatherAlert = it }
+        obj["yuki_late_night"]?.jsonPrimitive?.booleanOrNull?.let { yukiLateNightComment = it }
+    }
+
+    /** 匯出主題相關設定 JSON（背景 / 疊圖 alpha / scale mode / offset / rotation / 鍵盤高度 / 工具列動畫）。 */
+    fun exportThemeSnapshot(): JsonObject = buildJsonObject {
+        put("use_custom_background", useCustomBackground)
+        put("bg_overlay_alpha", bgOverlayAlpha)
+        put("bg_scale_mode", bgScaleMode)
+        put("bg_offset_x", bgOffsetX)
+        put("bg_offset_y", bgOffsetY)
+        put("bg_rotation", bgRotation)
+        put("keyboard_height_ratio", keyboardHeightRatio)
+        put("toolbar_anim_style", toolbarAnimStyle)
+    }
+
+    /** 匯入主題設定。 */
+    fun importThemeSnapshot(obj: JsonObject) {
+        obj["use_custom_background"]?.jsonPrimitive?.booleanOrNull?.let { useCustomBackground = it }
+        obj["bg_overlay_alpha"]?.jsonPrimitive?.intOrNull?.let { bgOverlayAlpha = it }
+        obj["bg_scale_mode"]?.jsonPrimitive?.intOrNull?.let { bgScaleMode = it }
+        obj["bg_offset_x"]?.jsonPrimitive?.floatOrNull?.let { bgOffsetX = it }
+        obj["bg_offset_y"]?.jsonPrimitive?.floatOrNull?.let { bgOffsetY = it }
+        obj["bg_rotation"]?.jsonPrimitive?.intOrNull?.let { bgRotation = it }
+        obj["keyboard_height_ratio"]?.jsonPrimitive?.floatOrNull?.let { keyboardHeightRatio = it }
+        obj["toolbar_anim_style"]?.jsonPrimitive?.contentOrNull?.let { toolbarAnimStyle = it }
+    }
 
     private inner class BoolPref(private val key: String, private val default: Boolean) {
         operator fun getValue(thisRef: Any?, property: KProperty<*>): Boolean =
