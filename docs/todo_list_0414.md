@@ -283,7 +283,7 @@
 - ✅ **候選字重複提交** — finishComposingText() 在 LINE 等 App 會 commit composing buffer，改用 setComposingText("", 1) 清空 composing 不 commit；Chewing directCommit 移除 pending text 避免雙重輸出
 
 ### 🔴 已知未修 Bug（低優先）
-- [ ] **面板輸入框無法打字** — 解密/詞庫/剪貼簿/GIF 面板的搜尋框與輸入框無法正常輸入，點擊搜尋框後框消失或輸入內容不顯示。多次嘗試修復未果，需重新設計面板 inputMode 機制（放最後處理）
+- ~~[ ] **面板輸入框無法打字**~~ — 2026-04-18 CodeX A 複核：`GifPanelView` / `DecryptPanelView` / `ClipboardPanelView` / `UserDictionaryPanelView` 已實作 `PanelInputTarget + enterInputMode()`，舊問題不再適合作為全局未修項
 
 ---
 
@@ -946,13 +946,13 @@ Phase 3：上架準備
 
 ## 🟡 中等問題（v0.9.21 掃描）
 
-- [ ] **AI Writer 開關無效**：`YukiPreferences.aiWriter` 有 switch 但 Service 未檢查就執行 WriterSkill
-- [ ] **AI EmojiTranslate 開關無效**：`YukiPreferences.aiEmojiTranslate` 同上
-- [ ] **AI ToneAdjust 無前端觸發**：後端 ToneAdjustSkill 存在但沒有 UI 入口呼叫
-- [ ] **AI CodeComplete / RegexGen 開關**：設定有但無明確整合路徑
+- ~~[ ] **AI Writer 開關無效**~~：`ClawPanelView.isSkillDisabledByPref()` 已檢查 `YukiPreferences.aiWriter`
+- ~~[ ] **AI EmojiTranslate 開關無效**~~：`ClawPanelView.isSkillDisabledByPref()` 已檢查 `YukiPreferences.aiEmojiTranslate`
+- ~~[ ] **AI ToneAdjust 無前端觸發**~~：`ClawToolbarView` 已有 `tone_adjust` 入口，`ClawClient` 已接 `ToneAdjustSkill`
+- ~~[ ] **AI CodeComplete / RegexGen 開關**~~：`ClawToolbarView` / `ClawClient` / `ClawPanelView.isSkillDisabledByPref()` 已形成完整入口與開關檢查
 - [ ] **GIF 面板搜尋**：onSearch 依賴 GiphyApiClient + API key，無 key 時無法搜尋
 - [ ] **天氣面板穿衣建議**：outfitText UI 有但推薦邏輯是 stub（"需解鎖"）
-- [ ] **TTS 設定**：ttsTranslateRead / ttsCandidateRead 偏好可能未完全生效
+- ~~[ ] **TTS 設定**~~：`ImeServiceMisc.onTranslateSpeakRequest()` / `onCandidateSpeak()` 已檢查 `ttsTranslateRead` / `ttsCandidateRead`
 - [ ] **VRM 3D 角色**：框架完整但模型素材 / 資產管線不確定
 - [ ] **EmotionalCooldownManager**：情緒冷靜期管理器邏輯可能不完整
 - [ ] **OpenWeather API**：key 有設定但實際 API 呼叫完整性待確認
@@ -971,13 +971,13 @@ Phase 3：上架準備
   - 文字：直接複製 + Toast 提示「已複製」
   - 圖片：複製為 ClipData.Item(Uri) 供其他 App 貼上
   - 檔案：複製檔案 Uri 到系統剪貼簿
-- [ ] **長按選單** — 複製 / 加密 / 釘選 / 分類 / 刪除
+- ~~[ ] **長按選單**~~ — `ClipboardPanelView.showContextMenu()` 已有複製 / 加密 / 釘選 / 刪除
 
 ### 分類 & 搜尋
-- [ ] **自動分類標籤** — 依內容自動標記：📝文字 / 🔗連結 / 📧信箱 / 📞電話 / 🖼️圖片 / 📎檔案 / 🔒加密
+- ~~[ ] **自動分類標籤**~~ — `ClipContentTag.detect()` + `ClipboardPanelView` 已實作文字 / 連結 / 信箱 / 電話等自動分類
 - [ ] **手動分類** — 使用者可自訂標籤（工作/個人/密碼/地址等）
-- [ ] **搜尋功能** — 頂部搜尋框，即時過濾剪貼簿歷史（加密項目需解鎖後才可搜尋內容）
-- [ ] **篩選標籤列** — 橫向標籤快速篩選分類
+- ~~[ ] **搜尋功能**~~ — `ClipboardPanelView` 已有搜尋列與即時過濾；加密項目未解鎖時不參與搜尋
+- ~~[ ] **篩選標籤列**~~ — `ClipboardPanelView.buildTagRow()` 已有橫向標籤篩選
 
 ### 圖片 & 檔案支援
 - [ ] **圖片剪貼簿** — 監聽 ClipboardManager 圖片項目，縮圖預覽 + 儲存本地
@@ -993,7 +993,7 @@ Phase 3：上架準備
 - [ ] **Supabase 同步** — 剪貼簿歷史 + 釘選項目雲端備份（需登入）
   - 加密項目以加密狀態同步（伺服器無法讀取明文）
   - 衝突解決：以最新時間戳為準
-- [ ] **同步開關** — YukiPreferences 加 `clipboardSyncEnabled`
+- ~~[ ] **同步開關**~~ — `YukiPreferences.clipboardSyncEnabled` + `ClipboardSettingsSection` 已存在；真正未做的是雲端同步本體
 - [ ] **同步範圍設定** — 僅釘選 / 全部 / 排除加密
 
 ## 🆕 新功能：自訂辭彙 CRUD（功能列入口）
@@ -1005,14 +1005,14 @@ Phase 3：上架準備
   - 編輯功能：點擊詞條可修改讀音或詞彙
   - 刪除功能：左滑或長按刪除
   - 搜尋/篩選功能
-- [ ] **UserDictionary CRUD 完善** — 確保 addManual / update / delete / queryAll 完整
-- [ ] **匯出/匯入** — 自訂辭彙匯出為 txt/csv + 匯入還原
+- ~~[ ] **UserDictionary CRUD 完善**~~ — `UserDictionary` 已有 `addManual` / `updateManual` / `removeManual` / `getAllManualWithCategory`
+- ~~[ ] **匯出/匯入**~~ — `UserDictionary.exportToString()` / `importFromString()` 與 `UserDictionaryPanelView` 已接上
 
 ## 🆕 新功能：語音音色選擇（Google TTS）
 
 - ~~[ ] **TTS 音色列表**~~ ✅ ttsVoiceName pref 已實作
 - ~~[ ] **設定頁 TTS 音色選擇器**~~ ✅ YukiPreferences.ttsVoiceName + SettingsActivity 已有
-- [ ] **套用音色** — 確認 TextToSpeech.setVoice() 完整套用到所有朗讀場景
+- ~~[ ] **套用音色**~~ — `AndroidTtsEngine.setVoice()` 已落地，IME lifecycle / input 路徑也有呼叫套用
 
 ## 🆕 新功能：悄悄話解密面板
 

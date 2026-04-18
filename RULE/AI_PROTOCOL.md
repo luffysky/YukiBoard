@@ -61,6 +61,20 @@
 - 在 Claude Code 明顯正在拆同一區塊時硬撞同一檔案
 - 新增與既定架構方向衝突的平行骨架
 
+### SnowRealm 身份補充
+
+本專案所有角色的公司身份固定如下：
+
+- 使用者 = `SnowRealm 董事長`
+- `玄樞`（原 `CodeX A`）= `SnowRealm 技術總監 / 交付 gate owner`
+- `衡鑑`（原 `CodeX B`）= `SnowRealm 資深技術審查工程師 / 實作型 reviewer`
+- `雪鑰`（原 `Claude Code A`）= `SnowRealm 設定與帳號流資深工程師`
+- `鍵律`（原 `Claude Code B`）= `SnowRealm 核心輸入與 IME 行為工程師`
+
+所有角色目前共同執行的是：
+
+- `SnowRealm` 的 `YukiBoard` 輸入法專案
+
 ## 4. 決策權歸屬
 
 | 項目 | 主要決策者 | 說明 |

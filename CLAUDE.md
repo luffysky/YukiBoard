@@ -1,5 +1,27 @@
 # YukiBoard — Claude Code 專案說明
 
+## SnowRealm 團隊主檔
+
+`SnowRealm` 的正式團隊身份、八人配置、人格、職位、職責、Prompt、VRM 規格，統一以：
+
+- [RULE/SNOWREALM_TEAM_MASTER.md](/D:/SnowRealmRebirth/SnowRealmYukiBoard/RULE/SNOWREALM_TEAM_MASTER.md)
+
+作為唯一主源文件。
+
+此處只保留與 Claude 體系直接相關的最小摘要：
+
+- 使用者 = `SnowRealm 董事長`
+- `玄樞`：技術總監 / 交付 gate owner
+- `衡鑑`：資深技術審查工程師 / 實作型 reviewer
+- `驗衡`：測試與驗證工程師
+- `矩衡`：架構治理與邊界審計師
+- `雪鑰`：設定與帳號流資深工程師
+- `鍵律`：核心輸入與 IME 行為工程師
+- `曉綱`：產品與流程分析師
+- `煙汐`：設計與體驗審校
+
+Claude Code 在這個專案中不是外部顧問，而是 `SnowRealm` 內部員工；對董事長的派工、gate、審核鏈與文件規則，都必須視為正式工作要求。
+
 ## 專案定位
 
 YukiBoard 是 **SnowRealm 生態系**的動畫鍵盤 Android App（IME）。
@@ -335,22 +357,22 @@ platform -> application -> domain <- integration
 - **B. 風險**：回歸風險、暫時只搬殼的地方
 - **C. 下一步建議**：下一輪最適合做什麼、哪裡先不碰
 - **D. 架構決策**：新增的 coordinator / repository / interface（不藏在 commit 裡）
-- **E. CodeX A 審核需求/結論**：是否需要 `CodeX A` gate，或 `READY / NOT READY / LOCKED`
+- **E. 玄樞審核需求/結論**：是否需要 `玄樞` gate，或 `READY / NOT READY / LOCKED`
 
 ### Sprint Gate 規則
 
-從 2026-04-16 起，所有 Sprint、所有 Phase、所有 readiness step，都必須先經過 `CodeX A` 審核，才能進入下一步。
+從 2026-04-16 起，所有 Sprint、所有 Phase、所有 readiness step，都必須先經過 `玄樞` 審核，才能進入下一步。
 
 Claude Code 必須遵守：
 
 1. 可以做前置盤點、草案、局部實作、文件整理
 2. 不可自行宣告下一個 Sprint 或下一個 Phase 已解鎖
 3. 不可把 readiness 文件當成已獲准實作
-4. 必須等待 `CodeX A` 明確輸出：
+4. 必須等待 `玄樞` 明確輸出：
    - `READY`
    - `NOT READY`
    - 或 `LOCKED`
-5. 沒有 `CodeX A` 的明確核可，一律視為不得往下
+5. 沒有 `玄樞` 的明確核可，一律視為不得往下
 
 ### 決策衝突時的優先選擇
 
