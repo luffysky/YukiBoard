@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 164
-        versionName "0.10.0"
+        versionCode 165
+        versionName "0.11.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,12 +82,11 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- Sprint 1-5: 完成 IME 狀態/容器/輸入流主線重構與穩定化\n" +
-                    "- Sprint 6: 6 個 panel 全部切成 binder 邊界，補 floating mode stale bug\n" +
-                    "- Sprint 7: 完成 network entry、session/auth/provider、sync gateway、prefs owner 收斂\n" +
-                    "- Sprint 8: 修完 IME lifecycle、SSE callback、UserDictionary shared-state / release 問題\n" +
-                    "- Sprint 9: 修完 Insight SSE、InviteCode atomicity、learning reload、auth JSON safety\n" +
-                    "- Insight / YukiBoard 整合：Supabase token exchange、雲端同步與登入鏈路已收斂"
+                    "- Sprint 10: auto commit path、settings consume rule、coroutine exception handler、InputRouter release、background updater receiver lifecycle、test baseline\n" +
+                    "- Sprint 11: 輸入引擎 case inventory、InputRouter / SmartInputManager / candidate dictionary 測試 baseline、silent catch first pass、TTS thread sleep fix、GL frame loop VSYNC 化\n" +
+                    "- Sprint 12: payment / API key audit、Newebpay 後端簽章 plan、API key release policy、remote keyboard 6-digit PIN + brute-force tracker + session token、telemetry facade 接 5 處關鍵錯誤\n" +
+                    "- 已知 deferred：S12-2 Android client payment refactor 與 S12-3.1 實作 round 將與 ZCoin wire-up 一併處理\n" +
+                    "- 不在本版內：Crashlytics / consent UX（留 Sprint 13+）"
             }
         }
         debug {
@@ -96,12 +95,11 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- Sprint 1-5: 完成 IME 狀態/容器/輸入流主線重構與穩定化\n" +
-                    "- Sprint 6: 6 個 panel 全部切成 binder 邊界，補 floating mode stale bug\n" +
-                    "- Sprint 7: 完成 network entry、session/auth/provider、sync gateway、prefs owner 收斂\n" +
-                    "- Sprint 8: 修完 IME lifecycle、SSE callback、UserDictionary shared-state / release 問題\n" +
-                    "- Sprint 9: 修完 Insight SSE、InviteCode atomicity、learning reload、auth JSON safety\n" +
-                    "- Insight / YukiBoard 整合：Supabase token exchange、雲端同步與登入鏈路已收斂"
+                    "- Sprint 10: auto commit path、settings consume rule、coroutine exception handler、InputRouter release、background updater receiver lifecycle、test baseline\n" +
+                    "- Sprint 11: 輸入引擎 case inventory、InputRouter / SmartInputManager / candidate dictionary 測試 baseline、silent catch first pass、TTS thread sleep fix、GL frame loop VSYNC 化\n" +
+                    "- Sprint 12: payment / API key audit、Newebpay 後端簽章 plan、API key release policy、remote keyboard 6-digit PIN + brute-force tracker + session token、telemetry facade 接 5 處關鍵錯誤\n" +
+                    "- 已知 deferred：S12-2 Android client payment refactor 與 S12-3.1 實作 round 將與 ZCoin wire-up 一併處理\n" +
+                    "- 不在本版內：Crashlytics / consent UX（留 Sprint 13+）"
             }
         }
     }
@@ -118,6 +116,12 @@ android {
 
     kotlinOptions {
         jvmTarget = '17'
+    }
+
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+        }
     }
 
     // OpenGL ES shader assets
@@ -217,6 +221,8 @@ dependencies {
 
     // Testing
     testImplementation 'junit:junit:4.13.2'
+    testImplementation 'androidx.test:core:1.5.0'
+    testImplementation 'org.robolectric:robolectric:4.13'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
 }
