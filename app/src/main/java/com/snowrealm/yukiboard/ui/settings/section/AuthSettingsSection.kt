@@ -88,8 +88,8 @@ class AuthSettingsSection(
 
     private fun updateAuthUI(loggedIn: Boolean, displayName: String?) {
         val context = authBtn.context
-        if (loggedIn && displayName != null) {
-            userNameLabel.text = displayName
+        if (loggedIn) {
+            userNameLabel.text = if (displayName.isNullOrBlank()) tr("已登入") else displayName
             userNameLabel.visibility = View.VISIBLE
             authBtn.text = tr("登出")
             authBtn.background = GradientDrawable().apply {

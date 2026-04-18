@@ -1,0 +1,154 @@
+warning: in the working copy of 'app/src/main/java/com/snowrealm/yukiboard/animation/gles/KeyboardGLSurfaceView.kt', LF will be replaced by CRLF the next time Git touches it
+diff --git a/app/src/main/java/com/snowrealm/yukiboard/animation/gles/KeyboardGLSurfaceView.kt b/app/src/main/java/com/snowrealm/yukiboard/animation/gles/KeyboardGLSurfaceView.kt
+index 904e06d..27cb919 100644
+--- a/app/src/main/java/com/snowrealm/yukiboard/animation/gles/KeyboardGLSurfaceView.kt
++++ b/app/src/main/java/com/snowrealm/yukiboard/animation/gles/KeyboardGLSurfaceView.kt
+@@ -36,6 +36,13 @@ class KeyboardGLSurfaceView @JvmOverloads constructor(
+     @Volatile private var surfaceWidth = 0
+     @Volatile private var surfaceHeight = 0
+ 
++    // S11-5：VSYNC align 用的獨立 lock / tick 計數；
++    // 與 `this` lock（alpha=0 暫停 / setFlowAlpha / onPause）分開，
++    // 避免 alpha=0 等待被每幀 VSYNC 喚醒後空轉。
++    private val vsyncLock = Object()
++    @Volatile private var vsyncTick: Long = 0L
++    private var vsyncCallback: android.view.Choreographer.FrameCallback? = null
++
+     init {
+         isClickable = false
+         isFocusable = false
+@@ -62,6 +69,7 @@ class KeyboardGLSurfaceView @JvmOverloads constructor(
+ 
+     fun onPause() {
+         running = false
++        synchronized(this) { (this as Object).notifyAll() }
+     }
+ 
+     fun onResume() {
+@@ -97,6 +105,8 @@ class KeyboardGLSurfaceView @JvmOverloads constructor(
+         if (running) return
+         running = true
+ 
++        startVsyncPump()
++
+         renderThread = Thread({
+             initEGL()
+             try {
+@@ -104,7 +114,6 @@ class KeyboardGLSurfaceView @JvmOverloads constructor(
+                 renderer.onSurfaceChanged(null, surfaceWidth, surfaceHeight)
+ 
+                 loop@ while (running) {
+-                    // alpha 為 0（功能關閉）時完全暫停渲染，等待外部喚醒
+                     if (renderer.alpha <= 0.01f) {
+                         var interrupted = false
+                         synchronized(this@KeyboardGLSurfaceView) {
+@@ -121,9 +130,16 @@ class KeyboardGLSurfaceView @JvmOverloads constructor(
+                     renderer.onSurfaceChanged(null, w, h)
+                     renderer.onDrawFrame(null)
+ 
+-                    if (!EGL14.eglSwapBuffers(eglDisplay, eglSurface)) break
++                    if (!EGL14.eglSwapBuffers(eglDisplay, eglSurface)) {
++                        android.util.Log.w("FlowLightGL", "eglSwapBuffers failed (error=${EGL14.eglGetError()}), exiting render loop")
++                        break
++                    }
+ 
+-                    try { Thread.sleep(16) } catch (_: InterruptedException) { break }
++                    // S11-5：以 Choreographer VSYNC tick 驅動下一幀，
++                    // 取代固定 Thread.sleep(remainingMs)；
++                    // 上限 2 * TARGET_FRAME_NS 作 fallback，
++                    // 避免 VSYNC 停止（例如螢幕關閉 / Choreographer 未送達）時 render thread 永久卡住。
++                    if (!waitNextVsync()) break
+                 }
+             } finally {
+                 releaseEGL()
+@@ -131,10 +147,79 @@ class KeyboardGLSurfaceView @JvmOverloads constructor(
+         }, "FlowLightGL").also { it.start() }
+     }
+ 
++    /**
++     * S11-5：render thread 呼叫此方法阻塞等下一個 VSYNC tick；
++     * 回傳 `false` 代表 thread 被 interrupt，呼叫端應退出 render loop。
++     * 超時 fallback（2 * TARGET_FRAME_NS）正常返回 true，避免 VSYNC 停送時 thread 卡住。
++     */
++    private fun waitNextVsync(): Boolean {
++        val lastTick = vsyncTick
++        val deadlineNs = System.nanoTime() + TARGET_FRAME_NS * 2
++        synchronized(vsyncLock) {
++            while (running && vsyncTick == lastTick) {
++                val remainingNs = deadlineNs - System.nanoTime()
++                if (remainingNs <= 0L) break
++                val remainingMs = (remainingNs / 1_000_000L).coerceAtLeast(1L)
++                try {
++                    (vsyncLock as Object).wait(remainingMs)
++                } catch (_: InterruptedException) {
++                    return false
++                }
++            }
++        }
++        return true
++    }
++
++    /**
++     * S11-5：在 main thread 上以 Choreographer frame callback 持續送出 VSYNC tick，
++     * render thread 以 `vsyncLock` wait 等到 tick 前進才畫下一幀。
++     * 所有 Choreographer 呼叫都必須在具 Looper 的 thread 執行，這裡透過 main Looper 的 Handler 轉發。
++     */
++    private fun startVsyncPump() {
++        val cb = object : android.view.Choreographer.FrameCallback {
++            override fun doFrame(frameTimeNanos: Long) {
++                synchronized(vsyncLock) {
++                    vsyncTick++
++                    (vsyncLock as Object).notifyAll()
++                }
++                if (running) {
++                    android.view.Choreographer.getInstance().postFrameCallback(this)
++                }
++            }
++        }
++        vsyncCallback = cb
++        android.os.Handler(android.os.Looper.getMainLooper()).post {
++            android.view.Choreographer.getInstance().postFrameCallback(cb)
++        }
++    }
++
++    private fun stopVsyncPump() {
++        val cb = vsyncCallback ?: return
++        vsyncCallback = null
++        android.os.Handler(android.os.Looper.getMainLooper()).post {
++            android.view.Choreographer.getInstance().removeFrameCallback(cb)
++        }
++        // 叫醒 render thread 可能正在 VSYNC wait 的狀態，讓它看到 running=false 後退出。
++        synchronized(vsyncLock) { (vsyncLock as Object).notifyAll() }
++    }
++
+     private fun stopRenderThread() {
+         running = false
+-        renderThread?.interrupt()
+-        try { renderThread?.join(500) } catch (_: Exception) {}
++        stopVsyncPump()
++        val t = renderThread
++        if (t != null) {
++            synchronized(this) { (this as Object).notifyAll() }
++            t.interrupt()
++            try {
++                t.join(500)
++                if (t.isAlive) {
++                    android.util.Log.w("FlowLightGL", "stopRenderThread: join timeout (500ms), thread still alive")
++                }
++            } catch (e: InterruptedException) {
++                android.util.Log.w("FlowLightGL", "stopRenderThread: interrupted while joining", e)
++                Thread.currentThread().interrupt()
++            }
++        }
+         renderThread = null
+     }
+ 
+@@ -188,4 +273,8 @@ class KeyboardGLSurfaceView @JvmOverloads constructor(
+             eglDisplay = EGL14.EGL_NO_DISPLAY
+         }
+     }
++
++    companion object {
++        private const val TARGET_FRAME_NS = 16_666_666L
++    }
+ }

@@ -12,6 +12,10 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.KeyEvent
+import com.snowrealm.yukiboard.BuildConfig
+import com.snowrealm.yukiboard.telemetry.Severity
+import com.snowrealm.yukiboard.telemetry.Telemetry
+import com.snowrealm.yukiboard.telemetry.TelemetryEvent
 
 /**
  * 藍牙 HID 鍵盤服務 — 將手機模擬為藍牙鍵盤。
@@ -34,6 +38,8 @@ import android.view.KeyEvent
  */
 @SuppressLint("MissingPermission")
 class BluetoothHidKeyboard(context: Context) : RemoteKeyboardService {
+
+    override val authLevel: AuthLevel = AuthLevel.PAIRED_ONLY
 
     companion object {
         private const val TAG = "BtHidKeyboard"
@@ -115,7 +121,11 @@ class BluetoothHidKeyboard(context: Context) : RemoteKeyboardService {
     // BluetoothHidDevice 回呼
     private val hidCallback = object : BluetoothHidDevice.Callback() {
         override fun onAppStatusChanged(pluggedDevice: BluetoothDevice?, registered: Boolean) {
-            Log.d(TAG, "App registered: $registered, device: ${pluggedDevice?.name}")
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "App registered: $registered, device: ${pluggedDevice?.name}")
+            } else {
+                Log.d(TAG, "App registered: $registered")
+            }
             if (registered) {
                 connectionState = ConnectionState.LISTENING
             } else {
@@ -124,7 +134,11 @@ class BluetoothHidKeyboard(context: Context) : RemoteKeyboardService {
         }
 
         override fun onConnectionStateChanged(device: BluetoothDevice?, state: Int) {
-            Log.d(TAG, "Connection state: $state, device: ${device?.name}")
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "Connection state: $state, device: ${device?.name}")
+            } else {
+                Log.d(TAG, "Connection state: $state")
+            }
             when (state) {
                 BluetoothProfile.STATE_CONNECTED -> {
                     hostDevice = device
@@ -175,6 +189,12 @@ class BluetoothHidKeyboard(context: Context) : RemoteKeyboardService {
         if (btAdapter == null || !btAdapter.isEnabled) {
             connectionState = ConnectionState.ERROR
             Log.e(TAG, "Bluetooth not available or not enabled")
+            Telemetry.report(TelemetryEvent(
+                category = "REMOTE_KEYBOARD",
+                severity = Severity.WARN,
+                code = "BT_ADAPTER_UNAVAILABLE",
+                extras = mapOf("adapterNull" to (btAdapter == null).toString())
+            ))
             return
         }
 
@@ -197,6 +217,11 @@ class BluetoothHidKeyboard(context: Context) : RemoteKeyboardService {
         if (!registered) {
             connectionState = ConnectionState.ERROR
             Log.e(TAG, "Failed to register HID app")
+            Telemetry.report(TelemetryEvent(
+                category = "REMOTE_KEYBOARD",
+                severity = Severity.ERROR,
+                code = "BT_HID_REGISTER_FAIL"
+            ))
         }
     }
 

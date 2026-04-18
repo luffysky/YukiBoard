@@ -1,6 +1,7 @@
 package com.snowrealm.yukiboard.app.ime
 
 import android.content.Context
+import com.snowrealm.yukiboard.remote.AuthLevel
 import com.snowrealm.yukiboard.remote.ConnectionState
 import com.snowrealm.yukiboard.theme.KeyboardTheme
 import com.snowrealm.yukiboard.ui.panel.RemoteKeyboardPanelView
@@ -23,6 +24,8 @@ object ImeRemotePanelBinder {
         btState: ConnectionState,
         wifiState: ConnectionState,
         wifiUrl: String,
+        wifiPin: String,
+        authLevel: AuthLevel,
         connectedDeviceName: String,
         onBluetoothToggle: () -> Unit,
         onWifiToggle: () -> Unit,
@@ -32,6 +35,8 @@ object ImeRemotePanelBinder {
         panel.btState = btState
         panel.wifiState = wifiState
         panel.wifiUrl = wifiUrl
+        panel.wifiPin = wifiPin
+        panel.authLevel = authLevel
         panel.connectedDeviceName = connectedDeviceName
         panel.onBluetoothToggle = onBluetoothToggle
         panel.onWifiToggle = onWifiToggle

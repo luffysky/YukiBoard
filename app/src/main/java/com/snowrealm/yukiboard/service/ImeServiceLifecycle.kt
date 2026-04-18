@@ -92,11 +92,15 @@ internal fun YukiBoardIMEService.registerClipboardFraudListener() {
                 if (text.length in 10..5000) {
                     scanClipboardForFraud(text)
                 }
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                android.util.Log.w("IME", "Clipboard fraud scan failed: ${e.message}", e)
+            }
         }
         cm.addPrimaryClipChangedListener(listener)
         clipboardListener = listener
-    } catch (_: Exception) { }
+    } catch (e: Exception) {
+        android.util.Log.w("IME", "registerClipboardFraudListener failed: ${e.message}", e)
+    }
 }
 
 internal fun YukiBoardIMEService.setupKeyboardOverlays() {
@@ -137,7 +141,10 @@ internal fun YukiBoardIMEService.setupKeyboardOverlays() {
 
     keyboardView.oneHandSide = try {
         KeyboardView.OneHandSide.valueOf(prefs.oneHandSide)
-    } catch (_: Exception) { KeyboardView.OneHandSide.NONE }
+    } catch (e: Exception) {
+        android.util.Log.w("IME", "Invalid oneHandSide pref '${prefs.oneHandSide}': ${e.message}", e)
+        KeyboardView.OneHandSide.NONE
+    }
     keyboardView.onOneHandChanged = { side ->
         prefs.oneHandSide = side.name
     }

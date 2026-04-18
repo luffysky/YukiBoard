@@ -68,6 +68,7 @@ import com.snowrealm.yukiboard.claw.ClawClient
 import com.snowrealm.yukiboard.ui.settings.YukiPreferences
 import com.snowrealm.yukiboard.gif.GiphyApiClient
 import com.snowrealm.yukiboard.translate.TranslateEngine
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -155,7 +156,19 @@ class YukiBoardIMEService : InputMethodService() {
     internal var stickerDownloadManager: com.snowrealm.yukiboard.sticker.StickerPackDownloadManager? = null
 
     // 非同步
-    internal val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    // S10-4：serviceScope 加上統一 CoroutineExceptionHandler，
+    // 讓 child coroutine 未捕捉例外至少有一個可觀測的 IME tag 記錄入口，
+    // 不改變 SupervisorJob 的 child 隔離語意。
+    private val serviceScopeExceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        android.util.Log.e(
+            "IME",
+            "Unhandled coroutine exception in serviceScope: ${throwable.message}",
+            throwable
+        )
+    }
+    internal val serviceScope = CoroutineScope(
+        Dispatchers.Main + SupervisorJob() + serviceScopeExceptionHandler
+    )
 
     // Claw AI
     var clawClient: ClawClient? = null
@@ -331,12 +344,36 @@ class YukiBoardIMEService : InputMethodService() {
     override fun onEvaluateInputViewShown(): Boolean = true
     override fun onShowInputRequested(flags: Int, configChange: Boolean): Boolean = true
 
-    override fun onCreateInputView(): View {
-        // 重建前先清掉舊的 receiver，避免多次 register 累積洩漏
+    internal fun unregisterBgUpdateReceiver() {
         bgUpdateReceiver?.let {
-            try { unregisterReceiver(it) } catch (_: Exception) {}
+            try {
+                unregisterReceiver(it)
+            } catch (e: Exception) {
+                android.util.Log.v("IME", "unregisterBgUpdateReceiver: already unregistered (${e.javaClass.simpleName})")
+            }
         }
         bgUpdateReceiver = null
+    }
+
+    internal fun registerBgUpdateReceiver() {
+        unregisterBgUpdateReceiver()
+        bgUpdateReceiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+                // 不要 clearBackground()，直接重載（reloadFromStorage 內部已有去重邏輯）
+                backgroundView?.reloadFromStorage()
+                keyboardView.hasCustomBackground = prefs.useCustomBackground
+                keyboardView.invalidate()
+                imePanelBindings.themePanel?.reloadPreviewBitmap()
+                imePanelBindings.themePanel?.invalidate()
+            }
+        }
+        val bgFilter = android.content.IntentFilter("com.snowrealm.yukiboard.ACTION_BG_UPDATED")
+        registerReceiver(bgUpdateReceiver, bgFilter, android.content.Context.RECEIVER_NOT_EXPORTED)
+    }
+
+    override fun onCreateInputView(): View {
+        // 重建前先清掉舊的 receiver，避免多次 register 累積洩漏
+        unregisterBgUpdateReceiver()
 
         // 確保 IME window 啟用硬體加速（TextureView 影片背景需要）
         window?.window?.let { w ->
@@ -413,6 +450,9 @@ class YukiBoardIMEService : InputMethodService() {
             kbHeight
         ))
 
+        // S10-6：floating / non-floating create path 都需對稱註冊背景更新 receiver。
+        registerBgUpdateReceiver()
+
         // 懸浮模式
         if (prefs.floatingModeEnabled) {
             startUiStateCollect()
@@ -435,20 +475,6 @@ class YukiBoardIMEService : InputMethodService() {
 
         // 寬度調整（非滿版時置中）
         applyKeyboardWidth(rootContainer)
-
-        // 註冊背景更新廣播接收器
-        bgUpdateReceiver = object : android.content.BroadcastReceiver() {
-            override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
-                // 不要 clearBackground()，直接重載（reloadFromStorage 內部已有去重邏輯）
-                backgroundView?.reloadFromStorage()
-                keyboardView.hasCustomBackground = prefs.useCustomBackground
-                keyboardView.invalidate()
-                imePanelBindings.themePanel?.reloadPreviewBitmap()
-                imePanelBindings.themePanel?.invalidate()
-            }
-        }
-        val bgFilter = android.content.IntentFilter("com.snowrealm.yukiboard.ACTION_BG_UPDATED")
-        registerReceiver(bgUpdateReceiver, bgFilter, android.content.Context.RECEIVER_NOT_EXPORTED)
 
         // Sprint 3 Phase 1: 啟動 uiState collect（activePanel + isVoiceInputActive）
         startUiStateCollect()
@@ -485,10 +511,13 @@ class YukiBoardIMEService : InputMethodService() {
             }
         }
 
-        // AUTO 模式啟動（onStartInputView 已 reset，不需處理 switchTo 回傳的 commitResult）
+        // AUTO 模式啟動：switchTo 回傳若為 CommitText，走 applyInputResult 保持 commit path 對稱（S10-2 R7）
         if (prefs.autoInputMode && inputRouter.inputMode != InputMode.AUTO) {
             val sr = inputRouter.switchTo(InputMode.AUTO)
-            if (sr is InputResult.CommitText) currentInputConnection?.commitText(sr.text, 1)
+            val ic = currentInputConnection
+            if (ic != null && sr is InputResult.CommitText) {
+                applyInputResult(ic, sr)
+            }
         }
 
         // 同步鍵盤顯示的語言（保留使用者上次選擇的輸入法）
@@ -618,8 +647,7 @@ class YukiBoardIMEService : InputMethodService() {
         imeSessionHooks.onDestroy(
             cleanup = DestroyCleanup(
                 unregisterReceivers = {
-                    bgUpdateReceiver?.let { try { unregisterReceiver(it) } catch (_: Exception) {} }
-                    bgUpdateReceiver = null
+                    unregisterBgUpdateReceiver()
                 },
                 stopSensors = {
                     shakeDetector.stop()

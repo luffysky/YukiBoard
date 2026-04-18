@@ -42,7 +42,9 @@ class ImeSessionHooks(
         scope.launch {
             try {
                 cloudSyncManager.onSessionEnd()
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                android.util.Log.w("ImeSessionHooks", "cloudSyncManager.onSessionEnd failed: ${e.message}", e)
             }
         }
     }

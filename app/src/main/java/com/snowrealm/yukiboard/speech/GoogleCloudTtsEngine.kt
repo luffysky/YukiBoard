@@ -59,10 +59,9 @@ class GoogleCloudTtsEngine(
             return
         }
 
-        // 停止前一段
-        stop()
-
+        val oldJob = playbackJob
         playbackJob = scope.launch {
+            oldJob?.cancelAndJoin()
             try {
                 val audioBytes = synthesize(text, locale, speed)
                 if (audioBytes != null) {
@@ -70,7 +69,7 @@ class GoogleCloudTtsEngine(
                 }
                 withContext(Dispatchers.Main) { onDone?.invoke() }
             } catch (e: CancellationException) {
-                // cancelled
+                throw e
             } catch (e: Exception) {
                 Log.e(tag, "speak failed", e)
                 withContext(Dispatchers.Main) { onDone?.invoke() }
@@ -81,11 +80,6 @@ class GoogleCloudTtsEngine(
     override fun stop() {
         playbackJob?.cancel()
         playbackJob = null
-        try {
-            audioTrack?.stop()
-        } catch (_: Exception) {}
-        audioTrack?.release()
-        audioTrack = null
     }
 
     override fun destroy() {
@@ -181,8 +175,7 @@ class GoogleCloudTtsEngine(
     }
 
     /** 播放 LINEAR16 PCM 音訊（含 WAV header 需跳過） */
-    private fun playPcm(audioData: ByteArray) {
-        // LINEAR16 回傳含 WAV header（44 bytes），跳過
+    private suspend fun playPcm(audioData: ByteArray) {
         val pcmOffset = if (audioData.size > 44 &&
             audioData[0] == 'R'.code.toByte() &&
             audioData[1] == 'I'.code.toByte()
@@ -195,7 +188,7 @@ class GoogleCloudTtsEngine(
             AudioFormat.ENCODING_PCM_16BIT
         ).coerceAtLeast(pcmData.size)
 
-        audioTrack = AudioTrack.Builder()
+        val track = AudioTrack.Builder()
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_ASSISTANT)
@@ -212,17 +205,23 @@ class GoogleCloudTtsEngine(
             .setBufferSizeInBytes(bufferSize)
             .setTransferMode(AudioTrack.MODE_STATIC)
             .build()
+        audioTrack = track
 
-        audioTrack?.write(pcmData, 0, pcmData.size)
-        audioTrack?.play()
+        try {
+            track.write(pcmData, 0, pcmData.size)
+            track.play()
 
-        // 等待播放完畢
-        val durationMs = (pcmData.size.toLong() * 1000) / (SAMPLE_RATE * 2) // 16-bit mono = 2 bytes/sample
-        Thread.sleep(durationMs + 100)
-
-        audioTrack?.stop()
-        audioTrack?.release()
-        audioTrack = null
+            val durationMs = (pcmData.size.toLong() * 1000) / (SAMPLE_RATE * 2)
+            delay(durationMs + 100)
+        } finally {
+            try {
+                track.stop()
+            } catch (e: IllegalStateException) {
+                Log.w(tag, "track.stop in finally: ${e.message}", e)
+            }
+            track.release()
+            if (audioTrack === track) audioTrack = null
+        }
     }
 
     companion object {

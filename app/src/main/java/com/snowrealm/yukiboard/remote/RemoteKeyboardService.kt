@@ -16,6 +16,9 @@ interface RemoteKeyboardService {
     /** 連線中的裝置資訊 */
     val connectedDevice: RemoteDevice?
 
+    /** 此傳輸當前實施的驗證等級 */
+    val authLevel: AuthLevel
+
     /** 啟動服務（開始可被發現/監聽） */
     fun start()
 
@@ -62,6 +65,13 @@ data class RemoteDevice(
 enum class RemoteType {
     BLUETOOTH,
     WIFI
+}
+
+enum class AuthLevel {
+    NONE,
+    PIN,
+    PIN_PLUS_SESSION,
+    PAIRED_ONLY
 }
 
 /** 遠端按鍵事件 */

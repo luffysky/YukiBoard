@@ -248,10 +248,11 @@ internal fun YukiBoardIMEService.bindKeyboardViewCallbacks() {
                     prefs.autoInputMode = false
                 }
                 val switchResult = inputRouter.switchTo(mode)
-                if (switchResult is InputResult.CommitText) {
-                    currentInputConnection?.commitText(switchResult.text, 1)
+                val ic = currentInputConnection
+                if (ic != null && switchResult is InputResult.CommitText) {
+                    applyInputResult(ic, switchResult)
                 }
-                currentInputConnection?.finishComposingText()
+                ic?.finishComposingText()
                 characterView?.playSwitchLang()
                 keyboardView.currentInputMode = mode
                 keyboardView.updateKeyRows(rowsForInputMode(mode))

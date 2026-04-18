@@ -420,13 +420,44 @@ class InputRouter(private val context: Context) {
     }
 
     /**
-     * S8-3：IME service 拆解時呼叫，解除長生命週期 UserDictionary 的
-     * SharedPreferences listener，避免留在 `SharedPreferencesImpl.mListeners` 的
-     * WeakHashMap entry 延後到 GC 才清掉。
+     * IME service 拆解時呼叫，做 InputRouter owner 鏈的最小釋放。
      *
-     * 僅清 listener，不影響已 commit 的 prefs 資料。
+     * S8-3 初版：只解除 UserDictionary 的 SharedPreferences listener。
+     * S10-5：補完至 SmartInputManager 落地 + 已初始化的 engine / candidate
+     *       / AUTO buffer / pendingCommitText 全域清理。
+     *
+     * 執行順序（固定）：
+     *   1. SmartInputManager 在記憶體中的學習狀態先 persist 再 maintenance，
+     *      避免 IME 被系統回收時丟失學詞 / 片語 / 風格 / 習慣 / 糾錯樣本。
+     *   2. 清已確定 eagerly 持有的 engine composing state（englishEngine、bopomofoEngine）。
+     *   3. 清 latinEngines LRU 內所有 runtime-registered 引擎的 composing state 並清空 map。
+     *   4. 清 candidateManager 的候選列，避免殘留帶到下次 onCreate。
+     *   5. 清 AUTO 模式的雙重解釋 buffer 與 pendingCommitText。
+     *   6. userDict.release()：解除 UserDictionary listener（S8-3 既有行為）。
+     *
+     * 刻意不做（保留給後續 round 或 Sprint 11+）：
+     *   - 不強制觸發 lazy engine（pinyin / cangjie / speedCangjie / japanese / korean）
+     *     的初始化；若從未被使用，就沒有可釋放的 composing state。
+     *   - 不新增 engine 層的 close()/destroy() API。
+     *   - 不在 SmartInputManager 新增 release()；沿用既有 persist()+maintenance()。
      */
     fun release() {
+        smartInput.persist()
+        smartInput.maintenance()
+
+        englishEngine.reset()
+        bopomofoEngine.reset()
+        for (engine in latinEngines.values) {
+            engine.reset()
+        }
+        latinEngines.clear()
+
+        candidateManager.clear()
+
+        autoQwertyBuffer.setLength(0)
+        autoBopomofoBuffer.clear()
+        pendingCommitText = null
+
         userDict.release()
     }
 

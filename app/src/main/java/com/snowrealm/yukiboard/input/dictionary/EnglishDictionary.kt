@@ -45,7 +45,7 @@ class EnglishDictionary(private val context: Context? = null) {
                 wordCount = rank
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.w("EnglishDictionary", "loadFromResource failed, falling back to BASIC_WORDS: ${e.message}", e)
             // 載入失敗降級為基本詞表
             BASIC_WORDS.forEachIndexed { index, word ->
                 insert(word, BASIC_WORDS.size - index)

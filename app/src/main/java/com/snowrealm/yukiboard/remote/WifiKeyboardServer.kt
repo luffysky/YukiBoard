@@ -5,6 +5,10 @@ import android.net.wifi.WifiManager
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.snowrealm.yukiboard.telemetry.AndroidLogReporter
+import com.snowrealm.yukiboard.telemetry.ErrorReporter
+import com.snowrealm.yukiboard.telemetry.Severity
+import com.snowrealm.yukiboard.telemetry.TelemetryEvent
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -12,7 +16,9 @@ import java.io.OutputStream
 import java.net.ServerSocket
 import java.net.Socket
 import java.security.MessageDigest
+import java.security.SecureRandom
 import java.util.Base64
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -35,13 +41,34 @@ import java.util.concurrent.atomic.AtomicBoolean
  * ## 內建網頁
  * Server 同時提供 HTTP 服務，瀏覽器訪問 http://手機IP:port 即可開啟控制頁面。
  */
-class WifiKeyboardServer(context: Context) : RemoteKeyboardService {
+class WifiKeyboardServer(
+    context: Context,
+    private val errorReporter: ErrorReporter = AndroidLogReporter
+) : RemoteKeyboardService {
 
     companion object {
         private const val TAG = "WifiKbServer"
         const val DEFAULT_PORT = 8765
         private const val WEBSOCKET_GUID = "258EAFA5-E914-47DA-95CA-5AB5DC76E97B"
-        private fun generatePin(): String = (1000..9999).random().toString()
+        private const val PIN_LENGTH = 6
+        private const val BRUTE_FORCE_WINDOW_MS = 60_000L
+        private const val BRUTE_FORCE_MAX_ATTEMPTS = 5
+        private const val LOCKOUT_MS = 300_000L
+        private const val TELEMETRY_CATEGORY = "REMOTE_KEYBOARD"
+
+        private val secureRandom = SecureRandom()
+
+        private fun generatePin(): String {
+            val upperBound = Math.pow(10.0, PIN_LENGTH.toDouble()).toInt()
+            val n = secureRandom.nextInt(upperBound)
+            return n.toString().padStart(PIN_LENGTH, '0')
+        }
+
+        private fun generateSessionToken(): String {
+            val bytes = ByteArray(16)
+            secureRandom.nextBytes(bytes)
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+        }
     }
 
     private val appContext = context.applicationContext
@@ -50,6 +77,7 @@ class WifiKeyboardServer(context: Context) : RemoteKeyboardService {
     private var serverSocket: ServerSocket? = null
     private var serverThread: Thread? = null
     private val clients = CopyOnWriteArrayList<WebSocketClient>()
+    private val attemptTrackers = ConcurrentHashMap<String, AttemptTracker>()
 
     @Volatile private var stateListener: ((ConnectionState) -> Unit)? = null
     @Volatile private var remoteKeyListener: ((RemoteKeyEvent) -> Unit)? = null
@@ -57,9 +85,11 @@ class WifiKeyboardServer(context: Context) : RemoteKeyboardService {
 
     var port: Int = DEFAULT_PORT
 
-    /** 4 位連線 PIN — 顯示在面板，WebSocket 握手時驗證 */
+    /** 6 位連線 PIN — 顯示在面板，WebSocket 握手時驗證 */
     @Volatile var connectionPin: String = generatePin()
         private set
+
+    override val authLevel: AuthLevel = AuthLevel.PIN_PLUS_SESSION
 
     override var connectionState: ConnectionState = ConnectionState.IDLE
         private set(value) {
@@ -90,6 +120,7 @@ class WifiKeyboardServer(context: Context) : RemoteKeyboardService {
         if (running.get()) return
 
         connectionPin = generatePin()
+        attemptTrackers.clear()
         running.set(true)
         connectionState = ConnectionState.LISTENING
 
@@ -123,6 +154,8 @@ class WifiKeyboardServer(context: Context) : RemoteKeyboardService {
         serverSocket = null
         serverThread = null
         connectionState = ConnectionState.IDLE
+        connectionPin = ""
+        attemptTrackers.clear()
     }
 
     override fun sendKeyEvent(event: RemoteKeyEvent) {
@@ -191,15 +224,39 @@ class WifiKeyboardServer(context: Context) : RemoteKeyboardService {
 
                     val wsKey = headers["Sec-WebSocket-Key"]
                     if (wsKey != null) {
-                        // WebSocket upgrade — 驗證 PIN
+                        val clientIp = socket.inetAddress?.hostAddress ?: "unknown"
+                        val now = System.currentTimeMillis()
+                        val tracker = attemptTrackers.computeIfAbsent(clientIp) { AttemptTracker() }
+
+                        if (tracker.isLockedOut(now)) {
+                            val reject = "HTTP/1.1 429 Too Many Requests\r\nConnection: close\r\n\r\nLocked"
+                            socket.getOutputStream().write(reject.toByteArray())
+                            socket.close()
+                            return@Thread
+                        }
+
                         val pinParam = path.substringAfter("pin=", "").substringBefore("&").substringBefore(" ")
                         if (pinParam == connectionPin) {
+                            tracker.reset()
                             upgradeToWebSocket(socket, wsKey)
                         } else {
+                            val lockoutJustTriggered = tracker.recordFailure(now)
                             val reject = "HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\nInvalid PIN"
                             socket.getOutputStream().write(reject.toByteArray())
                             socket.close()
-                            Log.w(TAG, "WebSocket rejected: wrong PIN from ${socket.inetAddress}")
+                            if (lockoutJustTriggered) {
+                                errorReporter.report(
+                                    TelemetryEvent(
+                                        category = TELEMETRY_CATEGORY,
+                                        severity = Severity.WARN,
+                                        code = "WIFI_PIN_BRUTE_FORCE_LOCKOUT",
+                                        extras = mapOf(
+                                            "lockoutMs" to LOCKOUT_MS.toString(),
+                                            "maxAttempts" to BRUTE_FORCE_MAX_ATTEMPTS.toString()
+                                        )
+                                    )
+                                )
+                            }
                         }
                     } else {
                         // 普通 HTTP → 回傳控制頁面
@@ -225,17 +282,19 @@ class WifiKeyboardServer(context: Context) : RemoteKeyboardService {
 
         socket.getOutputStream().write(response.toByteArray())
 
-        val client = WebSocketClient(socket)
+        val sessionToken = generateSessionToken()
+        val client = WebSocketClient(socket, sessionToken)
         clients.add(client)
         connectionState = ConnectionState.CONNECTED
 
-        Log.d(TAG, "WebSocket client connected: ${socket.inetAddress}")
+        Log.d(TAG, "WebSocket client connected")
 
-        // 發送歡迎訊息
+        // 發送歡迎訊息（含 sessionToken，後續訊息需帶回）
         val welcome = JSONObject().apply {
             put("type", "status")
             put("state", "connected")
             put("device", "YukiBoard")
+            put("session", sessionToken)
         }
         client.send(welcome.toString())
 
@@ -244,7 +303,7 @@ class WifiKeyboardServer(context: Context) : RemoteKeyboardService {
             val inputStream = socket.getInputStream()
             while (running.get() && !socket.isClosed) {
                 val frame = readWebSocketFrame(inputStream) ?: break
-                handleWebSocketMessage(frame)
+                handleWebSocketMessage(frame, sessionToken)
             }
         } catch (e: Exception) {
             Log.d(TAG, "WebSocket read ended: ${e.message}")
@@ -302,9 +361,14 @@ class WifiKeyboardServer(context: Context) : RemoteKeyboardService {
         return String(payload)
     }
 
-    private fun handleWebSocketMessage(message: String) {
+    private fun handleWebSocketMessage(message: String, expectedSessionToken: String) {
         try {
             val json = JSONObject(message)
+            val providedSession = json.optString("session", "")
+            if (providedSession != expectedSessionToken) {
+                Log.w(TAG, "WebSocket message rejected: session token mismatch")
+                return
+            }
             when (json.optString("type")) {
                 "key" -> {
                     val event = RemoteKeyEvent(
@@ -416,8 +480,8 @@ button {
 <div id="status" class="status connecting">請輸入 PIN 碼連線</div>
 
 <div id="pinBox" style="margin-bottom:16px;text-align:center;">
-    <input id="pinInput" type="text" maxlength="4" placeholder="輸入 4 位 PIN 碼"
-        style="width:160px;padding:10px;font-size:20px;text-align:center;background:#1a2035;border:1px solid #2a3555;border-radius:8px;color:#e8f4ff;letter-spacing:8px;">
+    <input id="pinInput" type="text" maxlength="6" placeholder="輸入 6 位 PIN 碼"
+        style="width:200px;padding:10px;font-size:20px;text-align:center;background:#1a2035;border:1px solid #2a3555;border-radius:8px;color:#e8f4ff;letter-spacing:8px;">
     <br><button class="btn-primary" style="margin-top:8px;" onclick="connectWithPin()">連線</button>
 </div>
 
@@ -456,12 +520,26 @@ button {
 let ws = null;
 let reconnectTimer = null;
 let currentPin = '';
+let sessionToken = '';
+let wasConnected = false;
 
 function connectWithPin() {
     const pin = document.getElementById('pinInput').value.trim();
-    if (pin.length !== 4) { setStatus('disconnected', 'PIN 碼需為 4 位數'); return; }
+    if (pin.length !== 6) { setStatus('disconnected', 'PIN 碼需為 6 位數'); return; }
     currentPin = pin;
+    wasConnected = false;
     connect();
+}
+
+function backToPinInput(message) {
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+    currentPin = '';
+    sessionToken = '';
+    wasConnected = false;
+    document.getElementById('pinInput').value = '';
+    document.getElementById('pinBox').style.display = '';
+    document.getElementById('textInput').style.display = 'none';
+    setStatus('disconnected', message);
 }
 
 function connect() {
@@ -470,6 +548,7 @@ function connect() {
     ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
+        wasConnected = true;
         setStatus('connected', '已連線');
         addLog('WebSocket 已連線（PIN 驗證通過）');
         document.getElementById('pinBox').style.display = 'none';
@@ -477,19 +556,27 @@ function connect() {
     };
 
     ws.onclose = () => {
-        setStatus('disconnected', '已斷線');
-        addLog('連線已斷開，5 秒後重連...');
-        reconnectTimer = setTimeout(connect, 5000);
+        if (wasConnected) {
+            setStatus('disconnected', '已斷線');
+            addLog('連線已斷開，5 秒後重連...');
+            reconnectTimer = setTimeout(connect, 5000);
+        } else {
+            addLog('連線失敗（PIN 錯誤或連線已被鎖定）');
+            backToPinInput('無法連線，請確認 PIN 碼正確。若已連續輸入錯誤多次，請等待 5 分鐘後再試。');
+        }
     };
 
     ws.onerror = () => {
-        setStatus('disconnected', '連線錯誤（PIN 碼錯誤？）');
+        // 不在此 setStatus — 交由 onclose 依 wasConnected 判斷後續行為，避免提前覆蓋
     };
 
     ws.onmessage = (event) => {
         try {
             const msg = JSON.parse(event.data);
-            if (msg.type === 'status') addLog('狀態: ' + msg.state);
+            if (msg.type === 'status') {
+                addLog('狀態: ' + msg.state);
+                if (msg.session) sessionToken = msg.session;
+            }
             else if (msg.type === 'key') addLog('按鍵: ' + msg.code);
             else if (msg.type === 'text') addLog('文字: ' + msg.content);
         } catch(e) { addLog('收到: ' + event.data); }
@@ -512,24 +599,24 @@ function addLog(msg) {
 // 即時傳送每個字元
 document.getElementById('textInput').addEventListener('input', (e) => {
     const data = e.data;
-    if (data && ws && ws.readyState === 1) {
-        ws.send(JSON.stringify({type: 'text', content: data}));
+    if (data && ws && ws.readyState === 1 && sessionToken) {
+        ws.send(JSON.stringify({type: 'text', content: data, session: sessionToken}));
     }
 });
 
 function sendCurrentText() {
     const text = document.getElementById('textInput').value;
-    if (text && ws && ws.readyState === 1) {
-        ws.send(JSON.stringify({type: 'text', content: text}));
+    if (text && ws && ws.readyState === 1 && sessionToken) {
+        ws.send(JSON.stringify({type: 'text', content: text, session: sessionToken}));
         addLog('傳送: ' + text.substring(0, 50) + (text.length > 50 ? '...' : ''));
     }
 }
 
 function sendKey(code, ctrl) {
-    if (ws && ws.readyState === 1) {
+    if (ws && ws.readyState === 1 && sessionToken) {
         ws.send(JSON.stringify({
             type: 'key', code: code, action: 'press',
-            modifiers: ctrl ? 1 : 0
+            modifiers: ctrl ? 1 : 0, session: sessionToken
         }));
     }
 }
@@ -547,10 +634,48 @@ document.getElementById('pinInput').addEventListener('keydown', (e) => {
 """.trimIndent()
 
     // =========================================================================
+    // Brute-force Tracker
+    // =========================================================================
+
+    private class AttemptTracker {
+        private var count: Int = 0
+        private var windowStartMs: Long = 0L
+        private var lockoutUntilMs: Long = 0L
+
+        @Synchronized
+        fun isLockedOut(nowMs: Long): Boolean = nowMs < lockoutUntilMs
+
+        @Synchronized
+        fun reset() {
+            count = 0
+            windowStartMs = 0L
+            lockoutUntilMs = 0L
+        }
+
+        /** @return true if this failure just triggered lockout (edge event) */
+        @Synchronized
+        fun recordFailure(nowMs: Long): Boolean {
+            if (nowMs - windowStartMs > BRUTE_FORCE_WINDOW_MS) {
+                windowStartMs = nowMs
+                count = 0
+            }
+            count += 1
+            if (count >= BRUTE_FORCE_MAX_ATTEMPTS && lockoutUntilMs <= nowMs) {
+                lockoutUntilMs = nowMs + LOCKOUT_MS
+                return true
+            }
+            return false
+        }
+    }
+
+    // =========================================================================
     // WebSocket Client 包裝
     // =========================================================================
 
-    private class WebSocketClient(private val socket: Socket) {
+    private class WebSocketClient(
+        private val socket: Socket,
+        val sessionToken: String
+    ) {
         val address: String = socket.inetAddress?.hostAddress ?: "unknown"
         private val output: OutputStream = socket.getOutputStream()
 

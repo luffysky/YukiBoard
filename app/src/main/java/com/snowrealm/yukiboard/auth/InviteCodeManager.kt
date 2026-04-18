@@ -4,6 +4,9 @@ import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.snowrealm.yukiboard.BuildConfig
+import com.snowrealm.yukiboard.telemetry.Severity
+import com.snowrealm.yukiboard.telemetry.Telemetry
+import com.snowrealm.yukiboard.telemetry.TelemetryEvent
 import java.text.SimpleDateFormat
 import java.util.*
 import javax.crypto.Mac
@@ -30,7 +33,23 @@ class InviteCodeManager(context: Context) {
         )
     } catch (e: Exception) {
         android.util.Log.w("InviteCodeMgr", "EncryptedPrefs failed, fallback", e)
+        Telemetry.report(TelemetryEvent(
+            category = "SECURE_STORAGE",
+            severity = Severity.ERROR,
+            code = "INVITE_PREFS_FALLBACK_PLAIN",
+            extras = mapOf("exception" to e.javaClass.simpleName)
+        ))
         context.getSharedPreferences("yukiboard_invite_fallback", Context.MODE_PRIVATE)
+    }
+
+    init {
+        if (!BuildConfig.DEBUG && BuildConfig.INVITE_HMAC_SECRET == "yukiboard_dev_2026") {
+            Telemetry.report(TelemetryEvent(
+                category = "AUTH",
+                severity = Severity.ERROR,
+                code = "INVITE_DEV_SECRET_DETECTED"
+            ))
+        }
     }
 
     companion object {

@@ -1,6 +1,9 @@
 package com.snowrealm.yukiboard.currency
 
 import com.snowrealm.yukiboard.BuildConfig
+import com.snowrealm.yukiboard.telemetry.Severity
+import com.snowrealm.yukiboard.telemetry.Telemetry
+import com.snowrealm.yukiboard.telemetry.TelemetryEvent
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
@@ -34,17 +37,27 @@ class NewebpayClient {
     fun buildPaymentParams(amount: Int, orderId: String, email: String): PaymentParams? {
         if (!isConfigured) return null
 
-        val tradeInfo = buildTradeInfo(amount, orderId, email)
-        val encrypted = aesEncrypt(tradeInfo)
-        val tradeSha = sha256("HashKey=$hashKey&$encrypted&HashIV=$hashIv")
+        return try {
+            val tradeInfo = buildTradeInfo(amount, orderId, email)
+            val encrypted = aesEncrypt(tradeInfo)
+            val tradeSha = sha256("HashKey=$hashKey&$encrypted&HashIV=$hashIv")
 
-        return PaymentParams(
-            merchantId = merchantId,
-            tradeInfo = encrypted,
-            tradeSha = tradeSha,
-            version = "2.0",
-            postUrl = PAYMENT_URL
-        )
+            PaymentParams(
+                merchantId = merchantId,
+                tradeInfo = encrypted,
+                tradeSha = tradeSha,
+                version = "2.0",
+                postUrl = PAYMENT_URL
+            )
+        } catch (e: Exception) {
+            Telemetry.report(TelemetryEvent(
+                category = "PAYMENT",
+                severity = Severity.ERROR,
+                code = "NEWEBPAY_SIGN_FAIL",
+                extras = mapOf("exception" to e.javaClass.simpleName)
+            ))
+            null
+        }
     }
 
     /** Z幣兌換比率：1 TWD = 10 Z幣 */

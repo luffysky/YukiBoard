@@ -5,6 +5,9 @@ import android.content.SharedPreferences
 import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.snowrealm.yukiboard.telemetry.Severity
+import com.snowrealm.yukiboard.telemetry.Telemetry
+import com.snowrealm.yukiboard.telemetry.TelemetryEvent
 
 /**
  * Z幣錢包管理器 — 本地快取 + Supabase 同步。
@@ -29,6 +32,12 @@ class ZCoinManager(context: Context) {
         )
     } catch (e: Exception) {
         Log.w("ZCoinManager", "EncryptedSharedPreferences failed, fallback", e)
+        Telemetry.report(TelemetryEvent(
+            category = "SECURE_STORAGE",
+            severity = Severity.ERROR,
+            code = "ZCOIN_PREFS_FALLBACK_PLAIN",
+            extras = mapOf("exception" to e.javaClass.simpleName)
+        ))
         context.getSharedPreferences("yukiboard_zcoin", Context.MODE_PRIVATE)
     }
 

@@ -84,7 +84,9 @@ internal fun YukiBoardIMEService.unregisterClipboardFraudListener() {
     try {
         val cm = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
         cm?.removePrimaryClipChangedListener(listener)
-    } catch (_: Exception) { }
+    } catch (e: Exception) {
+        android.util.Log.w("IME", "unregisterClipboardFraudListener failed: ${e.message}", e)
+    }
     clipboardListener = null
 }
 
@@ -416,6 +418,10 @@ internal fun YukiBoardIMEService.updateRemotePanelState() {
         btState = btConn
         wifiState = wifiConn
         wifiUrl = wifiServer?.getConnectionUrl() ?: ""
+        wifiPin = wifiServer?.connectionPin ?: ""
+        authLevel = wifiServer?.authLevel
+            ?: btKeyboard?.authLevel
+            ?: com.snowrealm.yukiboard.remote.AuthLevel.NONE
         connectedDeviceName = btKeyboard?.connectedDevice?.name
             ?: wifiServer?.connectedDevice?.name ?: ""
         invalidate()

@@ -43,7 +43,7 @@ class LatinInputEngine(
                 }
                 loaded = true
             } catch (e: Exception) {
-                e.printStackTrace()
+                android.util.Log.w("LatinInputEngine", "loadDictionary($langId) failed: ${e.message}", e)
             }
         }
     }

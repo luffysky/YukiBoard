@@ -83,10 +83,24 @@ class KeyboardSoundEngine {
     /** 給外部（音樂面板）直接用頻率+音色播放 */
     fun playFreq(freq: Float, durationMs: Int = 300, style: ToneStyle = defaultStyle) {
         if (style in setOf(ToneStyle.DRUM, ToneStyle.EDRUM, ToneStyle.BEATBOX)) {
-            scope.launch { try { playPercussion(" ", durationMs, style) } catch (_: Exception) {} }
+            scope.launch {
+                try {
+                    playPercussion(" ", durationMs, style)
+                } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    android.util.Log.w("KeyboardSoundEngine", "playFreq/playPercussion failed: ${e.message}", e)
+                }
+            }
             return
         }
-        scope.launch { try { playTone(freq, durationMs, style) } catch (_: Exception) {} }
+        scope.launch {
+            try {
+                playTone(freq, durationMs, style)
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                android.util.Log.w("KeyboardSoundEngine", "playFreq/playTone failed: ${e.message}", e)
+            }
+        }
     }
 
     /** 給外部查音符名對應頻率 */
@@ -94,11 +108,25 @@ class KeyboardSoundEngine {
 
     fun playKeyTone(label: String, durationMs: Int = 120) {
         if (isPercussion) {
-            scope.launch { try { playPercussion(label, durationMs, defaultStyle) } catch (_: Exception) {} }
+            scope.launch {
+                try {
+                    playPercussion(label, durationMs, defaultStyle)
+                } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    android.util.Log.w("KeyboardSoundEngine", "playKeyTone/playPercussion failed: ${e.message}", e)
+                }
+            }
             return
         }
         val freq = keyNotes[label] ?: keyNotes[label.lowercase()] ?: C4
-        scope.launch { try { playTone(freq, durationMs, defaultStyle) } catch (_: Exception) {} }
+        scope.launch {
+            try {
+                playTone(freq, durationMs, defaultStyle)
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                android.util.Log.w("KeyboardSoundEngine", "playKeyTone/playTone failed: ${e.message}", e)
+            }
+        }
     }
 
     private suspend fun playTone(freq: Float, durationMs: Int, style: ToneStyle) {

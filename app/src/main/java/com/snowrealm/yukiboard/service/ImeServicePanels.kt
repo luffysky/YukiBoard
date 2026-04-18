@@ -205,6 +205,10 @@ internal fun YukiBoardIMEService.createHighDependencyPanelOrNull(panel: PanelTyp
             btState = btKeyboard?.connectionState ?: ConnectionState.IDLE,
             wifiState = wifiServer?.connectionState ?: ConnectionState.IDLE,
             wifiUrl = wifiServer?.getConnectionUrl() ?: "",
+            wifiPin = wifiServer?.connectionPin ?: "",
+            authLevel = wifiServer?.authLevel
+                ?: btKeyboard?.authLevel
+                ?: com.snowrealm.yukiboard.remote.AuthLevel.NONE,
             connectedDeviceName = btKeyboard?.connectedDevice?.name
                 ?: wifiServer?.connectedDevice?.name ?: "",
             onBluetoothToggle = { toggleBluetooth() },
@@ -234,7 +238,9 @@ internal fun YukiBoardIMEService.createHighDependencyPanelOrNull(panel: PanelTyp
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         }
                         startActivity(intent)
-                    } catch (_: Exception) {}
+                    } catch (e: Exception) {
+                        android.util.Log.w("YukiIME", "Launch BackgroundPicker (image) failed: ${e.message}", e)
+                    }
                 },
                 onPickVideo = {
                     try {
@@ -243,7 +249,9 @@ internal fun YukiBoardIMEService.createHighDependencyPanelOrNull(panel: PanelTyp
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         }
                         startActivity(intent)
-                    } catch (_: Exception) {}
+                    } catch (e: Exception) {
+                        android.util.Log.w("YukiIME", "Launch BackgroundPicker (video) failed: ${e.message}", e)
+                    }
                 },
                 onClearBackground = {
                     val dir = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getBackgroundDir(this)
@@ -476,7 +484,9 @@ internal fun YukiBoardIMEService.launchMidiImportFor(panel: MusicPanelView) {
         val intent = android.content.Intent(this, com.snowrealm.yukiboard.ui.MidiImportActivity::class.java)
         intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
         startActivity(intent)
-    } catch (_: Exception) {}
+    } catch (e: Exception) {
+        android.util.Log.w("YukiIME", "Launch MidiImportActivity failed: ${e.message}", e)
+    }
 }
 
 internal fun YukiBoardIMEService.extractPanelSourceText(): String {

@@ -6,6 +6,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.view.MotionEvent
 import android.view.View
+import com.snowrealm.yukiboard.remote.AuthLevel
 import com.snowrealm.yukiboard.remote.ConnectionState
 import com.snowrealm.yukiboard.remote.RemoteType
 import com.snowrealm.yukiboard.theme.KeyboardTheme
@@ -57,6 +58,11 @@ class RemoteKeyboardPanelView(context: Context) : View(context) {
         textAlign = Paint.Align.LEFT
         textSize = 11f * density
     }
+    private val pinPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.LEFT
+        textSize = 18f * density
+        typeface = android.graphics.Typeface.MONOSPACE
+    }
 
     var theme: KeyboardTheme = KeyboardTheme.default()
         set(value) { field = value; invalidate() }
@@ -69,6 +75,10 @@ class RemoteKeyboardPanelView(context: Context) : View(context) {
     var connectedDeviceName: String = ""
         set(value) { field = value; invalidate() }
     var wifiUrl: String = ""
+        set(value) { field = value; invalidate() }
+    var wifiPin: String = ""
+        set(value) { field = value; invalidate() }
+    var authLevel: AuthLevel = AuthLevel.NONE
         set(value) { field = value; invalidate() }
 
     // 回呼
@@ -87,7 +97,7 @@ class RemoteKeyboardPanelView(context: Context) : View(context) {
         val w = MeasureSpec.getSize(widthMeasureSpec).let {
             if (it > 0) it else resources.displayMetrics.widthPixels
         }
-        setMeasuredDimension(w, (200 * density).toInt())
+        setMeasuredDimension(w, (240 * density).toInt())
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -136,6 +146,24 @@ class RemoteKeyboardPanelView(context: Context) : View(context) {
         if (wifiUrl.isNotEmpty() && (wifiState == ConnectionState.LISTENING || wifiState == ConnectionState.CONNECTED)) {
             urlPaint.color = theme.candidateSelectedColorInt
             canvas.drawText("URL: $wifiUrl", 12 * density, statusY + 32 * density, urlPaint)
+        }
+
+        if (wifiPin.isNotEmpty() && wifiState == ConnectionState.LISTENING) {
+            pinPaint.color = theme.candidateSelectedColorInt
+            canvas.drawText("連線 PIN 碼: $wifiPin", 12 * density, statusY + 58 * density, pinPaint)
+        }
+
+        val authText = when (authLevel) {
+            AuthLevel.PIN_PLUS_SESSION -> "🔒 驗證: PIN + 連線金鑰"
+            AuthLevel.PIN -> "🔒 驗證: PIN"
+            AuthLevel.PAIRED_ONLY -> "🔒 驗證: 系統配對"
+            AuthLevel.NONE -> ""
+        }
+        if (authText.isNotEmpty()) {
+            statusPaint.color = theme.candidateTextColorInt
+            statusPaint.alpha = 170
+            canvas.drawText(authText, 12 * density, statusY + 80 * density, statusPaint)
+            statusPaint.alpha = 255
         }
     }
 

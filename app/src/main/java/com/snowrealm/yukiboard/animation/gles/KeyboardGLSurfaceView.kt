@@ -36,6 +36,13 @@ class KeyboardGLSurfaceView @JvmOverloads constructor(
     @Volatile private var surfaceWidth = 0
     @Volatile private var surfaceHeight = 0
 
+    // S11-5：VSYNC align 用的獨立 lock / tick 計數；
+    // 與 `this` lock（alpha=0 暫停 / setFlowAlpha / onPause）分開，
+    // 避免 alpha=0 等待被每幀 VSYNC 喚醒後空轉。
+    private val vsyncLock = Object()
+    @Volatile private var vsyncTick: Long = 0L
+    private var vsyncCallback: android.view.Choreographer.FrameCallback? = null
+
     init {
         isClickable = false
         isFocusable = false
@@ -62,6 +69,10 @@ class KeyboardGLSurfaceView @JvmOverloads constructor(
 
     fun onPause() {
         running = false
+        // S11-5：onPause 立即喚醒 render thread 可能的任一 wait（alpha=0 wait 或 VSYNC wait）
+        // 避免原本最壞要等 wait(2000) timeout 才退出 loop。
+        synchronized(this) { (this as Object).notifyAll() }
+        synchronized(vsyncLock) { (vsyncLock as Object).notifyAll() }
     }
 
     fun onResume() {
@@ -97,6 +108,8 @@ class KeyboardGLSurfaceView @JvmOverloads constructor(
         if (running) return
         running = true
 
+        startVsyncPump()
+
         renderThread = Thread({
             initEGL()
             try {
@@ -123,7 +136,11 @@ class KeyboardGLSurfaceView @JvmOverloads constructor(
 
                     if (!EGL14.eglSwapBuffers(eglDisplay, eglSurface)) break
 
-                    try { Thread.sleep(16) } catch (_: InterruptedException) { break }
+                    // S11-5：以 Choreographer VSYNC tick 驅動下一幀，
+                    // 取代固定 Thread.sleep(16)；
+                    // 上限 2 * TARGET_FRAME_NS 作 fallback，
+                    // 避免 VSYNC 停止（例如螢幕關閉 / Choreographer 未送達）時 render thread 永久卡住。
+                    if (!waitNextVsync()) break
                 }
             } finally {
                 releaseEGL()
@@ -131,10 +148,82 @@ class KeyboardGLSurfaceView @JvmOverloads constructor(
         }, "FlowLightGL").also { it.start() }
     }
 
+    /**
+     * S11-5：render thread 呼叫此方法阻塞等下一個 VSYNC tick；
+     * 回傳 `false` 代表 thread 被 interrupt，呼叫端應退出 render loop。
+     * 超時 fallback（2 * TARGET_FRAME_NS）正常返回 true，避免 VSYNC 停送時 thread 卡住。
+     */
+    private fun waitNextVsync(): Boolean {
+        val lastTick = vsyncTick
+        val deadlineNs = System.nanoTime() + TARGET_FRAME_NS * 2
+        synchronized(vsyncLock) {
+            while (running && vsyncTick == lastTick) {
+                val remainingNs = deadlineNs - System.nanoTime()
+                if (remainingNs <= 0L) break
+                val remainingMs = (remainingNs / 1_000_000L).coerceAtLeast(1L)
+                try {
+                    (vsyncLock as Object).wait(remainingMs)
+                } catch (_: InterruptedException) {
+                    return false
+                }
+            }
+        }
+        return true
+    }
+
+    /**
+     * S11-5：在 main thread 上以 Choreographer frame callback 持續送出 VSYNC tick，
+     * render thread 以 `vsyncLock` wait 等到 tick 前進才畫下一幀。
+     * 所有 Choreographer 呼叫都必須在具 Looper 的 thread 執行，這裡透過 main Looper 的 Handler 轉發。
+     */
+    private fun startVsyncPump() {
+        val cb = object : android.view.Choreographer.FrameCallback {
+            override fun doFrame(frameTimeNanos: Long) {
+                synchronized(vsyncLock) {
+                    vsyncTick++
+                    (vsyncLock as Object).notifyAll()
+                }
+                if (running) {
+                    android.view.Choreographer.getInstance().postFrameCallback(this)
+                }
+            }
+        }
+        vsyncCallback = cb
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            android.view.Choreographer.getInstance().postFrameCallback(cb)
+        }
+    }
+
+    private fun stopVsyncPump() {
+        val cb = vsyncCallback ?: return
+        vsyncCallback = null
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            android.view.Choreographer.getInstance().removeFrameCallback(cb)
+        }
+        // 叫醒 render thread 可能正在 VSYNC wait 的狀態，讓它看到 running=false 後退出。
+        synchronized(vsyncLock) { (vsyncLock as Object).notifyAll() }
+    }
+
     private fun stopRenderThread() {
         running = false
-        renderThread?.interrupt()
-        try { renderThread?.join(500) } catch (_: Exception) {}
+        // S11-5：先停 VSYNC pump，再喚醒兩個 lock 的 wait，保證 render thread 能盡快看到 running=false
+        stopVsyncPump()
+        val t = renderThread
+        if (t != null) {
+            synchronized(this) { (this as Object).notifyAll() }
+            t.interrupt()
+            try {
+                t.join(500)
+                // S11-5：join 超時代表 thread 可能仍在跑（EGL context 未釋放）；
+                // 記下來以便後續觀察，Sprint 12 再處理 startRenderThread 併發 race。
+                if (t.isAlive) {
+                    android.util.Log.w("FlowLightGL", "stopRenderThread: join timeout (500ms), thread still alive")
+                }
+            } catch (e: InterruptedException) {
+                android.util.Log.w("FlowLightGL", "stopRenderThread: interrupted while joining", e)
+                Thread.currentThread().interrupt()
+            }
+        }
         renderThread = null
     }
 
@@ -187,5 +276,11 @@ class KeyboardGLSurfaceView @JvmOverloads constructor(
             EGL14.eglTerminate(eglDisplay)
             eglDisplay = EGL14.EGL_NO_DISPLAY
         }
+    }
+
+    companion object {
+        // 60 FPS target frame period in nanoseconds (1_000_000_000 / 60)。
+        // 用作 VSYNC wait 的 fallback deadline 計算基準，不再拿來硬鎖 render 速率。
+        private const val TARGET_FRAME_NS = 16_666_666L
     }
 }

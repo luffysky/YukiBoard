@@ -5,6 +5,9 @@ import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.snowrealm.yukiboard.BuildConfig
+import com.snowrealm.yukiboard.telemetry.Severity
+import com.snowrealm.yukiboard.telemetry.Telemetry
+import com.snowrealm.yukiboard.telemetry.TelemetryEvent
 
 class AIProviderManager private constructor(context: Context) {
 
@@ -43,6 +46,12 @@ class AIProviderManager private constructor(context: Context) {
         )
     } catch (e: Exception) {
         android.util.Log.w("AIProviderMgr", "EncryptedPrefs failed, fallback", e)
+        Telemetry.report(TelemetryEvent(
+            category = "SECURE_STORAGE",
+            severity = Severity.ERROR,
+            code = "AI_KEY_PREFS_FALLBACK_PLAIN",
+            extras = mapOf("exception" to e.javaClass.simpleName)
+        ))
         context.getSharedPreferences("yukiboard_ai_fallback", Context.MODE_PRIVATE)
     }
 
