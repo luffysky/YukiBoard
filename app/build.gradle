@@ -35,8 +35,8 @@ android {
         applicationId "com.snowrealm.yukiboard"
         minSdk 26
         targetSdk 34
-        versionCode 165
-        versionName "0.11.0"
+        versionCode 166
+        versionName "0.11.1"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -82,11 +82,12 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- Sprint 10: auto commit path、settings consume rule、coroutine exception handler、InputRouter release、background updater receiver lifecycle、test baseline\n" +
-                    "- Sprint 11: 輸入引擎 case inventory、InputRouter / SmartInputManager / candidate dictionary 測試 baseline、silent catch first pass、TTS thread sleep fix、GL frame loop VSYNC 化\n" +
-                    "- Sprint 12: payment / API key audit、Newebpay 後端簽章 plan、API key release policy、remote keyboard 6-digit PIN + brute-force tracker + session token、telemetry facade 接 5 處關鍵錯誤\n" +
-                    "- 已知 deferred：S12-2 Android client payment refactor 與 S12-3.1 實作 round 將與 ZCoin wire-up 一併處理\n" +
-                    "- 不在本版內：Crashlytics / consent UX（留 Sprint 13+）"
+                    "- Sprint 12 fix: ImeServiceLifecycle 重複 null 判斷清理，warning 移除且不改 runtime 行為\n" +
+                    "- Sprint 13-0: 補齊 API Key 雲同步隱私條文，與實際加密儲存 / 還原流程對齊\n" +
+                    "- Sprint 13-0: 修正設定頁登入後仍回到藍色登入按鈕的狀態判斷，已登入時不再錯回未登入 UI\n" +
+                    "- Sprint 13-1: network_security_config 文件化收斂，明確標示 production HTTPS baseline、debug user CA 與 loopback cleartext 邊界\n" +
+                    "- Gate docs: 補建 Sprint12 gate fix、更新 Sprint13 / Sprint14 round gate、完成段落改為整段刪除線\n" +
+                    "- 已知進行中：S13-2 Fraud Report Privacy 尚未結案，本版未包含其 runtime 變更"
             }
         }
         debug {
@@ -95,11 +96,12 @@ android {
             firebaseAppDistribution {
                 groups = "testers"
                 releaseNotes = "v${android.defaultConfig.versionName}\n" +
-                    "- Sprint 10: auto commit path、settings consume rule、coroutine exception handler、InputRouter release、background updater receiver lifecycle、test baseline\n" +
-                    "- Sprint 11: 輸入引擎 case inventory、InputRouter / SmartInputManager / candidate dictionary 測試 baseline、silent catch first pass、TTS thread sleep fix、GL frame loop VSYNC 化\n" +
-                    "- Sprint 12: payment / API key audit、Newebpay 後端簽章 plan、API key release policy、remote keyboard 6-digit PIN + brute-force tracker + session token、telemetry facade 接 5 處關鍵錯誤\n" +
-                    "- 已知 deferred：S12-2 Android client payment refactor 與 S12-3.1 實作 round 將與 ZCoin wire-up 一併處理\n" +
-                    "- 不在本版內：Crashlytics / consent UX（留 Sprint 13+）"
+                    "- Sprint 12 fix: ImeServiceLifecycle 重複 null 判斷清理，warning 移除且不改 runtime 行為\n" +
+                    "- Sprint 13-0: 補齊 API Key 雲同步隱私條文，與實際加密儲存 / 還原流程對齊\n" +
+                    "- Sprint 13-0: 修正設定頁登入後仍回到藍色登入按鈕的狀態判斷，已登入時不再錯回未登入 UI\n" +
+                    "- Sprint 13-1: network_security_config 文件化收斂，明確標示 production HTTPS baseline、debug user CA 與 loopback cleartext 邊界\n" +
+                    "- Gate docs: 補建 Sprint12 gate fix、更新 Sprint13 / Sprint14 round gate、完成段落改為整段刪除線\n" +
+                    "- 已知進行中：S13-2 Fraud Report Privacy 尚未結案，本版未包含其 runtime 變更"
             }
         }
     }

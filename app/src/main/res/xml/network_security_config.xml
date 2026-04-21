@@ -1,22 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  YukiBoard Network Security Config
+  Owner: 鍵律 (Claude CCB) / 雪鑰 (Claude CCA) consume
+  Sprint 13 S13-1: Network security baseline
+
+  Sections:
+    1. base-config       — Production: HTTPS only, system CA
+    2. debug-overrides   — Debug builds: allow user-installed CA (proxy debugging)
+    3. domain-config     — Explicit cleartext allowlist (loopback only)
+-->
 <network-security-config>
-    <!-- Production: HTTPS only -->
+
+    <!-- 1. Production baseline: reject cleartext, trust system CA only. -->
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
     </base-config>
 
-    <!-- Debug: allow user-installed CA for proxy debugging -->
+    <!-- 2. Debug-only: accept user-installed CA for mitmproxy / Charles debugging.
+         Not applied in release builds. -->
     <debug-overrides>
         <trust-anchors>
             <certificates src="user" />
         </trust-anchors>
     </debug-overrides>
 
-    <!-- WiFi Keyboard Server and Faster-Whisper need local HTTP -->
+    <!-- 3. Cleartext allowlist — loopback only.
+         Reason: WifiKeyboardServer binds http://<LAN-IP>:<port> (configurable,
+         default 8765) and also accepts loopback (localhost / 127.0.0.1) for
+         on-device debug tooling and for Faster-Whisper local inference server.
+         No external host is permitted.
+         includeSubdomains="false": literal hostnames only, no wildcard. -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="false">localhost</domain>
         <domain includeSubdomains="false">127.0.0.1</domain>
     </domain-config>
+
 </network-security-config>

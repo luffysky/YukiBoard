@@ -81,9 +81,9 @@ class AuthSettingsSection(
      * 由 SettingsScreenCoordinator 驗證 session 後回呼，更新 auth UI。
      * 取代原本 section 內獨立的 fetchMe() 呼叫。
      */
-    fun onSessionVerified(isConnected: Boolean, displayName: String?) {
+    fun onSessionVerified(isConnected: Boolean, displayName: String?, localIsLoggedIn: Boolean) {
         if (!::authBtn.isInitialized) return
-        updateAuthUI(isConnected, displayName)
+        updateAuthUI(isConnected || localIsLoggedIn, displayName)
     }
 
     private fun updateAuthUI(loggedIn: Boolean, displayName: String?) {

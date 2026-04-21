@@ -110,7 +110,7 @@ internal fun YukiBoardIMEService.setupKeyboardOverlays() {
     bgView.offsetY = prefs.bgOffsetY
     val savedBg = com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.getSavedBackground(this)
     val useCustomBg = prefs.useCustomBackground && savedBg != null
-    if (useCustomBg && savedBg != null) {
+    if (useCustomBg) {
         if (com.snowrealm.yukiboard.ui.keyboard.KeyboardBackgroundView.isVideoFile(savedBg)) {
             bgView.setVideoBackground(savedBg)
         } else {

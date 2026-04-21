@@ -51,7 +51,7 @@ li { margin-bottom: 4px; }
 <ul>
 <li>本機資料使用 Android SharedPreferences 儲存，敏感資料使用 EncryptedSharedPreferences</li>
 <li>網路通訊強制使用 HTTPS（TLS 1.2+）</li>
-<li>API Key 由使用者自行管理，不儲存於我們的伺服器</li>
+<li>API Key 由使用者自行管理。若使用者主動啟用雲端同步，我們會以加密形式儲存於伺服器；伺服器端無法直接得知原始 API Key，僅在使用者於自己的裝置還原時才會解密使用。</li>
 <li>藍牙 HID 鍵盤通訊使用標準 BLE 加密</li>
 </ul>
 

@@ -329,7 +329,7 @@ class SettingsActivity : AppCompatActivity() {
         activityScope.launch {
             settingsCoordinator.verifySessionAsync()
             val state = settingsCoordinator.uiState.value
-            authSection.onSessionVerified(state.isInsightConnected, state.verifiedDisplayName)
+            authSection.onSessionVerified(state.isInsightConnected, state.verifiedDisplayName, state.isLoggedIn)
             syncSection?.onSessionVerified(state.isInsightConnected, state.verifiedDisplayName, state.isLoggedIn)
         }
     }
